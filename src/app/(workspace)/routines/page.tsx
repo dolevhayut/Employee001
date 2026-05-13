@@ -700,7 +700,7 @@ function CreateRoutineModal({
               <textarea
                 value={task}
                 onChange={(e) => setTask(e.target.value)}
-                placeholder="Send a daily summary email to dolev@... with all open GitHub issues on Employee001."
+                placeholder="Send me a daily summary email with all open GitHub issues assigned to me."
                 rows={3}
                 style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 }}
               />

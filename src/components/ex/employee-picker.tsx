@@ -23,7 +23,7 @@ function statusLabel(emp: EmployeeWithTwin): string {
 export function EmployeePicker({ onSelect }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeId = searchParams.get("employee") ?? "dolev-hayut";
+  const activeId = searchParams.get("employee") ?? EMPLOYEES_WITH_TWIN[0]?.id ?? "";
   const active = getEmployee(activeId) ?? EMPLOYEES_WITH_TWIN[0];
 
   const [open, setOpen] = useState(false);
@@ -41,12 +41,33 @@ export function EmployeePicker({ onSelect }: Props) {
   }, [open]);
 
   function pick(emp: EmployeeWithTwin) {
-    if (emp.twinStatus !== "ready" && emp.id !== active.id) {
+    if (emp.twinStatus !== "ready" && emp.id !== active?.id) {
       // For non-ready employees, still allow selection so the banner shows.
     }
     setOpen(false);
     router.replace(`/flow?employee=${emp.id}`);
     onSelect?.(emp.id);
+  }
+
+  // No employees onboarded yet — render a quiet placeholder rather than crash.
+  // This is the fresh-install state (EMPLOYEE001_DEMO=false and no real
+  // employees added). Hooks above are unconditional so this early return is safe.
+  if (!active) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--sp-8)",
+          padding: "4px 10px",
+          fontFamily: '"Manrope", sans-serif',
+          fontSize: "var(--fs-ui)",
+          color: "#9A9490",
+        }}
+      >
+        No employees yet
+      </div>
+    );
   }
 
   return (

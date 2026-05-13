@@ -47,9 +47,11 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const employeeId = body.employeeId || "dolev-hayut";
+  const employeeId = body.employeeId;
   const employee =
-    EMPLOYEES_WITH_TWIN.find((e) => e.id === employeeId) ??
+    (employeeId
+      ? EMPLOYEES_WITH_TWIN.find((e) => e.id === employeeId)
+      : undefined) ??
     EMPLOYEES_WITH_TWIN.find(
       (e) => e.twinStatus === "ready" && hasEmployeeFiles(e.id)
     );

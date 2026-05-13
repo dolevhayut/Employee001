@@ -547,10 +547,13 @@ export default function MarketplacePage() {
 
     const owner = defaultOwnerFor(agent);
     setPendingAgent(agent);
+    // If no employees onboarded yet (fresh install, no demo), leave the
+    // responsible-employee fields empty. The dropdown lets the user pick,
+    // and the Confirm button is disabled on falsy responsibleEmployeeId.
     setPlacementDraft({
       employmentKind: "external_consultant",
-      responsibleEmployeeId: owner?.id ?? "dolev-hayut",
-      responsibleEmployeeName: owner?.name ?? "Dolev Hayut",
+      responsibleEmployeeId: owner?.id ?? "",
+      responsibleEmployeeName: owner?.name ?? "",
       teamName: agent.department,
       teammateIds: owner ? [owner.id] : [],
       teammateNames: owner ? [owner.name] : [],

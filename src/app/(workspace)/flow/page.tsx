@@ -21,7 +21,7 @@ const READY_EMPLOYEES = EMPLOYEES_WITH_TWIN.filter(
 
 export default function FlowPage() {
   const [activeId, setActiveId] = useState<string>(
-    READY_EMPLOYEES[0]?.id ?? "dolev-hayut"
+    READY_EMPLOYEES[0]?.id ?? "",
   );
   const [graph, setGraph] = useState<EmployeeGraph | null>(null);
   const [graphLoading, setGraphLoading] = useState(true);
@@ -99,6 +99,11 @@ export default function FlowPage() {
       cited: new Set(),
     });
     setOpenFile(null);
+
+    if (!activeId) {
+      setGraphLoading(false);
+      return;
+    }
 
     fetch(`/api/employees/${encodeURIComponent(activeId)}/graph`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))

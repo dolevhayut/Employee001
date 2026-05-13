@@ -2418,7 +2418,7 @@ export default function CouncilPage() {
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Raise a problem… use @amir, @noa, or @dana to address a specific twin"
+            placeholder="Raise a problem… mention @twin-name to address a specific twin"
             style={{
               flex: 1,
               border: "none",

@@ -188,7 +188,7 @@ function IntegrationRow({
 function DashboardContent() {
   const params = useSearchParams();
   const router = useRouter();
-  const employeeId = params.get("employee") ?? "dolev-hayut";
+  const employeeId = params.get("employee") ?? EMPLOYEES[0]?.id ?? "";
   const employee = EMPLOYEES.find((e) => e.id === employeeId) ?? EMPLOYEES[0];
 
   const [phase, setPhase] = useState<"loading" | "done">("loading");
