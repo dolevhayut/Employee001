@@ -76,9 +76,30 @@ function OnboardingPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const empId = searchParams.get("employee") ?? "";
+  const inviteToken = searchParams.get("invite") ?? "";
   const emp = EMPLOYEES.find((e) => e.id === empId);
-  const defaultName = emp?.name ?? "Sarah Chen";
-  const defaultRole = emp?.role ?? "Head of Engineering";
+  // If we arrived via an invite, the CEO may have given us a name/role hint.
+  // Fetched lazily below so the initial render still has values.
+  const [inviteHint, setInviteHint] = useState<{ name?: string; role?: string }>({});
+  useEffect(() => {
+    if (!inviteToken) return;
+    let cancelled = false;
+    fetch(`/api/invites/${encodeURIComponent(inviteToken)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        if (d?.status === "redeemable" && d.invite) {
+          setInviteHint({ name: d.invite.name, role: d.invite.role });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [inviteToken]);
+
+  const defaultName = emp?.name ?? inviteHint.name ?? "Sarah Chen";
+  const defaultRole = emp?.role ?? inviteHint.role ?? "Head of Engineering";
   const defaultChannel = emp
     ? `ask-${emp.name.split(" ")[0].toLowerCase()}`
     : "ask-sarah";
@@ -110,7 +131,47 @@ function OnboardingPageInner() {
     roadmap: false,
   });
 
-  const onFinish = () => router.push("/generation");
+  // Once the form is hydrated, populate from the invite hint so the employee
+  // sees their CEO-provided name/role pre-filled rather than the placeholder.
+  useEffect(() => {
+    if (inviteHint.name) setName(inviteHint.name);
+    if (inviteHint.role) setRole(inviteHint.role);
+  }, [inviteHint.name, inviteHint.role]);
+
+  const onFinish = async () => {
+    // No invite → legacy path (CEO running it themselves for an internal
+    // demo). Just route forward.
+    if (!inviteToken) {
+      router.push("/generation");
+      return;
+    }
+    // Invite-bearing finish → call the complete API. This writes the
+    // employee record to data/employees/ and marks the invite as used.
+    try {
+      const res = await fetch(
+        `/api/invites/${encodeURIComponent(inviteToken)}/complete`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            role,
+            // Profile bodies will land here in a follow-up that wires the
+            // wizard's collected text into proper markdown files. For v0.1
+            // we ship placeholder files; the CEO can fill them in later.
+          }),
+        },
+      );
+      const data = await res.json();
+      if (data?.employeeId) {
+        router.push(`/employees`);
+      } else {
+        router.push("/generation");
+      }
+    } catch {
+      router.push("/generation");
+    }
+  };
   const firstName = name.split(" ")[0] || "the employee";
 
   const sidebarNote =

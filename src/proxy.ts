@@ -78,12 +78,39 @@ function firstVisitRedirect(request: NextRequest): NextResponse | null {
   return NextResponse.redirect(url);
 }
 
+// Invite tokens bypass the LAN-token gate on /join and the invite endpoints
+// (validate + complete). The invite token IS the auth — the CEO chose to
+// hand it out, so its bearer is allowed to walk through the door once.
+function isInvitePath(pathname: string): boolean {
+  if (pathname === "/join") return true;
+  if (pathname === "/onboarding") return true;
+  if (pathname.startsWith("/api/invites/")) return true;
+  return false;
+}
+
+function extractInviteToken(request: NextRequest): string | undefined {
+  const q = request.nextUrl.searchParams.get("invite");
+  if (q && q.startsWith("inv_")) return q;
+  const path = request.nextUrl.pathname;
+  // /api/invites/<token>[/complete]
+  const m = path.match(/^\/api\/invites\/(inv_[a-f0-9]+)(\/|$)/);
+  return m?.[1];
+}
+
 export function proxy(request: NextRequest) {
   const welcome = firstVisitRedirect(request);
   if (welcome) return welcome;
 
   const bind = process.env.EMPLOYEE001_BIND;
   if (isLoopbackBind(bind)) {
+    return NextResponse.next();
+  }
+
+  // Invite-token bypass: the bearer of a valid invite token can reach the
+  // employee-onboarding surface without holding the workspace's LAN token.
+  // The shape check here is structural only — full redeemability (expiry,
+  // already-used) is enforced by the route handlers themselves.
+  if (isInvitePath(request.nextUrl.pathname) && extractInviteToken(request)) {
     return NextResponse.next();
   }
 

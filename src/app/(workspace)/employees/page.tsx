@@ -14,6 +14,7 @@ import {
   type EmployeeWithTwin,
   type TwinStatus,
 } from "@/lib/employees";
+import type { Invite } from "@/lib/invites";
 
 const MARKETPLACE_ID_PREFIX = "marketplace-";
 
@@ -627,7 +628,229 @@ function EmployeeCard({
   );
 }
 
+function inviteUrl(token: string): string {
+  if (typeof window === "undefined") return `/join?invite=${token}`;
+  return `${window.location.origin}/join?invite=${token}`;
+}
+
+function InvitePanel({
+  invites,
+  onInvitesChanged,
+}: {
+  invites: Invite[];
+  onInvitesChanged: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+
+  const pending = invites.filter((i) => !i.completedAt);
+
+  async function createInvite() {
+    setCreating(true);
+    try {
+      const res = await fetch("/api/invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), role: role.trim() }),
+      });
+      if (!res.ok) throw new Error("create_failed");
+      setName("");
+      setRole("");
+      onInvitesChanged();
+    } catch {
+      // No-op: a follow-up call to onInvitesChanged() refreshes from the
+      // server. Surfacing a toast here would need a toast system this page
+      // doesn't have today.
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function revoke(token: string) {
+    try {
+      await fetch(`/api/invites/${token}`, { method: "DELETE" });
+      onInvitesChanged();
+    } catch {
+      // ignore — the next refresh will reflect reality
+    }
+  }
+
+  async function copy(token: string) {
+    const url = inviteUrl(token);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedToken(token);
+      setTimeout(
+        () => setCopiedToken((t) => (t === token ? null : t)),
+        1800,
+      );
+    } catch {
+      window.prompt("Copy this link:", url);
+    }
+  }
+
+  return (
+    <div
+      className="card"
+      style={{
+        padding: "var(--sp-16)",
+        marginBottom: "var(--sp-20)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "var(--fs-sm)",
+          fontWeight: 600,
+          marginBottom: "var(--sp-10)",
+        }}
+      >
+        Invite an employee
+      </div>
+      <div
+        style={{
+          fontSize: "var(--fs-meta)",
+          color: "var(--text-subtle)",
+          marginBottom: "var(--sp-14)",
+        }}
+      >
+        Generate a one-time link. Share it on Slack, WhatsApp, or however you
+        normally reach the person. The link works on this local network only.
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "var(--sp-8)",
+          alignItems: "center",
+          marginBottom: pending.length ? "var(--sp-14)" : 0,
+        }}
+      >
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name (optional)"
+          style={{
+            flex: "1 1 200px",
+            height: 32,
+            padding: "0 10px",
+            border: "1px solid var(--hairline-strong)",
+            borderRadius: 6,
+            background: "var(--surface)",
+            fontSize: "var(--fs-sm)",
+          }}
+        />
+        <input
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          placeholder="Role (optional)"
+          style={{
+            flex: "1 1 200px",
+            height: 32,
+            padding: "0 10px",
+            border: "1px solid var(--hairline-strong)",
+            borderRadius: 6,
+            background: "var(--surface)",
+            fontSize: "var(--fs-sm)",
+          }}
+        />
+        <button
+          type="button"
+          onClick={createInvite}
+          disabled={creating}
+          className="btn primary"
+          style={{ height: 32 }}
+        >
+          <Icons.Plus size={13} /> {creating ? "Creating…" : "Create invite"}
+        </button>
+      </div>
+
+      {pending.length > 0 && (
+        <div style={{ display: "grid", gap: "var(--sp-6)" }}>
+          {pending.map((inv) => {
+            const url = inviteUrl(inv.token);
+            const copied = copiedToken === inv.token;
+            return (
+              <div
+                key={inv.token}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--sp-8)",
+                  padding: "8px 10px",
+                  background: "var(--bg-sunken)",
+                  borderRadius: 6,
+                  fontSize: "var(--fs-meta)",
+                }}
+              >
+                <div
+                  style={{
+                    minWidth: 0,
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: "var(--text)" }}>
+                    {inv.name || "Unnamed invite"}
+                    {inv.role ? ` · ${inv.role}` : ""}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-mono, ui-monospace, monospace)",
+                      color: "var(--text-subtle)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {url}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copy(inv.token)}
+                  className="btn ghost"
+                  style={{ height: 28, fontSize: "var(--fs-meta)" }}
+                >
+                  {copied ? <Icons.Check size={12} /> : null}
+                  {copied ? "Copied" : "Copy link"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => revoke(inv.token)}
+                  className="btn ghost"
+                  style={{
+                    height: 28,
+                    fontSize: "var(--fs-meta)",
+                    color: "var(--danger, #A04B3D)",
+                  }}
+                  title="Revoke this invite — link stops working immediately"
+                >
+                  Revoke
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EmployeesPage() {
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const refreshInvites = useCallback(() => {
+    fetch("/api/invites")
+      .then((r) => r.json())
+      .then((data: { invites?: Invite[] }) => setInvites(data.invites ?? []))
+      .catch(() => setInvites([]));
+  }, []);
+  useEffect(refreshInvites, [refreshInvites]);
+
   const [filter, setFilter] = useState<FilterKey>("all");
   const [query, setQuery] = useState("");
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -712,9 +935,19 @@ export default function EmployeesPage() {
             <Link href="/marketplace" className="btn ghost" style={{ textDecoration: "none" }}>
               <Icons.Store size={13} /> Marketplace
             </Link>
-            <Link href="/clone" className="btn primary" style={{ textDecoration: "none" }}>
-              <Icons.Plus size={13} /> Clone employee
-            </Link>
+            <a
+              href="#invite"
+              className="btn primary"
+              style={{ textDecoration: "none" }}
+              onClick={(e) => {
+                e.preventDefault();
+                document
+                  .getElementById("invite")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              <Icons.Plus size={13} /> Invite employee
+            </a>
           </div>
         }
       />
@@ -765,6 +998,11 @@ export default function EmployeesPage() {
             tone="idle"
             border
           />
+        </div>
+
+        {/* Invite panel — anchored so the topbar CTA can scroll to it */}
+        <div id="invite">
+          <InvitePanel invites={invites} onInvitesChanged={refreshInvites} />
         </div>
 
         {/* Search + filter row */}
@@ -886,7 +1124,9 @@ export default function EmployeesPage() {
           >
             <Icons.Search size={20} style={{ marginBottom: "var(--sp-10)", opacity: 0.5 }} />
             <div style={{ fontSize: "var(--fs-ui)" }}>
-              No employees match {query ? `"${query}"` : "this filter"}.
+              {allEmployees.length === 0
+                ? "No employees onboarded yet. Create an invite above and share the link with the first person you want a twin of."
+                : `No employees match ${query ? `"${query}"` : "this filter"}.`}
             </div>
           </div>
         ) : (
