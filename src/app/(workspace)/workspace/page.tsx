@@ -6,22 +6,13 @@ import { Topbar } from "@/components/ex/shell";
 import { PageHead } from "@/components/ex/page-head";
 import { EMPLOYEES_WITH_TWIN, CLAUDE_MODELS, type ClaudeModel } from "@/lib/employees";
 
-// Base costs derived from Opus 4.7 pricing
-const BASE_SEED: Record<string, number> = {
-  "dolev-hayut":   44.80,
-  "noa-levi":     26.80,
-  "dana-shapira": 19.40,
-};
-const BASE_MONTHLY: Record<string, number> = {
-  "dolev-hayut":   32.00,
-  "noa-levi":     28.00,
-  "dana-shapira": 24.00,
-};
-const ONBOARD_DATE: Record<string, string> = {
-  "dolev-hayut":   "2026-03-01",
-  "noa-levi":     "2026-03-15",
-  "dana-shapira": "2026-03-22",
-};
+// Per-employee budget/cost baselines. Originally seeded from demo data;
+// now driven entirely by the employee record (added by the CEO at runtime).
+// This page filters its list on BASE_SEED having an entry, so an empty map
+// produces a clean "no employees billed yet" empty state.
+const BASE_SEED: Record<string, number> = {};
+const BASE_MONTHLY: Record<string, number> = {};
+const ONBOARD_DATE: Record<string, string> = {};
 
 const MODELS_STORAGE_KEY = "employee001.models.v1";
 const TODAY = new Date("2026-04-30");

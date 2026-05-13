@@ -5,10 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Icons } from "@/components/ex/icons";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { INTEGRATIONS, type Integration } from "@/lib/ex-data";
-import { EMPLOYEES } from "@/lib/demo";
 import {
   CONSENT_SCOPES,
   CURRENT_CONSENT_VERSION,
+  EMPLOYEES,
   type ConsentScope,
 } from "@/lib/employees";
 

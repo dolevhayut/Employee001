@@ -50,8 +50,8 @@ export function EmployeePicker({ onSelect }: Props) {
   }
 
   // No employees onboarded yet — render a quiet placeholder rather than crash.
-  // This is the fresh-install state (EMPLOYEE001_DEMO=false and no real
-  // employees added). Hooks above are unconditional so this early return is safe.
+  // This is the fresh-install state, before the CEO adds any employees.
+  // Hooks above are unconditional so this early return is safe.
   if (!active) {
     return (
       <div

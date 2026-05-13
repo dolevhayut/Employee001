@@ -124,10 +124,6 @@ export default async function doctor() {
     }
   }
 
-  // Demo mode
-  if (env.EMPLOYEE001_DEMO === "true") warn("Demo mode", "ON — demo personas will appear on boot");
-  else ok("Demo mode", "off — fresh workspace");
-
   // data/ writable
   const dataDir = resolve(process.cwd(), "data");
   if (!existsSync(dataDir)) {

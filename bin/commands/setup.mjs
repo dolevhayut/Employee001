@@ -116,16 +116,6 @@ export default async function setup() {
     return;
   }
 
-  const includeDemo = await p.confirm({
-    message:
-      "Load demo personas (Dolev, Noa, Dana, …) to explore the product? You can remove them anytime.",
-    initialValue: false,
-  });
-  if (p.isCancel(includeDemo)) {
-    p.cancel("Setup cancelled");
-    return;
-  }
-
   // Always generate (or preserve) an access token. It's a no-op when bound
   // to 127.0.0.1; it becomes the LAN gate the moment the user flips bind to
   // 0.0.0.0, with no second setup step required.
@@ -154,9 +144,6 @@ export default async function setup() {
     "",
     "# Local server port.",
     `PORT=${port}`,
-    "",
-    "# Set to \"true\" to load demo personas on boot. Leave \"false\" for a real install.",
-    `EMPLOYEE001_DEMO=${includeDemo ? "true" : "false"}`,
     "",
   ];
 

@@ -1,13 +1,7 @@
-export type Employee = {
-  id: string;
-  name: string;
-  firstName: string;
-  role: string;
-  department: string;
-  initials: string;
-  avatarColor: string;
-  integrations: string[];
-};
+// Integration metadata. Originally part of a richer demo dataset; the demo
+// employees and animated onboarding have been removed. Only this map remains
+// because the workspace pages (join, employees) reference it for icons,
+// labels, and colors per provider.
 
 export type Integration = {
   id: string;
@@ -16,65 +10,12 @@ export type Integration = {
   color: string;
   bgColor: string;
   unit: string;
+  /** Approximate item count, used only by legacy display code. */
   totalItems: number;
-  startDelay: number; // ms before bar begins filling
-  duration: number;   // ms to fill completely
   icon: string;
-  simpleIconSlug: string; // slug for https://cdn.simpleicons.org/{slug}/0A0A0A
+  /** Slug for https://cdn.simpleicons.org/{slug}/0A0A0A */
+  simpleIconSlug: string;
 };
-
-export const EMPLOYEES: Employee[] = [
-  {
-    id: "dolev-hayut",
-    name: "Dolev Hayut",
-    firstName: "Dolev",
-    role: "CTO",
-    department: "Engineering",
-    initials: "DH",
-    avatarColor: "#A8B4C4",
-    integrations: ["github", "slack", "linear", "jira", "zoom"],
-  },
-  {
-    id: "noa-levi",
-    name: "Noa Levi",
-    firstName: "Noa",
-    role: "Product Manager",
-    department: "Product",
-    initials: "NL",
-    avatarColor: "#C4A8B8",
-    integrations: ["linear", "slack", "gmail", "zoom", "meet"],
-  },
-  {
-    id: "dana-shapira",
-    name: "Dana Shapira",
-    firstName: "Dana",
-    role: "Marketing Manager",
-    department: "Marketing",
-    initials: "DS",
-    avatarColor: "#B8C4A8",
-    integrations: ["slack", "gmail", "linear", "zoom", "outlook"],
-  },
-  {
-    id: "lior-ben-david",
-    name: "Lior Ben-David",
-    firstName: "Lior",
-    role: "Backend Developer",
-    department: "Engineering",
-    initials: "LB",
-    avatarColor: "#A8C4B8",
-    integrations: ["github", "slack", "linear"],
-  },
-  {
-    id: "tamar-dvir",
-    name: "Tamar Dvir",
-    firstName: "Tamar",
-    role: "Frontend Developer",
-    department: "Engineering",
-    initials: "TD",
-    avatarColor: "#C4B8A8",
-    integrations: ["github", "slack", "linear", "figma"],
-  },
-];
 
 export const INTEGRATIONS: Record<string, Integration> = {
   gmail: {
@@ -85,8 +26,6 @@ export const INTEGRATIONS: Record<string, Integration> = {
     bgColor: "#FEF2F0",
     unit: "emails",
     totalItems: 2847,
-    startDelay: 0,
-    duration: 9000,
     icon: "mail",
     simpleIconSlug: "gmail",
   },
@@ -98,8 +37,6 @@ export const INTEGRATIONS: Record<string, Integration> = {
     bgColor: "#F9F0FA",
     unit: "messages",
     totalItems: 12391,
-    startDelay: 800,
-    duration: 13000,
     icon: "message-square",
     simpleIconSlug: "slack",
   },
@@ -111,8 +48,6 @@ export const INTEGRATIONS: Record<string, Integration> = {
     bgColor: "#F6F8FA",
     unit: "commits",
     totalItems: 847,
-    startDelay: 1800,
-    duration: 7000,
     icon: "git-branch",
     simpleIconSlug: "github",
   },
@@ -124,8 +59,6 @@ export const INTEGRATIONS: Record<string, Integration> = {
     bgColor: "#F0F4FF",
     unit: "tickets",
     totalItems: 234,
-    startDelay: 2400,
-    duration: 8000,
     icon: "layout-grid",
     simpleIconSlug: "jira",
   },
@@ -137,8 +70,6 @@ export const INTEGRATIONS: Record<string, Integration> = {
     bgColor: "#F2F3FD",
     unit: "issues",
     totalItems: 312,
-    startDelay: 1200,
-    duration: 10000,
     icon: "zap",
     simpleIconSlug: "linear",
   },
@@ -150,8 +81,6 @@ export const INTEGRATIONS: Record<string, Integration> = {
     bgColor: "#F0F7FF",
     unit: "meetings",
     totalItems: 89,
-    startDelay: 3200,
-    duration: 6000,
     icon: "video",
     simpleIconSlug: "zoom",
   },
@@ -163,8 +92,6 @@ export const INTEGRATIONS: Record<string, Integration> = {
     bgColor: "#F0FAF4",
     unit: "meetings",
     totalItems: 67,
-    startDelay: 3800,
-    duration: 5500,
     icon: "video",
     simpleIconSlug: "googlemeet",
   },
@@ -176,31 +103,7 @@ export const INTEGRATIONS: Record<string, Integration> = {
     bgColor: "#F0F7FF",
     unit: "emails",
     totalItems: 1893,
-    startDelay: 1000,
-    duration: 11000,
     icon: "mail",
     simpleIconSlug: "microsoftoutlook",
   },
 };
-
-export const PROCESSING_MESSAGES = [
-  "Reading communication patterns…",
-  "Analyzing decision-making style…",
-  "Mapping expertise areas…",
-  "Processing meeting transcripts…",
-  "Learning response tendencies…",
-  "Identifying knowledge graph…",
-  "Calibrating voice & tone…",
-  "Building context memory…",
-  "Synthesizing work patterns…",
-  "Finalizing twin model…",
-];
-
-export const ONBOARDING_STEPS = [
-  { id: "welcome" },
-  { id: "gmail" },
-  { id: "slack" },
-  { id: "github" },
-  { id: "zoom" },
-  { id: "done" },
-];

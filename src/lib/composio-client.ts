@@ -12,11 +12,11 @@ import type { McpSdkServerConfigWithInstance } from "@anthropic-ai/claude-agent-
 // Curated so each twin can't act outside its functional area.
 // Toolkit slugs come from https://docs.composio.dev/toolkits
 
-const ROLE_TOOLKITS: Record<string, string[]> = {
-  "dolev-hayut": ["github", "linear", "slack", "googlecalendar"],
-  "noa-levi": ["linear", "notion", "slack", "gmail", "googlecalendar"],
-  "dana-shapira": ["hubspot", "slack", "gmail", "linkedin"],
-};
+// Per-employee toolkit allow-lists are configured at runtime through the
+// /connections UI and persisted in data/employees/{id}/. This in-memory map
+// is just a session cache; on cold start it's empty and the default
+// allow-list applies until the CEO picks specific toolkits per role.
+const ROLE_TOOLKITS: Record<string, string[]> = {};
 
 const DEFAULT_TOOLKITS = ["slack", "gmail"];
 
