@@ -69,8 +69,28 @@ jobs:
       - name: Pack (dry run, for log inspection)
         run: npm pack --dry-run
 
+      - name: Determine npm dist-tag from version
+        id: npm_tag
+        run: |
+          # 0.1.0-rc.6  → rc
+          # 0.1.0-alpha → alpha
+          # 0.1.0-beta  → beta
+          # 0.1.0       → latest (default)
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$PKG_VERSION" == *"-rc."* || "$PKG_VERSION" == *"-rc"* ]]; then
+            DIST_TAG="rc"
+          elif [[ "$PKG_VERSION" == *"-alpha"* ]]; then
+            DIST_TAG="alpha"
+          elif [[ "$PKG_VERSION" == *"-beta"* ]]; then
+            DIST_TAG="beta"
+          else
+            DIST_TAG="latest"
+          fi
+          echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
+          echo "Will publish $PKG_VERSION under dist-tag: $DIST_TAG"
+
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --tag ${{ steps.npm_tag.outputs.dist_tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -79,7 +99,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF##refs/tags/}"
+          PRERELEASE_FLAG=""
+          if [ "${{ steps.npm_tag.outputs.dist_tag }}" != "latest" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
           gh release create "$TAG" \
             --title "$TAG" \
             --generate-notes \
-            --verify-tag
+            --verify-tag \
+            $PRERELEASE_FLAG
