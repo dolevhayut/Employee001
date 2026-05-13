@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-// Loaded inline so the serif appears even though the root layout has no
-// font setup. Browser falls through to system serif while it streams.
+// Manrope + Instrument Serif are loaded at the root layout
+// (src/app/layout.tsx) and exposed as CSS variables. These pages reference
+// them so the brand fonts apply consistently across welcome, join, and the
+// rest of the app.
 const SERIF_FONT =
-  '"Instrument Serif", ui-serif, Georgia, Cambria, "Times New Roman", serif';
+  'var(--font-instrument-serif), "Instrument Serif", ui-serif, Georgia, serif';
 const SANS_FONT =
-  'ui-sans-serif, -apple-system, "Manrope", system-ui, sans-serif';
+  'var(--font-manrope), "Manrope", ui-sans-serif, system-ui, sans-serif';
 
 // Shown once on first-run after `npx employee001 setup && npx employee001 start`.
 // The proxy redirects "/" here unless the `e001_welcomed` cookie is set.

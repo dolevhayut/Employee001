@@ -1,20 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope, Instrument_Serif } from "next/font/google";
 import { LandingPage } from "@/components/landing/LandingPage";
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
-  display: "swap",
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-instrument-serif",
-});
 
 export const metadata: Metadata = {
   title: "Employee001 — Organizational brain for modern companies",
@@ -28,9 +13,11 @@ export const metadata: Metadata = {
   },
 };
 
+// Fonts (Manrope + Instrument Serif) are loaded at the root layout and
+// exposed as CSS variables — see src/app/layout.tsx.
 export default function Home() {
   return (
-    <div className={`${manrope.className} ${instrumentSerif.variable} landing-root`}>
+    <div className="landing-root">
       <LandingPage />
     </div>
   );

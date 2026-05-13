@@ -20,10 +20,11 @@ type ValidateResponse =
   | { status: "expired"; invite: InviteShape }
   | { status: "not_found" };
 
+// Fonts loaded at the root layout (src/app/layout.tsx).
 const SANS_FONT =
-  'ui-sans-serif, -apple-system, "Manrope", system-ui, sans-serif';
+  'var(--font-manrope), "Manrope", ui-sans-serif, system-ui, sans-serif';
 const SERIF_FONT =
-  '"Instrument Serif", ui-serif, Georgia, Cambria, "Times New Roman", serif';
+  'var(--font-instrument-serif), "Instrument Serif", ui-serif, Georgia, serif';
 
 function Page() {
   const router = useRouter();
