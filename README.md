@@ -56,7 +56,7 @@ Nothing in `data/` is ever sent anywhere except to the Anthropic API (only the p
 
 ## Network exposure
 
-By default, the server binds to `127.0.0.1` — only this machine can reach it.
+By default, the server binds to `127.0.0.1` — only this machine can reach it, and the OS itself is the access boundary.
 
 To expose on your LAN (e.g., for a Mac mini in the office serving the whole team):
 
@@ -64,7 +64,17 @@ To expose on your LAN (e.g., for a Mac mini in the office serving the whole team
 EMPLOYEE001_BIND=0.0.0.0 npx employee001 start
 ```
 
-> **Use a firewall or Tailscale.** This app is not hardened for the public internet.
+When bound to anything other than `127.0.0.1`, every request must carry a shared-secret token. `npx employee001 setup` generates one (`EMPLOYEE001_TOKEN` in `.env`) automatically. `start` prints the access URL on boot — visit it once from each device on your LAN:
+
+```
+http://<mac-mini>:3000/?token=<your-token>
+```
+
+The token is then set as an `e001_token` httpOnly cookie for 30 days. API calls without a matching cookie return `401`.
+
+> **Still: use a firewall or Tailscale.** The token gates HTTP access, but the app itself is not hardened for the public internet. Don't put this on a port-forwarded box.
+
+To rotate the token, delete the line from `.env` and re-run `setup`.
 
 ## Open-core
 
@@ -86,7 +96,9 @@ If that's interesting, [open a discussion](https://github.com/dolevhayut/Employe
 
 ## Contributing
 
-PRs welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) when it lands.
+PRs welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, the rules of the road (no telemetry, no paid gates, no cloud dependencies), and how to file a security issue.
+
+Maintainers: see [RELEASING.md](./RELEASING.md) for the tag-driven publish flow.
 
 ## License
 

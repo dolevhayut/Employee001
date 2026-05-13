@@ -1,6 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import * as p from "@clack/prompts";
+
+function generateToken() {
+  return randomBytes(24).toString("hex");
+}
 
 const ENV_PATH = resolve(process.cwd(), ".env");
 const DATA_DIR = resolve(process.cwd(), "data");
@@ -121,6 +126,11 @@ export default async function setup() {
     return;
   }
 
+  // Always generate (or preserve) an access token. It's a no-op when bound
+  // to 127.0.0.1; it becomes the LAN gate the moment the user flips bind to
+  // 0.0.0.0, with no second setup step required.
+  const token = existing.EMPLOYEE001_TOKEN || generateToken();
+
   const lines = [
     "# Employee001 — local configuration",
     "# This file is read at startup. Edits take effect on the next `employee001 start`.",
@@ -137,6 +147,10 @@ export default async function setup() {
     "# Bind address. Default 127.0.0.1 — only this machine can reach the app.",
     "# Set to 0.0.0.0 to expose on your LAN (use a firewall or Tailscale!).",
     `EMPLOYEE001_BIND=${existing.EMPLOYEE001_BIND ?? "127.0.0.1"}`,
+    "",
+    "# Shared-secret access token. Required when EMPLOYEE001_BIND is non-loopback.",
+    "# Ignored when bound to 127.0.0.1. Rotate by deleting and re-running `setup`.",
+    `EMPLOYEE001_TOKEN=${token}`,
     "",
     "# Local server port.",
     `PORT=${port}`,

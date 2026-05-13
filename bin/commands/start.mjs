@@ -74,20 +74,30 @@ export default async function start(argv) {
     NODE_ENV: "production",
   };
 
-  process.stdout.write(
-    [
-      "",
-      "  Employee001",
-      `  → http://localhost:${port}`,
-      `  Bound to ${bind}` +
-        (bind === "127.0.0.1"
-          ? " — not reachable from your network."
-          : " — exposed on your network. Use a firewall or Tailscale."),
-      "",
-      "  Press Ctrl+C to stop.",
-      "",
-    ].join("\n"),
-  );
+  const isLoopback =
+    !bind || bind === "127.0.0.1" || bind === "::1" || bind === "localhost";
+  const token = fileEnv.EMPLOYEE001_TOKEN ?? process.env.EMPLOYEE001_TOKEN;
+
+  const banner = ["", "  Employee001", `  → http://localhost:${port}`];
+  if (isLoopback) {
+    banner.push(`  Bound to ${bind} — not reachable from your network.`);
+  } else {
+    banner.push(`  Bound to ${bind} — exposed on your network. Use a firewall or Tailscale.`);
+    if (token) {
+      banner.push("");
+      banner.push("  Access requires a token. From another device on your LAN:");
+      banner.push(`    http://<this-machine>:${port}/?token=${token}`);
+      banner.push("  (the token is then set as a cookie for 30 days)");
+    } else {
+      banner.push("");
+      banner.push("  WARNING: EMPLOYEE001_TOKEN is not set. The proxy will refuse every");
+      banner.push("  request until you set one. Re-run `employee001 setup`.");
+    }
+  }
+  banner.push("");
+  banner.push("  Press Ctrl+C to stop.");
+  banner.push("");
+  process.stdout.write(banner.join("\n"));
 
   const child = spawn(process.execPath, [serverScript], {
     cwd: dirname(serverScript),

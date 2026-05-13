@@ -105,6 +105,25 @@ export default async function doctor() {
   if (env.ELEVENLABS_API_KEY) ok("ELEVENLABS_API_KEY", "set");
   else warn("ELEVENLABS_API_KEY", "not set — twin voices disabled");
 
+  // Bind + access token
+  const bind = env.EMPLOYEE001_BIND ?? process.env.EMPLOYEE001_BIND ?? "127.0.0.1";
+  const isLoopback = bind === "127.0.0.1" || bind === "::1" || bind === "localhost" || bind === "";
+  const token = env.EMPLOYEE001_TOKEN || process.env.EMPLOYEE001_TOKEN;
+  if (isLoopback) {
+    ok(`Bind ${bind}`, "loopback — local-only, no access token required");
+    if (token) ok("EMPLOYEE001_TOKEN", "set (unused on loopback, ready if you flip to 0.0.0.0)");
+  } else {
+    warn(`Bind ${bind}`, "exposed beyond loopback — use a firewall or Tailscale");
+    if (token && token.length >= 16) ok("EMPLOYEE001_TOKEN", `set (${token.length} chars)`);
+    else if (token) {
+      fail("EMPLOYEE001_TOKEN", `too short (${token.length} chars) — regenerate with setup`);
+      issues++;
+    } else {
+      fail("EMPLOYEE001_TOKEN", "not set — proxy will refuse every request on a non-loopback bind");
+      issues++;
+    }
+  }
+
   // Demo mode
   if (env.EMPLOYEE001_DEMO === "true") warn("Demo mode", "ON — demo personas will appear on boot");
   else ok("Demo mode", "off — fresh workspace");
