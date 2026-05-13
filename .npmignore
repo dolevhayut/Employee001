@@ -1,0 +1,39 @@
+# Source & dev artifacts
+src/
+tests/
+eval/
+evals/
+.eslintrc*
+eslint.config.*
+tsconfig.json
+.git/
+.github/
+.vscode/
+.idea/
+
+# Build caches
+.next/cache/
+.next/trace
+.turbo/
+.DS_Store
+*.log
+node_modules/
+
+# Internal docs (uncomment to keep private)
+# docs/BUILD-*.md
+# docs/PROGRESS.md
+# docs/PHASES.md
+# docs/internal/
+
+# Dev configs / dev-only files
+supabase/
+docker-compose.yml
+.env
+.env.local
+.env.development
+data/
+scripts/
+remotion/
+
+# Plans
+.claude/

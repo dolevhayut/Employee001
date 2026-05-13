@@ -1,0 +1,547 @@
+@import url('https://fonts.googleapis.com/css2?family=Stack+Sans+Notch:wght@200..700&display=swap');
+
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Tailwind v4 — @theme inline
+   Bridges our CSS variable system into Tailwind utility classes.
+   `inline` means Tailwind keeps the var() reference instead of resolving
+   at build time, so dark mode / theme switching works automatically.
+
+   Generated utilities (examples):
+     Colors  → bg-app, bg-surface, text-primary, text-muted, border-soft …
+     Type    → text-meta, text-ui, text-body, text-h1, text-display …
+     Font    → font-sans
+     Radius  → rounded-app-sm, rounded-app, rounded-app-lg
+     Shadow  → shadow-app-sm, shadow-app, shadow-app-lg
+   ────────────────────────────────────────────────────────────────────────── */
+
+@theme inline {
+  /* ── Colors ─────────────────────────────────────────────────────────── */
+  --color-app:              var(--bg);
+  --color-app-elevated:     var(--bg-elevated);
+  --color-app-sunken:       var(--bg-sunken);
+  --color-surface:          var(--surface);
+  --color-surface-soft:     var(--surface-soft);
+
+  --color-border:           var(--hairline);
+  --color-border-strong:    var(--hairline-strong);
+
+  --color-primary:          var(--text);
+  --color-muted:            var(--text-muted);
+  --color-subtle:           var(--text-subtle);
+
+  --color-accent:           var(--accent);
+  --color-accent-soft:      var(--accent-soft);
+  --color-accent-deep:      var(--accent-deep);
+
+  --color-success:          var(--success);
+  --color-warn:             var(--warn);
+  --color-danger:           var(--danger);
+  --color-twin:             var(--twin);
+  --color-twin-soft:        var(--twin-soft);
+
+  /* ── Typography ─────────────────────────────────────────────────────── */
+  --font-sans:              var(--font);
+
+  --text-2xs:               var(--fs-2xs);
+  --text-xs:                var(--fs-xs);
+  --text-meta:              var(--fs-meta);
+  --text-sm:                var(--fs-sm);
+  --text-ui:                var(--fs-ui);
+  --text-base:              var(--fs-base);
+  --text-body:              var(--fs-body);
+  --text-lg:                var(--fs-lg);
+  --text-h4:                var(--fs-h4);
+  --text-h3:                var(--fs-h3);
+  --text-h2:                var(--fs-h2);
+  --text-h1:                var(--fs-h1);
+  --text-display:           var(--fs-display);
+
+  /* ── Border radius ───────────────────────────────────────────────────── */
+  --radius-app-sm:          var(--radius-sm);
+  --radius-app:             var(--radius);
+  --radius-app-lg:          var(--radius-lg);
+
+  /* ── Shadows ─────────────────────────────────────────────────────────── */
+  --shadow-app-sm:          var(--shadow-sm);
+  --shadow-app:             var(--shadow);
+  --shadow-app-lg:          var(--shadow-lg);
+  --shadow-app-dialog:      var(--shadow-dialog);
+  --shadow-app-dropdown:    var(--shadow-dropdown);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Employee001 — design tokens (warm minimalist pro tool)
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Warm palette (default) */
+  --bg: #F3EEE8;
+  --bg-elevated: #FFFAF5;
+  --bg-sunken: #EDE5DC;
+  --surface: #FFFAF5;
+  --surface-soft: #F7F1EA;
+  --hairline: #DDD1C4;
+  --hairline-strong: #CDBFB0;
+  --text: #161311;
+  --text-muted: #5E544B;
+  --text-subtle: #8B8075;
+  --accent: #CDBFB0;
+  --accent-soft: #F8F2EB;
+  --accent-deep: #A89888;
+  --success: #6E8A6C;
+  --warn: #B88A47;
+  --danger: #A45E5E;
+  --twin: #7D8FA3;
+  --twin-soft: #D8CDC0;
+
+  /* Legacy aliases — keep existing pages working during the migration */
+  --cream: var(--bg);
+  --cream-dark: var(--bg-sunken);
+  --cream-border: var(--hairline);
+  --taupe-light: var(--hairline-strong);
+  --taupe: var(--accent);
+  --gray-mid: var(--text-subtle);
+  --gray-dark: var(--text-muted);
+  --black: var(--text);
+  --white: var(--surface);
+
+  /* Sizing */
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-lg: 6px;
+
+  /* Type */
+  --font: "Stack Sans Notch", system-ui, sans-serif;
+
+  /* Full scale — covers every real usage in the codebase */
+  --fs-2xs:    9px;   /* ultra-compact: tiny badges, overflow labels          */
+  --fs-xs:    10px;   /* compact data: table sub-labels, chart ticks           */
+  --fs-meta:  11px;   /* section titles, metadata, nav labels   HIGH VOLUME   */
+  --fs-sm:    12px;   /* secondary UI, captions, helper text    HIGH VOLUME   */
+  --fs-ui:    13px;   /* primary UI, nav items, buttons         HIGH VOLUME   */
+  --fs-base:  14px;   /* slightly larger body, form fields                    */
+  --fs-body:  15px;   /* reading text, paragraph content                      */
+  --fs-lg:    16px;   /* sub-headings, card titles                            */
+  --fs-h4:    18px;   /* h4 / section headings                                */
+  --fs-h3:    22px;   /* h3 (bumped for editorial rhythm)                     */
+  --fs-h2:    28px;   /* h2                                                   */
+  --fs-h1:    36px;   /* h1 / page titles                                     */
+  --fs-display: 52px; /* hero / display text                                  */
+
+  /* Line heights paired to the scale */
+  --lh-tight:  1.2;
+  --lh-snug:   1.35;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.65;
+
+  /* Letter spacing */
+  --ls-tight:  -0.025em;
+  --ls-snug:   -0.015em;
+  --ls-normal:  0;
+  --ls-wide:    0.04em;
+  --ls-wider:   0.08em;
+
+  /* ── Spacing scale — token name = exact px value, no ambiguity ──────────
+     Change a value here and every component using it scales in lockstep.   */
+  --sp-1:   1px;
+  --sp-2:   2px;
+  --sp-3:   3px;
+  --sp-4:   4px;
+  --sp-5:   5px;
+  --sp-6:   6px;
+  --sp-7:   7px;
+  --sp-8:   8px;
+  --sp-9:   9px;
+  --sp-10: 10px;
+  --sp-12: 12px;
+  --sp-14: 14px;
+  --sp-16: 16px;
+  --sp-18: 18px;
+  --sp-20: 20px;
+  --sp-22: 22px;
+  --sp-24: 24px;
+  --sp-28: 28px;
+  --sp-32: 32px;
+  --sp-36: 36px;
+  --sp-40: 40px;
+  --sp-48: 48px;
+  --sp-56: 56px;
+  --sp-64: 64px;
+
+  --shadow-sm: 0 1px 0 rgba(22, 19, 17, 0.04);
+  --shadow: 0 1px 2px rgba(22, 19, 17, 0.05), 0 4px 16px -8px rgba(22, 19, 17, 0.08);
+  --shadow-lg: 0 4px 12px rgba(22, 19, 17, 0.06), 0 16px 48px -16px rgba(22, 19, 17, 0.12);
+  --shadow-dialog: 0 24px 80px rgba(22, 19, 17, 0.22);
+  --shadow-dropdown: 0 4px 12px rgba(22, 19, 17, 0.08);
+}
+
+/* Explicit light override — beats @media prefers-color-scheme: dark */
+[data-theme="light"] {
+  --bg: #F3EEE8;
+  --bg-elevated: #FFFAF5;
+  --bg-sunken: #EDE5DC;
+  --surface: #FFFAF5;
+  --surface-soft: #F7F1EA;
+  --hairline: #DDD1C4;
+  --hairline-strong: #CDBFB0;
+  --text: #161311;
+  --text-muted: #5E544B;
+  --text-subtle: #8B8075;
+  --accent: #CDBFB0;
+  --accent-soft: #F8F2EB;
+  --accent-deep: #A89888;
+  --success: #6E8A6C;
+  --warn: #B88A47;
+  --danger: #A45E5E;
+  --twin: #7D8FA3;
+  --twin-soft: #D8CDC0;
+  --shadow-sm: 0 1px 0 rgba(22, 19, 17, 0.04);
+  --shadow: 0 1px 2px rgba(22, 19, 17, 0.05), 0 4px 16px -8px rgba(22, 19, 17, 0.08);
+  --shadow-lg: 0 4px 12px rgba(22, 19, 17, 0.06), 0 16px 48px -16px rgba(22, 19, 17, 0.12);
+  --shadow-dialog: 0 24px 80px rgba(22, 19, 17, 0.22);
+  --shadow-dropdown: 0 4px 12px rgba(22, 19, 17, 0.08);
+}
+
+[data-theme="cool"] {
+  --bg: #F0F1F3;
+  --bg-elevated: #F7F8FA;
+  --bg-sunken: #E6E8EC;
+  --surface: #FFFFFF;
+  --surface-soft: #F4F5F8;
+  --hairline: #DDE0E5;
+  --hairline-strong: #C5C9D1;
+  --text: #161A1F;
+  --text-muted: #5C6470;
+  --text-subtle: #828A95;
+  --accent: #4A6B8A;
+  --accent-soft: #D4DEE8;
+  --accent-deep: #2D4660;
+  --twin: #4A6B7A;
+  --twin-soft: #D8E2E8;
+}
+
+[data-theme="dark"] {
+  --bg: #11100E;
+  --bg-elevated: #1D1A17;
+  --bg-sunken: #171513;
+  --surface: #1D1A17;
+  --surface-soft: #25211D;
+  --hairline: #3B342D;
+  --hairline-strong: #6C6157;
+  --text: #F3EDE6;
+  --text-muted: #CBBFB2;
+  --text-subtle: #9A8E83;
+  --accent: #6C6157;
+  --accent-soft: #2A241F;
+  --accent-deep: #A89A8B;
+  --success: #89A785;
+  --warn: #C89D5D;
+  --danger: #C57A7A;
+  --twin: #8FA7C0;
+  --twin-soft: #312B25;
+  /* Dark mode shadows use pure black at higher opacity — perceived depth on
+     dark surfaces requires greater luminance contrast than on light ones */
+  --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.25);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 16px -8px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.3), 0 16px 48px -16px rgba(0, 0, 0, 0.5);
+  --shadow-dialog: 0 24px 80px rgba(0, 0, 0, 0.65);
+  --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* System preference auto-detection — fires before JS (prevents FOUC on first
+   load when the user's OS is in dark mode but no localStorage value exists) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="cool"]):not([data-theme="dark"]) {
+    --bg: #11100E;
+    --bg-elevated: #1D1A17;
+    --bg-sunken: #171513;
+    --surface: #1D1A17;
+    --surface-soft: #25211D;
+    --hairline: #3B342D;
+    --hairline-strong: #6C6157;
+    --text: #F3EDE6;
+    --text-muted: #CBBFB2;
+    --text-subtle: #9A8E83;
+    --accent: #6C6157;
+    --accent-soft: #2A241F;
+    --accent-deep: #A89A8B;
+    --success: #89A785;
+    --warn: #C89D5D;
+    --danger: #C57A7A;
+    --twin: #8FA7C0;
+    --twin-soft: #312B25;
+    --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.25);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 16px -8px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.3), 0 16px 48px -16px rgba(0, 0, 0, 0.5);
+    --shadow-dialog: 0 24px 80px rgba(0, 0, 0, 0.65);
+    --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-ui);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+}
+
+#root, body > div { min-height: 100vh; }
+
+button { font-family: inherit; cursor: pointer; }
+input, textarea { font-family: inherit; color: inherit; }
+
+::selection { background: var(--text); color: var(--bg); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Buttons
+   ────────────────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px;
+  font-size: var(--fs-sm); font-weight: 500;
+  border-radius: var(--radius);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--text);
+  letter-spacing: var(--ls-snug);
+  transition: background .12s, border-color .12s;
+  height: 28px;
+}
+.btn:hover { background: var(--surface-soft); border-color: var(--text-subtle); }
+.btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn.primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.accent:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+.btn.ghost { border-color: transparent; background: transparent; }
+.btn.ghost:hover { background: var(--bg-sunken); }
+.btn.sm { height: 24px; padding: 3px 9px; font-size: var(--fs-meta); }
+.btn.lg { height: 36px; padding: 8px 16px; font-size: var(--fs-ui); }
+.btn .ico { width: 13px; height: 13px; }
+
+.kbd {
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  padding: 1px 5px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 3px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  font-weight: 500;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Element defaults — semantic HTML pulls from the scale automatically.
+   Wrapped in @layer base so Tailwind utility classes (which live in
+   @layer utilities) always win over these resets in the cascade.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 600; letter-spacing: var(--ls-tight); line-height: var(--lh-tight); }
+  h1 { font-size: var(--fs-h1); }
+  h2 { font-size: var(--fs-h2); }
+  h3 { font-size: var(--fs-h3); }
+  h4 { font-size: var(--fs-h4); }
+  h5 { font-size: var(--fs-lg); }
+  h6 { font-size: var(--fs-ui); }
+
+  p { margin: 0; font-size: var(--fs-body); line-height: var(--lh-normal); }
+  small { font-size: var(--fs-meta); }
+  label { font-size: var(--fs-ui); }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Typography utility classes — use these instead of inline fontSize
+   ────────────────────────────────────────────────────────────────────────── */
+
+.fs-2xs   { font-size: var(--fs-2xs); }
+.fs-xs    { font-size: var(--fs-xs); }
+.fs-meta  { font-size: var(--fs-meta); }
+.fs-sm    { font-size: var(--fs-sm); }
+.fs-ui    { font-size: var(--fs-ui); }
+.fs-base  { font-size: var(--fs-base); }
+.fs-body  { font-size: var(--fs-body); }
+.fs-lg    { font-size: var(--fs-lg); }
+.fs-h4    { font-size: var(--fs-h4); }
+.fs-h3    { font-size: var(--fs-h3); }
+.fs-h2    { font-size: var(--fs-h2); }
+.fs-h1    { font-size: var(--fs-h1); }
+.fs-display { font-size: var(--fs-display); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Cards & sections
+   ────────────────────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+}
+
+.section-title {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: var(--ls-wider);
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.nav-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wider);
+  color: var(--text-subtle);
+  padding: 8px 8px 6px;
+}
+
+.nav-item:hover { background: var(--bg-sunken); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Badges & status dots
+   ────────────────────────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-meta); font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  letter-spacing: var(--ls-snug);
+}
+.badge.success { background: color-mix(in oklch, var(--success) 14%, transparent); color: var(--success); }
+.badge.warn    { background: color-mix(in oklch, var(--warn) 18%, transparent);    color: var(--warn); }
+.badge.danger  { background: color-mix(in oklch, var(--danger) 14%, transparent);  color: var(--danger); }
+.badge.twin    { background: var(--twin-soft); color: var(--twin); }
+.badge.accent  { background: var(--accent-soft); color: var(--accent-deep); }
+
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-subtle); }
+.dot.success { background: var(--success); box-shadow: 0 0 0 3px color-mix(in oklch, var(--success) 18%, transparent); }
+.dot.warn    { background: var(--warn);    box-shadow: 0 0 0 3px color-mix(in oklch, var(--warn) 22%, transparent); }
+.dot.danger  { background: var(--danger);  box-shadow: 0 0 0 3px color-mix(in oklch, var(--danger) 18%, transparent); }
+.dot.twin    { background: var(--twin); }
+.dot.idle    { background: var(--hairline-strong); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Utility
+   ────────────────────────────────────────────────────────────────────────── */
+
+.row { display: flex; align-items: center; gap: 8px; }
+.col { display: flex; flex-direction: column; }
+.spacer { flex: 1; }
+.muted { color: var(--text-muted); }
+.subtle { color: var(--text-subtle); }
+.mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+.hairline-y { border-top: 1px solid var(--hairline); }
+.hairline-x { border-right: 1px solid var(--hairline); }
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.pulse { animation: pulse-soft 1.6s ease-in-out infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
+
+.scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+.scrollbar::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 4px; }
+.scrollbar::-webkit-scrollbar-track { background: transparent; }
+
+/* Default thin scrollbar (legacy) */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 2px; }
+
+/* Logo — invert to white in dark mode (SVG fill is black) */
+[data-theme="dark"] .brand-logo { filter: invert(1); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="cool"]) .brand-logo { filter: invert(1); }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Marketing landing (/) — PRD palette + Manrope applied via next/font on page
+   ────────────────────────────────────────────────────────────────────────── */
+
+.landing-root {
+  --lp-bg: #F3EEE8;
+  --lp-surface: #FFFAF5;
+  --lp-surface-alt: #F7F1EA;
+  --lp-border: #DDD1C4;
+  --lp-text: #161311;
+  --lp-text-muted: #5E544B;
+  --lp-brand: #111111;
+  --lp-dot: #CDBFB0;
+  --lp-radius: 14px;
+  --lp-radius-sm: 10px;
+  --lp-max: 1240px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--lp-text);
+  background-color: var(--lp-bg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-theme="dark"] .landing-root {
+  --lp-bg: #11100E;
+  --lp-surface: #1D1A17;
+  --lp-surface-alt: #25211D;
+  --lp-border: #3B342D;
+  --lp-text: #F3EDE6;
+  --lp-text-muted: #CBBFB2;
+  --lp-brand: #F3EDE6;
+  --lp-dot: #6C6157;
+}
+
+
+.landing-root :focus-visible {
+  outline: 2px solid var(--lp-brand);
+  outline-offset: 3px;
+}
+
+.landing-root .landing-logo-mark {
+  display: block;
+}
+
+[data-theme="dark"] .landing-root .landing-logo-mark {
+  filter: invert(1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="cool"]):not([data-theme="dark"]) .landing-root .landing-logo-mark {
+    filter: invert(1);
+  }
+}
+
+.landing-hero-orbit {
+  stroke: var(--lp-dot);
+  fill: none;
+  opacity: 0.45;
+}
+
+.landing-dot-grid {
+  background-image: radial-gradient(circle, var(--lp-dot) 1px, transparent 1px);
+  background-size: 10px 10px;
+  opacity: 0.35;
+}
+
+@keyframes landing-soft-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.landing-float-slow {
+  animation: landing-soft-float 7s ease-in-out infinite;
+}

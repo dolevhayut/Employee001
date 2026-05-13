@@ -1,0 +1,90 @@
+{
+  "name": "employee001",
+  "version": "0.1.0",
+  "description": "Your company's organizational brain — agent twins of your real employees, running entirely on your own machine. MIT, no cloud, no telemetry.",
+  "license": "MIT",
+  "author": "Dolev Hayut",
+  "homepage": "https://github.com/dolevhayut/Employee001",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dolevhayut/Employee001.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dolevhayut/Employee001/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "claude",
+    "mcp",
+    "local-first",
+    "self-hosted",
+    "open-core",
+    "on-prem",
+    "organizational-brain",
+    "digital-twins"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "bin": {
+    "employee001": "./bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    ".next/standalone/",
+    ".next/static/",
+    "public/",
+    ".env.example",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && node scripts/post-build.mjs",
+    "start": "next start",
+    "lint": "eslint",
+    "pack:dry": "npm pack --dry-run",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.123",
+    "@anthropic-ai/sdk": "^0.91.1",
+    "@clack/prompts": "^0.9.1",
+    "@composio/claude-agent-sdk": "^0.8.0",
+    "@composio/core": "^0.8.0",
+    "@remotion/google-fonts": "4.0.458",
+    "@types/dompurify": "^3.0.5",
+    "@types/papaparse": "^5.5.2",
+    "clsx": "^2.1.1",
+    "dompurify": "^3.4.2",
+    "framer-motion": "^12.38.0",
+    "iconoir-react": "^7.11.0",
+    "next": "16.2.4",
+    "papaparse": "^5.5.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-force-graph-3d": "^1.29.1",
+    "react-markdown": "^10.1.0",
+    "reactflow": "^11.11.4",
+    "remark-gfm": "^4.0.1",
+    "semver": "^7.8.0",
+    "tailwind-merge": "^3.5.0",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@remotion/cli": "^4.0.458",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/semver": "^7.7.1",
+    "@types/three": "^0.184.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "promptfoo": "^0.121.9",
+    "remotion": "^4.0.458",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

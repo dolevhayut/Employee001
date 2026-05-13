@@ -1,0 +1,150 @@
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createServer } from "node:net";
+import semver from "semver";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const PKG_ROOT = resolve(HERE, "..", "..");
+
+const COLOR = process.stdout.isTTY
+  ? { red: "\x1b[31m", green: "\x1b[32m", yellow: "\x1b[33m", reset: "\x1b[0m", dim: "\x1b[2m" }
+  : { red: "", green: "", yellow: "", reset: "", dim: "" };
+
+function ok(label, detail = "") {
+  process.stdout.write(`  ${COLOR.green}✓${COLOR.reset} ${label}${detail ? ` ${COLOR.dim}${detail}${COLOR.reset}` : ""}\n`);
+}
+function warn(label, detail = "") {
+  process.stdout.write(`  ${COLOR.yellow}!${COLOR.reset} ${label}${detail ? ` ${COLOR.dim}${detail}${COLOR.reset}` : ""}\n`);
+}
+function fail(label, detail = "") {
+  process.stdout.write(`  ${COLOR.red}✗${COLOR.reset} ${label}${detail ? ` ${COLOR.dim}${detail}${COLOR.reset}` : ""}\n`);
+}
+
+function parseEnv(text) {
+  const out = {};
+  for (const line of text.split("\n")) {
+    const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!m) continue;
+    let v = m[2];
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.slice(1, -1);
+    }
+    out[m[1]] = v;
+  }
+  return out;
+}
+
+async function checkAnthropic(key) {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/models", {
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
+    });
+    return res.ok;
+  } catch {
+    return null;
+  }
+}
+
+function portFree(port) {
+  return new Promise((resolveP) => {
+    const s = createServer();
+    s.once("error", () => resolveP(false));
+    s.once("listening", () => s.close(() => resolveP(true)));
+    s.listen(port, "127.0.0.1");
+  });
+}
+
+export default async function doctor() {
+  let issues = 0;
+
+  process.stdout.write("\nEmployee001 — doctor\n\n");
+
+  // Node version
+  const need = ">=22.0.0";
+  if (semver.satisfies(process.version, need)) {
+    ok(`Node ${process.version}`, `(need ${need})`);
+  } else {
+    fail(`Node ${process.version}`, `need ${need}`);
+    issues++;
+  }
+
+  // .env
+  const envPath = resolve(process.cwd(), ".env");
+  let env = {};
+  if (existsSync(envPath)) {
+    env = parseEnv(readFileSync(envPath, "utf8"));
+    ok(".env present", envPath);
+  } else {
+    fail(".env not found", `${envPath} — run \`employee001 setup\``);
+    issues++;
+  }
+
+  // Anthropic key
+  const aKey = env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+  if (!aKey) {
+    fail("ANTHROPIC_API_KEY", "not set — required");
+    issues++;
+  } else {
+    const reachable = await checkAnthropic(aKey);
+    if (reachable === true) ok("ANTHROPIC_API_KEY", "authenticated against api.anthropic.com");
+    else if (reachable === false) {
+      fail("ANTHROPIC_API_KEY", "rejected by api.anthropic.com");
+      issues++;
+    } else warn("ANTHROPIC_API_KEY", "set, but couldn't reach api.anthropic.com to verify");
+  }
+
+  // Composio (required)
+  if (env.COMPOSIO_API_KEY) ok("COMPOSIO_API_KEY", "set");
+  else {
+    fail("COMPOSIO_API_KEY", "not set — required for MCP tool integrations");
+    issues++;
+  }
+
+  // ElevenLabs (optional)
+  if (env.ELEVENLABS_API_KEY) ok("ELEVENLABS_API_KEY", "set");
+  else warn("ELEVENLABS_API_KEY", "not set — twin voices disabled");
+
+  // Demo mode
+  if (env.EMPLOYEE001_DEMO === "true") warn("Demo mode", "ON — demo personas will appear on boot");
+  else ok("Demo mode", "off — fresh workspace");
+
+  // data/ writable
+  const dataDir = resolve(process.cwd(), "data");
+  if (!existsSync(dataDir)) {
+    try {
+      mkdirSync(dataDir, { recursive: true });
+      ok("data/", "created");
+    } catch (err) {
+      fail("data/", `cannot create: ${err.message}`);
+      issues++;
+    }
+  } else {
+    try {
+      accessSync(dataDir, constants.W_OK);
+      const sz = statSync(dataDir);
+      ok("data/", `writable (dir, ${sz.mode.toString(8)})`);
+    } catch {
+      fail("data/", "exists but not writable");
+      issues++;
+    }
+  }
+
+  // Port
+  const port = Number(env.PORT ?? 3000);
+  const free = await portFree(port);
+  if (free) ok(`Port ${port}`, "free");
+  else warn(`Port ${port}`, "in use — `employee001 start` will fail until it's freed");
+
+  // Standalone build
+  const server = resolve(PKG_ROOT, ".next", "standalone", "server.js");
+  if (existsSync(server)) ok("Standalone build", server);
+  else warn("Standalone build", "missing — needed for `employee001 start`");
+
+  process.stdout.write("\n");
+  if (issues === 0) process.stdout.write("All good.\n");
+  else {
+    process.stdout.write(`${issues} issue${issues === 1 ? "" : "s"} found.\n`);
+    process.exitCode = 1;
+  }
+}

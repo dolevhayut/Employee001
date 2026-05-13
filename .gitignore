@@ -1,0 +1,23 @@
+# Dependencies & build
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Local config & secrets
+.env
+.env.local
+.env.development
+.env.production
+
+# Local data (created on first run)
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor scratch
+*.swp
+.vscode/
+.idea/
