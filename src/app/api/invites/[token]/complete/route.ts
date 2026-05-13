@@ -22,9 +22,98 @@ const PROFILE_FILES = [
 type CompletePayload = {
   name?: string;
   role?: string;
-  /** Map from base name (e.g. "EXPERTISE") to markdown body. */
+  /** Free-form domain string the employee provided in the wizard. */
+  domain?: string;
+  /** Integration toolkits the employee opted in to. */
+  integrations?: string[];
+  /** Slack-like channel name suggested in the wizard. */
+  channel?: string;
+  /** Boundary flags from the wizard's privacy step. */
+  boundaries?: {
+    comp?: boolean;
+    hr?: boolean;
+    legal?: boolean;
+    customers?: boolean;
+    roadmap?: boolean;
+  };
+  /** Optional override: explicit markdown bodies per profile file. */
   profile?: Partial<Record<(typeof PROFILE_FILES)[number], string>>;
 };
+
+function buildProfileMarkdown(
+  payload: CompletePayload,
+  fallbacks: { name: string; role: string },
+): Record<(typeof PROFILE_FILES)[number], string> {
+  const name = fallbacks.name;
+  const role = fallbacks.role || "—";
+  const domain = (payload.domain ?? "").trim();
+  const integrations = (payload.integrations ?? []).filter(Boolean);
+  const channel = (payload.channel ?? "").trim();
+  const b = payload.boundaries ?? {};
+  const today = new Date().toISOString().slice(0, 10);
+
+  const out = {} as Record<(typeof PROFILE_FILES)[number], string>;
+
+  out.EXPERTISE = [
+    `# Expertise — ${name}`,
+    "",
+    role ? `Role: **${role}**` : "",
+    domain ? `Primary domain: ${domain}` : "",
+    "",
+    "## What I work on",
+    "",
+    domain
+      ? `My day-to-day centres on ${domain}.`
+      : "_The employee hasn't filled this in yet._",
+    integrations.length
+      ? `\nSignals my twin draws on:\n${integrations.map((i) => `- ${i}`).join("\n")}`
+      : "",
+    "",
+  ].filter(Boolean).join("\n");
+
+  out.EMPLOYMENT = [
+    `# Employment — ${name}`,
+    "",
+    `- Name: ${name}`,
+    role ? `- Role: ${role}` : "",
+    channel ? `- Preferred channel: ${channel}` : "",
+    `- Onboarded: ${today}`,
+    "",
+  ].filter(Boolean).join("\n");
+
+  out.BOUNDARIES = [
+    `# Boundaries — ${name}`,
+    "",
+    "My twin will not discuss or share information about the following without",
+    "explicit human approval:",
+    "",
+    b.comp ? "- Compensation, salary, or equity" : "",
+    b.hr ? "- HR matters and personnel files" : "",
+    b.legal ? "- Legal documents and contracts" : "",
+    b.customers ? "- Customer names and account details" : "",
+    b.roadmap ? "- Product roadmap and unreleased plans" : "",
+    !(b.comp || b.hr || b.legal || b.customers || b.roadmap)
+      ? "_No boundaries set yet — the employee can refine this any time from /profile._"
+      : "",
+    "",
+  ].filter(Boolean).join("\n");
+
+  // Files we don't synthesise from form data: leave a clear placeholder so
+  // it's obvious where the employee should pick up next.
+  for (const base of PROFILE_FILES) {
+    if (base in out) continue;
+    out[base] = `# ${base} — ${name}\n\n_To fill in. Update this file from /profile or directly on disk._\n`;
+  }
+
+  // Explicit profile overrides win.
+  for (const [key, body] of Object.entries(payload.profile ?? {})) {
+    if (PROFILE_FILES.includes(key as (typeof PROFILE_FILES)[number]) && body && body.trim()) {
+      out[key as (typeof PROFILE_FILES)[number]] = body;
+    }
+  }
+
+  return out;
+}
 
 function slugify(s: string): string {
   return s
@@ -74,15 +163,15 @@ export async function POST(request: NextRequest, { params }: Params) {
   const dir = path.join(process.cwd(), "data", "employees", employeeId);
   await fs.mkdir(dir, { recursive: true });
 
-  const profile = body.profile ?? {};
+  const profile = buildProfileMarkdown(body, { name, role });
   await Promise.all(
-    PROFILE_FILES.map((key) => {
-      const body = (profile[key] ?? "").trim() || `# ${key}\n\n_To fill in._\n`;
-      return fs.writeFile(path.join(dir, `${key}.md`), body, "utf8");
-    }),
+    PROFILE_FILES.map((key) =>
+      fs.writeFile(path.join(dir, `${key}.md`), profile[key], "utf8"),
+    ),
   );
 
-  // Tiny metadata sidecar so downstream code knows who this is.
+  // Metadata sidecar — read back by loadEmployeesFromDisk() to materialise
+  // the workspace's employee list.
   await fs.writeFile(
     path.join(dir, "employee.json"),
     JSON.stringify(
@@ -90,7 +179,9 @@ export async function POST(request: NextRequest, { params }: Params) {
         id: employeeId,
         name,
         role: role || null,
+        integrations: (body.integrations ?? []).filter(Boolean),
         createdAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
         via: { invite: token },
       },
       null,

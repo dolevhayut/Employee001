@@ -29,15 +29,18 @@ function Page() {
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get("invite") ?? "";
+  const justFinished = params.get("done") === "1";
 
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "no_token" }
     | { kind: "error"; status: ValidateResponse["status"] }
     | { kind: "ready"; invite: InviteShape }
-  >({ kind: "loading" });
+    | { kind: "done"; invite?: InviteShape }
+  >(justFinished ? { kind: "done" } : { kind: "loading" });
 
   useEffect(() => {
+    if (justFinished) return; // success view is its own thing
     if (!token) {
       setState({ kind: "no_token" });
       return;
@@ -52,7 +55,7 @@ function Page() {
         }
       })
       .catch(() => setState({ kind: "error", status: "not_found" }));
-  }, [token]);
+  }, [token, justFinished]);
 
   function go() {
     router.push(`/onboarding?invite=${encodeURIComponent(token)}`);
@@ -122,6 +125,51 @@ function Page() {
               </h1>
               <p style={{ color: "#6B6359", fontSize: 15, lineHeight: 1.55 }}>
                 Ask your CEO to send a fresh link.
+              </p>
+            </>
+          )}
+
+          {state.kind === "done" && (
+            <>
+              <div
+                style={{
+                  fontSize: 36,
+                  lineHeight: 1,
+                  marginBottom: 18,
+                }}
+              >
+                ✓
+              </div>
+              <h1
+                style={{
+                  fontFamily: SERIF_FONT,
+                  fontSize: 32,
+                  margin: "0 0 12px",
+                  lineHeight: 1.1,
+                }}
+              >
+                You&apos;re all set.
+              </h1>
+              <p
+                style={{
+                  color: "#6B6359",
+                  fontSize: 15,
+                  lineHeight: 1.55,
+                  marginBottom: 8,
+                }}
+              >
+                Your twin profile has been saved on the team&apos;s machine. You
+                can close this tab.
+              </p>
+              <p
+                style={{
+                  color: "#8F8678",
+                  fontSize: 13,
+                  lineHeight: 1.55,
+                }}
+              >
+                Your CEO can connect tools and bring the twin online from
+                their side.
               </p>
             </>
           )}

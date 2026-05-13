@@ -188,11 +188,15 @@ export type EmployeeWithTwin = Employee & {
 // content when needed.
 
 
-// The workspace's live employee roster. Currently always empty in the public
-// build — the CEO adds employees through the UI and they live in
-// data/employees/. A future revision will read this from disk at startup.
+// In-memory roster. Always empty in the public build — the source of truth
+// is data/employees/ on disk, surfaced via loadEmployeesFromDisk() / GET
+// /api/employees. Components that import this constant render an empty
+// state on first paint and hydrate from the API.
 export const EMPLOYEES_WITH_TWIN: EmployeeWithTwin[] = [];
 
 export function getEmployee(id: string): EmployeeWithTwin | undefined {
   return EMPLOYEES_WITH_TWIN.find((e) => e.id === id);
 }
+
+// The server-only disk loader lives in employees-disk.ts so client bundles
+// never see `fs`. Import it from there in API route handlers only.

@@ -1,11 +1,16 @@
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 
+export const runtime = "nodejs";
+
 export async function GET() {
-  const hired = getHiredEmployees();
+  const [fromDisk, hired] = await Promise.all([
+    loadEmployeesFromDisk(),
+    Promise.resolve(getHiredEmployees()),
+  ]);
   const all = [
-    ...EMPLOYEES_WITH_TWIN,
-    ...hired.filter((h) => !EMPLOYEES_WITH_TWIN.some((e) => e.id === h.id)),
+    ...fromDisk,
+    ...hired.filter((h) => !fromDisk.some((e) => e.id === h.id)),
   ];
   return Response.json(all, { headers: { "Cache-Control": "no-store" } });
 }

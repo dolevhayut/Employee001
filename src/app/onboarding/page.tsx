@@ -148,7 +148,7 @@ function OnboardingPageInner() {
     // Invite-bearing finish → call the complete API. This writes the
     // employee record to data/employees/ and marks the invite as used.
     try {
-      const res = await fetch(
+      await fetch(
         `/api/invites/${encodeURIComponent(inviteToken)}/complete`,
         {
           method: "POST",
@@ -156,20 +156,20 @@ function OnboardingPageInner() {
           body: JSON.stringify({
             name,
             role,
-            // Profile bodies will land here in a follow-up that wires the
-            // wizard's collected text into proper markdown files. For v0.1
-            // we ship placeholder files; the CEO can fill them in later.
+            domain,
+            integrations: Array.from(chosen),
+            channel,
+            boundaries,
           }),
         },
       );
-      const data = await res.json();
-      if (data?.employeeId) {
-        router.push(`/employees`);
-      } else {
-        router.push("/generation");
-      }
+      // Route the *employee* back to /join with a done flag. They don't
+      // hold the workspace token, so /employees would 401 for them anyway.
+      router.push(`/join?invite=${encodeURIComponent(inviteToken)}&done=1`);
     } catch {
-      router.push("/generation");
+      router.push(
+        `/join?invite=${encodeURIComponent(inviteToken)}&done=1`,
+      );
     }
   };
   const firstName = name.split(" ")[0] || "the employee";
