@@ -8,6 +8,24 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  // Guard: refuse to create invites when the system can't actually serve a
+  // twin. Sending an invite without keys means the employee fills out their
+  // profile, then nothing works — bad first impression, broken promise.
+  const missing: string[] = [];
+  if (!process.env.ANTHROPIC_API_KEY) missing.push("ANTHROPIC_API_KEY");
+  if (!process.env.COMPOSIO_API_KEY) missing.push("COMPOSIO_API_KEY");
+  if (missing.length > 0) {
+    return NextResponse.json(
+      {
+        error: "not_configured",
+        message:
+          "Set the missing API keys in .env (or re-run `npx employee001 setup`), then restart the server.",
+        missing,
+      },
+      { status: 409 },
+    );
+  }
+
   let body: { name?: unknown; role?: unknown } = {};
   try {
     body = (await request.json()) as typeof body;

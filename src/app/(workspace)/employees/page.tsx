@@ -633,6 +633,12 @@ function inviteUrl(token: string): string {
   return `${window.location.origin}/join?invite=${token}`;
 }
 
+type SystemConfig = {
+  anthropic: boolean;
+  composio: boolean;
+  ready: boolean;
+};
+
 function InvitePanel({
   invites,
   onInvitesChanged,
@@ -644,6 +650,18 @@ function InvitePanel({
   const [role, setRole] = useState("");
   const [creating, setCreating] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  // Block invite creation until both API keys are present. Fetched once
+  // on mount; the user has to restart the server after editing .env, so
+  // there's no point in polling.
+  const [config, setConfig] = useState<SystemConfig | null>(null);
+  useEffect(() => {
+    fetch("/api/system/config")
+      .then((r) => r.json() as Promise<SystemConfig>)
+      .then(setConfig)
+      .catch(() =>
+        setConfig({ anthropic: false, composio: false, ready: false }),
+      );
+  }, []);
 
   const pending = invites.filter((i) => !i.completedAt);
 
@@ -719,6 +737,41 @@ function InvitePanel({
         normally reach the person. The link works on this local network only.
       </div>
 
+      {config && !config.ready && (
+        <div
+          style={{
+            padding: "12px 14px",
+            marginBottom: "var(--sp-14)",
+            background: "rgba(160, 75, 61, 0.08)",
+            border: "1px solid rgba(160, 75, 61, 0.32)",
+            borderRadius: 6,
+            fontSize: "var(--fs-meta)",
+            color: "var(--text)",
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>
+            Configure API keys before inviting anyone
+          </div>
+          <div style={{ color: "var(--text-subtle)" }}>
+            Missing:{" "}
+            <span style={{ fontFamily: "var(--font-mono, ui-monospace, monospace)" }}>
+              {[
+                !config.anthropic && "ANTHROPIC_API_KEY",
+                !config.composio && "COMPOSIO_API_KEY",
+              ]
+                .filter(Boolean)
+                .join(", ")}
+            </span>
+            . Without them the twin can&apos;t think (Anthropic) or use tools
+            (Composio) — the employee would fill out a profile that goes
+            nowhere. Edit <span className="mono">.env</span> or re-run{" "}
+            <span className="mono">npx employee001 setup</span>, then restart
+            the server.
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           display: "flex",
@@ -732,6 +785,7 @@ function InvitePanel({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Name (optional)"
+          disabled={!config?.ready}
           style={{
             flex: "1 1 200px",
             height: 32,
@@ -740,12 +794,14 @@ function InvitePanel({
             borderRadius: 6,
             background: "var(--surface)",
             fontSize: "var(--fs-sm)",
+            opacity: config?.ready ? 1 : 0.55,
           }}
         />
         <input
           value={role}
           onChange={(e) => setRole(e.target.value)}
           placeholder="Role (optional)"
+          disabled={!config?.ready}
           style={{
             flex: "1 1 200px",
             height: 32,
@@ -754,14 +810,20 @@ function InvitePanel({
             borderRadius: 6,
             background: "var(--surface)",
             fontSize: "var(--fs-sm)",
+            opacity: config?.ready ? 1 : 0.55,
           }}
         />
         <button
           type="button"
           onClick={createInvite}
-          disabled={creating}
+          disabled={creating || !config?.ready}
           className="btn primary"
           style={{ height: 32 }}
+          title={
+            !config?.ready
+              ? "Configure ANTHROPIC_API_KEY and COMPOSIO_API_KEY first"
+              : undefined
+          }
         >
           <Icons.Plus size={13} /> {creating ? "Creating…" : "Create invite"}
         </button>
