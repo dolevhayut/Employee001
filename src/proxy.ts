@@ -11,6 +11,10 @@ import type { NextRequest } from "next/server";
 const COOKIE_NAME = "e001_token";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
+// First-visit gate: send the user to /welcome unless they've dismissed it.
+// Set independently of the access token cookie so it works on loopback too.
+const WELCOME_COOKIE = "e001_welcomed";
+
 function isLoopbackBind(bind: string | undefined): boolean {
   if (!bind) return true;
   const v = bind.trim();
@@ -61,7 +65,23 @@ function unauthorizedHtml(pathAndQuery: string): string {
 </html>`;
 }
 
+function firstVisitRedirect(request: NextRequest): NextResponse | null {
+  // Only intercept top-level navigation requests. Don't touch API, static,
+  // or non-GET. The /welcome page itself must always be reachable.
+  if (request.method !== "GET") return null;
+  const { pathname } = request.nextUrl;
+  if (pathname !== "/" && pathname !== "/index.html") return null;
+  if (request.cookies.get(WELCOME_COOKIE)?.value === "1") return null;
+
+  const url = request.nextUrl.clone();
+  url.pathname = "/welcome";
+  return NextResponse.redirect(url);
+}
+
 export function proxy(request: NextRequest) {
+  const welcome = firstVisitRedirect(request);
+  if (welcome) return welcome;
+
   const bind = process.env.EMPLOYEE001_BIND;
   if (isLoopbackBind(bind)) {
     return NextResponse.next();
