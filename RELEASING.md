@@ -4,7 +4,10 @@ Cutting a release is just a tag push. The `.github/workflows/release.yml` workfl
 
 ## One-time setup (maintainer only)
 
-1. Generate an [npm automation token](https://docs.npmjs.com/creating-and-viewing-access-tokens) with **publish** rights on the `employee001` package.
+1. Generate a **Granular Access Token** at https://www.npmjs.com/settings/<user>/tokens with:
+   - Permissions: **Read and write**
+   - Packages and scopes: **Only select packages → `employee001`**
+   - **Allow bypassing 2FA when publishing**: ✅ checked (the workflow can't prompt for OTP)
 2. Add it as `NPM_TOKEN` under **Settings → Secrets and variables → Actions** on the GitHub repo.
 
 That's it. `GITHUB_TOKEN` is provided automatically.
