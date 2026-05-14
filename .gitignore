@@ -21,3 +21,7 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# Local-only docs — session summaries, build notes, scratch
+# Anything under docs/local/ stays on disk only.
+docs/local/
