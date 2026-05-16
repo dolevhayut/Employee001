@@ -3,6 +3,48 @@ import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import * as p from "@clack/prompts";
 
+// Claude Code's brand orange (R204 G120 G92 — close to the official wordmark).
+// 24-bit ANSI works on every modern terminal we ship to; FORCE_COLOR=0 or a
+// non-TTY stdout downgrades it via process.stdout.isTTY check.
+const BRAND = "\x1b[38;2;204;120;92m";
+const DIM = "\x1b[2m";
+const RESET = "\x1b[0m";
+
+// Figlet "doh" style — same family Claude Code uses for its boot banner.
+// Keep the trailing whitespace in each line: it preserves the silhouette.
+const BANNER_001 = String.raw`
+     000000000          000000000       1111111
+   00:::::::::00      00:::::::::00    1::::::1
+ 00:::::::::::::00  00:::::::::::::00 1:::::::1
+0:::::::000:::::::00:::::::000:::::::0111:::::1
+0::::::0   0::::::00::::::0   0::::::0   1::::1
+0:::::0     0:::::00:::::0     0:::::0   1::::1
+0:::::0     0:::::00:::::0     0:::::0   1::::1
+0:::::0 000 0:::::00:::::0 000 0:::::0   1::::l
+0:::::0 000 0:::::00:::::0 000 0:::::0   1::::l
+0:::::0     0:::::00:::::0     0:::::0   1::::l
+0:::::0     0:::::00:::::0     0:::::0   1::::l
+0::::::0   0::::::00::::::0   0::::::0   1::::l
+0:::::::000:::::::00:::::::000:::::::0111::::::111
+ 00:::::::::::::00  00:::::::::::::00 1::::::::::1
+   00:::::::::00      00:::::::::00   1::::::::::1
+     000000000          000000000     111111111111
+`;
+
+function printBanner() {
+  // Respect non-color environments (CI logs, piped output, NO_COLOR convention).
+  const wantColor =
+    process.stdout.isTTY &&
+    process.env.NO_COLOR !== "1" &&
+    process.env.FORCE_COLOR !== "0";
+  const banner = wantColor ? `${BRAND}${BANNER_001}${RESET}` : BANNER_001;
+  const tagline = wantColor
+    ? `${DIM}  Employee001 — your company's organizational brain${RESET}`
+    : "  Employee001 — your company's organizational brain";
+  process.stdout.write(banner);
+  process.stdout.write(tagline + "\n\n");
+}
+
 function generateToken() {
   return randomBytes(24).toString("hex");
 }
@@ -39,6 +81,7 @@ async function validateAnthropicKey(key) {
 }
 
 export default async function setup() {
+  printBanner();
   p.intro("Employee001 — first-run setup");
 
   const existing = readExistingEnv();
