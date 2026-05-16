@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 
 type RunSurface = "shift" | "routine" | "task" | "council" | "builder";
 type RunStatus = "running" | "complete" | "error" | "aborted";
@@ -362,7 +362,7 @@ function LogLine({ ev }: { ev: RunLogEvent }) {
 }
 
 function CockpitCard({ run }: { run: ActiveRun }) {
-  const employee = EMPLOYEES_WITH_TWIN.find((e) => e.id === run.employeeId);
+  const employee = useRoster().find((e) => e.id === run.employeeId);
   const initials =
     employee?.initials ?? run.employeeName.slice(0, 2).toUpperCase();
   const avatarColor = employee?.avatarColor ?? "var(--surface)";

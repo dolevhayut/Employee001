@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 import type { AuditEntry, AuditVerdict } from "@/lib/audit-log";
 
 // ─── Verdict helpers ──────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ function relTime(ts: string): string {
 // ─── Employee avatar ──────────────────────────────────────────────────────────
 
 function EmpAvatar({ employeeId, employeeName }: { employeeId: string; employeeName: string }) {
-  const emp = EMPLOYEES_WITH_TWIN.find((e) => e.id === employeeId);
+  const emp = useRoster().find((e) => e.id === employeeId);
   const initials = emp?.initials ?? employeeName.slice(0, 2).toUpperCase();
   const color = emp?.avatarColor ?? "var(--surface)";
   return (
@@ -266,7 +266,7 @@ export default function AuditPage() {
           }}
         >
           <option value="">All employees</option>
-          {EMPLOYEES_WITH_TWIN.map((e) => (
+          {useRoster().map((e) => (
             <option key={e.id} value={e.id}>
               {e.name}
             </option>

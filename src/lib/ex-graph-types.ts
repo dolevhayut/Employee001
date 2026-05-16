@@ -152,6 +152,16 @@ export type TwinTraceEvent =
         content: string;
       };
       ts: number;
+    }
+  | {
+      /** External-service failure surfaced to the UI so the user sees a real
+       *  message instead of a silent empty bubble. `kind` lets the UI distinguish
+       *  e.g. "anthropic_unavailable" (the model is offline) from
+       *  "composio_degraded" (tools missing, but the twin can still answer). */
+      type: "error";
+      kind: "anthropic_unavailable" | "composio_degraded" | "internal";
+      message: string;
+      ts: number;
     };
 
 // ─── Skills (Paperclip-style typed tools) ────────────────────────────────────

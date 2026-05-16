@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 import { getTwinBudget } from "@/lib/twin-budget";
 
 export const runtime = "nodejs";
 
-export function GET() {
+export async function GET() {
+  const fromDisk = await loadEmployeesFromDisk();
   const all = [
-    ...EMPLOYEES_WITH_TWIN,
+    ...fromDisk,
     ...getHiredEmployees().filter(
-      (h) => !EMPLOYEES_WITH_TWIN.some((e) => e.id === h.id)
+      (h) => !fromDisk.some((e) => e.id === h.id)
     ),
   ];
   const budgets = all.map((emp) => ({

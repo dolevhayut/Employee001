@@ -21,7 +21,8 @@ import {
   type EmployeeCanvas,
 } from "@/components/ex/employee-canvas";
 import { ClarificationCard } from "@/components/ex/clarification-card";
-import { EMPLOYEES_WITH_TWIN, type EmployeeWithTwin } from "@/lib/employees";
+import { type EmployeeWithTwin } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 import type { CouncilEvent, ClarificationQuestion } from "@/lib/council-runner";
 import { humanizeToolAction } from "@/lib/tool-humanize";
 
@@ -141,7 +142,7 @@ function ParticipantsBar({
   active: Set<string>;
   onToggle: (id: string) => void;
 }) {
-  const readyEmployees = EMPLOYEES_WITH_TWIN.filter(
+  const readyEmployees = useRoster().filter(
     (e) => e.twinStatus === "ready"
   );
 
@@ -1453,10 +1454,20 @@ function TypingIndicator({ emp }: { emp: EmployeeWithTwin }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CouncilPage() {
-  const defaultActive = new Set(
-    EMPLOYEES_WITH_TWIN.filter((e) => e.twinStatus === "ready").map((e) => e.id)
-  );
-  const [activeIds, setActiveIds] = useState<Set<string>>(defaultActive);
+  const roster = useRoster();
+  const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
+
+  // Sync defaults once roster hydrates (initial render had an empty roster, so
+  // we can't seed activeIds via useState initializer).
+  useEffect(() => {
+    setActiveIds((prev) => {
+      if (prev.size > 0) return prev;
+      const next = new Set(
+        roster.filter((e) => e.twinStatus === "ready").map((e) => e.id)
+      );
+      return next.size > 0 ? next : prev;
+    });
+  }, [roster]);
   const [threads, setThreads] = useState<MessageThread[]>([]);
   // Stable across CEO messages — server uses it to load the meeting transcript
   // so every twin sees prior CEO asks and prior twin turns. Resets on page
@@ -1471,8 +1482,8 @@ export default function CouncilPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const readyEmployees = useMemo(
-    () => EMPLOYEES_WITH_TWIN.filter((e) => e.twinStatus === "ready"),
-    []
+    () => roster.filter((e) => e.twinStatus === "ready"),
+    [roster]
   );
 
   /** Twins matching the current @-query */
@@ -1529,7 +1540,7 @@ export default function CouncilPage() {
     const mentionedIds = parseMentions(trimmed);
     const respondingIds = mentionedIds
       ? mentionedIds
-      : EMPLOYEES_WITH_TWIN.filter(
+      : roster.filter(
           (e) => activeIds.has(e.id) && e.twinStatus === "ready"
         ).map((e) => e.id);
 
@@ -2187,9 +2198,9 @@ export default function CouncilPage() {
   }
 
   const empById = Object.fromEntries(
-    EMPLOYEES_WITH_TWIN.map((e) => [e.id, e])
+    roster.map((e) => [e.id, e])
   );
-  const readyCount = EMPLOYEES_WITH_TWIN.filter((e) => e.twinStatus === "ready").length;
+  const readyCount = roster.filter((e) => e.twinStatus === "ready").length;
 
   return (
     <div

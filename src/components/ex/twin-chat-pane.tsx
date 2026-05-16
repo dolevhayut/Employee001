@@ -10,9 +10,10 @@ import {
 } from "@/components/ex/employee-canvas";
 import type { TwinTraceEvent } from "@/lib/ex-graph-types";
 import {
-  EMPLOYEES_WITH_TWIN,
   ELEVENLABS_VOICE_STORAGE_KEY,
+  type EmployeeWithTwin,
 } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 
 // Web Speech API type declarations (not in default TS lib)
 interface SpeechRecognitionEvent extends Event {
@@ -432,13 +433,13 @@ function TypingDots() {
 
 // ─── TTS playback hook ────────────────────────────────────────────────────────
 
-function resolveVoiceId(employeeId: string): string {
+function resolveVoiceId(employeeId: string, roster: EmployeeWithTwin[]): string {
   try {
     const stored = localStorage.getItem(ELEVENLABS_VOICE_STORAGE_KEY);
     const overrides: Record<string, string> = stored ? JSON.parse(stored) : {};
     if (overrides[employeeId]) return overrides[employeeId];
   } catch { /* ignore */ }
-  return EMPLOYEES_WITH_TWIN.find((e) => e.id === employeeId)?.ttsVoiceId ?? "EXAVITQu4vr4xnSDxMaL";
+  return roster.find((e) => e.id === employeeId)?.ttsVoiceId ?? "EXAVITQu4vr4xnSDxMaL";
 }
 
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
@@ -639,7 +640,8 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
   const { playingId, loadingId, play, stopRef } = useTTS();
   const submitRef = useRef<(q: string) => void>(() => {});
 
-  const employee = EMPLOYEES_WITH_TWIN.find((e) => e.id === employeeId);
+  const roster = useRoster();
+  const employee = roster.find((e) => e.id === employeeId);
   const avatarColor = employee?.avatarColor ?? "var(--twin)";
   const initials = employee?.initials ?? "AI";
 
@@ -1124,7 +1126,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                     <button
                       onClick={() => {
                         if (playingId === m.id) { stopRef.current(); }
-                        else { play(m.id, m.text, resolveVoiceId(employeeId ?? "")); }
+                        else { play(m.id, m.text, resolveVoiceId(employeeId ?? "", roster)); }
                       }}
                       disabled={loadingId === m.id}
                       title={playingId === m.id ? "Stop" : "Listen"}

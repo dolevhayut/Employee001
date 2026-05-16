@@ -7,7 +7,8 @@ import {
 } from "@/lib/routines";
 import { isUnderBudget } from "@/lib/twin-budget";
 import { runSingleTwin, type CouncilEvent } from "@/lib/council-runner";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { loadEmployeesFromDisk } from "@/lib/employees-disk";
+import { getHiredEmployees } from "@/lib/hired-agents";
 import { runShift } from "@/lib/shift-runner";
 import { appendFeedItem } from "@/lib/feed-store";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
@@ -85,7 +86,12 @@ export async function fireRoutine(
     updateRoutine(r.id, { nextRunAt });
   }
 
-  const employee = EMPLOYEES_WITH_TWIN.find((e) => e.id === r.employeeId);
+  const fromDisk = await loadEmployeesFromDisk();
+  const roster = [
+    ...fromDisk,
+    ...getHiredEmployees().filter((h) => !fromDisk.some((e) => e.id === h.id)),
+  ];
+  const employee = roster.find((e) => e.id === r.employeeId);
   if (!employee) {
     state.running.delete(r.id);
     updateRoutine(r.id, {

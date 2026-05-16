@@ -132,7 +132,29 @@ export async function PUT(
     });
   }
 
-  const ok = writeEmployeeFileBody(id, name, body.body);
+  let ok: string | null = null;
+  try {
+    ok = writeEmployeeFileBody(id, name, body.body);
+  } catch (err) {
+    // Disk full, permission denied, read-only filesystem, etc. — return a
+    // clean structured error so the UI can show a user-visible message
+    // instead of a 500 stack trace. The app keeps running.
+    const message = err instanceof Error ? err.message : "Unknown disk error";
+    const lower = message.toLowerCase();
+    const reason =
+      lower.includes("eacces") || lower.includes("eperm")
+        ? "Permission denied — the data directory is not writable. Check filesystem permissions."
+        : lower.includes("enospc")
+        ? "Disk is full — free up space and try again."
+        : lower.includes("erofs")
+        ? "Filesystem is read-only — the data directory cannot be written."
+        : `Could not save: ${message}`;
+    console.warn(`[profile-write] save failed for ${id}/${name}: ${message}`);
+    return new Response(
+      JSON.stringify({ error: reason, code: "disk_write_failed" }),
+      { status: 503, headers: { "Content-Type": "application/json" } }
+    );
+  }
   if (!ok) {
     return new Response(JSON.stringify({ error: "invalid file or employee" }), {
       status: 400,

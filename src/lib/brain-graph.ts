@@ -14,7 +14,8 @@
 
 import fs from "fs";
 import path from "path";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { loadEmployeesFromDisk } from "@/lib/employees-disk";
+import { getHiredEmployees } from "@/lib/hired-agents";
 import { readAllEmployeeFiles } from "@/lib/employees-files";
 import { listOrgBrainNodes } from "@/lib/org-brain";
 import type { EmployeeGraph, RealEdge, RealNode } from "@/lib/profile-graph-real";
@@ -48,9 +49,14 @@ function estimateTokens(body: string): number {
  *   - employee → brain: when an employee profile file body contains a
  *     wikilink to a brain slug.
  */
-export function buildOrgBrainGraph(): EmployeeGraph {
+export async function buildOrgBrainGraph(): Promise<EmployeeGraph> {
   const brainNodes = listOrgBrainNodes();
   const brainSlugs = new Set(brainNodes.map((n) => n.slug));
+  const fromDisk = await loadEmployeesFromDisk();
+  const roster = [
+    ...fromDisk,
+    ...getHiredEmployees().filter((h) => !fromDisk.some((e) => e.id === h.id)),
+  ];
 
   const nodes: RealNode[] = [];
   const edges: RealEdge[] = [];
@@ -95,7 +101,7 @@ export function buildOrgBrainGraph(): EmployeeGraph {
   }
 
   // ─── employee profile clusters ──────────────────────────────────────
-  for (const emp of EMPLOYEES_WITH_TWIN) {
+  for (const emp of roster) {
     const empName = `emp:${emp.id}`;
     const files = (() => {
       try {
@@ -142,7 +148,7 @@ export function buildOrgBrainGraph(): EmployeeGraph {
   // scratch files and recent twin-memory cards as yellow nodes attached
   // to a (possibly synthetic) employee node. This is the agent's
   // short-term memory drawer made visible.
-  for (const emp of EMPLOYEES_WITH_TWIN) {
+  for (const emp of roster) {
     const empName = `emp:${emp.id}`;
     const scratchFiles = readScratchFiles(emp.id);
     const memoryCards = readRecentMemoryCards(emp.id, MEMORY_CARDS_PER_EMPLOYEE);
@@ -282,13 +288,13 @@ function readRecentMemoryCards(
 }
 
 /** Stats for UI summaries — not used in render, but useful for badges. */
-export function brainGraphStats(): {
+export async function brainGraphStats(): Promise<{
   brainNodeCount: number;
   edgeCount: number;
   employeesLinkedIn: number;
   orphanBrainNodes: number;
-} {
-  const graph = buildOrgBrainGraph();
+}> {
+  const graph = await buildOrgBrainGraph();
   const brainCount = graph.nodes.filter((n) => n.name.startsWith("brain:")).length;
   const empCount = graph.nodes.filter((n) => n.name.startsWith("emp:")).length;
 

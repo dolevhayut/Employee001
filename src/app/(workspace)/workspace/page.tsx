@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { PageHead } from "@/components/ex/page-head";
-import { EMPLOYEES_WITH_TWIN, CLAUDE_MODELS, type ClaudeModel } from "@/lib/employees";
+import { CLAUDE_MODELS, type ClaudeModel } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 
 // Per-employee budget/cost baselines. Originally seeded from demo data;
 // now driven entirely by the employee record (added by the CEO at runtime).
@@ -61,6 +62,7 @@ function formatCost(usd: number): string {
 }
 
 export default function WorkspaceOverviewPage() {
+  const roster = useRoster();
   const [overrides, setOverrides] = useState<ModelOverrides>({});
   const [execCosts, setExecCosts] = useState<ExecutionCosts | null>(null);
 
@@ -82,7 +84,7 @@ export default function WorkspaceOverviewPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const employees = EMPLOYEES_WITH_TWIN.filter((e) => BASE_SEED[e.id] !== undefined);
+  const employees = roster.filter((e) => BASE_SEED[e.id] !== undefined);
 
   function getModels(emp: (typeof employees)[number]) {
     return overrides[emp.id] ?? { seed: emp.seedModel, refresh: emp.refreshModel };
@@ -407,7 +409,7 @@ export default function WorkspaceOverviewPage() {
                 </div>
 
                 {execCosts.byEmployee.map((row, i) => {
-                  const emp = EMPLOYEES_WITH_TWIN.find(
+                  const emp = roster.find(
                     (e) => e.id === row.employeeId
                   );
                   const pct =

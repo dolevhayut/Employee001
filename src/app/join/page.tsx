@@ -16,9 +16,10 @@ type InviteShape = {
 
 type ValidateResponse =
   | { status: "redeemable"; invite: InviteShape }
-  | { status: "used"; invite: InviteShape }
-  | { status: "expired"; invite: InviteShape }
-  | { status: "not_found" };
+  | { status: "used"; invite: InviteShape; message?: string }
+  | { status: "already_redeemed"; invite: InviteShape; message?: string }
+  | { status: "expired"; invite: InviteShape; message?: string }
+  | { status: "not_found"; message?: string };
 
 // Fonts loaded at the root layout (src/app/layout.tsx).
 const SANS_FONT =
@@ -118,8 +119,8 @@ function Page() {
           {state.kind === "error" && (
             <>
               <h1 style={{ fontFamily: SERIF_FONT, fontSize: 32, margin: "0 0 12px" }}>
-                {state.status === "used"
-                  ? "This invite was already used."
+                {state.status === "used" || state.status === "already_redeemed"
+                  ? "This invite was already redeemed."
                   : state.status === "expired"
                     ? "This invite expired."
                     : "Invite not found."}

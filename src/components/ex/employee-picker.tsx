@@ -4,11 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { NavArrowRight } from "iconoir-react";
-import {
-  EMPLOYEES_WITH_TWIN,
-  getEmployee,
-  type EmployeeWithTwin,
-} from "@/lib/employees";
+import { type EmployeeWithTwin } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 
 type Props = {
   onSelect?: (id: string) => void;
@@ -23,8 +20,9 @@ function statusLabel(emp: EmployeeWithTwin): string {
 export function EmployeePicker({ onSelect }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeId = searchParams.get("employee") ?? EMPLOYEES_WITH_TWIN[0]?.id ?? "";
-  const active = getEmployee(activeId) ?? EMPLOYEES_WITH_TWIN[0];
+  const roster = useRoster();
+  const activeId = searchParams.get("employee") ?? roster[0]?.id ?? "";
+  const active = roster.find((e) => e.id === activeId) ?? roster[0];
 
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -179,7 +177,7 @@ export function EmployeePicker({ onSelect }: Props) {
             zIndex: 50,
           }}
         >
-          {EMPLOYEES_WITH_TWIN.map((emp) => {
+          {roster.map((emp) => {
             const disabled = emp.twinStatus !== "ready";
             const isActive = emp.id === active.id;
             return (

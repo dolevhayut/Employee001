@@ -10,10 +10,8 @@ import {
   EmployeeCanvasPanel,
   type EmployeeCanvas,
 } from "@/components/ex/employee-canvas";
-import {
-  EMPLOYEES_WITH_TWIN,
-  type EmployeeWithTwin,
-} from "@/lib/employees";
+import { type EmployeeWithTwin } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 import {
   filterTemplates,
   type TaskTemplate,
@@ -292,14 +290,19 @@ function eventsToLog(events: PersistedEvent[]): TaskLogEntry[] {
   return out;
 }
 
-const READY_EMPLOYEES = EMPLOYEES_WITH_TWIN.filter((e) => e.twinStatus === "ready");
-
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
-  const [selectedId, setSelectedId] = useState<string>(
-    READY_EMPLOYEES[0]?.id ?? ""
-  );
+  const roster = useRoster();
+  const readyEmployees = roster.filter((e) => e.twinStatus === "ready");
+  const [selectedId, setSelectedId] = useState<string>("");
+
+  // Default to the first ready twin once the roster hydrates.
+  useEffect(() => {
+    if (selectedId) return;
+    const next = readyEmployees[0]?.id;
+    if (next) setSelectedId(next);
+  }, [selectedId, readyEmployees]);
   const [task, setTask] = useState("");
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<TaskLogEntry[]>([]);
@@ -385,7 +388,7 @@ export default function TasksPage() {
     };
   }, [expandedRunId]);
 
-  const selected = EMPLOYEES_WITH_TWIN.find((e) => e.id === selectedId);
+  const selected = roster.find((e) => e.id === selectedId);
 
   // Fetch connections whenever selected employee changes
   useEffect(() => {
@@ -655,7 +658,7 @@ export default function TasksPage() {
 
   function handleRerun(run: TaskRun) {
     setTask(run.task);
-    const isReady = READY_EMPLOYEES.some((e) => e.id === run.employeeId);
+    const isReady = readyEmployees.some((e) => e.id === run.employeeId);
     if (isReady) setSelectedId(run.employeeId);
     requestAnimationFrame(() => {
       textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -771,7 +774,7 @@ export default function TasksPage() {
                   flexWrap: "wrap",
                 }}
               >
-                {READY_EMPLOYEES.map((emp) => (
+                {readyEmployees.map((emp) => (
                   <EmployeeChip
                     key={emp.id}
                     employee={emp}
@@ -1606,7 +1609,7 @@ function HistoryRow({
   onRerun: (run: TaskRun) => void;
   isLast: boolean;
 }) {
-  const employee = EMPLOYEES_WITH_TWIN.find((e) => e.id === run.employeeId);
+  const employee = useRoster().find((e) => e.id === run.employeeId);
   const badge = statusBadge(run.status);
   const dur = durationLabel(run.startedAt, run.endedAt);
   const replayLog = events ? eventsToLog(events) : null;

@@ -6,7 +6,7 @@ import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { PageHead } from "@/components/ex/page-head";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 import type { Routine, Schedule, RoutineRunStatus } from "@/lib/routines";
 import { isValidCron } from "@/lib/cron";
 
@@ -43,6 +43,7 @@ const STATUS_META: Record<RoutineRunStatus, { label: string; color: string; bg: 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function RoutinesPage() {
+  const roster = useRoster();
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [detailRoutine, setDetailRoutine] = useState<Routine | null>(null);
@@ -130,7 +131,7 @@ export default function RoutinesPage() {
         {routines.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-10)", maxWidth: 880 }}>
             {routines.map((r) => {
-              const employee = EMPLOYEES_WITH_TWIN.find((e) => e.id === r.employeeId);
+              const employee = roster.find((e) => e.id === r.employeeId);
               const status = r.lastRunStatus ? STATUS_META[r.lastRunStatus] : null;
               return (
                 <motion.div
@@ -351,7 +352,7 @@ function RoutineDetailModal({
   onClose: () => void;
   onRunNow: () => Promise<void>;
 }) {
-  const employee = EMPLOYEES_WITH_TWIN.find((e) => e.id === routine.employeeId);
+  const employee = useRoster().find((e) => e.id === routine.employeeId);
   const status = routine.lastRunStatus ? STATUS_META[routine.lastRunStatus] : null;
 
   return (
@@ -557,8 +558,16 @@ function CreateRoutineModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const ready = EMPLOYEES_WITH_TWIN.filter((e) => e.twinStatus === "ready");
-  const [employeeId, setEmployeeId] = useState(ready[0]?.id ?? EMPLOYEES_WITH_TWIN[0].id);
+  const roster = useRoster();
+  const ready = roster.filter((e) => e.twinStatus === "ready");
+  const [employeeId, setEmployeeId] = useState<string>(ready[0]?.id ?? roster[0]?.id ?? "");
+
+  // Sync default when roster hydrates after mount (initial render had an empty roster).
+  useEffect(() => {
+    if (employeeId) return;
+    const next = ready[0]?.id ?? roster[0]?.id;
+    if (next) setEmployeeId(next);
+  }, [employeeId, ready, roster]);
   const [name, setName] = useState("");
   const [task, setTask] = useState("");
   const [scheduleType, setScheduleType] = useState<"daily" | "weekly" | "interval" | "cron">("daily");
@@ -678,7 +687,7 @@ function CreateRoutineModal({
               onChange={(e) => setEmployeeId(e.target.value)}
               style={selectStyle}
             >
-              {EMPLOYEES_WITH_TWIN.map((e) => (
+              {roster.map((e) => (
                 <option key={e.id} value={e.id} disabled={e.twinStatus !== "ready"}>
                   {e.name} {e.twinStatus !== "ready" ? "(not ready)" : ""}
                 </option>

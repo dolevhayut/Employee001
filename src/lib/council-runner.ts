@@ -760,9 +760,26 @@ export async function runSingleTwin(
   try {
     // Build the per-employee Composio MCP server (null if not configured / no connections)
     // and merge in any org-wide custom MCP servers the CEO configured in /settings.
+    // Composio outages must NOT abort the twin's turn — degrade gracefully by
+    // omitting the toolkit so the twin can still answer from its profile files.
     const [composioMcp, orgMcpServers] = await Promise.all([
-      buildEmployeeMcpServer(employee.id),
-      loadOrgCustomMcpServers(),
+      buildEmployeeMcpServer(employee.id).catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[composio] tools unavailable, twin will answer without them: ${msg}`);
+        onEvent({
+          type: "tool_blocked",
+          employeeId: employee.id,
+          tool: "composio",
+          reason: `Composio is temporarily unavailable — tools are degraded. ${msg}`,
+          ts: ts(),
+        });
+        return null;
+      }),
+      loadOrgCustomMcpServers().catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[org-mcp] load failed: ${msg}`);
+        return {};
+      }),
     ]);
 
     const meetingId = options.teamMeetingContext?.meetingId;
@@ -1250,6 +1267,19 @@ export async function runSingleTwin(
         const subtype = (message as { subtype?: string }).subtype;
         if (subtype === "error_max_budget_usd") stoppedReason = "max_budget";
         else if (subtype === "error_max_turns") stoppedReason = "max_turns";
+        // External-service failure (Anthropic 5xx, connection refused, billing,
+        // auth, etc.) — the SDK surfaces it as a result with is_error=true or
+        // subtype "error_during_execution". Throw so the outer catch emits a
+        // user-visible employee_error instead of letting us declare success
+        // with empty text.
+        const isErr = (message as { is_error?: boolean }).is_error === true ||
+          subtype === "error_during_execution";
+        if (isErr && !finalText) {
+          const errs = (message as { errors?: string[] }).errors ?? [];
+          const apiStatus = (message as { api_error_status?: number | null }).api_error_status;
+          const detail = errs.join("; ") || (apiStatus ? `API error ${apiStatus}` : "Anthropic API error");
+          throw new Error(`anthropic_unavailable: ${detail}`);
+        }
       }
     }
 

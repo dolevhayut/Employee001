@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import { isInviteRedeemable, markInviteCompleted } from "@/lib/invites";
+import { classifyInvite, markInviteCompleted, tryClaimInvite, releaseInviteClaim } from "@/lib/invites";
 
 export const runtime = "nodejs";
 
@@ -228,64 +228,126 @@ function slugify(s: string): string {
  * Body: { name, role, profile? }. profile keys are file basenames (no .md).
  * Missing keys still produce empty files so downstream readers don't break.
  */
+function statusForReason(
+  reason: "not_found" | "used" | "expired" | "already_claimed",
+): { status: string; httpStatus: number; message: string } {
+  switch (reason) {
+    case "not_found":
+      return {
+        status: "not_found",
+        httpStatus: 404,
+        message: "This invite link is not recognized. Ask the CEO for a new one.",
+      };
+    case "used":
+      return {
+        status: "already_redeemed",
+        httpStatus: 410,
+        message: "This invite has already been redeemed. Ask the CEO for a new link.",
+      };
+    case "expired":
+      return {
+        status: "expired",
+        httpStatus: 410,
+        message: "This invite has expired. Ask the CEO for a new link.",
+      };
+    case "already_claimed":
+      // Concurrent request is finishing onboarding for this same token.
+      // Surface as "already redeemed" — by the time the user retries, it will be.
+      return {
+        status: "already_redeemed",
+        httpStatus: 409,
+        message: "This invite is being completed in another tab. Ask the CEO for a new link if you didn't start it.",
+      };
+  }
+}
+
 export async function POST(request: NextRequest, { params }: Params) {
   const { token } = await params;
-  const invite = isInviteRedeemable(token);
-  if (!invite) {
+
+  const cls = classifyInvite(token);
+  if (!cls.ok) {
+    const info = statusForReason(cls.reason);
     return NextResponse.json(
-      { status: "not_redeemable" },
-      { status: 410 },
+      { status: info.status, message: info.message },
+      { status: info.httpStatus },
     );
   }
+  const invite = cls.invite;
 
   let body: CompletePayload = {};
   try {
     body = (await request.json()) as CompletePayload;
   } catch {
-    return NextResponse.json({ status: "invalid_body" }, { status: 400 });
+    return NextResponse.json(
+      { status: "invalid_body", message: "Request body must be valid JSON." },
+      { status: 400 },
+    );
   }
 
   const name = (body.name || invite.name || "").trim();
   if (!name) {
-    return NextResponse.json({ status: "name_required" }, { status: 400 });
+    return NextResponse.json(
+      { status: "name_required", message: "A name is required to complete onboarding." },
+      { status: 400 },
+    );
   }
   const role = (body.role || invite.role || "").trim();
 
   const slug = slugify(name);
   if (!slug) {
-    return NextResponse.json({ status: "name_invalid" }, { status: 400 });
+    return NextResponse.json(
+      { status: "name_invalid", message: "That name can't be turned into a valid slug. Try plain letters." },
+      { status: 400 },
+    );
   }
-  const employeeId = `${slug}-${token.slice(4, 10)}`;
-  const dir = path.join(process.cwd(), "data", "employees", employeeId);
-  await fs.mkdir(dir, { recursive: true });
 
-  const profile = buildProfileMarkdown(body, { name, role });
-  await Promise.all(
-    PROFILE_FILES.map((key) =>
-      fs.writeFile(path.join(dir, `${key}.md`), profile[key], "utf8"),
-    ),
-  );
+  // Atomic claim: only one concurrent request can pass this gate. Subsequent
+  // requests for the same token get a clean "already redeemed" response
+  // instead of writing duplicate employee directories or racing the write.
+  const claim = tryClaimInvite(token);
+  if (!claim.claimed) {
+    const info = statusForReason(claim.reason);
+    return NextResponse.json(
+      { status: info.status, message: info.message },
+      { status: info.httpStatus },
+    );
+  }
 
-  // Metadata sidecar — read back by loadEmployeesFromDisk() to materialise
-  // the workspace's employee list.
-  await fs.writeFile(
-    path.join(dir, "employee.json"),
-    JSON.stringify(
-      {
-        id: employeeId,
-        name,
-        role: role || null,
-        integrations: (body.integrations ?? []).filter(Boolean),
-        createdAt: new Date().toISOString(),
-        lastActiveAt: new Date().toISOString(),
-        via: { invite: token },
-      },
-      null,
-      2,
-    ),
-    "utf8",
-  );
+  try {
+    const employeeId = `${slug}-${token.slice(4, 10)}`;
+    const dir = path.join(process.cwd(), "data", "employees", employeeId);
+    await fs.mkdir(dir, { recursive: true });
 
-  const updated = markInviteCompleted(token, employeeId);
-  return NextResponse.json({ status: "completed", employeeId, invite: updated });
+    const profile = buildProfileMarkdown(body, { name, role });
+    await Promise.all(
+      PROFILE_FILES.map((key) =>
+        fs.writeFile(path.join(dir, `${key}.md`), profile[key], "utf8"),
+      ),
+    );
+
+    // Metadata sidecar — read back by loadEmployeesFromDisk() to materialise
+    // the workspace's employee list.
+    await fs.writeFile(
+      path.join(dir, "employee.json"),
+      JSON.stringify(
+        {
+          id: employeeId,
+          name,
+          role: role || null,
+          integrations: (body.integrations ?? []).filter(Boolean),
+          createdAt: new Date().toISOString(),
+          lastActiveAt: new Date().toISOString(),
+          via: { invite: token },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const updated = markInviteCompleted(token, employeeId);
+    return NextResponse.json({ status: "completed", employeeId, invite: updated });
+  } finally {
+    releaseInviteClaim(token);
+  }
 }

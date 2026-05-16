@@ -10,6 +10,13 @@ const nextConfig: NextConfig = {
   // .next/standalone/server.js rather than nested under the absolute
   // project path (Next.js default behavior when project is in a deep dir).
   outputFileTracingRoot: path.join(__dirname),
+  // Next 16 blocks cross-origin requests to dev resources by default. When
+  // the browser hits the dev server via 127.0.0.1 (instead of the literal
+  // host Next sees), the HMR client chunks are rejected — which on this
+  // codebase silently breaks client-side hydration across the whole
+  // workspace. Allow both loopback names so dev works regardless of which
+  // the user types.
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "cdn.simpleicons.org" },

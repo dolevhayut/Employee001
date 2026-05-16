@@ -9,20 +9,27 @@ import {
 } from "@/components/ex/obsidian-graph";
 import { RealFileDrawer } from "@/components/ex/real-file-drawer";
 import { TwinChatPane } from "@/components/ex/twin-chat-pane";
-import { EMPLOYEES_WITH_TWIN, type EmployeeWithTwin } from "@/lib/employees";
+import { type EmployeeWithTwin } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 import type { TwinTraceEvent } from "@/lib/ex-graph-types";
 import type { EmployeeGraph } from "@/lib/profile-graph-real";
 
 const TOUCHED_LINGER_MS = 3000;
 
-const READY_EMPLOYEES = EMPLOYEES_WITH_TWIN.filter(
-  (e) => e.twinStatus === "ready"
-);
-
 export default function FlowPage() {
-  const [activeId, setActiveId] = useState<string>(
-    READY_EMPLOYEES[0]?.id ?? "",
+  const roster = useRoster();
+  const readyEmployees = useMemo(
+    () => roster.filter((e) => e.twinStatus === "ready"),
+    [roster],
   );
+  const [activeId, setActiveId] = useState<string>("");
+
+  // Default to first ready twin once the roster hydrates.
+  useEffect(() => {
+    if (activeId) return;
+    const next = readyEmployees[0]?.id;
+    if (next) setActiveId(next);
+  }, [activeId, readyEmployees]);
   const [graph, setGraph] = useState<EmployeeGraph | null>(null);
   const [graphLoading, setGraphLoading] = useState(true);
   const [openFile, setOpenFile] = useState<string | null>(null);
@@ -84,7 +91,7 @@ export default function FlowPage() {
   }, [isResizing]);
 
   const activeEmployee: EmployeeWithTwin | undefined = useMemo(
-    () => READY_EMPLOYEES.find((e) => e.id === activeId),
+    () => readyEmployees.find((e) => e.id === activeId),
     [activeId]
   );
 
@@ -334,6 +341,7 @@ function EmployeePickerBar({
   activeId: string;
   onSelect: (id: string) => void;
 }) {
+  const readyEmployees = useRoster().filter((e) => e.twinStatus === "ready");
   return (
     <div
       style={{
@@ -359,7 +367,7 @@ function EmployeePickerBar({
       >
         Twin brain
       </span>
-      {READY_EMPLOYEES.map((emp) => {
+      {readyEmployees.map((emp) => {
         const isActive = emp.id === activeId;
         return (
           <motion.button

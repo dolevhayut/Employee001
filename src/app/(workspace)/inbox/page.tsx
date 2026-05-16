@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 
 type FeedSource =
   | { kind: "shift"; employeeId: string; runId: string }
@@ -85,7 +85,7 @@ function TypeBadge({ type }: { type: FeedType }) {
 }
 
 function EmpAvatar({ employeeId, size = 22 }: { employeeId: string; size?: number }) {
-  const emp = EMPLOYEES_WITH_TWIN.find((e) => e.id === employeeId);
+  const emp = useRoster().find((e) => e.id === employeeId);
   const initials = emp?.initials ?? employeeId.slice(0, 2).toUpperCase();
   const color = emp?.avatarColor ?? "var(--surface)";
   return (
@@ -111,8 +111,9 @@ function EmpAvatar({ employeeId, size = 22 }: { employeeId: string; size?: numbe
 }
 
 function SourceLine({ source }: { source: FeedSource }) {
+  const roster = useRoster();
   if (source.kind === "shift") {
-    const emp = EMPLOYEES_WITH_TWIN.find((e) => e.id === source.employeeId);
+    const emp = roster.find((e) => e.id === source.employeeId);
     return (
       <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-6)" }}>
         <EmpAvatar employeeId={source.employeeId} size={18} />
@@ -124,7 +125,7 @@ function SourceLine({ source }: { source: FeedSource }) {
     );
   }
   if (source.kind === "routine") {
-    const emp = EMPLOYEES_WITH_TWIN.find((e) => e.id === source.employeeId);
+    const emp = roster.find((e) => e.id === source.employeeId);
     return (
       <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-6)" }}>
         <EmpAvatar employeeId={source.employeeId} size={18} />
@@ -138,7 +139,7 @@ function SourceLine({ source }: { source: FeedSource }) {
     );
   }
   if (source.kind === "task-run") {
-    const emp = EMPLOYEES_WITH_TWIN.find((e) => e.id === source.employeeId);
+    const emp = roster.find((e) => e.id === source.employeeId);
     return (
       <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-6)" }}>
         <EmpAvatar employeeId={source.employeeId} size={18} />
@@ -150,8 +151,8 @@ function SourceLine({ source }: { source: FeedSource }) {
     );
   }
   if (source.kind === "twin-task") {
-    const fromEmp = EMPLOYEES_WITH_TWIN.find((e) => e.id === source.fromId);
-    const toEmp = EMPLOYEES_WITH_TWIN.find((e) => e.id === source.toId);
+    const fromEmp = roster.find((e) => e.id === source.fromId);
+    const toEmp = roster.find((e) => e.id === source.toId);
     return (
       <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-5)", fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>
         <span style={{ fontWeight: 500 }}>{fromEmp?.firstName ?? source.fromId}</span>
@@ -161,7 +162,7 @@ function SourceLine({ source }: { source: FeedSource }) {
     );
   }
   if (source.kind === "approval") {
-    const emp = EMPLOYEES_WITH_TWIN.find((e) => e.id === source.employeeId);
+    const emp = roster.find((e) => e.id === source.employeeId);
     return (
       <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-6)" }}>
         <EmpAvatar employeeId={source.employeeId} size={18} />

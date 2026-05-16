@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import type { TwinTraceEvent } from "@/lib/ex-graph-types";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { loadEmployeesFromDisk } from "@/lib/employees-disk";
+import { getHiredEmployees } from "@/lib/hired-agents";
 import { hasEmployeeFiles } from "@/lib/employees-files";
 import { runSingleTwin } from "@/lib/council-runner";
 import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
@@ -49,11 +50,16 @@ export async function POST(request: NextRequest) {
   }
 
   const employeeId = body.employeeId;
+  const fromDisk = await loadEmployeesFromDisk();
+  const roster = [
+    ...fromDisk,
+    ...getHiredEmployees().filter((h) => !fromDisk.some((e) => e.id === h.id)),
+  ];
   const employee =
     (employeeId
-      ? EMPLOYEES_WITH_TWIN.find((e) => e.id === employeeId)
+      ? roster.find((e) => e.id === employeeId)
       : undefined) ??
-    EMPLOYEES_WITH_TWIN.find(
+    roster.find(
       (e) => e.twinStatus === "ready" && hasEmployeeFiles(e.id)
     );
 

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { runCouncil } from "@/lib/council-runner";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { loadEmployeesFromDisk } from "@/lib/employees-disk";
+import { getHiredEmployees } from "@/lib/hired-agents";
 import { hasEmployeeFiles } from "@/lib/employees-files";
 
 export async function POST(request: NextRequest) {
@@ -22,7 +23,12 @@ export async function POST(request: NextRequest) {
   }
 
   const requestedIds = body.employeeIds ?? [];
-  const employees = EMPLOYEES_WITH_TWIN.filter(
+  const fromDisk = await loadEmployeesFromDisk();
+  const roster = [
+    ...fromDisk,
+    ...getHiredEmployees().filter((h) => !fromDisk.some((e) => e.id === h.id)),
+  ];
+  const employees = roster.filter(
     (e) =>
       e.twinStatus === "ready" &&
       requestedIds.includes(e.id) &&
@@ -37,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   // All ready employees available for delegation (even if not in the active session)
-  const allParticipants = EMPLOYEES_WITH_TWIN.filter(
+  const allParticipants = roster.filter(
     (e) => e.twinStatus === "ready" && hasEmployeeFiles(e.id)
   );
 

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { loadEmployeesFromDisk } from "@/lib/employees-disk";
+import { getHiredEmployees } from "@/lib/hired-agents";
 import { hasEmployeeFiles } from "@/lib/employees-files";
 import { runSingleTwin } from "@/lib/council-runner";
 import type { CouncilEvent } from "@/lib/council-runner";
@@ -29,7 +30,12 @@ export async function POST(
     });
   }
 
-  const employee = EMPLOYEES_WITH_TWIN.find((e) => e.id === id);
+  const fromDisk = await loadEmployeesFromDisk();
+  const roster = [
+    ...fromDisk,
+    ...getHiredEmployees().filter((h) => !fromDisk.some((e) => e.id === h.id)),
+  ];
+  const employee = roster.find((e) => e.id === id);
   if (!employee || !hasEmployeeFiles(employee.id)) {
     return new Response(
       JSON.stringify({ error: "employee not found or has no profile files" }),

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 import type { FocusPrefetch, FocusConfig } from "@/lib/twin-focus";
 
 const SUGGESTIONS: { slug: string; args: Record<string, unknown>; label: string }[] = [
@@ -19,8 +19,15 @@ const SUGGESTIONS: { slug: string; args: Record<string, unknown>; label: string 
 const MONO_FONT = "ui-monospace, SFMono-Regular, Menlo, monospace";
 
 export default function FocusPage() {
-  const ready = EMPLOYEES_WITH_TWIN.filter((e) => e.twinStatus === "ready");
-  const [employeeId, setEmployeeId] = useState<string>(ready[0]?.id ?? "");
+  const roster = useRoster();
+  const ready = roster.filter((e) => e.twinStatus === "ready");
+  const [employeeId, setEmployeeId] = useState<string>("");
+
+  // Default to the first ready employee once the roster hydrates.
+  useEffect(() => {
+    if (employeeId) return;
+    if (ready[0]?.id) setEmployeeId(ready[0].id);
+  }, [employeeId, ready]);
   const [config, setConfig] = useState<FocusConfig>({ prefetches: [] });
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<{ index: number | null; seed?: Partial<FocusPrefetch> } | null>(null);
@@ -61,7 +68,7 @@ export default function FocusPage() {
     await save(next);
   }
 
-  const employee = EMPLOYEES_WITH_TWIN.find((e) => e.id === employeeId);
+  const employee = roster.find((e) => e.id === employeeId);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>

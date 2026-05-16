@@ -1,4 +1,5 @@
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { loadEmployeesFromDisk } from "@/lib/employees-disk";
+import { getHiredEmployees } from "@/lib/hired-agents";
 import {
   getAssignedOrgSkillIdsForEmployee,
   listOrgSkills,
@@ -10,7 +11,12 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
-  const employee = EMPLOYEES_WITH_TWIN.find((e) => e.id === id);
+  const fromDisk = await loadEmployeesFromDisk();
+  const roster = [
+    ...fromDisk,
+    ...getHiredEmployees().filter((h) => !fromDisk.some((e) => e.id === h.id)),
+  ];
+  const employee = roster.find((e) => e.id === id);
   const assignedSkillIds = getAssignedOrgSkillIdsForEmployee(
     id,
     employee?.orgSkillIds ?? []

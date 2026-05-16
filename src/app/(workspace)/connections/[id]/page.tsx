@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "iconoir-react";
 import { Topbar } from "@/components/ex/shell";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 
 // ─── Types from the API ──────────────────────────────────────────────────────
@@ -54,9 +54,10 @@ export default function ConnectionsForEmployeePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const roster = useRoster();
   const employee = useMemo(
-    () => EMPLOYEES_WITH_TWIN.find((e) => e.id === id),
-    [id]
+    () => roster.find((e) => e.id === id),
+    [id, roster]
   );
 
   const [data, setData] = useState<ConnectionsResponse | null>(null);
@@ -881,7 +882,7 @@ function StatusDot({
 // ─── Employee picker (top of page) ───────────────────────────────────────────
 
 function EmployeePickerBar({ activeId }: { activeId: string }) {
-  const ready = EMPLOYEES_WITH_TWIN.filter((e) => e.twinStatus === "ready");
+  const ready = useRoster().filter((e) => e.twinStatus === "ready");
   return (
     <div
       style={{

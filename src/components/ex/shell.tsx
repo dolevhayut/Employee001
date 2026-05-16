@@ -7,9 +7,10 @@ import { useState, useRef, useEffect, useCallback, useMemo, type KeyboardEvent, 
 import { createPortal } from "react-dom";
 import { HalfMoon, NavArrowDown, SunLight } from "iconoir-react";
 import { Icons, type IconName } from "./icons";
-import { EMPLOYEES_WITH_TWIN, type EmployeeWithTwin } from "@/lib/employees";
+import { type EmployeeWithTwin } from "@/lib/employees";
 import { GlobalApprovalOverlay, NotificationBell } from "./global-approval-overlay";
 import { ActiveBuildsBanner } from "./active-builds-banner";
+import { RosterProvider, useRoster } from "./roster-context";
 
 type NavItem = {
   href: string;
@@ -296,8 +297,8 @@ function statusLabel(emp: EmployeeWithTwin) {
   return "Not started";
 }
 
-function buildTwinCommands(): CommandItem[] {
-  return EMPLOYEES_WITH_TWIN.flatMap((emp) => {
+function buildTwinCommands(roster: EmployeeWithTwin[]): CommandItem[] {
+  return roster.flatMap((emp) => {
     const flowHref = emp.twinStatus === "ready" ? `/flow?employee=${emp.id}` : "/clone";
     const statusKeyword = emp.twinStatus === "ready" ? "ready live chat memory" : "onboarding setup clone";
 
@@ -336,7 +337,8 @@ function CommandPalette({
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const commands = useMemo(() => [...STATIC_COMMANDS, ...buildTwinCommands()], []);
+  const roster = useRoster();
+  const commands = useMemo(() => [...STATIC_COMMANDS, ...buildTwinCommands(roster)], [roster]);
   const filteredCommands = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return commands;
@@ -592,8 +594,16 @@ function CommandPalette({
 
 function TwinSwitcher() {
   const router = useRouter();
-  const defaultTwin = EMPLOYEES_WITH_TWIN.find((e) => e.twinStatus === "ready") ?? EMPLOYEES_WITH_TWIN[0];
-  const [active, setActive] = useState<EmployeeWithTwin>(defaultTwin);
+  const roster = useRoster();
+  const defaultTwin = roster.find((e) => e.twinStatus === "ready") ?? roster[0];
+  const [active, setActive] = useState<EmployeeWithTwin | undefined>(defaultTwin);
+
+  // Sync local active state when roster hydrates from /api/employees on mount.
+  useEffect(() => {
+    if (active) return;
+    const next = roster.find((e) => e.twinStatus === "ready") ?? roster[0];
+    if (next) setActive(next);
+  }, [roster, active]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -611,6 +621,17 @@ function TwinSwitcher() {
     if (emp.twinStatus === "ready") {
       router.push(`/flow?employee=${emp.id}`);
     }
+  }
+
+  if (!active) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-1)" }}>
+        <div className="nav-label">Active twin</div>
+        <div className="subtle" style={{ fontSize: "var(--fs-meta)", padding: "8px 4px" }}>
+          No employees yet.
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -686,7 +707,7 @@ function TwinSwitcher() {
               boxShadow: "var(--shadow-dropdown)",
             }}
           >
-            {EMPLOYEES_WITH_TWIN.map((emp) => {
+            {roster.map((emp) => {
               const isCurrent = emp.id === active.id;
               return (
                 <button
@@ -1081,21 +1102,23 @@ export function Topbar({ crumbs = [], actions }: { crumbs?: string[]; actions?: 
 
 export function Shell({ children }: { children: ReactNode }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "auto 1fr",
-        height: "100vh",
-        overflow: "hidden",
-        background: "var(--bg)",
-      }}
-    >
-      <Sidebar />
-      <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--bg)" }}>
-        {children}
+    <RosterProvider>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "auto 1fr",
+          height: "100vh",
+          overflow: "hidden",
+          background: "var(--bg)",
+        }}
+      >
+        <Sidebar />
+        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--bg)" }}>
+          {children}
+        </div>
+        <GlobalApprovalOverlay />
+        <ActiveBuildsBanner />
       </div>
-      <GlobalApprovalOverlay />
-      <ActiveBuildsBanner />
-    </div>
+    </RosterProvider>
   );
 }

@@ -15,16 +15,23 @@ Commands:
   start     Start the local server (binds to 127.0.0.1 by default)
   update    Check GitHub releases for a newer version
   doctor    Run a health check on your install
+  export    Snapshot data/ to a tar.gz archive (excludes .env)
+  import    Restore data/ from a tar.gz archive
   help      Show this message
 
 Common flags:
   --no-open       (start) Do not open browser
   --port <n>      (start) Override port (default 3000)
+  --force         (import) Overwrite a non-empty data/ directory
+
+Examples:
+  employee001 export ~/Desktop/e001-backup.tar.gz
+  employee001 import ~/Desktop/e001-backup.tar.gz
 
 Docs: https://github.com/dolevhayut/Employee001
 `;
 
-const KNOWN = new Set(["setup", "start", "update", "doctor", "help"]);
+const KNOWN = new Set(["setup", "start", "update", "doctor", "export", "import", "help"]);
 
 async function main() {
   const cmd = process.argv[2];

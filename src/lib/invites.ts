@@ -117,3 +117,60 @@ export function markInviteCompleted(
   writeAll(list);
   return list[idx];
 }
+
+/**
+ * Classify why a token is not currently redeemable. Used by the complete
+ * endpoint to surface a precise UI message (already redeemed / expired /
+ * not found) instead of a generic 410.
+ */
+export type InviteUnavailableReason = "not_found" | "used" | "expired";
+
+export function classifyInvite(
+  token: string,
+): { ok: true; invite: Invite } | { ok: false; reason: InviteUnavailableReason; invite?: Invite } {
+  const i = findInvite(token);
+  if (!i) return { ok: false, reason: "not_found" };
+  if (i.completedAt) return { ok: false, reason: "used", invite: i };
+  if (new Date(i.expiresAt).getTime() < Date.now()) {
+    return { ok: false, reason: "expired", invite: i };
+  }
+  return { ok: true, invite: i };
+}
+
+/**
+ * Atomically claim an invite token for completion. Uses an O_EXCL lockfile
+ * so only one concurrent request can win — the rest see `already_claimed`.
+ * Caller must call `releaseInviteClaim` after `markInviteCompleted` (or on
+ * failure, to free the lock so a retry isn't blocked).
+ */
+export function tryClaimInvite(token: string): { claimed: true } | { claimed: false; reason: "already_claimed" | "not_found" | "used" | "expired" } {
+  const cls = classifyInvite(token);
+  if (!cls.ok) return { claimed: false, reason: cls.reason };
+  ensureDir();
+  const lockPath = path.join(path.dirname(file()), `.invite-${token}.lock`);
+  try {
+    fs.writeFileSync(lockPath, String(process.pid), { flag: "wx" });
+    // Re-check after acquiring lock — another request may have already
+    // marked the token completed between classify and lock.
+    const recheck = classifyInvite(token);
+    if (!recheck.ok) {
+      // If completion already happened, surface that specifically.
+      try { fs.unlinkSync(lockPath); } catch {}
+      return { claimed: false, reason: recheck.reason };
+    }
+    return { claimed: true };
+  } catch (err: unknown) {
+    const e = err as NodeJS.ErrnoException;
+    if (e && e.code === "EEXIST") return { claimed: false, reason: "already_claimed" };
+    throw err;
+  }
+}
+
+export function releaseInviteClaim(token: string): void {
+  const lockPath = path.join(path.dirname(file()), `.invite-${token}.lock`);
+  try {
+    fs.unlinkSync(lockPath);
+  } catch {
+    // best-effort
+  }
+}

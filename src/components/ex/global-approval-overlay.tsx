@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { useRoster } from "@/components/ex/roster-context";
 
 type PendingApproval = {
   approvalId: string;
@@ -30,6 +30,7 @@ function describeTool(toolName: string): string {
 }
 
 export function GlobalApprovalOverlay() {
+  const roster = useRoster();
   const [pending, setPending] = useState<PendingApproval[]>([]);
   const [editing, setEditing] = useState<Record<string, boolean>>({});
   const [editedJson, setEditedJson] = useState<Record<string, string>>({});
@@ -85,7 +86,7 @@ export function GlobalApprovalOverlay() {
   if (pending.length === 0) return null;
 
   const current = pending[0]; // surface one at a time, queue the rest
-  const employee = EMPLOYEES_WITH_TWIN.find((e) => e.id === current.employeeId);
+  const employee = roster.find((e) => e.id === current.employeeId);
   const isEditing = !!editing[current.approvalId];
   const editedText = editedJson[current.approvalId] ?? JSON.stringify(current.input, null, 2);
 

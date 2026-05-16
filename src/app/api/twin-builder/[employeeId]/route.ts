@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
+import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 import { runTwinBuilder, type TwinBuilderEvent } from "@/lib/twin-builder";
 import {
@@ -40,10 +40,11 @@ export async function POST(
     maxBudgetUsd?: number;
   };
 
+  const fromDisk = await loadEmployeesFromDisk();
   const allEmployees = [
-    ...EMPLOYEES_WITH_TWIN,
+    ...fromDisk,
     ...getHiredEmployees().filter(
-      (h) => !EMPLOYEES_WITH_TWIN.some((e) => e.id === h.id)
+      (h) => !fromDisk.some((e) => e.id === h.id)
     ),
   ];
   const employee = allEmployees.find((e) => e.id === employeeId);
