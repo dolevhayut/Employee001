@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { classifyInvite, markInviteCompleted, tryClaimInvite, releaseInviteClaim } from "@/lib/invites";
+import { readState } from "@/lib/composio-client";
+import { loadEmployeesFromDisk } from "@/lib/employees-disk";
+import {
+  spawnDetachedBuild,
+  writePendingBuild,
+  countActiveConnections,
+} from "@/lib/twin-build-runner";
 
 export const runtime = "nodejs";
 
@@ -346,7 +353,97 @@ export async function POST(request: NextRequest, { params }: Params) {
     );
 
     const updated = markInviteCompleted(token, employeeId);
-    return NextResponse.json({ status: "completed", employeeId, invite: updated });
+
+    // ─── Auto-train on consent (Wave 2A) ────────────────────────────────────
+    // Fire the twin-builder if the new employee already has ≥ 1 ACTIVE
+    // Composio connection. Otherwise defer to .builder-pending.json and let
+    // the connection-status path resume it once the first ACTIVE arrives.
+    const lookbackDays =
+      typeof invite.lookbackDays === "number" && Number.isFinite(invite.lookbackDays)
+        ? Math.min(360, Math.max(30, Math.round(invite.lookbackDays)))
+        : 90;
+
+    let composioState: { connections: Record<string, { status: string }> };
+    try {
+      composioState = await readState(employeeId);
+    } catch {
+      composioState = { connections: {} };
+    }
+    const activeCount = countActiveConnections(composioState);
+
+    if (activeCount === 0) {
+      try {
+        await writePendingBuild(employeeId, {
+          lookbackDays,
+          ceoContext: "Auto-train on consent",
+        });
+      } catch (err) {
+        const m = err instanceof Error ? err.message : String(err);
+        console.warn(`[invite-complete] pending sidecar write failed: ${m}`);
+      }
+      return NextResponse.json({
+        status: "completed",
+        employeeId,
+        invite: updated,
+        buildStatus: "pending_toolkits",
+      });
+    }
+
+    // We have at least one ACTIVE — spawn the builder detached.
+    // Re-materialise the freshly-written employee so we hand the runner a
+    // full EmployeeWithTwin (it needs firstName, role, department, etc).
+    const fromDisk = await loadEmployeesFromDisk();
+    const employee = fromDisk.find((e) => e.id === employeeId);
+    if (!employee) {
+      // Should never happen — we just wrote it. Treat as pending so the user
+      // at least sees a non-broken state and the connection path can recover.
+      try {
+        await writePendingBuild(employeeId, {
+          lookbackDays,
+          ceoContext: "Auto-train on consent",
+        });
+      } catch {
+        /* ignore */
+      }
+      return NextResponse.json({
+        status: "completed",
+        employeeId,
+        invite: updated,
+        buildStatus: "pending_toolkits",
+      });
+    }
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      // Can't run the builder, but onboarding succeeded — defer politely.
+      try {
+        await writePendingBuild(employeeId, {
+          lookbackDays,
+          ceoContext: "Auto-train on consent",
+        });
+      } catch {
+        /* ignore */
+      }
+      return NextResponse.json({
+        status: "completed",
+        employeeId,
+        invite: updated,
+        buildStatus: "pending_toolkits",
+      });
+    }
+
+    const spawn = spawnDetachedBuild({
+      employee,
+      lookbackDays,
+      ceoContext: "Auto-train on consent",
+    });
+
+    return NextResponse.json({
+      status: "completed",
+      employeeId,
+      invite: updated,
+      buildStatus: "training",
+      buildId: spawn.buildId,
+    });
   } finally {
     releaseInviteClaim(token);
   }
