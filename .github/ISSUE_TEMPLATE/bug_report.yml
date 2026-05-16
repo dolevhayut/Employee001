@@ -1,0 +1,91 @@
+name: Bug Report
+description: Something isn't working as expected
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Fill in as much as you can — it speeds up the fix.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: "When I run `npx employee001 start`, the server starts but the browser shows a blank page."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      placeholder: "The dashboard should load at http://localhost:3000."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `npx employee001 setup`
+        2. Run `npx employee001 start`
+        3. Open http://localhost:3000
+        4. See blank page
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Employee001 version
+      description: Run `npx employee001 --version` or check your `package.json`
+      placeholder: "0.1.0-rc.6"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      description: Run `node --version`
+      placeholder: "v22.4.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor-output
+    attributes:
+      label: Doctor output
+      description: Run `npx employee001 doctor` and paste the output here. Redact API keys.
+      render: shell
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or errors
+      description: Any console output, stack traces, or error messages.
+      render: shell
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this hasn't been reported yet
+          required: true
+        - label: I am not including API keys or secrets in this report
+          required: true

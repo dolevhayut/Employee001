@@ -1,0 +1,44 @@
+name: Feature Request
+description: Suggest an improvement or new capability
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a feature request, check [open issues](https://github.com/dolevhayut/Employee001/issues) to see if it's already being tracked.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation that led you here. "I'm trying to..." works great.
+      placeholder: "I'm trying to share the employee roster with a colleague on the same LAN, but there's no way to do that without exposing the CEO account."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to see? Rough ideas are fine — you don't need a complete design.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Any workarounds or different approaches you've thought about.
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints check
+      description: Employee001 has hard constraints. Please confirm this request is compatible.
+      options:
+        - label: This does not require sending data to a server I don't control (local-first principle)
+          required: true
+        - label: This does not add paid feature gates or license-key checks
+          required: true
+        - label: This does not depend on cloud infrastructure beyond Anthropic and Composio
+          required: true
