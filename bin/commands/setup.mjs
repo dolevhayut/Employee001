@@ -37,12 +37,26 @@ function printBanner() {
     process.stdout.isTTY &&
     process.env.NO_COLOR !== "1" &&
     process.env.FORCE_COLOR !== "0";
-  const banner = wantColor ? `${BRAND}${BANNER_001}${RESET}` : BANNER_001;
-  const tagline = wantColor
-    ? `${DIM}  Employee001 — your company's organizational brain${RESET}`
-    : "  Employee001 — your company's organizational brain";
-  process.stdout.write(banner);
-  process.stdout.write(tagline + "\n\n");
+
+  const orange = (s) => (wantColor ? `${BRAND}${s}${RESET}` : s);
+  const dim = (s) => (wantColor ? `${DIM}${s}${RESET}` : s);
+
+  process.stdout.write(orange(BANNER_001));
+
+  // Mission lines pulled from the public welcome page + README so the
+  // wizard tells you what this thing actually is before asking for keys.
+  const lines = [
+    "",
+    `  ${orange("Your company's organizational brain.")}`,
+    "  Agent twins of every person on your team, running on your own machine.",
+    `  ${dim("No cloud. No telemetry. Yours to shape.")}`,
+    "",
+    `  ${dim("Built by")} ${orange("Dolev Hayut")} ${dim("· github.com/dolevhayut/Employee001 · MIT")}`,
+    `  ${dim("Get ready for 2030.")}`,
+    "",
+    "",
+  ];
+  process.stdout.write(lines.join("\n"));
 }
 
 function generateToken() {
