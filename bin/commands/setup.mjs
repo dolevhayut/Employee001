@@ -135,12 +135,32 @@ export default async function setup() {
     spin.stop("Key did not authenticate (saving anyway — you can fix it later).");
   }
 
+  // Explain WHY Composio is required before asking for it. Past users
+  // (and other agents) have read the prompt as "tool integrations =
+  // optional" and skipped it. It's not optional: it's the input pipeline
+  // for the autonomous training loop that generates the 9 profile
+  // markdown files for every employee. No Composio → no training → no
+  // twins, full stop.
+  p.note(
+    [
+      "When you onboard an employee, an autonomous Claude agent studies",
+      "roughly the last 120 days of their work through Composio MCP —",
+      "Slack threads, Gmail, GitHub PRs, Linear tickets, calendar events.",
+      "From that signal it writes the 9 profile markdown files that",
+      "define who that twin is and how they think.",
+      "",
+      "Without Composio there is no training pipeline, and no twins.",
+      "That's why the next key is required, not optional.",
+    ].join("\n"),
+    "How twin training works",
+  );
+
   const composioKey = await p.password({
     message:
-      "Composio API key (required, for Slack/Linear/GitHub MCP integrations) — get one at https://app.composio.dev",
+      "Composio API key (required — powers the 120-day training backfill) — get one at https://app.composio.dev",
     mask: "•",
     validate(value) {
-      if (!value) return "A Composio API key is required";
+      if (!value) return "A Composio API key is required — no training pipeline without it";
     },
   });
   if (p.isCancel(composioKey)) {
@@ -185,7 +205,11 @@ export default async function setup() {
     "# Required. Get one from https://console.anthropic.com",
     `ANTHROPIC_API_KEY=${anthropicKey}`,
     "",
-    "# Required. Composio MCP — Slack, Linear, GitHub, and 100+ more.",
+    "# Required. Composio MCP powers the autonomous training loop:",
+    "# when you onboard an employee, a Claude agent studies ~120 days",
+    "# of their work (Slack, Gmail, GitHub, Linear, calendar) and writes",
+    "# the 9 profile markdown files. Without this key, no twins can be",
+    "# created — twin chat and tool execution all depend on it too.",
     `COMPOSIO_API_KEY=${composioKey ?? ""}`,
     "",
     "# Optional. ElevenLabs for cloned twin voices.",
