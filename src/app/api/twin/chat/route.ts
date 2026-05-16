@@ -4,6 +4,7 @@ import { EMPLOYEES_WITH_TWIN } from "@/lib/employees";
 import { hasEmployeeFiles } from "@/lib/employees-files";
 import { runSingleTwin } from "@/lib/council-runner";
 import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
+import { bumpActivityOnDisk } from "@/lib/employees-disk";
 
 const PROFILE_FILE_NAMES = [
   "EXPERTISE.md", "DECISIONS.md", "CONTEXT.md", "PEOPLE.md",
@@ -199,6 +200,9 @@ export async function POST(request: NextRequest) {
             break;
         }
       };
+
+      // Fire-and-forget: increment question counter for this employee.
+      bumpActivityOnDisk(employee.id);
 
       try {
         // When the client has a sessionId from a prior turn, prefer SDK

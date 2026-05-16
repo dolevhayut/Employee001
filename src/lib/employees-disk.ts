@@ -42,7 +42,48 @@ type DiskSidecar = {
   department?: string;
   integrations?: string[];
   lastActiveAt?: string;
+  questionsThisWeek?: number;
+  weekOf?: string; // ISO week string e.g. "2026-W20"
 };
+
+/** Returns the ISO week string for a given date, e.g. "2026-W20". */
+function isoWeek(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+/**
+ * Increment questionsThisWeek for an employee and update lastActiveAt.
+ * Resets the counter when the ISO week has rolled over since the last write.
+ * Fire-and-forget: errors are swallowed so a disk hiccup never breaks a chat.
+ */
+export async function bumpActivityOnDisk(employeeId: string): Promise<void> {
+  const sidecarPath = path.join(
+    process.cwd(), "data", "employees", employeeId, "employee.json"
+  );
+  try {
+    const raw = await fs.readFile(sidecarPath, "utf8");
+    const sidecar: DiskSidecar = JSON.parse(raw);
+    const thisWeek = isoWeek(new Date());
+    const count =
+      sidecar.weekOf === thisWeek ? (sidecar.questionsThisWeek ?? 0) + 1 : 1;
+    await fs.writeFile(
+      sidecarPath,
+      JSON.stringify(
+        { ...sidecar, lastActiveAt: new Date().toISOString(), questionsThisWeek: count, weekOf: thisWeek },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+  } catch {
+    // Non-critical — never crash the chat for a stats write failure.
+  }
+}
 
 export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
   const root = path.join(process.cwd(), "data", "employees");
@@ -93,7 +134,8 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
       twinConfidence: complete >= 6 ? Math.min(1, complete / 9) : 0,
       profileFilesComplete: complete,
       lastActiveAt: sidecar.lastActiveAt,
-      questionsThisWeek: 0,
+      questionsThisWeek:
+        sidecar.weekOf === isoWeek(new Date()) ? (sidecar.questionsThisWeek ?? 0) : 0,
       skills: [],
       orgSkillIds: [],
       seedModel: "claude-opus-4-7",

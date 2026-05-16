@@ -98,12 +98,108 @@ function buildProfileMarkdown(
     "",
   ].filter(Boolean).join("\n");
 
-  // Files we don't synthesise from form data: leave a clear placeholder so
-  // it's obvious where the employee should pick up next.
-  for (const base of PROFILE_FILES) {
-    if (base in out) continue;
-    out[base] = `# ${base} — ${name}\n\n_To fill in. Update this file from /profile or directly on disk._\n`;
-  }
+  // Synthesise starter content for the remaining files from available form data.
+  // Good-enough starters beat blank placeholders: the twin can answer basic
+  // questions while the employee fills in the details over time.
+
+  const domainLine = domain ? `Works in: ${domain}.` : "";
+  const intLine = integrations.length
+    ? `Primary tools: ${integrations.join(", ")}.`
+    : "";
+  const channelLine = channel ? `Primary communication channel: ${channel}.` : "";
+
+  out.CONTEXT = [
+      `# Context — ${name}`,
+      "",
+      `**Role:** ${role || "—"}`,
+      domainLine,
+      intLine,
+      channelLine,
+      "",
+      "## Team & organisation",
+      "",
+      "_Add key stakeholders, reporting lines, and cross-team dependencies here._",
+      "",
+      "## Current priorities",
+      "",
+      "_Add the 2–3 most important things this person is working on right now._",
+      "",
+    ].filter(Boolean).join("\n");
+
+  out.DECISIONS = [
+    `# Decisions — ${name}`,
+    "",
+    `As ${role || "a team member"}${domain ? ` working in ${domain}` : ""}, I own decisions in these areas.`,
+    "",
+    "## Standing decisions",
+    "",
+    "_Document recurring decisions and the reasoning behind them — tech choices, process calls, vendor selections. The twin draws on this to explain rationale without escalating._",
+    "",
+    "## How I decide",
+    "",
+    "_Optional: describe your decision-making style, who you consult, and when you escalate._",
+    "",
+  ].filter(Boolean).join("\n");
+
+  out.PEOPLE = [
+    `# People — ${name}`,
+    "",
+    "_Who this person works closely with, trusts, defers to, or needs to keep in the loop._",
+    "",
+    "## Close collaborators",
+    "",
+    "_Name, role, and what you work on together._",
+    "",
+    "## Escalation contacts",
+    "",
+    "_Who to loop in for legal, HR, finance, or customer escalations._",
+    "",
+  ].filter(Boolean).join("\n");
+
+  out.PROJECTS = [
+    `# Projects — ${name}`,
+    "",
+    domainLine,
+    "",
+    "## Active projects",
+    "",
+    "_List ongoing initiatives with a one-line description and current status._",
+    "",
+    "## Completed / archived",
+    "",
+    "_Past projects worth referencing — context the twin may need._",
+    "",
+  ].filter(Boolean).join("\n");
+
+  out.PREFERENCES = [
+    `# Preferences — ${name}`,
+    "",
+    channelLine,
+    "",
+    "## Communication",
+    "",
+    "_How to reach me, response time expectations, async vs sync preferences._",
+    "",
+    "## Working style",
+    "",
+    "_Deep work hours, meeting preferences, how I like to receive feedback._",
+    "",
+  ].filter(Boolean).join("\n");
+
+  out.TONE = [
+    `# Tone — ${name}`,
+    "",
+    `**Role:** ${role || "—"}`,
+    "",
+    "## Register",
+    "",
+    "_Describe how this person communicates: direct or diplomatic, formal or casual, brief or detailed. The twin mirrors this style._",
+    "",
+    "## Characteristic phrases",
+    "",
+    "_Optional: phrases, sign-offs, or language patterns to preserve._",
+    "",
+  ].filter(Boolean).join("\n");
 
   // Explicit profile overrides win.
   for (const [key, body] of Object.entries(payload.profile ?? {})) {
