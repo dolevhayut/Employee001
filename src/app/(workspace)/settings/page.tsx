@@ -35,6 +35,7 @@ export default function SettingsPage() {
             style={{ marginBottom: "var(--sp-20)" }}
           />
 
+          <ApiKeysSection />
           <WorkspaceSection />
           <OrgBrainSection />
           <OrgSkillsSection />
@@ -43,6 +44,112 @@ export default function SettingsPage() {
         </div>
       </div>
     </>
+  );
+}
+
+function ApiKeysSection() {
+  const [anthropic, setAnthropic] = useState("");
+  const [composio, setComposio] = useState("");
+  const [elevenLabs, setElevenLabs] = useState("");
+  const [status, setStatus] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/system/config")
+      .then((r) => r.json())
+      .then((d) => setStatus(d))
+      .catch(() => {});
+  }, []);
+
+  async function saveKey(key: string, value: string) {
+    if (!value.trim()) return;
+    setSaving(key);
+    try {
+      const res = await fetch("/api/system/config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value: value.trim() }),
+      });
+      if (res.ok) {
+        setSaved(key);
+        setStatus((s) => ({ ...s, [key === "ANTHROPIC_API_KEY" ? "anthropic" : key === "COMPOSIO_API_KEY" ? "composio" : "elevenLabs"]: true }));
+        setTimeout(() => setSaved(null), 2000);
+        if (key === "ANTHROPIC_API_KEY") setAnthropic("");
+        if (key === "COMPOSIO_API_KEY") setComposio("");
+        if (key === "ELEVENLABS_API_KEY") setElevenLabs("");
+      }
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  const keyRows: { key: string; label: string; statusKey: keyof typeof status; value: string; setValue: (v: string) => void; required: boolean }[] = [
+    { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key", statusKey: "anthropic", value: anthropic, setValue: setAnthropic, required: true },
+    { key: "COMPOSIO_API_KEY", label: "Composio API Key", statusKey: "composio", value: composio, setValue: setComposio, required: true },
+    { key: "ELEVENLABS_API_KEY", label: "ElevenLabs API Key", statusKey: "elevenLabs", value: elevenLabs, setValue: setElevenLabs, required: false },
+  ];
+
+  return (
+    <section style={{ marginBottom: "var(--sp-32)" }}>
+      <SectionHeader
+        title="API Keys"
+        desc="Keys are written to .env on your machine. Values are never sent anywhere except the respective APIs. Restart the server after saving to apply changes."
+      />
+      <div className="card" style={{ padding: "var(--sp-20)", display: "flex", flexDirection: "column", gap: "var(--sp-16)" }}>
+        {keyRows.map(({ key, label, statusKey, value, setValue, required }) => (
+          <div key={key}>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", marginBottom: "var(--sp-6)" }}>
+              <span className="section-title" style={{ fontSize: "var(--fs-xs)" }}>{label}</span>
+              {required && <span style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase" }}>required</span>}
+              {status[statusKey] && (
+                <span style={{ fontSize: 10, color: "var(--green, #4caf7d)", textTransform: "uppercase" }}>
+                  {saved === key ? "saved ✓" : "configured"}
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: "var(--sp-8)" }}>
+              <input
+                type="password"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder={status[statusKey] ? "Enter new key to replace…" : "Paste key here…"}
+                style={{
+                  flex: 1,
+                  padding: "8px 10px",
+                  fontSize: "var(--fs-ui)",
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--hairline)",
+                  borderRadius: 4,
+                  color: "var(--text)",
+                  fontFamily: "var(--font-mono)",
+                }}
+              />
+              <button
+                onClick={() => saveKey(key, value)}
+                disabled={!value.trim() || saving === key}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: "var(--fs-ui)",
+                  background: value.trim() ? "var(--brand)" : "var(--bg-elevated)",
+                  color: value.trim() ? "#fff" : "var(--text-3)",
+                  border: "1px solid var(--hairline)",
+                  borderRadius: 4,
+                  cursor: value.trim() ? "pointer" : "not-allowed",
+                  fontFamily: "inherit",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {saving === key ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        ))}
+        <p style={{ fontSize: "var(--fs-xs)", color: "var(--text-3)", margin: 0 }}>
+          After saving, restart the server with <code style={{ fontFamily: "var(--font-mono)" }}>npx employee001 start</code> to apply the new keys.
+        </p>
+      </div>
+    </section>
   );
 }
 

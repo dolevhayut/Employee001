@@ -1,6 +1,60 @@
 import fs from "fs";
 import path from "path";
 
+// ─── Rotation ─────────────────────────────────────────────────────────────────
+
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+/**
+ * If audit.jsonl exceeds MAX_BYTES or its oldest entry is older than MAX_AGE_MS,
+ * rotate: drop entries outside the window into audit.YYYY-MM.jsonl and rewrite
+ * audit.jsonl with only the entries that fit within the window.
+ */
+function maybeRotate(filePath: string): void {
+  try {
+    const stat = fs.statSync(filePath);
+    if (stat.size < MAX_BYTES) return; // fast path — no rotation needed
+
+    const raw = fs.readFileSync(filePath, "utf8");
+    const lines = raw.split("\n").filter(Boolean);
+    const cutoff = Date.now() - MAX_AGE_MS;
+
+    const keep: string[] = [];
+    const archive: Map<string, string[]> = new Map(); // "YYYY-MM" → lines
+
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as { ts?: string };
+        const ts = entry.ts ? new Date(entry.ts).getTime() : 0;
+        if (ts >= cutoff) {
+          keep.push(line);
+        } else {
+          const label = entry.ts
+            ? entry.ts.slice(0, 7) // "YYYY-MM"
+            : "unknown";
+          if (!archive.has(label)) archive.set(label, []);
+          archive.get(label)!.push(line);
+        }
+      } catch {
+        keep.push(line); // unparseable line — keep it
+      }
+    }
+
+    // Write archive files
+    const dir = path.dirname(filePath);
+    for (const [label, archiveLines] of archive) {
+      const archivePath = path.join(dir, `audit.${label}.jsonl`);
+      fs.appendFileSync(archivePath, archiveLines.join("\n") + "\n", "utf8");
+    }
+
+    // Rewrite active file
+    fs.writeFileSync(filePath, keep.join("\n") + (keep.length ? "\n" : ""), "utf8");
+  } catch {
+    // Rotation must never crash the app.
+  }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type AuditVerdict =
@@ -53,6 +107,7 @@ export function appendAuditEntry(
 ): void {
   try {
     ensureDir();
+    maybeRotate(AUDIT_FILE);
     const row: AuditEntry = {
       id: makeId(),
       ts: new Date().toISOString(),

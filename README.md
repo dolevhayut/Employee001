@@ -2,8 +2,15 @@
 
 > Your company's organizational brain — agent twins of your real employees, running entirely on **your own machine**.
 
+[![npm version](https://img.shields.io/npm/v/employee001)](https://www.npmjs.com/package/employee001)
+[![npm downloads](https://img.shields.io/npm/dm/employee001)](https://www.npmjs.com/package/employee001)
+[![CI](https://github.com/dolevhayut/Employee001/actions/workflows/ci.yml/badge.svg)](https://github.com/dolevhayut/Employee001/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
+
+| Employees roster | Twin chat | Settings |
+|---|---|---|
+| ![Employees](docs/screenshots/02-employees.png) | ![Twin chat](docs/screenshots/03-flow.png) | ![Settings](docs/screenshots/04-settings.png) |
 
 ## Install
 
@@ -24,6 +31,43 @@ Requires Node.js 22+, an Anthropic API key, and a Composio API key (for MCP tool
 - **Org Brain** — one shared knowledge graph every twin reads from.
 - **On-prem by design** — runs on your Mac mini (or any machine with Node 22). Bound to `127.0.0.1` by default.
 - **Human-controlled autonomy** — every sensitive action hits an approval gate before it runs.
+
+## Why not ChatGPT Teams or Copilot?
+
+Those tools give your employees AI. Employee001 gives your company AI — twins that represent specific people, carry institutional knowledge, and can act on your behalf through real tools.
+
+The bigger difference: **your data never leaves your machine.** ChatGPT Teams and Copilot send every conversation to OpenAI or Microsoft. Employee001 sends only the prompts you explicitly generate to Anthropic. Employee profiles, org knowledge, audit logs — all stay on your hardware.
+
+This matters if you're a law firm, a fund, an agency, or any team where client confidentiality isn't optional.
+
+## How it works
+
+```mermaid
+flowchart LR
+    CEO["CEO (browser)"]
+    subgraph local ["Your machine"]
+        Server["employee001 server\n(Next.js + Node)"]
+        Data["data/\nprofiles · audit · knowledge"]
+        Server <--> Data
+    end
+    Anthropic["Anthropic API\n(Claude)"]
+    Composio["Composio MCP\n(tools)"]
+
+    CEO -->|invite link| Server
+    CEO -->|ask a question| Server
+    Server -->|prompts only| Anthropic
+    Anthropic -->|twin responses| Server
+    Server -->|tool calls| Composio
+    Composio -->|Slack · Linear · email · code| Server
+    Server -->|answer + approval gate| CEO
+```
+
+Data flow in plain English:
+1. **CEO invites employees** — each employee fills a profile form, saved as a markdown file in `data/employees/`
+2. **CEO asks a question** — routed to one or more twins based on expertise
+3. **Twin(s) reason** — using Claude, reading from `data/` knowledge graph
+4. **Tool calls** — if a twin wants to send a Slack message, file a ticket, etc., it goes through Composio MCP; CEO approves before execution
+5. **Nothing persists outside `data/`** — no external database, no analytics
 
 ## Commands
 
