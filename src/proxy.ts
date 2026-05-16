@@ -92,7 +92,11 @@ function extractInviteToken(request: NextRequest): string | undefined {
   const q = request.nextUrl.searchParams.get("invite");
   if (q && q.startsWith("inv_")) return q;
   const path = request.nextUrl.pathname;
-  // /api/invites/<token>[/complete]
+  // /api/invites/<token>[/<sub>...] — matches the bare validate / complete
+  // endpoints AND the employee-side OAuth surface under
+  // /api/invites/<token>/connections/* (initiate + per-toolkit disconnect).
+  // The trailing `(\/|$)` is what makes the deeper paths fall into this
+  // bypass; don't tighten without re-checking the onboarding OAuth flow.
   const m = path.match(/^\/api\/invites\/(inv_[a-f0-9]+)(\/|$)/);
   return m?.[1];
 }

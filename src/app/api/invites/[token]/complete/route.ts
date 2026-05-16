@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import { classifyInvite, markInviteCompleted, tryClaimInvite, releaseInviteClaim } from "@/lib/invites";
+import {
+  classifyInvite,
+  markInviteCompleted,
+  tryClaimInvite,
+  releaseInviteClaim,
+  materializeEmployeeFromInvite,
+} from "@/lib/invites";
 import { readState } from "@/lib/composio-client";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import {
@@ -321,28 +327,56 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   try {
-    const employeeId = `${slug}-${token.slice(4, 10)}`;
+    // The employee may already exist on disk if they connected a toolkit
+    // earlier in the wizard (employee-side OAuth flow). Materialize is
+    // idempotent: if the dir already exists, we reuse the existing id and
+    // avoid clobbering markdown the employee may have personalised.
+    const materialized = await materializeEmployeeFromInvite(token, { name, role });
+    const employeeId = materialized.employeeId;
     const dir = path.join(process.cwd(), "data", "employees", employeeId);
     await fs.mkdir(dir, { recursive: true });
 
     const profile = buildProfileMarkdown(body, { name, role });
+    // Write a markdown file ONLY if it doesn't already exist or still looks
+    // like the synthetic placeholder produced by materializeEmployeeFromInvite
+    // (which always ends with "_To be filled in during onboarding._\n").
     await Promise.all(
-      PROFILE_FILES.map((key) =>
-        fs.writeFile(path.join(dir, `${key}.md`), profile[key], "utf8"),
-      ),
+      PROFILE_FILES.map(async (key) => {
+        const filePath = path.join(dir, `${key}.md`);
+        let existing: string | null = null;
+        try {
+          existing = await fs.readFile(filePath, "utf8");
+        } catch {
+          existing = null;
+        }
+        const looksLikePlaceholder =
+          existing === null ||
+          existing.trim().endsWith("_To be filled in during onboarding._");
+        if (looksLikePlaceholder) {
+          await fs.writeFile(filePath, profile[key], "utf8");
+        }
+      }),
     );
 
-    // Metadata sidecar — read back by loadEmployeesFromDisk() to materialise
-    // the workspace's employee list.
+    // Refresh / write the metadata sidecar with the final wizard values.
+    // Always overwrite the sidecar: name/role may have started as placeholders
+    // (e.g. "Pending (abc123)") and the wizard's final values are authoritative.
+    const sidecarPath = path.join(dir, "employee.json");
+    let existingSidecar: { createdAt?: string } = {};
+    try {
+      existingSidecar = JSON.parse(await fs.readFile(sidecarPath, "utf8"));
+    } catch {
+      existingSidecar = {};
+    }
     await fs.writeFile(
-      path.join(dir, "employee.json"),
+      sidecarPath,
       JSON.stringify(
         {
           id: employeeId,
           name,
           role: role || null,
           integrations: (body.integrations ?? []).filter(Boolean),
-          createdAt: new Date().toISOString(),
+          createdAt: existingSidecar.createdAt ?? new Date().toISOString(),
           lastActiveAt: new Date().toISOString(),
           via: { invite: token },
         },

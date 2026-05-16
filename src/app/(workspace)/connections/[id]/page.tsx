@@ -253,6 +253,25 @@ export default function ConnectionsForEmployeePage({
           </div>
         </motion.div>
 
+        {/* Architectural rule banner — OAuth is the employee's job. */}
+        <div
+          style={{
+            marginTop: "var(--sp-20)",
+            padding: "12px 14px",
+            borderRadius: 8,
+            border: "1px solid var(--hairline-strong)",
+            background: "var(--bg-sunken)",
+            fontSize: "var(--fs-sm)",
+            color: "var(--text-muted)",
+            lineHeight: 1.5,
+          }}
+        >
+          <strong style={{ color: "var(--text)" }}>For real employees, send their invite link.</strong>{" "}
+          They&apos;ll connect their own accounts from <span className="mono">/onboarding</span>,
+          authorizing each tool while signed into <em>their</em> Slack, Gmail, Linear, etc.
+          The Connect buttons below are for marketplace agents or for testing — they bind to the
+          CEO&apos;s identity, which is the wrong audit trail for a real person&apos;s twin.
+        </div>
         {/* Status banners */}
         {data && !data.configured && (
           <motion.div

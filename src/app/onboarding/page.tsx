@@ -105,7 +105,16 @@ function OnboardingPageInner() {
     : "ask-sarah";
 
   const [viewMode, setViewMode] = useState<ViewMode>("employee");
-  const [step, setStep] = useState(0);
+  // Honor `?step=` from the URL on first mount — the employee-side OAuth
+  // callback returns to /onboarding?invite=…&step=2 so the user lands back
+  // on the Sources step after authorizing on Composio's domain.
+  const initialStep = (() => {
+    const raw = searchParams.get("step");
+    const n = raw ? parseInt(raw, 10) : NaN;
+    if (Number.isFinite(n) && n >= 0 && n < STEPS.length) return n;
+    return 0;
+  })();
+  const [step, setStep] = useState(initialStep);
   const [acceptedScopes, setAcceptedScopes] = useState<Set<ConsentScope>>(
     () => new Set(CONSENT_SCOPES.filter((s) => s.required).map((s) => s.id))
   );
@@ -115,12 +124,48 @@ function OnboardingPageInner() {
   const [name, setName] = useState(defaultName);
   const [role, setRole] = useState(defaultRole);
   const [domain, setDomain] = useState("Distributed systems & platform");
-  const [chosen, setChosen] = useState<Set<string>>(
-    new Set(["slack", "gmail", "github", "linear"])
-  );
+  // `chosen` is now only an ephemeral UI hint ("which rows did the employee
+  // touch in this session"). The source of truth for "is this actually
+  // connected" lives in the per-invite /connections endpoint and is fetched
+  // by StepSources directly. Start empty for invite-bound flows.
+  const [chosen, setChosen] = useState<Set<string>>(() => new Set());
   const [extraToolkits, setExtraToolkits] = useState<
     Record<string, { slug: string; name: string; iconUrl?: string; description?: string }>
   >({});
+  // Count of ACTIVE Composio connections for this invite. Polled in parallel
+  // with StepSources so the Continue gate stays correct even when the user
+  // hasn't opened the Sources step yet.
+  const [activeConnections, setActiveConnections] = useState(0);
+  useEffect(() => {
+    if (!inviteToken) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(
+          `/api/invites/${encodeURIComponent(inviteToken)}/connections`,
+          { cache: "no-store" },
+        );
+        if (!r.ok) return;
+        const data = (await r.json()) as {
+          connections?: Record<string, { status?: string }>;
+        };
+        if (cancelled) return;
+        const n = Object.values(data.connections ?? {}).filter(
+          (c) => String(c.status ?? "").toUpperCase() === "ACTIVE",
+        ).length;
+        setActiveConnections(n);
+      } catch {
+        /* ignore */
+      }
+    };
+    tick();
+    const t = setInterval(tick, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [inviteToken]);
+
   const [channel, setChannel] = useState(defaultChannel);
   const [threshold, setThreshold] = useState(0.7);
   const [boundaries, setBoundaries] = useState<Boundaries>({
@@ -333,6 +378,7 @@ function OnboardingPageInner() {
             setChosen={setChosen}
             extraToolkits={extraToolkits}
             setExtraToolkits={setExtraToolkits}
+            inviteToken={inviteToken}
           />
         )}
         {step === 3 && (
@@ -378,19 +424,27 @@ function OnboardingPageInner() {
             You can change everything later
           </span>
           {step < STEPS.length - 1 ? (
+            (() => {
+              const sourcesBlocked =
+                step === 2 && Boolean(inviteToken) && activeConnections === 0;
+              const consentBlocked = step === 0 && !requiredScopesAccepted;
+              const disabled = consentBlocked || sourcesBlocked;
+              return (
             <button
               className="btn primary"
               onClick={() => setStep(step + 1)}
-              disabled={step === 0 && !requiredScopesAccepted}
+              disabled={disabled}
+              title={sourcesBlocked ? "Connect at least one tool to continue." : undefined}
               style={{
-                opacity: step === 0 && !requiredScopesAccepted ? 0.4 : 1,
-                cursor:
-                  step === 0 && !requiredScopesAccepted ? "not-allowed" : "pointer",
+                opacity: disabled ? 0.4 : 1,
+                cursor: disabled ? "not-allowed" : "pointer",
               }}
             >
               {step === 0 ? "I consent — continue" : "Continue"}{" "}
               <Icons.Chevron size={12} />
             </button>
+              );
+            })()
           ) : viewMode === "ceo" ? (
             <button className="btn accent" onClick={onFinish}>
               <Icons.Spark size={13} /> Generate profile
@@ -691,12 +745,33 @@ type CatalogToolkit = {
   noAuth?: boolean;
 };
 
+type InviteConnectionRecord = {
+  toolkit: string;
+  status: string;
+  redirectUrl?: string;
+};
+
+type InviteConnectionsResponse = {
+  employeeId: string | null;
+  connections: Record<string, InviteConnectionRecord>;
+  pendingEmployee: boolean;
+};
+
+function statusBucket(status: string | undefined): "active" | "pending" | "broken" | "disconnected" {
+  const v = String(status || "").toUpperCase();
+  if (v === "ACTIVE") return "active";
+  if (v === "INITIALIZING" || v === "INITIATED") return "pending";
+  if (v === "EXPIRED" || v === "FAILED") return "broken";
+  return "disconnected";
+}
+
 function StepSources({
   viewMode,
   chosen,
   setChosen,
   extraToolkits,
   setExtraToolkits,
+  inviteToken,
 }: {
   viewMode: ViewMode;
   chosen: Set<string>;
@@ -705,14 +780,105 @@ function StepSources({
   setExtraToolkits: (
     v: Record<string, { slug: string; name: string; iconUrl?: string; description?: string }>
   ) => void;
+  inviteToken: string;
 }) {
   const isCeo = viewMode === "ceo";
-  const toggle = (id: string) => {
-    const next = new Set(chosen);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setChosen(next);
-  };
+
+  // ─── Live connection state (employee-side OAuth) ────────────────────────
+  const [connections, setConnections] = useState<Record<string, InviteConnectionRecord>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [connError, setConnError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!inviteToken) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const r = await fetch(
+          `/api/invites/${encodeURIComponent(inviteToken)}/connections`,
+          { cache: "no-store" },
+        );
+        if (!r.ok) return;
+        const data = (await r.json()) as InviteConnectionsResponse;
+        if (!cancelled) setConnections(data.connections ?? {});
+      } catch {
+        /* keep last good state */
+      }
+    };
+    load();
+    const t = setInterval(load, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [inviteToken]);
+
+  // Toolkit slug used by Composio (falls back to the built-in id when no override).
+  const composioSlugFor = (it: Integration): string =>
+    (it.composioSlug ?? it.id).toLowerCase();
+
+  async function connectToolkit(slug: string) {
+    if (!inviteToken) {
+      // CEO-self mode — no invite token, so just toggle the slug into `chosen`.
+      const next = new Set(chosen);
+      next.add(slug);
+      setChosen(next);
+      return;
+    }
+    setBusy(slug);
+    setConnError(null);
+    try {
+      const callbackUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/onboarding?invite=${encodeURIComponent(inviteToken)}&step=2`
+          : undefined;
+      const r = await fetch(
+        `/api/invites/${encodeURIComponent(inviteToken)}/connections/initiate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ toolkit: slug, callbackUrl }),
+        },
+      );
+      const body = (await r.json()) as { redirectUrl?: string; error?: string };
+      if (!r.ok || !body.redirectUrl) {
+        throw new Error(body.error || "Failed to start authorization");
+      }
+      // Track in UI-side state too so the row immediately reflects pending.
+      const next = new Set(chosen);
+      next.add(slug);
+      setChosen(next);
+      window.location.href = body.redirectUrl;
+    } catch (err) {
+      setConnError(err instanceof Error ? err.message : "Failed to connect");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function disconnectSlug(slug: string) {
+    if (!inviteToken) {
+      const next = new Set(chosen);
+      next.delete(slug);
+      setChosen(next);
+      return;
+    }
+    setBusy(slug);
+    try {
+      await fetch(
+        `/api/invites/${encodeURIComponent(inviteToken)}/connections/${encodeURIComponent(slug)}/disconnect`,
+        { method: "POST" },
+      );
+      setConnections((prev) => {
+        const next = { ...prev };
+        delete next[slug];
+        return next;
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const grouped: Record<string, Integration[]> = {};
   INTEGRATIONS.forEach((s) => {
     (grouped[s.category] ||= []).push(s);
@@ -767,9 +933,8 @@ function StepSources({
       ...extraToolkits,
       [t.slug]: { slug: t.slug, name: t.name, iconUrl: t.iconUrl, description: t.description },
     });
-    const next = new Set(chosen);
-    next.add(t.slug);
-    setChosen(next);
+    // The actual Connect happens via connectToolkit — the catalog "+" just
+    // surfaces the row in the visible list.
   };
 
   const removeExtra = (slug: string) => {
@@ -780,6 +945,11 @@ function StepSources({
     next.delete(slug);
     setChosen(next);
   };
+
+  // Active connection count (source of truth for the Continue button rule).
+  const activeCount = Object.values(connections).filter(
+    (c) => statusBucket(c.status) === "active",
+  ).length;
   return (
     <div>
       <h1
@@ -797,9 +967,23 @@ function StepSources({
         style={{ fontSize: "var(--fs-base)", lineHeight: 1.5, marginBottom: "var(--sp-24)" }}
       >
         {isCeo
-          ? "We pull read-only data across the lookback window you chose through Composio. Tokens never touch our servers. Pick at least three."
-          : "We pull read-only data from your connected tools through Composio across the lookback window your manager chose. Your tokens never touch our servers. Pick at least three."}
+          ? "We pull read-only data across the lookback window you chose through Composio. Tokens never touch our servers."
+          : "Connect the tools you actually use. You'll authorize each one on its own site — Composio holds the tokens, not us, not your manager. Connect at least one to start building your twin."}
       </p>
+      {connError && (
+        <div
+          style={{
+            marginBottom: "var(--sp-12)",
+            padding: "8px 12px",
+            border: "1px solid var(--danger)",
+            borderRadius: 6,
+            fontSize: "var(--fs-sm)",
+            color: "var(--danger)",
+          }}
+        >
+          {connError}
+        </div>
+      )}
       {Object.keys(extraToolkits).length > 0 && (
         <div style={{ marginBottom: "var(--sp-18)" }}>
           <div className="section-title" style={{ marginBottom: "var(--sp-8)" }}>
@@ -813,7 +997,12 @@ function StepSources({
             }}
           >
             {Object.values(extraToolkits).map((t) => {
-              const sel = chosen.has(t.slug);
+              const slug = t.slug.toLowerCase();
+              const conn = connections[slug];
+              const bucket = statusBucket(conn?.status);
+              const isBusy = busy === slug;
+              const active = bucket === "active";
+              const pending = bucket === "pending";
               return (
                 <div
                   key={t.slug}
@@ -821,10 +1010,9 @@ function StepSources({
                   style={{
                     padding: "var(--sp-12)",
                     gap: "var(--sp-12)",
-                    border: `1px solid ${sel ? "var(--text)" : "var(--hairline)"}`,
-                    background: sel ? "var(--surface)" : "var(--bg-elevated)",
+                    border: `1px solid ${active ? "var(--success, #2c9e6e)" : pending ? "var(--accent-deep)" : "var(--hairline)"}`,
+                    background: active ? "var(--surface)" : "var(--bg-elevated)",
                     borderRadius: 6,
-                    boxShadow: sel ? "0 0 0 3px var(--accent-soft)" : "none",
                   }}
                 >
                   {t.iconUrl ? (
@@ -846,17 +1034,54 @@ function StepSources({
                         textOverflow: "ellipsis",
                       }}
                     >
-                      {t.description ?? t.slug}
+                      {pending
+                        ? "Complete the connection on the Composio screen, then return here."
+                        : t.description ?? t.slug}
                     </div>
                   </div>
-                  <button
-                    onClick={() => removeExtra(t.slug)}
-                    className="btn ghost sm"
-                    aria-label={`Remove ${t.name}`}
-                    style={{ flexShrink: 0 }}
-                  >
-                    Remove
-                  </button>
+                  {active ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", flexShrink: 0 }}>
+                      <span className="row" style={{ gap: 4, fontSize: "var(--fs-meta)", color: "var(--success, #2c9e6e)", fontWeight: 600 }}>
+                        <Icons.Check size={12} /> Connected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => disconnectSlug(slug)}
+                        disabled={isBusy}
+                        className="btn ghost sm"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  ) : pending ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", flexShrink: 0 }}>
+                      <button type="button" disabled className="btn sm" style={{ opacity: 0.7, cursor: "default" }}>
+                        Waiting for authorization…
+                      </button>
+                      <button type="button" onClick={() => disconnectSlug(slug)} disabled={isBusy} className="btn ghost sm">
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => connectToolkit(slug)}
+                        disabled={isBusy || !inviteToken}
+                        className="btn accent sm"
+                      >
+                        {isBusy ? "Starting…" : "Connect"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeExtra(t.slug)}
+                        className="btn ghost sm"
+                        aria-label={`Remove ${t.name}`}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -876,27 +1101,29 @@ function StepSources({
             }}
           >
             {items.map((it) => {
-              const sel = chosen.has(it.id);
+              const slug = composioSlugFor(it);
+              const conn = connections[slug];
+              const bucket = statusBucket(conn?.status);
+              const isBusy = busy === slug;
+              const active = bucket === "active";
+              const pending = bucket === "pending";
               return (
-                <button
+                <div
                   key={it.id}
                   className="row"
-                  onClick={() => toggle(it.id)}
                   style={{
                     padding: "var(--sp-12)",
                     gap: "var(--sp-12)",
                     textAlign: "left",
                     border:
                       "1px solid " +
-                      (sel ? "var(--text)" : "var(--hairline)"),
-                    background: sel ? "var(--surface)" : "var(--bg-elevated)",
+                      (active ? "var(--success, #2c9e6e)" : pending ? "var(--accent-deep)" : "var(--hairline)"),
+                    background: active ? "var(--surface)" : "var(--bg-elevated)",
                     borderRadius: 6,
                     position: "relative",
-                    boxShadow: sel ? "0 0 0 3px var(--accent-soft)" : "none",
-                    cursor: "pointer",
                   }}
                 >
-                  <ToolkitIcon slug={it.composioSlug ?? it.id} size={32} />
+                  <ToolkitIcon slug={slug} size={32} />
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>
                       {it.name}
@@ -912,27 +1139,64 @@ function StepSources({
                         textOverflow: "ellipsis",
                       }}
                     >
-                      {it.desc}
+                      {pending
+                        ? "Complete the connection on the Composio screen, then return here."
+                        : it.desc}
                     </div>
                   </div>
-                  <div
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: 4,
-                      border:
-                        "1px solid " +
-                        (sel ? "var(--text)" : "var(--hairline-strong)"),
-                      background: sel ? "var(--text)" : "transparent",
-                      color: "var(--bg)",
-                      display: "grid",
-                      placeItems: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {sel && <Icons.Check size={11} />}
-                  </div>
-                </button>
+                  {active ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", flexShrink: 0 }}>
+                      <span
+                        className="row"
+                        style={{
+                          gap: 4,
+                          fontSize: "var(--fs-meta)",
+                          color: "var(--success, #2c9e6e)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        <Icons.Check size={12} /> Connected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => disconnectSlug(slug)}
+                        disabled={isBusy}
+                        className="btn ghost sm"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  ) : pending ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        disabled
+                        className="btn sm"
+                        style={{ opacity: 0.7, cursor: "default" }}
+                      >
+                        Waiting for authorization…
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => disconnectSlug(slug)}
+                        disabled={isBusy}
+                        className="btn ghost sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => connectToolkit(slug)}
+                      disabled={isBusy || !inviteToken}
+                      className="btn accent sm"
+                      style={{ flexShrink: 0 }}
+                    >
+                      {isBusy ? "Starting…" : "Connect"}
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -1030,7 +1294,7 @@ function StepSources({
               className="scrollbar"
             >
               {filteredCatalog.map((t) => {
-                const already = chosen.has(t.slug) || extraToolkits[t.slug];
+                const already = Boolean(extraToolkits[t.slug]) || Boolean(connections[t.slug.toLowerCase()]);
                 return (
                   <button
                     key={t.slug}
@@ -1106,6 +1370,34 @@ function StepSources({
           </div>
         )}
       </div>
+      {inviteToken && (
+        <div
+          style={{
+            marginTop: "var(--sp-20)",
+            padding: "10px 14px",
+            borderRadius: 8,
+            background: "var(--bg-sunken)",
+            border: "1px solid var(--hairline)",
+            fontSize: "var(--fs-sm)",
+            color: "var(--text-muted)",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--sp-8)",
+            flexWrap: "wrap",
+          }}
+        >
+          {activeCount === 0 ? (
+            <span>Connect at least one tool so we can start building your twin.</span>
+          ) : activeCount < 3 ? (
+            <span>You can connect more later from <span className="mono">/profile</span>.</span>
+          ) : null}
+          {activeCount > 0 ? (
+            <span style={{ color: "var(--text)", fontWeight: 600 }}>
+              {activeCount} connected · {Object.values(connections).filter((c) => statusBucket(c.status) === "pending").length} pending
+            </span>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

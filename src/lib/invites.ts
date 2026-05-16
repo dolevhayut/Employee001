@@ -7,6 +7,7 @@
 // app at all (they don't have the shared EMPLOYEE001_TOKEN).
 
 import fs from "fs";
+import fsp from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
 
@@ -136,6 +137,25 @@ export function revokeInvite(token: string): boolean {
   return true;
 }
 
+/**
+ * Bind an `employeeId` to an invite without marking it completed.
+ * Used by `materializeEmployeeFromInvite` so subsequent GET
+ * /api/invites/<token>/connections requests can resolve the employee
+ * before consent has been finalised. Idempotent — re-binding the same
+ * id is a no-op; binding a different id is rejected.
+ */
+export function bindInviteEmployee(token: string, employeeId: string): boolean {
+  const list = readAll();
+  const idx = list.findIndex((i) => i.token === token);
+  if (idx < 0) return false;
+  const inv = list[idx];
+  if (inv.employeeId === employeeId) return true;
+  if (inv.employeeId && inv.employeeId !== employeeId) return false;
+  list[idx] = { ...inv, employeeId };
+  writeAll(list);
+  return true;
+}
+
 export function markInviteCompleted(
   token: string,
   employeeId: string,
@@ -198,6 +218,153 @@ export function tryClaimInvite(token: string): { claimed: true } | { claimed: fa
     if (e && e.code === "EEXIST") return { claimed: false, reason: "already_claimed" };
     throw err;
   }
+}
+
+// ─── Employee materialization (extracted from /api/invites/[token]/complete) ──
+//
+// The original "complete" route did all of this at the very end of the wizard.
+// With employee-side OAuth, we need a real employee directory on disk BEFORE
+// the consent submit so Composio has a stable user_id to bind the connection
+// to. This function is idempotent: if the directory + employee.json already
+// exist, it returns the existing employeeId without overwriting any content.
+
+const PROFILE_FILES_LITERAL = [
+  "EXPERTISE",
+  "DECISIONS",
+  "CONTEXT",
+  "PEOPLE",
+  "PROJECTS",
+  "PREFERENCES",
+  "TONE",
+  "BOUNDARIES",
+  "EMPLOYMENT",
+] as const;
+type ProfileFileKey = (typeof PROFILE_FILES_LITERAL)[number];
+
+function slugifyForId(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
+/** Lightweight starter markdown — used when the employee hasn't filled in
+ * the consent form yet. The /complete route later replaces these (only if
+ * they still look like placeholders) with richer content from the wizard. */
+function placeholderMarkdown(name: string, role: string): Record<ProfileFileKey, string> {
+  const today = new Date().toISOString().slice(0, 10);
+  const out = {} as Record<ProfileFileKey, string>;
+  out.EMPLOYMENT = `# Employment — ${name}\n\n- Name: ${name}\n${role ? `- Role: ${role}\n` : ""}- Onboarded: ${today}\n`;
+  out.EXPERTISE = `# Expertise — ${name}\n\n_To be filled in during onboarding._\n`;
+  out.BOUNDARIES = `# Boundaries — ${name}\n\n_To be filled in during onboarding._\n`;
+  out.CONTEXT = `# Context — ${name}\n\n_To be filled in during onboarding._\n`;
+  out.DECISIONS = `# Decisions — ${name}\n\n_To be filled in during onboarding._\n`;
+  out.PEOPLE = `# People — ${name}\n\n_To be filled in during onboarding._\n`;
+  out.PROJECTS = `# Projects — ${name}\n\n_To be filled in during onboarding._\n`;
+  out.PREFERENCES = `# Preferences — ${name}\n\n_To be filled in during onboarding._\n`;
+  out.TONE = `# Tone — ${name}\n\n_To be filled in during onboarding._\n`;
+  return out;
+}
+
+export type MaterializeOverrides = {
+  name?: string;
+  role?: string;
+};
+
+export type MaterializeResult = {
+  employeeId: string;
+  /** True if the directory already existed (idempotent re-call). */
+  reused: boolean;
+};
+
+/**
+ * Idempotently materialize an employee directory for an invite. Safe to call
+ * multiple times for the same token — subsequent calls return the existing
+ * employeeId without touching disk content.
+ *
+ * The invite's name may still be empty at first connect time (the employee
+ * hasn't reached the profile step). In that case we fall back to the role or
+ * a synthetic `pending-<tokenSlice>` slug. The /complete route may later
+ * rename… actually, we lock in the employeeId at first call. The /complete
+ * route reconciles the sidecar (name/role) but does NOT change the id, since
+ * Composio is now bound to the original composio user id (`employee:<id>`).
+ */
+export async function materializeEmployeeFromInvite(
+  token: string,
+  overrides?: MaterializeOverrides,
+): Promise<MaterializeResult> {
+  const invite = findInvite(token);
+  if (!invite) throw new Error("invite not found");
+
+  // If the invite was previously marked completed, return that id.
+  if (invite.employeeId) {
+    return { employeeId: invite.employeeId, reused: true };
+  }
+
+  const nameRaw = (overrides?.name || invite.name || "").trim();
+  const roleRaw = (overrides?.role || invite.role || "").trim();
+
+  let slug = slugifyForId(nameRaw);
+  if (!slug) slug = slugifyForId(roleRaw);
+  if (!slug) slug = `pending-${token.slice(4, 10)}`;
+
+  const employeeId = `${slug}-${token.slice(4, 10)}`;
+  const dir = path.join(process.cwd(), "data", "employees", employeeId);
+  const sidecarPath = path.join(dir, "employee.json");
+
+  // Idempotency check: sidecar exists → return without touching anything.
+  try {
+    await fsp.access(sidecarPath);
+    return { employeeId, reused: true };
+  } catch {
+    // not yet materialized
+  }
+
+  await fsp.mkdir(dir, { recursive: true });
+
+  const name = nameRaw || `Pending (${token.slice(4, 10)})`;
+  const role = roleRaw;
+  const placeholders = placeholderMarkdown(name, role);
+
+  // Only write a markdown file if it doesn't already exist.
+  await Promise.all(
+    PROFILE_FILES_LITERAL.map(async (key) => {
+      const p = path.join(dir, `${key}.md`);
+      try {
+        await fsp.access(p);
+      } catch {
+        await fsp.writeFile(p, placeholders[key], "utf8");
+      }
+    }),
+  );
+
+  await fsp.writeFile(
+    sidecarPath,
+    JSON.stringify(
+      {
+        id: employeeId,
+        name,
+        role: role || null,
+        integrations: [],
+        createdAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
+        via: { invite: token },
+        pendingProfile: !nameRaw, // hint for /complete to overwrite the synthetic name
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+
+  // Bind employeeId on the invite record so the GET connections endpoint
+  // can resolve it before consent is finalised. Doesn't mark completed.
+  bindInviteEmployee(token, employeeId);
+
+  return { employeeId, reused: false };
 }
 
 export function releaseInviteClaim(token: string): void {
