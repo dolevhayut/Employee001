@@ -10,6 +10,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.1.0-rc.7] — 2026-05-16
+
+### Added
+- **Community-health docs.** `SECURITY.md` with concrete disclosure SLAs, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, `.github/ISSUE_TEMPLATE/` (bug + feature), `.github/pull_request_template.md`, and `.github/dependabot.yml` for weekly security updates.
+- **Real starter content for all 9 twin profile files.** `/api/invites/<token>/complete` now synthesises CONTEXT, DECISIONS, PEOPLE, PROJECTS, PREFERENCES, TONE from the wizard's collected data (previously placeholders).
+- **Weekly activity tracking.** `employees-disk.ts` exposes `bumpActivityOnDisk`; `/api/twin/chat` bumps it on every request. The UI now shows real `questionsThisWeek` counts that auto-reset on ISO week boundaries.
+- **In-UI API key management.** `/settings` lets the CEO add/clear Anthropic, Composio, and ElevenLabs keys without dropping to a terminal.
+- **`update` CLI command actually updates.** Detects npm/pnpm/yarn installation method, prompts before running, falls back to printing the command on unknown setups.
+- **Audit log rotation.** `audit.jsonl` is split into monthly `audit.YYYY-MM.jsonl` archives once it crosses 10MB or contains entries older than 30 days.
+- **README screenshots.** Four PNGs (welcome, employees, flow, settings) replace the placeholder comment. `scripts/screenshot.mjs` regenerates them via Playwright.
+
+### Changed
+- `.gitignore` now ignores `.claude/` (Claude Code session metadata stays local).
+
+---
+
 ## [0.1.0-rc.6] — 2026-05-16
 
 ### Changed
