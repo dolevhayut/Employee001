@@ -857,7 +857,12 @@ function InvitePanel({
               value={lookbackDays}
               onChange={(e) => setLookbackDays(Number(e.target.value))}
               disabled={!config?.ready}
-              style={{ flex: "1 1 auto", maxWidth: 360 }}
+              style={{
+                flex: "1 1 auto",
+                maxWidth: 360,
+                accentColor: "var(--text)",
+                cursor: config?.ready ? "pointer" : "not-allowed",
+              }}
             />
           </div>
           <div

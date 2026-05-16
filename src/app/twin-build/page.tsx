@@ -634,7 +634,7 @@ function TwinBuildContent() {
                   step={30}
                   value={lookbackDays}
                   onChange={(e) => setLookbackDays(Number(e.target.value))}
-                  style={{ width: 100 }}
+                  style={{ width: 100, accentColor: "var(--text)", cursor: "pointer" }}
                 />
                 <span className="mono" style={{ fontSize: "var(--fs-meta)", minWidth: 56 }}>
                   {lookbackDays}d
