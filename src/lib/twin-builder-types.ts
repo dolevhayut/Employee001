@@ -17,7 +17,15 @@ export const TWIN_FILE_NAMES = [
 export type TwinFileName = (typeof TWIN_FILE_NAMES)[number];
 
 export type TwinBuilderEvent =
-  | { type: "start"; employeeId: string; activeToolkits: string[]; ts: number }
+  | {
+      type: "start";
+      employeeId: string;
+      activeToolkits: string[];
+      /** Window (in days) the builder is searching back over for evidence.
+       *  Threaded from the invite / route → runTwinBuilder → prompt. */
+      activeLookbackDays: number;
+      ts: number;
+    }
   | { type: "plan"; text: string; ts: number }
   | { type: "tool_use"; tool: string; input: unknown; ts: number }
   | { type: "tool_result"; tool: string; ts: number }
@@ -66,6 +74,11 @@ export type TwinBuilderEvent =
       filesWritten: TwinFileName[];
       turns: number;
       costUsd: number;
-      stoppedReason: "max_budget" | "max_turns" | "natural" | "no_connections";
+      stoppedReason:
+        | "max_budget"
+        | "max_turns"
+        | "natural"
+        | "no_connections"
+        | "lookback_out_of_range";
       ts: number;
     };

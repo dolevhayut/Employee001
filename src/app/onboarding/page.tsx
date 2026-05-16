@@ -176,8 +176,8 @@ function OnboardingPageInner() {
 
   const sidebarNote =
     viewMode === "ceo"
-      ? <>We pull 12 months of activity across the sources you connect, then Claude generates 12 markdown files describing how {firstName} thinks and works. You review and edit. Then their twin goes live in Slack.</>
-      : <>Claude generates 12 markdown files from your connected tools. Your manager reviews and approves the profile before your twin goes live. You stay in control at any time via <span className="mono">/profile</span>.</>;
+      ? <>We study the lookback window you chose (default 90 days) across the sources you connect, then Claude writes 9 profile markdown files describing how {firstName} thinks and works. You review and edit. Then their twin goes live.</>
+      : <>Claude reads the lookback window your manager chose of your activity from the tools you connect, then writes 9 profile markdown files. Your manager reviews and approves before your twin goes live. You stay in control any time at <span className="mono">/profile</span>.</>;
 
   const isEmployeeView = viewMode === "employee";
 
@@ -797,8 +797,8 @@ function StepSources({
         style={{ fontSize: "var(--fs-base)", lineHeight: 1.5, marginBottom: "var(--sp-24)" }}
       >
         {isCeo
-          ? "We pull 12 months of read-only data through Composio. Tokens never touch our servers. Pick at least three."
-          : "We pull 12 months of read-only data from your connected tools through Composio. Your tokens never touch our servers. Pick at least three."}
+          ? "We pull read-only data across the lookback window you chose through Composio. Tokens never touch our servers. Pick at least three."
+          : "We pull read-only data from your connected tools through Composio across the lookback window your manager chose. Your tokens never touch our servers. Pick at least three."}
       </p>
       {Object.keys(extraToolkits).length > 0 && (
         <div style={{ marginBottom: "var(--sp-18)" }}>
@@ -1378,7 +1378,7 @@ function StepReview({
               <span className="mono" style={{ color: "var(--text)" }}>
                 $32–47
               </span>{" "}
-              using Claude Opus 4.7 across 12 profile files.
+              using Claude Opus 4.7 across 9 profile files.
             </div>
           </div>
         )}

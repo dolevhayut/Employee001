@@ -55,6 +55,13 @@ export type RunTwinBuilderArgs = {
   employee: EmployeeWithTwin;
   /** Free-form context the CEO captured at onboarding/profile time. */
   ceoContext?: string;
+  /**
+   * Historical window (in days) the builder will instruct the agent to search
+   * back over for evidence. Must be in [30, 360]. Out-of-range values cause
+   * the run to emit an `error` + `done` (stoppedReason "lookback_out_of_range")
+   * without spawning the SDK.
+   */
+  lookbackDays: number;
   onEvent: (event: TwinBuilderEvent) => void;
   /** Hard dollar cap for this build. Default $5. */
   maxBudgetUsd?: number;
@@ -73,9 +80,33 @@ export type RunTwinBuilderArgs = {
 };
 
 export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
-  const { employee, ceoContext, onEvent } = args;
+  const { employee, ceoContext, onEvent, lookbackDays } = args;
   const start = Date.now();
   const ts = () => Date.now() - start;
+
+  // Validate lookback window before doing any I/O or SDK spin-up. The caller
+  // (route or CLI) should have already clamped this, but we re-check here so
+  // direct in-process callers can't accidentally bypass the contract.
+  if (
+    !Number.isFinite(lookbackDays) ||
+    lookbackDays < 30 ||
+    lookbackDays > 360
+  ) {
+    onEvent({
+      type: "error",
+      message: `lookbackDays must be between 30 and 360 (got ${lookbackDays}).`,
+      ts: ts(),
+    });
+    onEvent({
+      type: "done",
+      filesWritten: [],
+      turns: 0,
+      costUsd: 0,
+      stoppedReason: "lookback_out_of_range",
+      ts: ts(),
+    });
+    return;
+  }
 
   const employeeDir = EMPLOYEE_DATA_DIR(employee.id);
   await fsp.mkdir(employeeDir, { recursive: true });
@@ -94,6 +125,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
     type: "start",
     employeeId: employee.id,
     activeToolkits,
+    activeLookbackDays: lookbackDays,
     ts: ts(),
   });
 
@@ -221,6 +253,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
     activeToolkits,
     orgMcpNames: Object.keys(orgMcpServers),
     existingFiles: present,
+    lookbackDays,
   });
 
   const buildId = args.buildId ?? newBuildId();
@@ -550,6 +583,7 @@ function buildBuilderSystemPrompt(args: {
   activeToolkits: string[];
   orgMcpNames: string[];
   existingFiles: TwinFileName[];
+  lookbackDays: number;
 }): string {
   const {
     employee,
@@ -558,6 +592,7 @@ function buildBuilderSystemPrompt(args: {
     activeToolkits,
     orgMcpNames,
     existingFiles,
+    lookbackDays,
   } = args;
   const firstName = employee.firstName;
 
@@ -581,7 +616,7 @@ function buildBuilderSystemPrompt(args: {
       spec: `Active and recent projects with a **mini Threats/Opportunities pass per project**:
 
   - **Project name → ${firstName}'s role → current status → next milestone → blockers → threats → opportunities.**
-  - Evidence preference: Linear/Jira issues *assigned to or created by* ${firstName} (not just visible to them); GitHub PRs they authored; Notion project pages they edited in the last 90 days; calendar events they organize for that project.
+  - Evidence preference: Linear/Jira issues *assigned to or created by* ${firstName} (not just visible to them); GitHub PRs they authored; Notion project pages they edited in the last ${lookbackDays} days; calendar events they organize for that project.
   - "Threats" = what could derail it (resource, dependency, deadline, political).
   - "Opportunities" = what would 10x it if they leaned in.
   - Avoid listing projects they're peripherally CC'd on — that's noise, not their actual work.`,
@@ -649,6 +684,10 @@ You are NOT a content generator. You are reading between the lines of a digital 
 - **Role:** ${employee.role}
 - **First name (used by the twin in conversation):** ${firstName}
 ${ceoContext ? `\n## What the CEO told us about ${firstName}\n\n${ceoContext}\n` : ""}
+
+# Lookback window
+
+All evidence gathering should focus on the **last ${lookbackDays} days** of ${firstName}'s digital trail. When a toolkit accepts a date filter (Gmail \`after:\`, Slack \`after:\`, GitHub \`updated:>\`, Linear \`updatedAt\`, Calendar \`timeMin\`), scope the query to roughly \`now - ${lookbackDays} days\` so you don't burn budget on stale signal. Older signal is only useful as fallback if the recent window is thin.
 
 # Available systems
 

@@ -94,12 +94,12 @@ export default async function doctor() {
     } else warn("ANTHROPIC_API_KEY", "set, but couldn't reach api.anthropic.com to verify");
   }
 
-  // Composio (required — powers the 120-day twin-training backfill)
+  // Composio (required — powers the 30-360 day twin-training backfill, default 90)
   if (env.COMPOSIO_API_KEY) ok("COMPOSIO_API_KEY", "set");
   else {
     fail(
       "COMPOSIO_API_KEY",
-      "not set — required. Powers the autonomous training pipeline that writes the 9 profile files per employee.",
+      "not set — required. Powers the autonomous training pipeline (30-360 day Composio backfill, default 90) that writes the 9 profile files per employee.",
     );
     issues++;
   }

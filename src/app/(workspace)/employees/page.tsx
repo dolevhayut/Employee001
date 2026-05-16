@@ -648,6 +648,7 @@ function InvitePanel({
 }) {
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
+  const [lookbackDays, setLookbackDays] = useState(90);
   const [creating, setCreating] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   // Block invite creation until both API keys are present. Fetched once
@@ -671,11 +672,16 @@ function InvitePanel({
       const res = await fetch("/api/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), role: role.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          role: role.trim(),
+          lookbackDays,
+        }),
       });
       if (!res.ok) throw new Error("create_failed");
       setName("");
       setRole("");
+      setLookbackDays(90);
       onInvitesChanged();
     } catch {
       // No-op: a follow-up call to onInvitesChanged() refreshes from the
@@ -813,6 +819,68 @@ function InvitePanel({
             opacity: config?.ready ? 1 : 0.55,
           }}
         />
+        <div
+          style={{
+            flex: "1 1 100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            padding: "6px 10px",
+            border: "1px solid var(--hairline-strong)",
+            borderRadius: 6,
+            background: "var(--surface)",
+            opacity: config?.ready ? 1 : 0.55,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              fontSize: "var(--fs-sm)",
+            }}
+          >
+            <label
+              htmlFor="lookback-days"
+              title="How far back the AI will study this person's work (Slack, GitHub, Linear, Gmail, calendar) to build their twin. Longer = more accurate, more expensive."
+              style={{ cursor: "help", userSelect: "none" }}
+            >
+              Lookback: {lookbackDays} days
+            </label>
+            <input
+              id="lookback-days"
+              type="range"
+              min={30}
+              max={360}
+              step={30}
+              value={lookbackDays}
+              onChange={(e) => setLookbackDays(Number(e.target.value))}
+              disabled={!config?.ready}
+              style={{ flex: "1 1 auto", maxWidth: 360 }}
+            />
+          </div>
+          <div
+            style={{
+              fontSize: "var(--fs-meta)",
+              color: "var(--text-subtle)",
+            }}
+          >
+            {(() => {
+              const cost = (0.005 * lookbackDays).toFixed(2);
+              const totalSec = 2 * lookbackDays;
+              const mins = Math.floor(totalSec / 60);
+              const secs = totalSec % 60;
+              const timeStr =
+                mins > 0
+                  ? secs > 0
+                    ? `${mins}min ${secs}s`
+                    : `${mins}min`
+                  : `${secs}s`;
+              return `~ $${cost} · ${timeStr}. Estimate — varies with signal density.`;
+            })()}
+          </div>
+        </div>
         <button
           type="button"
           onClick={createInvite}

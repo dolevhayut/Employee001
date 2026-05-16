@@ -38,7 +38,17 @@ export async function POST(
   const body = (await request.json().catch(() => ({}))) as {
     ceoContext?: string;
     maxBudgetUsd?: number;
+    /** Historical window the builder will search. Clamped to [30, 360]; defaults to 90. */
+    lookbackDays?: number;
   };
+
+  // Clamp + default the lookback window before forwarding to the runner.
+  // Manual "build now" button posts an empty body — keep that backward-compatible.
+  const rawLookback =
+    typeof body.lookbackDays === "number" && Number.isFinite(body.lookbackDays)
+      ? Math.round(body.lookbackDays)
+      : 90;
+  const lookbackDays = Math.min(360, Math.max(30, rawLookback));
 
   const fromDisk = await loadEmployeesFromDisk();
   const allEmployees = [
@@ -130,6 +140,7 @@ export async function POST(
     buildId,
     ceoContext: body.ceoContext,
     maxBudgetUsd: body.maxBudgetUsd,
+    lookbackDays,
     onEvent,
   })
     .catch((err) => {

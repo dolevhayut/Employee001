@@ -23,9 +23,34 @@ export type Invite = {
   employeeId?: string;
   /** Invitations expire 14 days after creation if unused. */
   expiresAt: string;
+  /**
+   * How many days of historical signal the twin-builder should pull when
+   * training the employee's twin. CEO picks this per-invite; clamped to
+   * [30, 360]. Cost and training time scale roughly linearly with this.
+   */
+  lookbackDays: number;
 };
 
 const INVITE_EXPIRY_DAYS = 14;
+const LOOKBACK_MIN = 30;
+const LOOKBACK_MAX = 360;
+const LOOKBACK_DEFAULT = 90;
+
+/** Clamp a lookback value into the allowed window; non-integers/garbage default. */
+export function clampLookbackDays(raw: unknown): number {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return LOOKBACK_DEFAULT;
+  const i = Math.round(n);
+  if (i < LOOKBACK_MIN) return LOOKBACK_MIN;
+  if (i > LOOKBACK_MAX) return LOOKBACK_MAX;
+  return i;
+}
+
+/** Apply the in-memory default for invites persisted before this field existed. */
+function withLookbackDefault(i: Invite): Invite {
+  if (typeof (i as { lookbackDays?: unknown }).lookbackDays === "number") return i;
+  return { ...i, lookbackDays: LOOKBACK_DEFAULT };
+}
 
 function file(): string {
   return path.join(process.cwd(), "data", "invites.json");
@@ -56,10 +81,15 @@ export function listInvites(): Invite[] {
   // Return newest first, scrub anything that was created with a bad shape.
   return readAll()
     .filter((i): i is Invite => typeof i?.token === "string")
+    .map(withLookbackDefault)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function createInvite(input: { name?: string; role?: string }): Invite {
+export function createInvite(input: {
+  name?: string;
+  role?: string;
+  lookbackDays?: number;
+}): Invite {
   const token = `inv_${randomBytes(20).toString("hex")}`;
   const now = new Date();
   const expires = new Date(now.getTime() + INVITE_EXPIRY_DAYS * 86400_000);
@@ -69,6 +99,9 @@ export function createInvite(input: { name?: string; role?: string }): Invite {
     role: input.role?.trim() || undefined,
     createdAt: now.toISOString(),
     expiresAt: expires.toISOString(),
+    lookbackDays: clampLookbackDays(
+      input.lookbackDays === undefined ? LOOKBACK_DEFAULT : input.lookbackDays,
+    ),
   };
   const list = readAll();
   list.push(invite);
@@ -78,7 +111,8 @@ export function createInvite(input: { name?: string; role?: string }): Invite {
 
 export function findInvite(token: string): Invite | undefined {
   if (!token.startsWith("inv_")) return undefined;
-  return readAll().find((i) => i.token === token);
+  const i = readAll().find((x) => x.token === token);
+  return i ? withLookbackDefault(i) : undefined;
 }
 
 /**

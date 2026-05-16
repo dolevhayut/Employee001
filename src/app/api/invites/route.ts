@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { name?: unknown; role?: unknown } = {};
+  let body: { name?: unknown; role?: unknown; lookbackDays?: unknown } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -34,6 +34,28 @@ export async function POST(request: NextRequest) {
   }
   const name = typeof body.name === "string" ? body.name : undefined;
   const role = typeof body.role === "string" ? body.role : undefined;
-  const invite = createInvite({ name, role });
+
+  // lookbackDays: required integer in [30, 360]. Absent => default 90.
+  // Reject explicit out-of-range values rather than silently clamping —
+  // a slider that asks for 720 days is a bug somewhere, not a UX rounding.
+  let lookbackDays: number | undefined;
+  if (body.lookbackDays !== undefined && body.lookbackDays !== null) {
+    const n =
+      typeof body.lookbackDays === "number"
+        ? body.lookbackDays
+        : Number(body.lookbackDays);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 30 || n > 360) {
+      return NextResponse.json(
+        {
+          error: "lookback_out_of_range",
+          message: "lookbackDays must be between 30 and 360",
+        },
+        { status: 400 },
+      );
+    }
+    lookbackDays = n;
+  }
+
+  const invite = createInvite({ name, role, lookbackDays });
   return NextResponse.json({ invite }, { status: 201 });
 }

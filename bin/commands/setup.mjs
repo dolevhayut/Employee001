@@ -143,12 +143,13 @@ export default async function setup() {
   // twins, full stop.
   p.note(
     [
-      "When you onboard an employee, an autonomous Claude agent studies",
-      "roughly the last 120 days of their work through Composio MCP —",
-      "Slack threads, Gmail, GitHub PRs, Linear tickets, calendar events.",
-      "From that signal it writes the 9 profile markdown files that",
-      "define who that twin is and how they think.",
+      "For every invite, the CEO chooses a lookback window between 30 and",
+      "360 days (default 90). An autonomous Claude agent then studies that",
+      "window of the employee's work through Composio MCP — Slack, Gmail,",
+      "GitHub PRs, Linear tickets, calendar — and writes the 9 profile",
+      "markdown files that define who that twin is and how they think.",
       "",
+      "Bigger window = more accurate twin, more API spend, longer wait.",
       "Without Composio there is no training pipeline, and no twins.",
       "That's why the next key is required, not optional.",
     ].join("\n"),
@@ -157,7 +158,7 @@ export default async function setup() {
 
   const composioKey = await p.password({
     message:
-      "Composio API key (required — powers the 120-day training backfill) — get one at https://app.composio.dev",
+      "Composio API key (required — powers the 30-360 day training backfill) — get one at https://app.composio.dev",
     mask: "•",
     validate(value) {
       if (!value) return "A Composio API key is required — no training pipeline without it";
@@ -206,10 +207,11 @@ export default async function setup() {
     `ANTHROPIC_API_KEY=${anthropicKey}`,
     "",
     "# Required. Composio MCP powers the autonomous training loop:",
-    "# when you onboard an employee, a Claude agent studies ~120 days",
-    "# of their work (Slack, Gmail, GitHub, Linear, calendar) and writes",
-    "# the 9 profile markdown files. Without this key, no twins can be",
-    "# created — twin chat and tool execution all depend on it too.",
+    "# when you onboard an employee, a Claude agent studies the CEO-chosen",
+    "# lookback window (30-360 days, default 90) of their work (Slack,",
+    "# Gmail, GitHub, Linear, calendar) and writes the 9 profile markdown",
+    "# files. Without this key, no twins can be created — twin chat and",
+    "# tool execution all depend on it too.",
     `COMPOSIO_API_KEY=${composioKey ?? ""}`,
     "",
     "# Optional. ElevenLabs for cloned twin voices.",

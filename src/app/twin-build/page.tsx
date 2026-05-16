@@ -198,6 +198,7 @@ function TwinBuildContent() {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [activeBuildId, setActiveBuildId] = useState<string | null>(null);
   const [reattached, setReattached] = useState(false);
+  const [lookbackDays, setLookbackDays] = useState<number>(90);
   const startedAtRef = useRef<number | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const feedScrollRef = useRef<HTMLDivElement | null>(null);
@@ -299,7 +300,7 @@ function TwinBuildContent() {
       res = await fetch(`/api/twin-builder/${employee.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ceoContext }),
+        body: JSON.stringify({ ceoContext, lookbackDays }),
       });
     } catch (err) {
       setPhase("error");
@@ -614,9 +615,35 @@ function TwinBuildContent() {
               <Icons.X size={11} /> Stop watching
             </button>
           ) : phase === "idle" ? (
-            <button className="btn primary" onClick={start}>
-              <Icons.Spark size={12} /> Start build
-            </button>
+            <>
+              <label
+                className="row"
+                style={{
+                  gap: "var(--sp-6)",
+                  alignItems: "center",
+                  fontSize: "var(--fs-meta)",
+                  color: "var(--text-subtle)",
+                }}
+                title="How far back to search the connected systems for evidence. 30–360 days."
+              >
+                <span>Window</span>
+                <input
+                  type="range"
+                  min={30}
+                  max={360}
+                  step={30}
+                  value={lookbackDays}
+                  onChange={(e) => setLookbackDays(Number(e.target.value))}
+                  style={{ width: 100 }}
+                />
+                <span className="mono" style={{ fontSize: "var(--fs-meta)", minWidth: 56 }}>
+                  {lookbackDays}d
+                </span>
+              </label>
+              <button className="btn primary" onClick={start}>
+                <Icons.Spark size={12} /> Start build
+              </button>
+            </>
           ) : (
             <button className="btn" onClick={start}>
               <Icons.Refresh size={12} /> Run again
