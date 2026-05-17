@@ -137,6 +137,43 @@ export function revokeInvite(token: string): boolean {
   return true;
 }
 
+export type BulkRevokeScope = "expired" | "unused";
+
+/**
+ * Bulk-delete invites matching a scope. Completed invites are never touched
+ * — they're historical records (the binding `employeeId` is the audit trail
+ * of how that employee got hired). One disk write per call.
+ *
+ * - "expired": invites whose `expiresAt` is in the past AND not completed.
+ * - "unused": invites with no `completedAt` AND no bound `employeeId`. By
+ *   convention this also clears expired ones (a superset).
+ */
+export function bulkRevokeInvites(scope: BulkRevokeScope): {
+  removed: number;
+  tokens: string[];
+} {
+  const now = Date.now();
+  const list = readAll();
+  const matches = (i: Invite): boolean => {
+    if (i.completedAt) return false;
+    if (scope === "expired") {
+      return new Date(i.expiresAt).getTime() < now;
+    }
+    // "unused" — no completion AND no employee binding yet.
+    return !i.employeeId;
+  };
+  const removed: string[] = [];
+  const next = list.filter((i) => {
+    if (matches(i)) {
+      removed.push(i.token);
+      return false;
+    }
+    return true;
+  });
+  if (removed.length > 0) writeAll(next);
+  return { removed: removed.length, tokens: removed };
+}
+
 /**
  * Bind an `employeeId` to an invite without marking it completed.
  * Used by `materializeEmployeeFromInvite` so subsequent GET

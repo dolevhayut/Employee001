@@ -701,6 +701,25 @@ function InvitePanel({
     }
   }
 
+  async function bulkRevoke(scope: "expired" | "unused", count: number) {
+    if (count === 0) return;
+    const noun = scope === "expired" ? "expired invite" : "unused invite";
+    const ok = window.confirm(
+      `Revoke ${count} ${noun}${count === 1 ? "" : "s"}? The link${count === 1 ? "" : "s"} will stop working immediately.`,
+    );
+    if (!ok) return;
+    try {
+      await fetch("/api/invites/bulk-revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope }),
+      });
+      onInvitesChanged();
+    } catch {
+      /* next refresh fixes UI */
+    }
+  }
+
   async function copy(token: string) {
     const url = inviteUrl(token);
     try {
@@ -901,6 +920,67 @@ function InvitePanel({
           <Icons.Plus size={13} /> {creating ? "Creating…" : "Create invite"}
         </button>
       </div>
+
+      {pending.length > 0 && (() => {
+        const now = Date.now();
+        const expiredCount = pending.filter(
+          (i) => new Date(i.expiresAt).getTime() < now,
+        ).length;
+        const unusedCount = pending.filter((i) => !i.employeeId).length;
+        if (expiredCount === 0 && unusedCount === 0) return null;
+        return (
+          <div
+            style={{
+              display: "flex",
+              gap: "var(--sp-8)",
+              alignItems: "center",
+              marginBottom: "var(--sp-8)",
+              fontSize: "var(--fs-meta)",
+              color: "var(--text-subtle)",
+            }}
+          >
+            <span>Bulk actions:</span>
+            <button
+              type="button"
+              onClick={() => bulkRevoke("expired", expiredCount)}
+              disabled={expiredCount === 0}
+              className="btn ghost"
+              style={{
+                height: 26,
+                fontSize: "var(--fs-meta)",
+                color: expiredCount === 0 ? "var(--text-subtle)" : "var(--danger, #A04B3D)",
+                opacity: expiredCount === 0 ? 0.5 : 1,
+              }}
+              title={
+                expiredCount === 0
+                  ? "No expired invites"
+                  : `Revoke ${expiredCount} expired invite${expiredCount === 1 ? "" : "s"}`
+              }
+            >
+              Revoke expired ({expiredCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => bulkRevoke("unused", unusedCount)}
+              disabled={unusedCount === 0}
+              className="btn ghost"
+              style={{
+                height: 26,
+                fontSize: "var(--fs-meta)",
+                color: unusedCount === 0 ? "var(--text-subtle)" : "var(--danger, #A04B3D)",
+                opacity: unusedCount === 0 ? 0.5 : 1,
+              }}
+              title={
+                unusedCount === 0
+                  ? "No unused invites"
+                  : `Revoke ${unusedCount} invite${unusedCount === 1 ? "" : "s"} that no employee has started — includes expired ones`
+              }
+            >
+              Revoke unused ({unusedCount})
+            </button>
+          </div>
+        );
+      })()}
 
       {pending.length > 0 && (
         <div style={{ display: "grid", gap: "var(--sp-6)" }}>
