@@ -38,6 +38,8 @@ import {
   Activity,
   Coins,
   Trash,
+  ChatBubble as ChatBubbleIcon,
+  Send as SendIcon,
 } from "iconoir-react";
 
 type IcoProps = {
@@ -97,6 +99,8 @@ export const Icons = {
   Activity: (p: IcoProps) => <Activity {...toI(p)} />,
   DollarSign: (p: IcoProps) => <Coins {...toI(p)} />,
   Trash: (p: IcoProps) => <Trash {...toI(p)} />,
+  MessageSquare: (p: IcoProps) => <ChatBubbleIcon {...toI(p)} />,
+  Send: (p: IcoProps) => <SendIcon {...toI(p)} />,
 };
 
 export type IconName = keyof typeof Icons;

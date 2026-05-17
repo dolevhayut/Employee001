@@ -8,6 +8,7 @@ import { PageHead } from "@/components/ex/page-head";
 import { Topbar } from "@/components/ex/shell";
 import { INTEGRATIONS as INTEGRATION_META } from "@/lib/demo";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
+import { OrgChart } from "@/components/ex/org-chart";
 import {
   EMPLOYEES_WITH_TWIN,
   ORG_SKILLS,
@@ -1070,6 +1071,7 @@ export default function EmployeesPage() {
   const [query, setQuery] = useState("");
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [allEmployees, setAllEmployees] = useState<EmployeeWithTwin[]>(EMPLOYEES_WITH_TWIN);
+  const [orgChartOpen, setOrgChartOpen] = useState(true);
 
   // Fetch all employees (static + hired marketplace agents)
   useEffect(() => {
@@ -1213,6 +1215,59 @@ export default function EmployeesPage() {
             tone="idle"
             border
           />
+        </div>
+
+        {/* Org chart — reporting structure */}
+        <div
+          className="card"
+          style={{
+            marginBottom: "var(--sp-28)",
+            padding: 0,
+            overflow: "hidden",
+          }}
+        >
+          <button
+            onClick={() => setOrgChartOpen((v) => !v)}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "14px 18px",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              color: "var(--fg)",
+            }}
+            aria-expanded={orgChartOpen}
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: "var(--sp-10)" }}>
+              <Icons.Team size={14} />
+              <span style={{ fontWeight: 600, fontSize: "var(--fs-base)" }}>
+                Org chart
+              </span>
+              <span
+                className="subtle mono"
+                style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}
+              >
+                who reports to whom
+              </span>
+            </span>
+            <Icons.Chevron
+              size={14}
+              style={{
+                transform: orgChartOpen ? "rotate(90deg)" : "rotate(0deg)",
+                transition: "transform 0.18s",
+                color: "var(--text-subtle)",
+              }}
+            />
+          </button>
+          {orgChartOpen && (
+            <div style={{ borderTop: "1px solid var(--hairline)" }}>
+              <OrgChart employees={allEmployees} />
+            </div>
+          )}
         </div>
 
         {/* Invite panel — anchored so the topbar CTA can scroll to it */}
