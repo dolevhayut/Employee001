@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Manrope, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
-// Load the brand fonts once at the root so every page — landing, welcome,
-// join, workspace — has access to them via CSS variables. Individual pages
+// Load the brand fonts once at the root so every page — welcome, join,
+// workspace — has access to them via CSS variables. Individual pages
 // reference --font-manrope / --font-instrument-serif rather than re-importing.
 
 const manrope = Manrope({
