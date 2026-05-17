@@ -120,6 +120,41 @@ The token is then set as an `e001_token` httpOnly cookie for 30 days. API calls 
 
 To rotate the token, delete the line from `.env` and re-run `setup`.
 
+## What twins are allowed to do
+
+Twins run on the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview). The SDK gives them access to tools — file reading, web search, calling external services through Composio MCP, and so on. We don't enable everything. The permissions are deliberate and the same for every twin in every workspace.
+
+**Hard-disallowed everywhere — no twin can call these, ever:**
+
+```
+Bash · NotebookEdit · EnterWorktree · ExitWorktree
+```
+
+No twin can run a shell command on your machine. No twin can edit notebooks. No twin can spawn or move between git worktrees. This is enforced in two places at once (the SDK's `disallowedTools` strips them from the model's context, and a `PreToolUse` hook rejects them defensively if a future config ever lets them through).
+
+**What's allowed, by run type:**
+
+| Run type | Built-in tools | External tools |
+|---|---|---|
+| **Twin chat** (you ask a twin a question) | `Read`, `Glob`, `Grep`, `Write`¹, `WebSearch`, `WebFetch`, `Task`², `TodoWrite`, `AskUserQuestion` | Composio³ |
+| **Twin training** (autonomous profile build) | `Read`, `Write`¹, `Glob`, `Grep`, `TodoWrite` | Composio³ (read-only signal — Slack/Gmail/Linear/GitHub history) |
+| **Scheduled routines** (e.g. daily PR digest) | `TodoWrite` | Composio³ |
+| **Org-brain summarisation** | — none — | — none — |
+
+¹ `Write` is sandboxed to `data/scratch/<employee-id>/`. A twin can jot a memo or draft — it **cannot** overwrite its own profile, the org brain, audit logs, or any other file under `data/`. Path traversal is rejected.
+
+² `Task` spawns one of two restricted sub-agents: a **web-researcher** (only `WebSearch` + `WebFetch`) or a **brain-explorer** (only `Read` + `Glob` + `Grep`). Sub-agents inherit the same hard-disallow list.
+
+³ Composio MCP tools are *external-effect* tools — posting to Slack, sending Gmail, opening GitHub PRs. Every call hits the **approval gate**: the twin proposes the action, you see it in the approval queue with the full input, you click **Approve** or **Deny**. Auto-execution is off by default. Read-only Composio calls (listing channels, fetching messages, reading PRs) run without prompting — they don't change anything outside.
+
+**Audit trail.** Every tool call — built-in or Composio — is appended to `data/audit.jsonl` with the run id, the employee id, the tool name, the input, and the verdict (`executed` / `ceo_approved` / `ceo_denied` / `hard_blocked`). Browseable from `/audit` in the workspace.
+
+**Web citations.** After any `WebSearch` or `WebFetch`, a `PostToolUse` hook injects an instruction into the model's context telling it to cite the URL and the fetch date in its answer. Twins can look things up online, but they can't pretend they "just knew" something.
+
+**Models.** Twins use `claude-sonnet-4-6` by default with `claude-sonnet-4-5` as a fallback. You can override to `claude-opus-4-7` for a single message from the chat UI. Twin-training runs use `effort: high`; routines use `effort: low`; everything else uses `effort: medium`. Adaptive thinking is on.
+
+If you want to see the source of truth, it's all in [`src/lib/sdk-defaults.ts`](src/lib/sdk-defaults.ts).
+
 ## Open-core
 
 100% of the code in this repo is MIT-licensed and free. Everything you see in the product is available to you.
