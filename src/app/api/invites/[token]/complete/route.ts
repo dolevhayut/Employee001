@@ -39,8 +39,6 @@ type CompletePayload = {
   domain?: string;
   /** Integration toolkits the employee opted in to. */
   integrations?: string[];
-  /** Slack-like channel name suggested in the wizard. */
-  channel?: string;
   /** Boundary flags from the wizard's privacy step. */
   boundaries?: {
     comp?: boolean;
@@ -61,7 +59,6 @@ function buildProfileMarkdown(
   const role = fallbacks.role || "—";
   const domain = (payload.domain ?? "").trim();
   const integrations = (payload.integrations ?? []).filter(Boolean);
-  const channel = (payload.channel ?? "").trim();
   const b = payload.boundaries ?? {};
   const today = new Date().toISOString().slice(0, 10);
 
@@ -89,7 +86,6 @@ function buildProfileMarkdown(
     "",
     `- Name: ${name}`,
     role ? `- Role: ${role}` : "",
-    channel ? `- Preferred channel: ${channel}` : "",
     `- Onboarded: ${today}`,
     "",
   ].filter(Boolean).join("\n");
@@ -119,7 +115,6 @@ function buildProfileMarkdown(
   const intLine = integrations.length
     ? `Primary tools: ${integrations.join(", ")}.`
     : "";
-  const channelLine = channel ? `Primary communication channel: ${channel}.` : "";
 
   out.CONTEXT = [
       `# Context — ${name}`,
@@ -127,7 +122,6 @@ function buildProfileMarkdown(
       `**Role:** ${role || "—"}`,
       domainLine,
       intLine,
-      channelLine,
       "",
       "## Team & organisation",
       "",
@@ -186,8 +180,6 @@ function buildProfileMarkdown(
 
   out.PREFERENCES = [
     `# Preferences — ${name}`,
-    "",
-    channelLine,
     "",
     "## Communication",
     "",

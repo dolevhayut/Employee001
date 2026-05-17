@@ -27,7 +27,7 @@ type Boundaries = {
   roadmap: boolean;
 };
 
-const STEPS = ["Consent", "Profile", "Sources", "Output", "Boundaries", "Review"] as const;
+const STEPS = ["Consent", "Profile", "Sources", "Boundaries", "Review"] as const;
 
 function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
   return (
@@ -105,9 +105,6 @@ function OnboardingPageInner() {
 
   const defaultName = emp?.name ?? inviteHint.name ?? "Sarah Chen";
   const defaultRole = emp?.role ?? inviteHint.role ?? "Head of Engineering";
-  const defaultChannel = emp
-    ? `ask-${emp.name.split(" ")[0].toLowerCase()}`
-    : "ask-sarah";
 
   const [viewMode, setViewMode] = useState<ViewMode>("employee");
   // Persistence: scope all wizard state to the invite token so a mid-flow
@@ -193,14 +190,6 @@ function OnboardingPageInner() {
     };
   }, [inviteToken]);
 
-  const [channel, setChannel] = usePersistedState<string>(
-    k("channel"),
-    defaultChannel,
-  );
-  const [threshold, setThreshold] = usePersistedState<number>(
-    k("threshold"),
-    0.7,
-  );
   const [boundaries, setBoundaries] = usePersistedState<Boundaries>(
     k("boundaries"),
     {
@@ -242,7 +231,6 @@ function OnboardingPageInner() {
             role,
             domain,
             integrations: Array.from(chosen),
-            channel,
             boundaries,
           }),
         },
@@ -425,30 +413,19 @@ function OnboardingPageInner() {
           />
         )}
         {step === 3 && (
-          <StepOutput
-            viewMode={viewMode}
-            channel={channel}
-            setChannel={setChannel}
-            threshold={threshold}
-            setThreshold={setThreshold}
-          />
-        )}
-        {step === 4 && (
           <StepBoundaries
             viewMode={viewMode}
             boundaries={boundaries}
             setBoundaries={setBoundaries}
           />
         )}
-        {step === 5 && (
+        {step === 4 && (
           <StepReview
             viewMode={viewMode}
             name={name}
             role={role}
             domain={domain}
             chosen={chosen}
-            channel={channel}
-            threshold={threshold}
             boundaries={boundaries}
           />
         )}
@@ -518,8 +495,6 @@ function OnboardingPageInner() {
           role={role}
           domain={domain}
           chosen={chosen}
-          channel={channel}
-          threshold={threshold}
           viewMode={viewMode}
         />
       </div>
@@ -1445,124 +1420,6 @@ function StepSources({
   );
 }
 
-function StepOutput({
-  viewMode,
-  channel,
-  setChannel,
-  threshold,
-  setThreshold,
-}: {
-  viewMode: ViewMode;
-  channel: string;
-  setChannel: (v: string) => void;
-  threshold: number;
-  setThreshold: (v: number) => void;
-}) {
-  const isCeo = viewMode === "ceo";
-  return (
-    <div>
-      <h1
-        style={{
-          fontSize: "var(--fs-h2)",
-          fontWeight: 600,
-          letterSpacing: "-0.02em",
-          margin: "0 0 8px",
-        }}
-      >
-        {isCeo ? "Where does the twin speak?" : "Where will your twin answer?"}
-      </h1>
-      <p
-        className="muted"
-        style={{ fontSize: "var(--fs-base)", lineHeight: 1.5, marginBottom: "var(--sp-32)" }}
-      >
-        {isCeo
-          ? "For now the twin only answers in Slack. You can add channels and adjust the confidence threshold later."
-          : "Your twin answers in Slack. Your manager sets the channel — you control how confident the twin needs to be before it speaks on your behalf."}
-      </p>
-
-      {/* CEO-only: Slack channel config */}
-      {isCeo && (
-        <Field label="Slack channel">
-          <div className="row" style={{ gap: 0 }}>
-            <span
-              style={{
-                padding: "8px 10px",
-                fontSize: "var(--fs-ui)",
-                border: "1px solid var(--hairline-strong)",
-                borderRight: 0,
-                borderRadius: "4px 0 0 4px",
-                background: "var(--bg-elevated)",
-                color: "var(--text-muted)",
-              }}
-              className="mono"
-            >
-              #
-            </span>
-            <TextInput
-              value={channel}
-              onChange={setChannel}
-              style={{ borderRadius: "0 4px 4px 0" }}
-            />
-          </div>
-        </Field>
-      )}
-
-      {/* Employee view: read-only channel info */}
-      {!isCeo && (
-        <div
-          style={{
-            padding: "var(--sp-14)",
-            borderRadius: 8,
-            background: "var(--bg-sunken)",
-            border: "1px solid var(--hairline)",
-            fontSize: "var(--fs-sm)",
-            lineHeight: 1.55,
-            color: "var(--text-muted)",
-            marginBottom: "var(--sp-24)",
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--sp-10)",
-          }}
-        >
-          <Icons.Slack size={14} style={{ flexShrink: 0 }} />
-          <span>
-            Your twin will answer in{" "}
-            <span className="mono" style={{ color: "var(--text)" }}>#{channel}</span>
-            . Channel is set by your workspace admin.
-          </span>
-        </div>
-      )}
-
-      <Field
-        label={"Confidence threshold — " + threshold.toFixed(2)}
-        hint={
-          isCeo
-            ? "Below this, the twin escalates to the employee instead of answering."
-            : "Below this level, your twin routes the question back to you instead of answering."
-        }
-      >
-        <input
-          type="range"
-          min="0.5"
-          max="0.95"
-          step="0.05"
-          value={threshold}
-          onChange={(e) => setThreshold(+e.target.value)}
-          style={{ width: "100%", accentColor: "var(--accent)" }}
-        />
-        <div
-          className="row mono subtle"
-          style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-4)" }}
-        >
-          <span>chatty (0.50)</span>
-          <div className="spacer" />
-          <span>cautious (0.95)</span>
-        </div>
-      </Field>
-    </div>
-  );
-}
-
 function StepBoundaries({
   viewMode,
   boundaries,
@@ -1644,8 +1501,6 @@ function StepReview({
   role,
   domain,
   chosen,
-  channel,
-  threshold,
   boundaries,
 }: {
   viewMode: ViewMode;
@@ -1653,8 +1508,6 @@ function StepReview({
   role: string;
   domain: string;
   chosen: Set<string>;
-  channel: string;
-  threshold: number;
   boundaries: Boundaries;
 }) {
   const isCeo = viewMode === "ceo";
@@ -1677,8 +1530,8 @@ function StepReview({
         style={{ fontSize: "var(--fs-base)", lineHeight: 1.5, marginBottom: "var(--sp-24)" }}
       >
         {isCeo
-          ? "Profile generation takes ~30 minutes. We'll email you when each file is ready for review."
-          : "Your responses have been recorded. Your manager will review and approve the profile before your twin goes live. We'll notify you when it's ready."}
+          ? "Profile generation starts now and runs autonomously. Watch live progress on the next screen — usually a few minutes."
+          : "Your responses are recorded. The twin starts building now — you'll see live progress on the next screen. You can close this and come back to the same link any time to check status."}
       </p>
       <div className="card" style={{ padding: "var(--sp-20)" }}>
         <ReviewRow label={isCeo ? "Twin for" : "Your profile"} value={`${name} — ${role}`} />
@@ -1686,10 +1539,6 @@ function StepReview({
         <ReviewRow
           label="Sources"
           value={`${sources.length} connected · ${sources.map((s) => s.name).join(", ")}`}
-        />
-        <ReviewRow
-          label="Output"
-          value={`#${channel} · threshold ${threshold.toFixed(2)}`}
         />
         <ReviewRow
           label="Boundaries"
@@ -1771,8 +1620,6 @@ function PreviewCard({
   role,
   domain,
   chosen,
-  channel,
-  threshold,
   viewMode,
 }: {
   step: number;
@@ -1780,8 +1627,6 @@ function PreviewCard({
   role: string;
   domain: string;
   chosen: Set<string>;
-  channel: string;
-  threshold: number;
   viewMode: ViewMode;
 }) {
   const isCeo = viewMode === "ceo";
@@ -1886,17 +1731,6 @@ function PreviewCard({
         </div>
       )}
       {step >= 3 && (
-        <div className="card" style={{ padding: "var(--sp-14)", marginBottom: "var(--sp-12)" }}>
-          <div className="section-title" style={{ marginBottom: "var(--sp-10)" }}>Output</div>
-          <div className="row" style={{ gap: "var(--sp-8)" }}>
-            <Icons.Slack size={14} />
-            <span className="mono" style={{ fontSize: "var(--fs-sm)" }}>#{channel}</span>
-            <div className="spacer" />
-            <span className="badge">τ {threshold.toFixed(2)}</span>
-          </div>
-        </div>
-      )}
-      {step >= 4 && (
         <div className="card" style={{ padding: "var(--sp-14)" }}>
           <div className="section-title" style={{ marginBottom: "var(--sp-10)" }}>Sample twin reply</div>
           <div

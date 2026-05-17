@@ -16,6 +16,21 @@ import { ObsidianGraph } from "@/components/ex/obsidian-graph";
 import { BrainGraph3D } from "@/components/ex/brain-graph-3d";
 
 export default function SettingsPage() {
+  // App Router doesn't auto-scroll to hash on client navigations. When the
+  // launchpad sends the CEO to /settings#company-brain we have to scroll
+  // manually once the section is mounted.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    const tick = () => {
+      const el = document.getElementById(hash);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    const t = setTimeout(tick, 60);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <>
       <Topbar crumbs={["Workspace", "Settings"]} />
@@ -657,7 +672,10 @@ function OrgBrainSection() {
   }
 
   return (
-    <section style={{ marginBottom: "var(--sp-32)" }}>
+    <section
+      id="company-brain"
+      style={{ marginBottom: "var(--sp-32)", scrollMarginTop: 80 }}
+    >
       <SectionHeader
         title="Company brain"
         desc="Organization-wide knowledge nodes — facts every twin reads at run time. Pricing policies, customer segments, incident postmortems, product decisions."

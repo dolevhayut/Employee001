@@ -66,21 +66,29 @@ const SIDEBAR_NAV: NavSection[] = [
   },
 ];
 
+type ThemeId = "light" | "dark" | "cool";
+const THEME_ORDER: ThemeId[] = ["light", "dark", "cool"];
+
 function useTheme() {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<ThemeId>("light");
 
   useEffect(() => {
     const saved = localStorage.getItem("em001-theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial: "light" | "dark" =
-      saved === "dark" || saved === "light" ? saved : prefersDark ? "dark" : "light";
+    const initial: ThemeId =
+      saved === "dark" || saved === "light" || saved === "cool"
+        ? (saved as ThemeId)
+        : prefersDark
+          ? "dark"
+          : "light";
     setTheme(initial);
     document.documentElement.setAttribute("data-theme", initial);
   }, []);
 
   const toggle = useCallback(() => {
     setTheme((prev) => {
-      const next = prev === "dark" ? "light" : "dark";
+      const idx = THEME_ORDER.indexOf(prev);
+      const next = THEME_ORDER[(idx + 1) % THEME_ORDER.length];
       document.documentElement.setAttribute("data-theme", next);
       localStorage.setItem("em001-theme", next);
       return next;

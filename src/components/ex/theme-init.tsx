@@ -6,7 +6,12 @@ export function ThemeInit() {
   useEffect(() => {
     const saved = localStorage.getItem("em001-theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const theme = saved === "dark" || saved === "light" ? saved : prefersDark ? "dark" : "light";
+    const theme =
+      saved === "dark" || saved === "light" || saved === "cool"
+        ? saved
+        : prefersDark
+          ? "dark"
+          : "light";
     document.documentElement.setAttribute("data-theme", theme);
   }, []);
 
