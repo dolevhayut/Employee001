@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
@@ -69,7 +69,7 @@ type FileBody = {
   body: string;
 };
 
-type Tab = "overview" | "files" | "preview" | "versions";
+type Tab = "overview" | "files" | "preview" | "versions" | "danger";
 
 type EmployeeSkillsPayload = {
   skills: OrgSkillPlaybook[];
@@ -424,8 +424,13 @@ function ProfilePageContent() {
       .catch(() => {/* fall back to static */});
   }, []);
 
-  const employee: EmployeeWithTwin =
+  // After a fresh install — or when a CEO opens a stale profile URL whose
+  // employee was deleted — `allEmployees` is empty. Previously we fell back
+  // to `allEmployees[0]` (undefined) and crashed on `.id`. Now we treat the
+  // missing case explicitly and render a friendly empty state below.
+  const employee: EmployeeWithTwin | undefined =
     allEmployees.find((e) => e.id === empId) ?? allEmployees[0];
+  const employeeId = employee?.id;
 
   const [tab, setTab] = useState<Tab>("overview");
   const [activeFileName, setActiveFileName] = useState<string | null>(null);
@@ -436,12 +441,13 @@ function ProfilePageContent() {
   useEffect(() => {
     setTab("overview");
     setActiveFileName(null);
-  }, [employee.id]);
+  }, [employeeId]);
 
   // Fetch connections
   useEffect(() => {
+    if (!employeeId) return;
     let cancelled = false;
-    fetch(`/api/connections/${employee.id}`)
+    fetch(`/api/connections/${employeeId}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -456,12 +462,13 @@ function ProfilePageContent() {
     return () => {
       cancelled = true;
     };
-  }, [employee.id]);
+  }, [employeeId]);
 
   // Fetch file list (from graph endpoint, which includes frontmatter metadata)
   useEffect(() => {
+    if (!employeeId) return;
     let cancelled = false;
-    fetch(`/api/employees/${employee.id}/graph`)
+    fetch(`/api/employees/${employeeId}/graph`)
       .then((r) => (r.ok ? r.json() : { nodes: [] }))
       .then((data) => {
         if (cancelled) return;
@@ -471,7 +478,57 @@ function ProfilePageContent() {
     return () => {
       cancelled = true;
     };
-  }, [employee.id]);
+  }, [employeeId]);
+
+  if (!employee) {
+    return (
+      <>
+        <Topbar crumbs={["Workspace", "Profile"]} />
+        <div
+          className="scrollbar"
+          style={{ overflow: "auto", padding: "32px 40px 60px" }}
+        >
+          <div
+            style={{
+              maxWidth: 520,
+              margin: "120px auto",
+              textAlign: "center",
+            }}
+          >
+            <h1
+              style={{
+                fontSize: "var(--fs-h2)",
+                fontWeight: 600,
+                margin: "0 0 12px",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              No twin to show here.
+            </h1>
+            <p
+              style={{
+                fontSize: "var(--fs-body)",
+                color: "var(--text-muted)",
+                lineHeight: 1.55,
+                margin: "0 0 24px",
+              }}
+            >
+              {empId
+                ? "This profile doesn't exist anymore — it may have been revoked or deleted."
+                : "You haven't created a twin yet. Start by inviting your first employee."}
+            </p>
+            <a
+              href="/employees"
+              className="btn primary"
+              style={{ display: "inline-block", padding: "10px 18px" }}
+            >
+              Go to Employees →
+            </a>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -496,7 +553,7 @@ function ProfilePageContent() {
             borderBottom: "1px solid var(--hairline)",
           }}
         >
-          {(["overview", "files", "preview", "versions"] as const).map((t) => (
+          {(["overview", "files", "preview", "versions", "danger"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -583,10 +640,209 @@ function ProfilePageContent() {
                 <VersionsTab employeeId={employee.id} />
               </motion.div>
             )}
+            {tab === "danger" && (
+              <motion.div
+                key="danger"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <DangerTab employee={employee} />
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </div>
     </>
+  );
+}
+
+// ─── Danger Tab ───────────────────────────────────────────────────────────────
+// The CEO's escape hatch when a twin was created by mistake (typo on the
+// invite name, abandoned OAuth that left a `pending-*` shell, marketplace
+// hire that turned out useless) or when an employee leaves the company.
+// Type-to-confirm gates the destructive action — the CEO has to type the
+// twin's exact name before the button enables.
+
+function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
+  const router = useRouter();
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const confirmed = confirmText.trim() === employee.name.trim() && !deleting;
+
+  async function deleteTwin() {
+    if (!confirmed) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/employees/${encodeURIComponent(employee.id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { message?: string };
+        throw new Error(body.message ?? `Delete failed (${res.status})`);
+      }
+      // Twin gone — back to the roster.
+      router.push("/employees");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed.");
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-32)" }}>
+      <div>
+        <h2
+          style={{
+            fontSize: "var(--fs-h3)",
+            fontWeight: 600,
+            letterSpacing: "-0.015em",
+            margin: "0 0 8px",
+            color: "var(--text)",
+          }}
+        >
+          Danger zone
+        </h2>
+        <p
+          className="muted"
+          style={{ fontSize: "var(--fs-base)", lineHeight: 1.55, margin: 0 }}
+        >
+          Use this when a twin was created by mistake or is no longer needed.
+          Everything below is permanent — there&apos;s no undo button.
+        </p>
+      </div>
+
+      <div
+        className="card"
+        style={{
+          padding: "var(--sp-24)",
+          border: "1px solid var(--danger)",
+          background: "color-mix(in srgb, var(--danger) 4%, transparent)",
+        }}
+      >
+        <div className="row" style={{ gap: "var(--sp-10)", marginBottom: "var(--sp-12)" }}>
+          <Icons.Trash size={16} style={{ color: "var(--danger)" }} />
+          <span style={{ fontSize: "var(--fs-base)", fontWeight: 600, color: "var(--danger)" }}>
+            Delete this twin
+          </span>
+        </div>
+
+        <p
+          style={{
+            fontSize: "var(--fs-sm)",
+            lineHeight: 1.6,
+            margin: "0 0 var(--sp-12)",
+            color: "var(--text-muted)",
+          }}
+        >
+          This will remove:
+        </p>
+        <ul
+          style={{
+            margin: "0 0 var(--sp-16)",
+            paddingLeft: "var(--sp-20)",
+            fontSize: "var(--fs-sm)",
+            lineHeight: 1.7,
+            color: "var(--text-muted)",
+          }}
+        >
+          <li>The 9 profile files (<span className="mono">EXPERTISE.md</span>, <span className="mono">DECISIONS.md</span>, etc.) and all version snapshots.</li>
+          <li>The Composio connections this twin owns — the underlying SaaS tokens stay with the employee&apos;s own accounts.</li>
+          <li>Any scratch notes the twin wrote under <span className="mono">data/scratch/{employee.id}/</span>.</li>
+          <li>Routines, scheduled work, and pending approvals scoped to this twin.</li>
+        </ul>
+        <p
+          style={{
+            fontSize: "var(--fs-sm)",
+            lineHeight: 1.6,
+            margin: "0 0 var(--sp-20)",
+            color: "var(--text-muted)",
+          }}
+        >
+          The audit log entry for this twin is preserved — the deletion itself is
+          recorded with the timestamp and the operator id.
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--sp-8)",
+            marginBottom: "var(--sp-16)",
+          }}
+        >
+          <label
+            htmlFor="confirm-twin-name"
+            style={{
+              fontSize: "var(--fs-sm)",
+              fontWeight: 500,
+              color: "var(--text)",
+            }}
+          >
+            Type <span className="mono" style={{ color: "var(--danger)" }}>{employee.name}</span> to confirm:
+          </label>
+          <input
+            id="confirm-twin-name"
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            disabled={deleting}
+            autoComplete="off"
+            spellCheck={false}
+            style={{
+              padding: "10px 12px",
+              fontSize: "var(--fs-ui)",
+              fontFamily: "var(--font-mono, monospace)",
+              background: "var(--bg)",
+              border: "1px solid var(--hairline-strong)",
+              borderRadius: 4,
+              color: "var(--text)",
+              outline: "none",
+              maxWidth: 360,
+            }}
+          />
+        </div>
+
+        <button
+          onClick={deleteTwin}
+          disabled={!confirmed}
+          style={{
+            padding: "10px 20px",
+            fontSize: "var(--fs-ui)",
+            fontWeight: 600,
+            color: confirmed ? "#FFFFFF" : "var(--text-subtle)",
+            background: confirmed ? "var(--danger)" : "var(--bg-sunken)",
+            border: `1px solid ${confirmed ? "var(--danger)" : "var(--hairline)"}`,
+            borderRadius: 6,
+            cursor: confirmed ? "pointer" : "not-allowed",
+            fontFamily: "inherit",
+            transition: "all .15s",
+          }}
+        >
+          {deleting ? "Deleting…" : `Delete ${employee.name} permanently`}
+        </button>
+
+        {error && (
+          <div
+            style={{
+              marginTop: "var(--sp-12)",
+              padding: "var(--sp-10) var(--sp-12)",
+              background: "color-mix(in srgb, var(--danger) 8%, transparent)",
+              border: "1px solid var(--danger)",
+              borderRadius: 4,
+              fontSize: "var(--fs-sm)",
+              color: "var(--danger)",
+            }}
+          >
+            {error}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -603,7 +859,14 @@ export default function ProfilePage() {
 function Hero({ employee }: { employee: EmployeeWithTwin }) {
   return (
     <div className="card" style={{ padding: "var(--sp-24)", maxWidth: 880 }}>
-      <div className="row" style={{ gap: "var(--sp-20)", alignItems: "center" }}>
+      <div
+        className="row"
+        style={{
+          gap: "var(--sp-20)",
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
         <div
           style={{
             width: 72,
@@ -633,9 +896,6 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
             {employee.twinStatus === "pending" && (
               <span className="badge">Not started</span>
             )}
-            <span className="subtle mono" style={{ fontSize: "var(--fs-meta)" }}>
-              confidence threshold 0.70
-            </span>
           </div>
           <h1
             style={{
@@ -651,7 +911,14 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
             {employee.role} · Employee001
           </div>
         </div>
-        <div className="row" style={{ gap: "var(--sp-8)" }}>
+        <div
+          className="row"
+          style={{
+            gap: "var(--sp-8)",
+            flexShrink: 0,
+            marginLeft: "auto",
+          }}
+        >
           <Link
             href={`/twin-build?employee=${employee.id}`}
             className="btn"
@@ -1257,36 +1524,52 @@ function OverviewTab({
         subhead="What this twin sounds like, what it speaks to with confidence, and where it stays silent."
         divider={false}
       >
-        <div>
-          <SectionTitle>Sample voice</SectionTitle>
-          <div
-            className="card"
-            style={{
-              padding: "var(--sp-20)",
-              background: "var(--twin-soft)",
-              borderColor: "var(--twin)",
-            }}
-          >
-            <div className="row" style={{ gap: "var(--sp-10)", marginBottom: "var(--sp-10)" }}>
-              <Icons.Bot size={14} style={{ color: "var(--twin)" }} />
-              <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--twin)" }}>
-                Twin reply preview
-              </span>
-              <div className="spacer" />
-              <span className="badge success">Confidence 0.91</span>
-            </div>
-            <p style={{ fontSize: "var(--fs-base)", lineHeight: 1.6, margin: 0, color: "var(--text)" }}>
-              I focus on architecture and intent before syntax. My first pass is
-              always about understanding <em>why</em> the code was written this way.
-              For style issues I rely on the linter. My comments tend to be questions
-              rather than directives — &ldquo;Have you considered X?&rdquo; rather
-              than &ldquo;Do X.&rdquo;
-            </p>
-            <div className="subtle mono" style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-12)" }}>
-              In response to: &ldquo;How does Sarah approach code reviews?&rdquo;
+        {employee.twinStatus === "ready" ? (
+          <div>
+            <SectionTitle>Sample voice</SectionTitle>
+            <div
+              className="card"
+              style={{
+                padding: "var(--sp-20)",
+                background: "var(--twin-soft)",
+                borderColor: "var(--twin)",
+              }}
+            >
+              <div className="row" style={{ gap: "var(--sp-10)", marginBottom: "var(--sp-10)" }}>
+                <Icons.Bot size={14} style={{ color: "var(--twin)" }} />
+                <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--twin)" }}>
+                  Twin reply preview
+                </span>
+                <div className="spacer" />
+                <span className="subtle mono" style={{ fontSize: "var(--fs-meta)" }}>
+                  Ask the twin a question at <Link href={`/flow?employee=${employee.id}`} style={{ color: "var(--twin)" }}>/flow</Link>
+                </span>
+              </div>
+              <p style={{ fontSize: "var(--fs-base)", lineHeight: 1.6, margin: 0, color: "var(--text-muted)" }}>
+                Sample replies appear here after the twin is trained and you&apos;ve had your first conversation. The voice is shaped by <span className="mono">TONE.md</span>, <span className="mono">EXPERTISE.md</span>, and <span className="mono">CONTEXT.md</span>.
+              </p>
             </div>
           </div>
-        </div>
+        ) : (
+          <div>
+            <SectionTitle>Sample voice</SectionTitle>
+            <div
+              className="card"
+              style={{
+                padding: "var(--sp-20)",
+                background: "var(--bg-elevated)",
+              }}
+            >
+              <p style={{ fontSize: "var(--fs-base)", lineHeight: 1.6, margin: 0, color: "var(--text-muted)" }}>
+                No replies to preview yet — the twin hasn&apos;t been trained.{" "}
+                <Link href={`/twin-build?employee=${employee.id}`} style={{ color: "var(--accent)" }}>
+                  Start training
+                </Link>{" "}
+                to generate the 9 profile files that define the twin&apos;s voice.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div>
           <SectionTitle>Voice</SectionTitle>
@@ -1409,80 +1692,201 @@ function FilesTab({
   files: FileNode[];
   onSelect: (name: string) => void;
 }) {
+  // Always-on hover tracking — driving the row background through React state
+  // rather than inline onMouseEnter / onMouseLeave keeps the file-tree clean
+  // (no per-row event handlers, no flicker on fast cursor moves).
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(true);
+
   if (files.length === 0) {
     return (
-      <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0 }}>
-        No profile files yet.
-      </p>
+      <div
+        className="card"
+        style={{
+          padding: "var(--sp-20)",
+          background: "var(--bg-elevated)",
+        }}
+      >
+        <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0 }}>
+          No profile files yet. Run the twin builder to generate them.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "var(--sp-10)" }}>
-      {files.map((f) => {
-        const description = PROFILE_FILE_DESCRIPTIONS[f.name] ?? "";
-        return (
-          <button
-            key={f.name}
-            onClick={() => onSelect(f.name)}
+    <div
+      className="card"
+      style={{
+        padding: "var(--sp-10) var(--sp-8) var(--sp-10) var(--sp-10)",
+        background: "var(--bg-elevated)",
+        border: "1px solid var(--hairline)",
+        fontFamily: "var(--font-mono, monospace)",
+      }}
+    >
+      {/* Root folder row */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--sp-8)",
+          width: "100%",
+          padding: "6px 8px",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          color: "var(--text)",
+          borderRadius: 4,
+          transition: "background .12s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "var(--surface-soft)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
+        }}
+      >
+        <motion.span
+          animate={{ rotate: expanded ? 90 : 0 }}
+          transition={{ duration: 0.15 }}
+          style={{ display: "inline-flex", color: "var(--text-muted)" }}
+        >
+          <Icons.Chevron size={11} />
+        </motion.span>
+        <Icons.Doc size={13} style={{ color: "var(--accent)" }} />
+        <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>
+          profile/
+        </span>
+        <div style={{ flex: 1 }} />
+        <span
+          className="subtle"
+          style={{ fontSize: "var(--fs-xs)", fontWeight: 400 }}
+        >
+          {files.length} files
+        </span>
+      </button>
+
+      {/* Tree body */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="files"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             style={{
-              textAlign: "left",
-              padding: "var(--sp-14)",
-              background: "var(--surface)",
-              border: "1px solid var(--hairline)",
-              borderRadius: 8,
-              cursor: "pointer",
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--sp-6)",
-              fontFamily: "inherit",
-              transition: "all .12s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--text-subtle)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "var(--hairline)";
-              e.currentTarget.style.transform = "translateY(0)";
+              overflow: "hidden",
+              marginLeft: 12,
+              borderLeft: "1px solid var(--hairline)",
+              paddingLeft: 0,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-7)" }}>
-              <Icons.Doc size={13} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
-              <span
-                style={{
-                  fontSize: "var(--fs-ui)",
-                  fontWeight: 600,
-                  color: "var(--text)",
-                  fontFamily: "var(--font-mono, monospace)",
-                }}
-              >
-                {f.name}
-              </span>
-              <div style={{ flex: 1 }} />
-              <span
-                style={{
-                  fontSize: "var(--fs-xs)",
-                  color: "var(--text-subtle)",
-                  fontFamily: "var(--font-mono, monospace)",
-                }}
-              >
-                ~{f.tokens.toLocaleString()} tok
-              </span>
-            </div>
-            {description && (
-              <p style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", margin: 0, lineHeight: 1.45 }}>
-                {description}
-              </p>
-            )}
-            {f.lastUpdated && (
-              <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", marginTop: "auto" }}>
-                Updated {f.lastUpdated}
-              </div>
-            )}
-          </button>
-        );
-      })}
+            {files.map((f, i) => {
+              const description = PROFILE_FILE_DESCRIPTIONS[f.name] ?? "";
+              const isHover = hovered === f.name;
+              const isLast = i === files.length - 1;
+              return (
+                <button
+                  key={f.name}
+                  onClick={() => onSelect(f.name)}
+                  onMouseEnter={() => setHovered(f.name)}
+                  onMouseLeave={() => setHovered(null)}
+                  title={description}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "var(--sp-8)",
+                    width: "calc(100% - 8px)",
+                    padding: "5px 8px 5px 14px",
+                    marginLeft: 8,
+                    background: isHover ? "var(--surface-soft)" : "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    color: isHover ? "var(--text)" : "var(--text-muted)",
+                    borderRadius: 4,
+                    textAlign: "left",
+                    position: "relative",
+                    transition: "background .1s, color .1s",
+                  }}
+                >
+                  {/* Tree connector ── feeds from the parent's left border. */}
+                  <span
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      left: -1,
+                      top: 0,
+                      width: 12,
+                      height: isLast ? "50%" : "100%",
+                      borderLeft: "1px solid var(--hairline)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                  <span
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      left: -1,
+                      top: "50%",
+                      width: 11,
+                      borderTop: "1px solid var(--hairline)",
+                      pointerEvents: "none",
+                    }}
+                  />
+
+                  <Icons.Doc
+                    size={12}
+                    style={{
+                      color: isHover ? "var(--text)" : "var(--text-subtle)",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "var(--fs-sm)",
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {f.name}
+                  </span>
+                  {description && (
+                    <span
+                      className="subtle"
+                      style={{
+                        fontSize: "var(--fs-xs)",
+                        fontWeight: 400,
+                        fontFamily: "var(--font-sans, sans-serif)",
+                        marginLeft: 6,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        opacity: 0.7,
+                      }}
+                    >
+                      — {description}
+                    </span>
+                  )}
+                  <div style={{ flex: 1, minWidth: 8 }} />
+                  <span
+                    style={{
+                      fontSize: "var(--fs-xs)",
+                      color: "var(--text-subtle)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    ~{f.tokens.toLocaleString()} tok
+                  </span>
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

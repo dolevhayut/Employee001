@@ -1055,7 +1055,41 @@ export function Sidebar() {
   );
 }
 
-export function Topbar({ crumbs = [], actions }: { crumbs?: string[]; actions?: ReactNode }) {
+// Default route for common breadcrumb labels. Existing callers pass plain
+// strings (`["Workspace", "Profile"]`) — we derive the href so they become
+// clickable without touching every page. Callers wanting a non-default link
+// can pass `{ label, href }` instead.
+const CRUMB_DEFAULT_HREFS: Record<string, string> = {
+  Workspace: "/employees",
+  Employees: "/employees",
+  Profile: "/employees",
+  Connections: "/employees",
+  Settings: "/settings",
+  Tasks: "/tasks",
+  Templates: "/templates",
+  Routines: "/routines",
+  Cockpit: "/cockpit",
+  Budgets: "/budgets",
+  Inbox: "/inbox",
+  Twins: "/employees",
+  "Team Meeting": "/council",
+  "Memory graph": "/employees",
+  Generation: "/employees",
+  Learning: "/employees",
+};
+
+type Crumb = string | { label: string; href?: string };
+
+function crumbLabel(c: Crumb): string {
+  return typeof c === "string" ? c : c.label;
+}
+
+function crumbHref(c: Crumb): string | undefined {
+  if (typeof c === "string") return CRUMB_DEFAULT_HREFS[c];
+  return c.href ?? CRUMB_DEFAULT_HREFS[c.label];
+}
+
+export function Topbar({ crumbs = [], actions }: { crumbs?: Crumb[]; actions?: ReactNode }) {
   const [commandOpen, setCommandOpen] = useState(false);
 
   return (
@@ -1073,19 +1107,46 @@ export function Topbar({ crumbs = [], actions }: { crumbs?: string[]; actions?: 
         }}
       >
         <div className="row" style={{ gap: "var(--sp-8)", fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
-          {crumbs.map((c, i) => (
-            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-8)" }}>
-              {i > 0 && <span style={{ color: "var(--text-subtle)" }}>/</span>}
+          {crumbs.map((c, i) => {
+            const isLast = i === crumbs.length - 1;
+            const label = crumbLabel(c);
+            const href = isLast ? undefined : crumbHref(c);
+            const inner = (
               <span
                 style={{
-                  color: i === crumbs.length - 1 ? "var(--text)" : undefined,
-                  fontWeight: i === crumbs.length - 1 ? 600 : 500,
+                  color: isLast ? "var(--text)" : undefined,
+                  fontWeight: isLast ? 600 : 500,
                 }}
               >
-                {c}
+                {label}
               </span>
-            </span>
-          ))}
+            );
+            return (
+              <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-8)" }}>
+                {i > 0 && <span style={{ color: "var(--text-subtle)" }}>/</span>}
+                {href ? (
+                  <Link
+                    href={href}
+                    style={{
+                      color: "inherit",
+                      textDecoration: "none",
+                      transition: "color .12s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "var(--text)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "";
+                    }}
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  inner
+                )}
+              </span>
+            );
+          })}
         </div>
         <div className="spacer" />
         <div className="row" style={{ gap: "var(--sp-8)" }}>
