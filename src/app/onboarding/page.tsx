@@ -11,6 +11,11 @@ import {
   EMPLOYEES,
   type ConsentScope,
 } from "@/lib/employees";
+import {
+  clearPersistedKeys,
+  setCodec,
+  usePersistedState,
+} from "@/lib/use-persisted-state";
 
 type ViewMode = "ceo" | "employee";
 
@@ -105,33 +110,55 @@ function OnboardingPageInner() {
     : "ask-sarah";
 
   const [viewMode, setViewMode] = useState<ViewMode>("employee");
+  // Persistence: scope all wizard state to the invite token so a mid-flow
+  // refresh (or the Composio OAuth redirect) doesn't drop the user's
+  // progress. Falsy `storageKey` opts out for the legacy CEO-self path.
+  const storageKey = inviteToken
+    ? `employee001:onboarding:${inviteToken}`
+    : null;
+  const k = (suffix: string) => (storageKey ? `${storageKey}:${suffix}` : null);
+
   // Honor `?step=` from the URL on first mount — the employee-side OAuth
   // callback returns to /onboarding?invite=…&step=2 so the user lands back
-  // on the Sources step after authorizing on Composio's domain.
-  const initialStep = (() => {
+  // on the Sources step after authorizing on Composio's domain. Without
+  // an explicit ?step, fall back to whatever localStorage remembers.
+  const urlStep = (() => {
     const raw = searchParams.get("step");
     const n = raw ? parseInt(raw, 10) : NaN;
     if (Number.isFinite(n) && n >= 0 && n < STEPS.length) return n;
-    return 0;
+    return null;
   })();
-  const [step, setStep] = useState(initialStep);
-  const [acceptedScopes, setAcceptedScopes] = useState<Set<ConsentScope>>(
-    () => new Set(CONSENT_SCOPES.filter((s) => s.required).map((s) => s.id))
+  const [step, setStep] = usePersistedState<number>(k("step"), urlStep ?? 0);
+  useEffect(() => {
+    if (urlStep != null) setStep(urlStep);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlStep]);
+  const [acceptedScopes, setAcceptedScopes] = usePersistedState<Set<ConsentScope>>(
+    k("acceptedScopes"),
+    () => new Set(CONSENT_SCOPES.filter((s) => s.required).map((s) => s.id)),
+    setCodec<ConsentScope>(),
   );
   const requiredScopesAccepted = CONSENT_SCOPES.filter(
     (s) => s.required
   ).every((s) => acceptedScopes.has(s.id));
-  const [name, setName] = useState(defaultName);
-  const [role, setRole] = useState(defaultRole);
-  const [domain, setDomain] = useState("Distributed systems & platform");
+  const [name, setName] = usePersistedState<string>(k("name"), defaultName);
+  const [role, setRole] = usePersistedState<string>(k("role"), defaultRole);
+  const [domain, setDomain] = usePersistedState<string>(
+    k("domain"),
+    "Distributed systems & platform",
+  );
   // `chosen` is now only an ephemeral UI hint ("which rows did the employee
   // touch in this session"). The source of truth for "is this actually
   // connected" lives in the per-invite /connections endpoint and is fetched
   // by StepSources directly. Start empty for invite-bound flows.
-  const [chosen, setChosen] = useState<Set<string>>(() => new Set());
-  const [extraToolkits, setExtraToolkits] = useState<
+  const [chosen, setChosen] = usePersistedState<Set<string>>(
+    k("chosen"),
+    () => new Set<string>(),
+    setCodec<string>(),
+  );
+  const [extraToolkits, setExtraToolkits] = usePersistedState<
     Record<string, { slug: string; name: string; iconUrl?: string; description?: string }>
-  >({});
+  >(k("extraToolkits"), {});
   // Count of ACTIVE Composio connections for this invite. Polled in parallel
   // with StepSources so the Continue gate stays correct even when the user
   // hasn't opened the Sources step yet.
@@ -166,21 +193,33 @@ function OnboardingPageInner() {
     };
   }, [inviteToken]);
 
-  const [channel, setChannel] = useState(defaultChannel);
-  const [threshold, setThreshold] = useState(0.7);
-  const [boundaries, setBoundaries] = useState<Boundaries>({
-    comp: true,
-    hr: true,
-    legal: true,
-    customers: false,
-    roadmap: false,
-  });
+  const [channel, setChannel] = usePersistedState<string>(
+    k("channel"),
+    defaultChannel,
+  );
+  const [threshold, setThreshold] = usePersistedState<number>(
+    k("threshold"),
+    0.7,
+  );
+  const [boundaries, setBoundaries] = usePersistedState<Boundaries>(
+    k("boundaries"),
+    {
+      comp: true,
+      hr: true,
+      legal: true,
+      customers: false,
+      roadmap: false,
+    },
+  );
 
   // Once the form is hydrated, populate from the invite hint so the employee
   // sees their CEO-provided name/role pre-filled rather than the placeholder.
+  // Only overwrite when the field is still at the literal placeholder —
+  // otherwise a refreshed/persisted edit would silently revert.
   useEffect(() => {
-    if (inviteHint.name) setName(inviteHint.name);
-    if (inviteHint.role) setRole(inviteHint.role);
+    if (inviteHint.name && name === "Sarah Chen") setName(inviteHint.name);
+    if (inviteHint.role && role === "Head of Engineering") setRole(inviteHint.role);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inviteHint.name, inviteHint.role]);
 
   const onFinish = async () => {
@@ -208,6 +247,10 @@ function OnboardingPageInner() {
           }),
         },
       );
+      // Persisted wizard state is no longer useful after the invite has
+      // been completed — wipe it so a stale draft doesn't haunt the next
+      // employee on a shared device.
+      if (storageKey) clearPersistedKeys(storageKey);
       // Route the *employee* back to /join with a done flag. They don't
       // hold the workspace token, so /employees would 401 for them anyway.
       router.push(`/join?invite=${encodeURIComponent(inviteToken)}&done=1`);
