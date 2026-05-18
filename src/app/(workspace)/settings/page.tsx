@@ -1746,6 +1746,9 @@ function CustomMcpSection() {
   // Cleared on close so the next blank "Add" doesn't carry stale values.
   const [presetting, setPresetting] = useState<McpPreset | null>(null);
 
+  const [oauthConnecting, setOauthConnecting] = useState<string | null>(null);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/org/mcp", { cache: "no-store" });
@@ -1764,6 +1767,61 @@ function CustomMcpSection() {
     }, 0);
     return () => clearTimeout(id);
   }, [load]);
+
+  // Listen for the postMessage emitted by /api/org/mcp/oauth/callback when
+  // the popup finishes. Don't pin to a specific origin — the popup is
+  // same-origin in dev and the message payload is verified shape-wise.
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      const data = e.data as { type?: string; ok?: boolean; message?: string } | null;
+      if (!data || data.type !== "mcp-oauth") return;
+      setOauthConnecting(null);
+      if (data.ok) {
+        setOauthError(null);
+        void load();
+      } else {
+        setOauthError(data.message ?? "OAuth flow failed.");
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [load]);
+
+  /**
+   * Kick off an OAuth flow for a preset. POSTs to /api/org/mcp/oauth/start,
+   * opens the returned auth URL in a popup, and waits for the callback to
+   * postMessage success/failure. The Settings page itself stays interactive.
+   */
+  async function connectOAuthPreset(p: McpPreset) {
+    setOauthConnecting(p.id);
+    setOauthError(null);
+    try {
+      const res = await fetch("/api/org/mcp/oauth/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: p.name,
+          description: p.description,
+          transport: p.transport,
+          url: p.url,
+          iconSlug: p.iconSlug,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `Start failed (${res.status})`);
+      }
+      const { authUrl } = (await res.json()) as { authUrl?: string };
+      if (!authUrl) throw new Error("No authUrl returned from /start.");
+      const popup = window.open(authUrl, "mcpOAuth", "width=620,height=720,menubar=no,toolbar=no");
+      if (!popup) {
+        throw new Error("Popup blocked. Allow popups for this site and try again.");
+      }
+    } catch (err) {
+      setOauthConnecting(null);
+      setOauthError(err instanceof Error ? err.message : "OAuth start failed.");
+    }
+  }
 
   async function toggleEnabled(s: CustomMcpServer) {
     setServers((prev) =>
@@ -1830,13 +1888,23 @@ function CustomMcpSection() {
                 const alreadyAdded = servers.some(
                   (s) => s.url === p.url || s.name.toLowerCase() === p.name.toLowerCase(),
                 );
+                const busy = oauthConnecting === p.id;
                 return (
                   <button
                     key={p.id}
                     type="button"
-                    disabled={alreadyAdded}
-                    onClick={() => setPresetting(p)}
-                    title={alreadyAdded ? `${p.name} is already added` : p.description}
+                    disabled={alreadyAdded || busy}
+                    onClick={() => {
+                      if (p.auth === "oauth") void connectOAuthPreset(p);
+                      else setPresetting(p);
+                    }}
+                    title={
+                      alreadyAdded
+                        ? `${p.name} is already added`
+                        : busy
+                        ? `Waiting for ${p.name} OAuth window…`
+                        : p.description
+                    }
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
@@ -1877,6 +1945,11 @@ function CustomMcpSection() {
                         · added
                       </span>
                     )}
+                    {busy && (
+                      <span style={{ fontSize: "var(--fs-meta)", marginLeft: 2 }}>
+                        · connecting…
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -1896,6 +1969,21 @@ function CustomMcpSection() {
             }}
           >
             {error}
+          </div>
+        )}
+
+        {oauthError && (
+          <div
+            style={{
+              padding: "var(--sp-10)",
+              fontSize: "var(--fs-sm)",
+              background: "rgba(220, 80, 60, 0.08)",
+              color: "var(--danger)",
+              borderRadius: 6,
+              marginBottom: "var(--sp-12)",
+            }}
+          >
+            OAuth: {oauthError}
           </div>
         )}
 

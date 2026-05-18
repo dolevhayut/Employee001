@@ -13,12 +13,40 @@ import type {
   McpSSEServerConfig,
   McpServerConfig,
 } from "@anthropic-ai/claude-agent-sdk";
+import { refreshAccessToken } from "./mcp-oauth";
 
 export type CustomMcpTransport = "http" | "sse";
 
 export type CustomMcpHeader = {
   key: string;
   value: string;
+};
+
+/**
+ * State stored for an OAuth-authenticated MCP server. The runner reads
+ * `accessToken` (refreshing first if expired) and injects it as
+ * `Authorization: Bearer <accessToken>` before each twin run — the runner
+ * itself never participates in the OAuth dance, that all happens in the
+ * /api/org/mcp/oauth/* routes when the CEO connects in the UI.
+ */
+export type CustomMcpOAuthState = {
+  /** Endpoint URLs we discovered + cached at registration time. */
+  authorizationServer: string;
+  tokenEndpoint: string;
+  /** OAuth client_id we received from Dynamic Client Registration (RFC 7591).
+   *  None of the servers we target hand out long-lived static client_ids — we
+   *  register on the fly when the user first hits Connect. */
+  clientId: string;
+  /** Optional client secret if the server returned one (most public MCP
+   *  servers use public clients with PKCE — secret is absent). */
+  clientSecret?: string;
+  /** Granted scope string (space-delimited per OAuth spec). */
+  scope?: string;
+  accessToken: string;
+  refreshToken?: string;
+  /** ISO timestamp the access token stops being valid. We refresh ~60s
+   *  before this to absorb clock skew. */
+  expiresAt: string;
 };
 
 export type CustomMcpServer = {
@@ -30,8 +58,13 @@ export type CustomMcpServer = {
   description?: string;
   transport: CustomMcpTransport;
   url: string;
-  /** Auth + arbitrary headers. Stored on disk; rotate via the UI. */
+  /** Auth + arbitrary headers. Stored on disk; rotate via the UI. Used for
+   *  bearer-token servers (Apify, Stripe, etc.) — for OAuth servers the
+   *  Authorization header is built on the fly from `oauth.accessToken`. */
   headers: CustomMcpHeader[];
+  /** Populated for OAuth-authenticated servers. When present, the runner
+   *  ignores `headers.Authorization` and injects a fresh Bearer token. */
+  oauth?: CustomMcpOAuthState;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -74,6 +107,8 @@ export type CreateCustomMcpInput = {
   transport: CustomMcpTransport;
   url: string;
   headers?: CustomMcpHeader[];
+  /** Populated by the OAuth callback route — bearer-token registrations omit this. */
+  oauth?: CustomMcpOAuthState;
   enabled?: boolean;
 };
 
@@ -91,6 +126,7 @@ export async function createCustomMcp(
     transport: input.transport,
     url: input.url.trim(),
     headers: cleanHeaders(input.headers ?? []),
+    ...(input.oauth ? { oauth: input.oauth } : {}),
     enabled: input.enabled ?? true,
     createdAt: now,
     updatedAt: now,
@@ -157,6 +193,24 @@ export async function updateCustomMcp(
   return next;
 }
 
+/**
+ * Replace an existing server's OAuth state. Called from the runner-side
+ * refresh path. We don't bump `updatedAt` here — tokens rotate every hour
+ * and updating that timestamp would make the row look like it's constantly
+ * being edited from the UI.
+ */
+export async function setCustomMcpOAuthState(
+  id: string,
+  oauth: CustomMcpOAuthState,
+): Promise<boolean> {
+  const state = await readFile();
+  const idx = state.servers.findIndex((s) => s.id === id);
+  if (idx === -1) return false;
+  state.servers[idx] = { ...state.servers[idx], oauth };
+  await writeFile(state);
+  return true;
+}
+
 export async function deleteCustomMcp(id: string): Promise<boolean> {
   const state = await readFile();
   const before = state.servers.length;
@@ -176,6 +230,62 @@ export async function deleteCustomMcp(id: string): Promise<boolean> {
  * Keys are sanitized from the server's `name` so the agent sees stable
  * `mcp__<name>__<tool>` identifiers even if the display name changes case.
  */
+/** Refresh ~60 seconds before nominal expiry to absorb clock skew. */
+const TOKEN_REFRESH_SKEW_MS = 60_000;
+
+/**
+ * Bring an OAuth-authenticated server's access token up to date. If the
+ * stored access token is still valid we use it as-is; if it expired (or is
+ * about to), we refresh via the token_endpoint and persist the new tokens.
+ * Returns the access token to use right now, or null if we couldn't get
+ * one (e.g. refresh token revoked) — the server is skipped in that case.
+ */
+async function ensureFreshAccessToken(
+  server: CustomMcpServer,
+): Promise<string | null> {
+  const oauth = server.oauth;
+  if (!oauth) return null;
+
+  const expiresAt = Date.parse(oauth.expiresAt);
+  const stillFresh = Number.isFinite(expiresAt)
+    ? Date.now() < expiresAt - TOKEN_REFRESH_SKEW_MS
+    : false;
+  if (stillFresh) return oauth.accessToken;
+
+  if (!oauth.refreshToken) {
+    // No refresh token (e.g. server didn't issue one). The user has to
+    // reconnect to get a new access token.
+    console.warn(
+      `[mcp-oauth] ${server.name}: access token expired and no refresh token on file — skipping until reconnect.`,
+    );
+    return null;
+  }
+
+  try {
+    const refreshed = await refreshAccessToken({
+      tokenEndpoint: oauth.tokenEndpoint,
+      refreshToken: oauth.refreshToken,
+      clientId: oauth.clientId,
+      clientSecret: oauth.clientSecret,
+    });
+    const nextOauth: CustomMcpOAuthState = {
+      ...oauth,
+      accessToken: refreshed.accessToken,
+      // Some servers rotate the refresh token, some don't. Keep the old one
+      // when the response omits a new one.
+      refreshToken: refreshed.refreshToken ?? oauth.refreshToken,
+      expiresAt: refreshed.expiresAt,
+      scope: refreshed.scope ?? oauth.scope,
+    };
+    await setCustomMcpOAuthState(server.id, nextOauth);
+    return refreshed.accessToken;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[mcp-oauth] ${server.name}: refresh failed (${msg}) — skipping until reconnect.`);
+    return null;
+  }
+}
+
 export async function loadOrgCustomMcpServers(): Promise<
   Record<string, McpServerConfig>
 > {
@@ -187,7 +297,17 @@ export async function loadOrgCustomMcpServers(): Promise<
   for (const s of enabled) {
     const key = sanitizeKey(s.name) || `mcp_${s.id}`;
     if (map[key]) continue; // collision-safe; first wins
+
+    // Start with the user-supplied headers, then layer OAuth bearer on top
+    // when present. We intentionally overwrite any existing Authorization
+    // header — the OAuth token is authoritative for OAuth-mode servers.
     const headers = headersAsRecord(s.headers);
+    if (s.oauth) {
+      const token = await ensureFreshAccessToken(s);
+      if (!token) continue; // skip until the CEO reconnects
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     if (s.transport === "http") {
       const cfg: McpHttpServerConfig = {
         type: "http",

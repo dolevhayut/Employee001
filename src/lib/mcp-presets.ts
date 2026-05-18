@@ -15,12 +15,21 @@ export type McpPreset = {
   description: string;
   transport: "http" | "sse";
   url: string;
+  /**
+   * How the user authenticates. `"bearer"` (default) renders a token-paste
+   * field in the modal; `"oauth"` swaps that for a Connect button that
+   * opens the upstream service's OAuth flow in a popup. The OAuth path
+   * relies on the target server implementing the MCP authorization spec
+   * (Dynamic Client Registration + PKCE) — verified at /start time.
+   */
+  auth?: "bearer" | "oauth";
   /** Optional header skeleton — value is left blank ("Bearer ") so the
    *  user only types/pastes the secret part. Omit for unauthenticated
-   *  servers. */
+   *  servers. Only used when auth === "bearer". */
   headerKey?: string;
   headerValuePrefix?: string;
-  /** Short hint shown in the modal explaining where to find the secret. */
+  /** Short hint shown in the modal explaining where to find the secret
+   *  (bearer mode) or what the OAuth scope grants (oauth mode). */
   tokenHint?: string;
   /** Optional URL the user can click to grab their token. */
   tokenUrl?: string;
@@ -113,6 +122,17 @@ export const MCP_PRESETS: McpPreset[] = [
       "Paste a Vapi private API key from the dashboard. Use a server-side key, not the public one.",
     tokenUrl: "https://dashboard.vapi.ai/account",
     iconSlug: "vapi",
+  },
+  {
+    id: "higgsfield",
+    name: "Higgsfield",
+    description:
+      "Cinematic AI image and video generation. Sign in with your Higgsfield account — no API key to copy.",
+    transport: "http",
+    url: "https://mcp.higgsfield.ai/mcp",
+    auth: "oauth",
+    tokenHint:
+      "You'll be sent to Higgsfield in a popup to sign in. Tokens stay on this machine — they're never sent anywhere else.",
   },
 ];
 
