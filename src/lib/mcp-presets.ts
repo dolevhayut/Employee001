@@ -72,6 +72,48 @@ export const MCP_PRESETS: McpPreset[] = [
     tokenUrl: "https://github.com/settings/personal-access-tokens/new",
     iconSlug: "github",
   },
+  {
+    id: "linear",
+    name: "Linear",
+    description:
+      "Issues, projects, cycles, comments. Read your roadmap and create/update tickets from chat.",
+    transport: "http",
+    url: "https://mcp.linear.app/mcp",
+    headerKey: "Authorization",
+    headerValuePrefix: "Bearer ",
+    tokenHint:
+      "Paste a Linear Personal API key. Scope it to read-only first if you only want the twin to summarise — write access lets it create/edit issues.",
+    tokenUrl: "https://linear.app/settings/account/security",
+    iconSlug: "linear",
+  },
+  {
+    id: "firecrawl",
+    name: "Firecrawl",
+    description:
+      "Scrape, crawl, and extract structured data from any website. LLM-ready markdown out of the box.",
+    transport: "http",
+    url: "https://mcp.firecrawl.dev/v2/mcp",
+    headerKey: "Authorization",
+    headerValuePrefix: "Bearer ",
+    tokenHint:
+      "Paste your Firecrawl API key (fc_…). The free tier covers a few hundred pages a month — paid plans scale up.",
+    tokenUrl: "https://www.firecrawl.dev/app/api-keys",
+    iconSlug: "firecrawl",
+  },
+  {
+    id: "vapi",
+    name: "Vapi",
+    description:
+      "Voice agents: place calls, manage assistants, read call transcripts and recordings.",
+    transport: "http",
+    url: "https://mcp.vapi.ai/mcp",
+    headerKey: "Authorization",
+    headerValuePrefix: "Bearer ",
+    tokenHint:
+      "Paste a Vapi private API key from the dashboard. Use a server-side key, not the public one.",
+    tokenUrl: "https://dashboard.vapi.ai/account",
+    iconSlug: "vapi",
+  },
 ];
 
 export function findPreset(id: string): McpPreset | undefined {
