@@ -9,6 +9,7 @@ import type {
   CustomMcpServer,
   CustomMcpTransport,
 } from "@/lib/custom-mcp";
+import { MCP_PRESETS, type McpPreset } from "@/lib/mcp-presets";
 import type { OrgSkillPlaybook } from "@/lib/org-skills";
 import type { OrgBrainNode, OrgBrainNodeType, OrgBrainInput } from "@/lib/org-brain";
 import type { EmployeeGraph } from "@/lib/profile-graph-real";
@@ -1740,6 +1741,9 @@ function CustomMcpSection() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<CustomMcpServer | null>(null);
   const [creating, setCreating] = useState(false);
+  // When non-null, opens the modal with fields pre-filled from a preset.
+  // Cleared on close so the next blank "Add" doesn't carry stale values.
+  const [presetting, setPresetting] = useState<McpPreset | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -1803,6 +1807,78 @@ function CustomMcpSection() {
           </button>
         </div>
 
+        {servers !== null && MCP_PRESETS.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sp-8)",
+              marginBottom: "var(--sp-16)",
+              paddingBottom: "var(--sp-16)",
+              borderBottom: "1px dashed var(--hairline)",
+            }}
+          >
+            <div
+              className="section-title"
+              style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}
+            >
+              Quick add
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-8)" }}>
+              {MCP_PRESETS.map((p) => {
+                const alreadyAdded = servers.some(
+                  (s) => s.url === p.url || s.name.toLowerCase() === p.name.toLowerCase(),
+                );
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={alreadyAdded}
+                    onClick={() => setPresetting(p)}
+                    title={alreadyAdded ? `${p.name} is already added` : p.description}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "var(--sp-6)",
+                      padding: "6px 12px",
+                      fontSize: "var(--fs-sm)",
+                      fontWeight: 500,
+                      borderRadius: 16,
+                      border: "1px solid var(--hairline)",
+                      background: alreadyAdded ? "var(--bg-sunken)" : "var(--surface)",
+                      color: alreadyAdded ? "var(--text-subtle)" : "var(--text)",
+                      cursor: alreadyAdded ? "not-allowed" : "pointer",
+                      opacity: alreadyAdded ? 0.55 : 1,
+                      fontFamily: "var(--font)",
+                      transition: "background .15s, color .15s, border-color .15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (alreadyAdded) return;
+                      e.currentTarget.style.background = "var(--text)";
+                      e.currentTarget.style.color = "var(--bg)";
+                      e.currentTarget.style.borderColor = "var(--text)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (alreadyAdded) return;
+                      e.currentTarget.style.background = "var(--surface)";
+                      e.currentTarget.style.color = "var(--text)";
+                      e.currentTarget.style.borderColor = "var(--hairline)";
+                    }}
+                  >
+                    <Icons.Plus size={10} />
+                    {p.name}
+                    {alreadyAdded && (
+                      <span style={{ fontSize: "var(--fs-meta)", marginLeft: 2 }}>
+                        · added
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {error && (
           <div
             style={{
@@ -1849,16 +1925,19 @@ function CustomMcpSection() {
         )}
       </div>
 
-      {(creating || editing) && (
+      {(creating || editing || presetting) && (
         <McpModal
           server={editing}
+          preset={presetting}
           onClose={() => {
             setCreating(false);
             setEditing(null);
+            setPresetting(null);
           }}
           onSaved={() => {
             setCreating(false);
             setEditing(null);
+            setPresetting(null);
             load();
           }}
         />
@@ -1991,25 +2070,31 @@ function McpServerRow({
 
 function McpModal({
   server,
+  preset,
   onClose,
   onSaved,
 }: {
   server: CustomMcpServer | null;
+  preset?: McpPreset | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const isEdit = server !== null;
-  const [name, setName] = useState(server?.name ?? "");
-  const [description, setDescription] = useState(server?.description ?? "");
+  const [name, setName] = useState(server?.name ?? preset?.name ?? "");
+  const [description, setDescription] = useState(
+    server?.description ?? preset?.description ?? "",
+  );
   const [transport, setTransport] = useState<CustomMcpTransport>(
-    server?.transport ?? "http"
+    server?.transport ?? preset?.transport ?? "http"
   );
-  const [url, setUrl] = useState(server?.url ?? "");
-  const [headers, setHeaders] = useState<CustomMcpHeader[]>(
-    server?.headers && server.headers.length > 0
-      ? server.headers
-      : [{ key: "", value: "" }]
-  );
+  const [url, setUrl] = useState(server?.url ?? preset?.url ?? "");
+  const [headers, setHeaders] = useState<CustomMcpHeader[]>(() => {
+    if (server?.headers && server.headers.length > 0) return server.headers;
+    if (preset?.headerKey) {
+      return [{ key: preset.headerKey, value: preset.headerValuePrefix ?? "" }];
+    }
+    return [{ key: "", value: "" }];
+  });
   const [enabled, setEnabled] = useState(server?.enabled ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2075,7 +2160,11 @@ function McpModal({
       >
         <div style={{ marginBottom: "var(--sp-20)" }}>
           <h2 style={{ fontSize: "var(--fs-lg)", fontWeight: 600, margin: 0 }}>
-            {isEdit ? `Edit ${server.name}` : "Add custom MCP server"}
+            {isEdit
+              ? `Edit ${server.name}`
+              : preset
+              ? `Add ${preset.name}`
+              : "Add custom MCP server"}
           </h2>
           <p
             className="subtle"
@@ -2085,6 +2174,36 @@ function McpModal({
             the same approval + audit log as Composio actions.
           </p>
         </div>
+
+        {preset && !isEdit && preset.tokenHint && (
+          <div
+            style={{
+              padding: "10px 12px",
+              marginBottom: "var(--sp-16)",
+              border: "1px solid var(--accent-deep)",
+              background: "var(--accent-soft)",
+              borderRadius: 8,
+              fontSize: "var(--fs-sm)",
+              lineHeight: 1.5,
+              color: "var(--text)",
+            }}
+          >
+            <strong>{preset.tokenHint}</strong>
+            {preset.tokenUrl && (
+              <>
+                {" "}
+                <a
+                  href={preset.tokenUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--accent-deep)", fontWeight: 600 }}
+                >
+                  Open {preset.name} →
+                </a>
+              </>
+            )}
+          </div>
+        )}
 
         <div style={{ display: "grid", gap: "var(--sp-14)" }}>
           <Field
