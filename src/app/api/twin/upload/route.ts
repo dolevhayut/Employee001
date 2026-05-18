@@ -69,14 +69,18 @@ export async function POST(request: NextRequest) {
   const buf = Buffer.from(await file.arrayBuffer());
   await fsp.writeFile(absPath, buf);
 
-  // The twin runner cd's into `data/`, so the path it sees is relative to
-  // that. Return it pre-formatted so the chat client can splice it into
-  // the prompt without thinking about the layout.
-  const relative = path.posix.join("uploads", employeeId, filename);
+  // The twin runner cd's into `data/`, so the relative form would in
+  // theory be enough. In practice the SDK's Read tool requires an
+  // absolute path, so we return both:
+  //   path     — the absolute filesystem path the model should pass to Read
+  //   relPath  — the data-relative form, handy for debugging / display
+  // The client splices `path` into the <attached> block.
+  const relPath = path.posix.join("uploads", employeeId, filename);
 
   return json({
     ok: true,
-    path: relative,
+    path: absPath,
+    relPath,
     filename: safe,
     size: file.size,
     contentType: file.type || "application/octet-stream",
