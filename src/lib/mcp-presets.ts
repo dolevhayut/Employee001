@@ -40,6 +40,32 @@ export const MCP_PRESETS: McpPreset[] = [
       "Paste your Personal API token from the Apify console. It must start with apify_api_…",
     tokenUrl: "https://console.apify.com/account#/integrations",
   },
+  {
+    id: "stripe",
+    name: "Stripe",
+    description:
+      "Customers, products, payments, subscriptions, invoices. Scope it down with a restricted API key.",
+    transport: "http",
+    url: "https://mcp.stripe.com/",
+    headerKey: "Authorization",
+    headerValuePrefix: "Bearer ",
+    tokenHint:
+      "Paste a Stripe restricted API key (rk_live_… or rk_test_…). Use restricted keys, not full secret keys — limit the agent to only the resources it needs.",
+    tokenUrl: "https://dashboard.stripe.com/apikeys/create?name=Employee001+MCP&permissions[customer_read]=read",
+  },
+  {
+    id: "github",
+    name: "GitHub",
+    description:
+      "Repos, issues, pull requests, code search, commit & PR history. Official GitHub-hosted MCP.",
+    transport: "http",
+    url: "https://api.githubcopilot.com/mcp/",
+    headerKey: "Authorization",
+    headerValuePrefix: "Bearer ",
+    tokenHint:
+      "Paste a GitHub Personal Access Token (classic or fine-grained). Scope it to the repos and actions the twin needs — don't grant org-wide write.",
+    tokenUrl: "https://github.com/settings/personal-access-tokens/new",
+  },
 ];
 
 export function findPreset(id: string): McpPreset | undefined {
