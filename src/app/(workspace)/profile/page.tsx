@@ -21,24 +21,44 @@ import type { OrgSkillPlaybook } from "@/lib/org-skills";
 
 const MODELS_STORAGE_KEY = "employee001.models.v1";
 
-const DOMAINS = [
-  "Engineering leadership",
-  "Code review culture",
-  "Sprint planning & capacity",
-  "Hiring loops",
-  "Architecture tradeoffs",
-  "Incident response",
-  "Performance reviews",
-];
-
-
-const BOUNDARIES = [
-  "Compensation, equity, or salary discussions",
-  "Performance feedback for direct reports",
-  "Customer commitments above $50K ARR",
-  "Roadmap changes inside the active quarter",
-  "Anything legal, HR, or PR-sensitive",
-];
+// Extract short bullets / h3 headings from a profile markdown body. Used to
+// populate the Overview tab's "Authoritative domains" (EXPERTISE.md) and
+// "Boundaries" (BOUNDARIES.md) panels from the actual twin's content rather
+// than a hardcoded list. Strips leading bullet markers, normalises
+// whitespace, drops items that are obviously sentences rather than topics.
+function extractBullets(md: string, max = 8): string[] {
+  if (!md) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const rawLine of md.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    let item: string | undefined;
+    const bullet = line.match(/^(?:[-*+]|\d+\.)\s+(.+)$/);
+    if (bullet) item = bullet[1];
+    else {
+      const heading = line.match(/^#{2,4}\s+(.+)$/);
+      if (heading) item = heading[1];
+    }
+    if (!item) continue;
+    // Strip inline markdown formatting and trailing punctuation
+    item = item
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/`(.+?)`/g, "$1")
+      .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+      .replace(/\s+/g, " ")
+      .replace(/[.;,:]+$/, "")
+      .trim();
+    if (item.length < 3 || item.length > 80) continue;
+    const key = item.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+    if (out.length >= max) break;
+  }
+  return out;
+}
 
 const PROFILE_FILE_DESCRIPTIONS: Record<string, string> = {
   "EXPERTISE.md": "Domains the twin can answer authoritatively",
@@ -1517,6 +1537,33 @@ function OverviewTab({
   employee: EmployeeWithTwin;
   activeToolkits: string[];
 }) {
+  const [domains, setDomains] = useState<string[]>([]);
+  const [boundaries, setBoundaries] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load(name: string): Promise<string> {
+      try {
+        const r = await fetch(`/api/employees/${employee.id}/file/${name}`);
+        if (!r.ok) return "";
+        const data = (await r.json()) as { body?: string };
+        return data.body ?? "";
+      } catch {
+        return "";
+      }
+    }
+    Promise.all([load("EXPERTISE.md"), load("BOUNDARIES.md")]).then(
+      ([expertise, bounds]) => {
+        if (cancelled) return;
+        setDomains(extractBullets(expertise, 8));
+        setBoundaries(extractBullets(bounds, 6));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [employee.id]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-56)" }}>
       <SectionGroup
@@ -1582,35 +1629,49 @@ function OverviewTab({
             The twin will answer with high confidence on these topics. Outside this
             list, it defers or escalates.
           </p>
-          <div className="row" style={{ flexWrap: "wrap", gap: "var(--sp-8)" }}>
-            {DOMAINS.map((d) => (
-              <Chip key={d}>{d}</Chip>
-            ))}
-          </div>
+          {domains.length === 0 ? (
+            <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, fontStyle: "italic" }}>
+              No domains parsed from <span className="mono">EXPERTISE.md</span> yet —
+              add bullets to that file to populate this list.
+            </p>
+          ) : (
+            <div className="row" style={{ flexWrap: "wrap", gap: "var(--sp-8)" }}>
+              {domains.map((d) => (
+                <Chip key={d}>{d}</Chip>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>
           <SectionTitle>Boundaries</SectionTitle>
           <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: "0 0 14px", lineHeight: 1.5 }}>
-            Topics the twin will never answer alone. These always escalate to Sarah.
+            Topics the twin will never answer alone. These always escalate to you.
           </p>
-          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-            {BOUNDARIES.map((b, i) => (
-              <div
-                key={b}
-                className="row"
-                style={{
-                  padding: "12px 16px",
-                  gap: "var(--sp-12)",
-                  borderBottom:
-                    i < BOUNDARIES.length - 1 ? "1px solid var(--hairline)" : "none",
-                }}
-              >
-                <Icons.Lock size={13} style={{ color: "var(--text-subtle)" }} />
-                <span style={{ fontSize: "var(--fs-ui)" }}>{b}</span>
-              </div>
-            ))}
-          </div>
+          {boundaries.length === 0 ? (
+            <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, fontStyle: "italic" }}>
+              No boundaries parsed from <span className="mono">BOUNDARIES.md</span> yet —
+              add bullets to that file to populate this list.
+            </p>
+          ) : (
+            <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+              {boundaries.map((b, i) => (
+                <div
+                  key={b}
+                  className="row"
+                  style={{
+                    padding: "12px 16px",
+                    gap: "var(--sp-12)",
+                    borderBottom:
+                      i < boundaries.length - 1 ? "1px solid var(--hairline)" : "none",
+                  }}
+                >
+                  <Icons.Lock size={13} style={{ color: "var(--text-subtle)" }} />
+                  <span style={{ fontSize: "var(--fs-ui)" }}>{b}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </SectionGroup>
 

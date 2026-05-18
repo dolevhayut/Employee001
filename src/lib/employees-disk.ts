@@ -44,6 +44,14 @@ type DiskSidecar = {
   lastActiveAt?: string;
   questionsThisWeek?: number;
   weekOf?: string; // ISO week string e.g. "2026-W20"
+  /**
+   * Set when materialised from an invite before the employee finished the
+   * consent wizard. Such records have placeholder markdown that would
+   * otherwise score as "ready" and surface in /employees + org chart as a
+   * ghost row. Skipped in `loadEmployeesFromDisk` until the wizard clears
+   * the flag.
+   */
+  pendingProfile?: boolean;
 };
 
 /** Returns the ISO week string for a given date, e.g. "2026-W20". */
@@ -107,6 +115,11 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
       continue;
     }
     if (!sidecar?.name) continue;
+    // Invite materialised the directory before consent — skip until the
+    // wizard reconciles the sidecar (drops pendingProfile + rewrites the
+    // markdown). Otherwise the placeholder content scores as "ready" and
+    // shows a ghost row in /employees and the org chart.
+    if (sidecar.pendingProfile) continue;
 
     let complete = 0;
     for (const base of PROFILE_BASES) {

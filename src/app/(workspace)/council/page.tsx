@@ -1172,8 +1172,8 @@ function FileDrawer({
               fontSize: "var(--fs-meta)",
               fontWeight: 600,
               padding: "5px 12px",
-              background: "var(--accent)",
-              color: "var(--accent-on)",
+              background: "var(--text)",
+              color: "var(--bg)",
               borderRadius: 8,
               textDecoration: "none",
             }}

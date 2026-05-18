@@ -93,7 +93,7 @@ function useTickingNow(active: boolean): number {
 
 function StatusPill({ status }: { status: RunStatus }) {
   const meta: Record<RunStatus, { bg: string; color: string; label: string }> = {
-    running: { bg: "var(--accent)", color: "#ffffff", label: "running" },
+    running: { bg: "var(--text)", color: "var(--bg)", label: "running" },
     complete: { bg: "#dcfce7", color: "#16a34a", label: "done" },
     error: { bg: "#fee2e2", color: "#dc2626", label: "failed" },
     aborted: { bg: "var(--bg-sunken)", color: "var(--text-muted)", label: "aborted" },
