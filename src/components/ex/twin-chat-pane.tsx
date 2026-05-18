@@ -85,7 +85,19 @@ type PendingClarification = {
 };
 
 type Message =
-  | { role: "user"; id: string; text: string }
+  | {
+      role: "user";
+      id: string;
+      text: string;
+      /**
+       * Set on retry: id of the twin bubble that owns this message's reply.
+       * Lets us treat the user message as answered even when the reply is
+       * appended at the END of the thread (so the CEO doesn't have to
+       * scroll back to see it). Survives within this in-memory session;
+       * a hard reload reverts to "no following twin → unanswered".
+       */
+      answeredBy?: string;
+    }
   | {
       role: "twin";
       id: string;
@@ -756,6 +768,15 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
     if (isStreaming) return false;
     const m = messages[idx];
     if (!m || m.role !== "user") return false;
+    // Retry path: a twin bubble somewhere downstream is the canonical reply.
+    if (m.answeredBy) {
+      const owner = messages.find((x) => x.id === m.answeredBy);
+      if (owner && owner.role === "twin") {
+        if (owner.streaming) return false;
+        return owner.text.trim().length === 0;
+      }
+      // The referenced twin disappeared (shouldn't happen) — fall through.
+    }
     const next = messages[idx + 1];
     if (!next) return true;
     if (next.role !== "twin") return true;
@@ -929,10 +950,11 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       const newTwinBubble = { role: "twin" as const, id: twinId, text: "", streaming: true, trace: [], confidence: null, cited: [], pendingApprovals: [], pendingClarifications: [], blocked: [], artifacts: [], followups: [] };
       setMessages((m) => {
         if (retry) {
-          // Splice: drop any empty orphan twin right after the user message,
-          // then insert the fresh twin bubble in that same slot so the new
-          // reply lands directly under the retried message (not appended to
-          // the bottom of the thread).
+          // Drop the orphan empty twin (if any) sitting after the retried
+          // user message, mark the user message as answered by the new
+          // twin bubble, and append the new bubble at the END of the
+          // thread. The CEO sees the new reply in the natural reading
+          // position — no need to scroll back to where the retry button was.
           const userIdx = m.findIndex((x) => x.id === retry.afterUserId);
           if (userIdx === -1) return [...m, newTwinBubble];
           const next = m[userIdx + 1];
@@ -940,11 +962,10 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
             next && next.role === "twin" && next.text.trim().length === 0
               ? [...m.slice(0, userIdx + 1), ...m.slice(userIdx + 2)]
               : m;
-          return [
-            ...dropped.slice(0, userIdx + 1),
-            newTwinBubble,
-            ...dropped.slice(userIdx + 1),
-          ];
+          const marked = dropped.map((x, i) =>
+            i === userIdx && x.role === "user" ? { ...x, answeredBy: twinId } : x,
+          );
+          return [...marked, newTwinBubble];
         }
         return [
           ...m,
