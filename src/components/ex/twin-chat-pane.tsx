@@ -109,6 +109,44 @@ type Props = {
   employeeId?: string;
 };
 
+/**
+ * Pulls the <attached>…</attached> scaffolding back out of a user message
+ * for display. The block is what we splice in to tell the twin "read these
+ * before answering"; rendering it raw in the bubble is ugly. We strip it
+ * from the visible text and recover any attachment metadata for chips.
+ *
+ * Safe-by-default: if parsing fails we still drop the block from display.
+ */
+function parseUserBubble(raw: string): {
+  visibleText: string;
+  attachments: Array<{ path: string; filename: string; contentType: string; size: number }>;
+} {
+  const match = raw.match(/<attached>\n([\s\S]*?)\n<\/attached>\n*/);
+  if (!match) return { visibleText: raw, attachments: [] };
+  const block = match[1];
+  const attachments: Array<{
+    path: string;
+    filename: string;
+    contentType: string;
+    size: number;
+  }> = [];
+  for (const line of block.split("\n")) {
+    const m = line.match(/^- (\S+) \(([^,]+), ([^,]+), (\d+) bytes\)\s*$/);
+    if (m) {
+      attachments.push({
+        path: m[1],
+        filename: m[2],
+        contentType: m[3],
+        size: Number(m[4]),
+      });
+    }
+  }
+  return {
+    visibleText: raw.replace(match[0], "").trim(),
+    attachments,
+  };
+}
+
 function confidenceBadgeClass(c: number): string {
   if (c >= 0.85) return "badge success";
   if (c >= 0.7) return "badge warn";
@@ -648,6 +686,26 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+
+  // Show the browser's native "are you sure you want to leave?" prompt
+  // while a turn is streaming — the SSE stream dies the moment the page
+  // unloads, and the twin's answer is lost. The prompt covers reload,
+  // close-tab, typing a new URL, and the back button. It does NOT cover
+  // client-side navigation within the SPA (Next.js Link clicks) — that
+  // would need a router-level interceptor and isn't where the user got
+  // bitten.
+  useEffect(() => {
+    if (!isStreaming) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers ignore the custom string and show their own copy,
+      // but `returnValue` is still required for the prompt to fire.
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isStreaming]);
+
   /** Most recently copied message id — drives the "copied" pill state for ~1.4s
    *  before reverting. Stored as id only so re-renders don't accumulate timers. */
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -1125,27 +1183,71 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
         {/* Message list */}
         {messages.map((m) =>
           m.role === "user" ? (
-            <motion.div
-              key={m.id}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2 }}
-              style={{ display: "flex", justifyContent: "flex-end" }}
-            >
-              <div
-                style={{
-                  background: "var(--text)",
-                  color: "var(--bg)",
-                  padding: "8px 12px",
-                  borderRadius: "12px 12px 3px 12px",
-                  maxWidth: "80%",
-                  fontSize: "var(--fs-ui)", lineHeight: 1.5, letterSpacing: "-0.005em", fontWeight: 500,
-                  boxShadow: "var(--shadow)",
-                }}
-              >
-                {m.text}
-              </div>
-            </motion.div>
+            (() => {
+              const parsed = parseUserBubble(m.text);
+              return (
+                <motion.div
+                  key={m.id}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "var(--sp-5)" }}
+                >
+                  {parsed.attachments.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "var(--sp-5)", maxWidth: "80%" }}>
+                      {parsed.attachments.map((a) => (
+                        <span
+                          key={a.path}
+                          title={`${a.filename} · ${(a.size / 1024).toFixed(1)} KB`}
+                          style={{
+                            display: "inline-flex", alignItems: "center", gap: "var(--sp-5)",
+                            padding: "3px 8px",
+                            fontSize: "var(--fs-xs)",
+                            background: "var(--surface)",
+                            border: "1px solid var(--hairline)",
+                            borderRadius: 10,
+                            color: "var(--text-muted)",
+                            maxWidth: 220,
+                          }}
+                        >
+                          <svg
+                            width={9}
+                            height={9}
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.8}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                            style={{ flexShrink: 0 }}
+                          >
+                            <path d="M21 12.5L12.5 21a5 5 0 0 1-7-7L14 5.5a3.5 3.5 0 0 1 5 5L10 19" />
+                          </svg>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {a.filename}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      background: "var(--text)",
+                      color: "var(--bg)",
+                      padding: "8px 12px",
+                      borderRadius: "12px 12px 3px 12px",
+                      maxWidth: "80%",
+                      fontSize: "var(--fs-ui)", lineHeight: 1.5, letterSpacing: "-0.005em", fontWeight: 500,
+                      boxShadow: "var(--shadow)",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {parsed.visibleText}
+                  </div>
+                </motion.div>
+              );
+            })()
           ) : (
             <motion.div
               key={m.id}
