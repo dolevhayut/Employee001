@@ -98,6 +98,9 @@ type Message =
       pendingClarifications: PendingClarification[];
       blocked: { tool: string; reason: string }[];
       artifacts: EmployeeCanvas[];
+      /** Suggested next prompts from the Haiku follow-up call. Empty until
+       *  the trailing `followup_suggestions` SSE event arrives. */
+      followups: string[];
     };
 
 type Props = {
@@ -689,7 +692,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                 role: "twin" as const, id: m.id, text: m.text,
                 streaming: false, trace: [], confidence: m.confidence ?? null,
                 cited: m.cited ?? [], pendingApprovals: [], pendingClarifications: [], blocked: [],
-                artifacts: m.artifacts ?? [],
+                artifacts: m.artifacts ?? [], followups: [],
               }
         ));
       })
@@ -737,7 +740,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       setMessages((m) => [
         ...m,
         { role: "user", id: userId, text: q },
-        { role: "twin", id: twinId, text: "", streaming: true, trace: [], confidence: null, cited: [], pendingApprovals: [], pendingClarifications: [], blocked: [], artifacts: [] },
+        { role: "twin", id: twinId, text: "", streaming: true, trace: [], confidence: null, cited: [], pendingApprovals: [], pendingClarifications: [], blocked: [], artifacts: [], followups: [] },
       ]);
       setInput("");
       setIsStreaming(true);
@@ -828,6 +831,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                   case "tool_approval_resolved": return { ...m, pendingApprovals: m.pendingApprovals.filter((a) => a.approvalId !== evt.approvalId) };
                   case "clarification_request": return { ...m, pendingClarifications: [...m.pendingClarifications, { approvalId: evt.approvalId, questions: evt.questions, ts: evt.ts }] };
                   case "clarification_resolved": return { ...m, pendingClarifications: m.pendingClarifications.filter((c) => c.approvalId !== evt.approvalId) };
+                  case "followup_suggestions": return { ...m, followups: evt.suggestions };
                   case "tool_blocked": return { ...m, blocked: [...m.blocked, { tool: evt.tool, reason: evt.reason }] };
                   case "scratch_write_denied": return { ...m, blocked: [...m.blocked, { tool: "Write (scratch denied)", reason: evt.reason }] };
                   case "artifact": return newArtifact ? { ...m, artifacts: [...m.artifacts, newArtifact] } : m;
@@ -1196,6 +1200,56 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       <span>{loadingId === m.id ? "loading…" : playingId === m.id ? "stop" : "listen"}</span>
                     </button>
                   </div>
+                )}
+
+                {/* Follow-up suggestions — Haiku-generated chips. Clicking
+                    one fires the same submit() path as typing it manually. */}
+                {!m.streaming && m.followups.length > 0 && m.pendingApprovals.length === 0 && m.pendingClarifications.length === 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: 0.05 }}
+                    style={{
+                      marginTop: "var(--sp-10)",
+                      display: "flex", flexWrap: "wrap", gap: "var(--sp-6)",
+                    }}
+                  >
+                    {m.followups.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => submit(s)}
+                        disabled={isStreaming}
+                        style={{
+                          padding: "5px 11px",
+                          fontSize: "var(--fs-xs)",
+                          borderRadius: 14,
+                          border: "1px solid var(--hairline)",
+                          background: "var(--surface)",
+                          color: "var(--text-muted)",
+                          cursor: isStreaming ? "not-allowed" : "pointer",
+                          fontFamily: "var(--font)",
+                          textAlign: "start",
+                          maxWidth: "100%",
+                          opacity: isStreaming ? 0.55 : 1,
+                          transition: "background .15s, color .15s, border-color .15s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (isStreaming) return;
+                          e.currentTarget.style.background = "var(--text)";
+                          e.currentTarget.style.color = "var(--bg)";
+                          e.currentTarget.style.borderColor = "var(--text)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "var(--surface)";
+                          e.currentTarget.style.color = "var(--text-muted)";
+                          e.currentTarget.style.borderColor = "var(--hairline)";
+                        }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </motion.div>
                 )}
               </div>
             </motion.div>

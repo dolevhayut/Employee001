@@ -6,6 +6,7 @@ import { hasEmployeeFiles } from "@/lib/employees-files";
 import { runSingleTwin } from "@/lib/council-runner";
 import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
 import { bumpActivityOnDisk } from "@/lib/employees-disk";
+import { generateFollowups } from "@/lib/followup-suggestions";
 
 const PROFILE_FILE_NAMES = [
   "EXPERTISE.md", "DECISIONS.md", "CONTEXT.md", "PEOPLE.md",
@@ -238,6 +239,26 @@ export async function POST(request: NextRequest) {
           useResume ? [] : body.history ?? [],
           { resumeSessionId: useResume ? body.sessionId : undefined }
         );
+
+        // After the main answer finished streaming, emit 3 follow-up
+        // suggestions for the CEO to click. Skip when the answer was empty
+        // (no text was streamed — e.g. tool-only run) since chips have no
+        // anchor to suggest from.
+        if (responseText.trim().length > 0) {
+          const suggestions = await generateFollowups({
+            question,
+            answer: responseText,
+            employeeName: employee.name,
+            employeeRole: employee.role,
+          });
+          if (suggestions.length > 0) {
+            send({
+              type: "followup_suggestions",
+              suggestions,
+              ts: Date.now() - start,
+            });
+          }
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
         send({ type: "tool_result", name: "error", summary: msg, files: [], ts: Date.now() - start });

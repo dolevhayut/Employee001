@@ -184,6 +184,14 @@ export type TwinTraceEvent =
       type: "clarification_resolved";
       approvalId: string;
       ts: number;
+    }
+  | {
+      /** Three short "next question" prompts produced by a cheap Haiku call
+       *  after the main answer finished streaming. Rendered as click-to-send
+       *  chips under the twin's bubble. Best-effort — may arrive empty. */
+      type: "followup_suggestions";
+      suggestions: string[];
+      ts: number;
     };
 
 // ─── Skills (Paperclip-style typed tools) ────────────────────────────────────
