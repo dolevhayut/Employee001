@@ -24,6 +24,9 @@ export type McpPreset = {
   tokenHint?: string;
   /** Optional URL the user can click to grab their token. */
   tokenUrl?: string;
+  /** Composio catalog slug used to fetch a brand logo via `ToolkitIcon`.
+   *  We only borrow the icon — Composio doesn't proxy the MCP traffic. */
+  iconSlug?: string;
 };
 
 export const MCP_PRESETS: McpPreset[] = [
@@ -39,6 +42,7 @@ export const MCP_PRESETS: McpPreset[] = [
     tokenHint:
       "Paste your Personal API token from the Apify console. It must start with apify_api_…",
     tokenUrl: "https://console.apify.com/account#/integrations",
+    iconSlug: "apify",
   },
   {
     id: "stripe",
@@ -52,6 +56,7 @@ export const MCP_PRESETS: McpPreset[] = [
     tokenHint:
       "Paste a Stripe restricted API key (rk_live_… or rk_test_…). Use restricted keys, not full secret keys — limit the agent to only the resources it needs.",
     tokenUrl: "https://dashboard.stripe.com/apikeys/create?name=Employee001+MCP&permissions[customer_read]=read",
+    iconSlug: "stripe",
   },
   {
     id: "github",
@@ -65,6 +70,7 @@ export const MCP_PRESETS: McpPreset[] = [
     tokenHint:
       "Paste a GitHub Personal Access Token (classic or fine-grained). Scope it to the repos and actions the twin needs — don't grant org-wide write.",
     tokenUrl: "https://github.com/settings/personal-access-tokens/new",
+    iconSlug: "github",
   },
 ];
 

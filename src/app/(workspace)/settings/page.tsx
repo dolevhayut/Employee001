@@ -10,6 +10,7 @@ import type {
   CustomMcpTransport,
 } from "@/lib/custom-mcp";
 import { MCP_PRESETS, type McpPreset } from "@/lib/mcp-presets";
+import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import type { OrgSkillPlaybook } from "@/lib/org-skills";
 import type { OrgBrainNode, OrgBrainNodeType, OrgBrainInput } from "@/lib/org-brain";
 import type { EmployeeGraph } from "@/lib/profile-graph-real";
@@ -1865,7 +1866,11 @@ function CustomMcpSection() {
                       e.currentTarget.style.borderColor = "var(--hairline)";
                     }}
                   >
-                    <Icons.Plus size={10} />
+                    {p.iconSlug ? (
+                      <ToolkitIcon slug={p.iconSlug} size={16} />
+                    ) : (
+                      <Icons.Plus size={10} />
+                    )}
                     {p.name}
                     {alreadyAdded && (
                       <span style={{ fontSize: "var(--fs-meta)", marginLeft: 2 }}>
