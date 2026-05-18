@@ -241,10 +241,18 @@ export async function POST(request: NextRequest) {
         );
 
         // After the main answer finished streaming, emit 3 follow-up
-        // suggestions for the CEO to click. Skip when the answer was empty
-        // (no text was streamed — e.g. tool-only run) since chips have no
-        // anchor to suggest from.
-        if (responseText.trim().length > 0) {
+        // suggestions for the CEO to click. Skip when:
+        //  - The answer was empty (tool-only run) — no anchor to suggest from.
+        //  - The twin ended its own reply with a question. In that case the
+        //    CEO should answer the question naturally, not click a chip that
+        //    silently abandons the conversational beat. Detection: scan the
+        //    last ~300 chars of the trimmed body for a "?". Catches "…shall
+        //    we do A or B?" patterns even when the model trails off with an
+        //    emoji or a soft sign-off after the question mark.
+        const trimmed = responseText.trim();
+        const tail = trimmed.slice(-300);
+        const twinAskedAQuestion = tail.includes("?") || tail.includes("؟");
+        if (trimmed.length > 0 && !twinAskedAQuestion) {
           const suggestions = await generateFollowups({
             question,
             answer: responseText,
