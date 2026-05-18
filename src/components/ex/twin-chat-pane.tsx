@@ -1186,9 +1186,9 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
 
                 {/* Confidence + TTS row */}
                 {!m.streaming && m.text && m.pendingApprovals.length === 0 && m.pendingClarifications.length === 0 && (
-                  <div style={{ marginTop: "var(--sp-6)", display: "flex", alignItems: "center", gap: "var(--sp-6)" }}>
+                  <div style={{ marginTop: "var(--sp-8)", display: "flex", alignItems: "center", gap: "var(--sp-8)" }}>
                     {m.confidence != null && (
-                      <span className={confidenceBadgeClass(m.confidence)} style={{ fontSize: "var(--fs-2xs)" }}>
+                      <span className={confidenceBadgeClass(m.confidence)} style={{ fontSize: "var(--fs-xs)", padding: "4px 10px" }}>
                         {(m.confidence * 100).toFixed(0)}% confident
                       </span>
                     )}
@@ -1200,8 +1200,8 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       disabled={loadingId === m.id}
                       title={playingId === m.id ? "Stop" : "Listen"}
                       style={{
-                        display: "inline-flex", alignItems: "center", gap: "var(--sp-4)",
-                        padding: "2px 7px", fontSize: "var(--fs-xs)", borderRadius: 4,
+                        display: "inline-flex", alignItems: "center", gap: "var(--sp-5)",
+                        padding: "4px 10px", fontSize: "var(--fs-sm)", borderRadius: 6,
                         border: playingId === m.id ? `1px solid ${avatarColor}` : "1px solid var(--hairline)",
                         background: playingId === m.id
                           ? `color-mix(in oklch, ${avatarColor} 15%, var(--surface))`
@@ -1214,11 +1214,11 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       }}
                     >
                       {loadingId === m.id ? (
-                        <Icons.Loader size={9} style={{ animation: "spin 1s linear infinite" }} />
+                        <Icons.Loader size={12} style={{ animation: "spin 1s linear infinite" }} />
                       ) : playingId === m.id ? (
-                        <Icons.VolumeOff size={9} />
+                        <Icons.VolumeOff size={12} />
                       ) : (
-                        <Icons.Volume size={9} />
+                        <Icons.Volume size={12} />
                       )}
                       <span>{loadingId === m.id ? "loading…" : playingId === m.id ? "stop" : "listen"}</span>
                     </button>
@@ -1227,8 +1227,8 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       onClick={() => copyMessage(m.id, m.text)}
                       title={copiedId === m.id ? "Copied" : "Copy message"}
                       style={{
-                        display: "inline-flex", alignItems: "center", gap: "var(--sp-4)",
-                        padding: "2px 7px", fontSize: "var(--fs-xs)", borderRadius: 4,
+                        display: "inline-flex", alignItems: "center", gap: "var(--sp-5)",
+                        padding: "4px 10px", fontSize: "var(--fs-sm)", borderRadius: 6,
                         border: copiedId === m.id ? "1px solid var(--success, #4ade80)" : "1px solid var(--hairline)",
                         background: copiedId === m.id
                           ? "color-mix(in oklch, var(--success, #4ade80) 12%, var(--surface))"
@@ -1240,12 +1240,12 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       }}
                     >
                       {copiedId === m.id ? (
-                        <Icons.Check size={9} />
+                        <Icons.Check size={12} />
                       ) : (
                         // Inline copy glyph — two stacked rounded rectangles
                         <svg
-                          width={9}
-                          height={9}
+                          width={12}
+                          height={12}
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
