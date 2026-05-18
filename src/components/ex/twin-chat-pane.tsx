@@ -745,6 +745,49 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
     setAttachments((prev) => prev.filter((a) => a.path !== p));
   }
 
+  /**
+   * A user message is "unanswered" if no twin reply ever landed for it —
+   * i.e. either it's the last message in the thread, OR it's followed by a
+   * twin bubble that ended up empty (got cut off by a navigation, a fetch
+   * error, etc.). We only flag this when we're NOT currently streaming, so
+   * the in-flight bubble doesn't get a spurious retry chip.
+   */
+  function isUnanswered(idx: number): boolean {
+    if (isStreaming) return false;
+    const m = messages[idx];
+    if (!m || m.role !== "user") return false;
+    const next = messages[idx + 1];
+    if (!next) return true;
+    if (next.role !== "twin") return true;
+    if (next.streaming) return false;
+    return next.text.trim().length === 0;
+  }
+
+  /**
+   * Pop a user message back into the input for editing. Removes both the
+   * message itself and any orphan empty twin bubble that followed it, then
+   * restores the typed text + attachment list to the composer. The user
+   * can then tweak and hit Send normally.
+   *
+   * The persisted chat-history row is left in place — we don't have a
+   * delete endpoint and the next submit will append a fresh row, so the
+   * server-side trace shows both attempts (acceptable archaeology).
+   */
+  function editMessageAt(idx: number) {
+    if (isStreaming) return;
+    const m = messages[idx];
+    if (!m || m.role !== "user") return;
+    const parsed = parseUserBubble(m.text);
+    setMessages((prev) => {
+      const next = prev[idx + 1];
+      const hasOrphanTwin = next && next.role === "twin" && next.text.trim().length === 0;
+      const sliceEnd = hasOrphanTwin ? idx + 2 : idx + 1;
+      return [...prev.slice(0, idx), ...prev.slice(sliceEnd)];
+    });
+    setInput(parsed.visibleText);
+    setAttachments(parsed.attachments);
+  }
+
   const copyMessage = useCallback(async (id: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -845,9 +888,17 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
   );
 
   const submit = useCallback(
-    async (question: string) => {
-      const q = question.trim();
-      if (!q || isStreaming) return;
+    async (
+      question: string,
+      retry?: { existingComposed: string; afterUserId: string },
+    ) => {
+      // In retry mode `question` is ignored — we replay the original composed
+      // text (`<attached>` block + typed text) that's still sitting in the
+      // user bubble we're retrying. In normal mode we splice attachments
+      // freshly. Either way, `composed` ends up being what the model sees.
+      const q = retry ? "" : question.trim();
+      if (!retry && (!q || isStreaming)) return;
+      if (retry && isStreaming) return;
 
       // Splice the attachment list (if any) onto the front of the question
       // as a small structured block. The twin runner cd's into data/, so
@@ -855,14 +906,15 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       // user's question afterwards so the model still treats the typed
       // text as the primary instruction.
       const attached = attachments;
-      const composed =
-        attached.length > 0
-          ? `<attached>\n${attached
-              .map((a) => `- ${a.path} (${a.filename}, ${a.contentType}, ${a.size} bytes)`)
-              .join("\n")}\nRead these with your Read tool before answering — they're the reference for what I'm asking.\n</attached>\n\n${q}`
-          : q;
+      const composed = retry
+        ? retry.existingComposed
+        : attached.length > 0
+        ? `<attached>\n${attached
+            .map((a) => `- ${a.path} (${a.filename}, ${a.contentType}, ${a.size} bytes)`)
+            .join("\n")}\nRead these with your Read tool before answering — they're the reference for what I'm asking.\n</attached>\n\n${q}`
+        : q;
 
-      const userId = `u-${Date.now()}`;
+      const userId = retry ? retry.afterUserId : `u-${Date.now()}`;
       const twinId = `t-${Date.now()}`;
       const now = Date.now();
 
@@ -874,16 +926,41 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       // composed so history replay stays consistent. The <attached> block
       // renders inline as a small monospace chunk via the Markdown plain
       // path which is fine.
-      setMessages((m) => [
-        ...m,
-        { role: "user", id: userId, text: composed },
-        { role: "twin", id: twinId, text: "", streaming: true, trace: [], confidence: null, cited: [], pendingApprovals: [], pendingClarifications: [], blocked: [], artifacts: [], followups: [] },
-      ]);
-      setInput("");
-      setAttachments([]);
+      const newTwinBubble = { role: "twin" as const, id: twinId, text: "", streaming: true, trace: [], confidence: null, cited: [], pendingApprovals: [], pendingClarifications: [], blocked: [], artifacts: [], followups: [] };
+      setMessages((m) => {
+        if (retry) {
+          // Splice: drop any empty orphan twin right after the user message,
+          // then insert the fresh twin bubble in that same slot so the new
+          // reply lands directly under the retried message (not appended to
+          // the bottom of the thread).
+          const userIdx = m.findIndex((x) => x.id === retry.afterUserId);
+          if (userIdx === -1) return [...m, newTwinBubble];
+          const next = m[userIdx + 1];
+          const dropped =
+            next && next.role === "twin" && next.text.trim().length === 0
+              ? [...m.slice(0, userIdx + 1), ...m.slice(userIdx + 2)]
+              : m;
+          return [
+            ...dropped.slice(0, userIdx + 1),
+            newTwinBubble,
+            ...dropped.slice(userIdx + 1),
+          ];
+        }
+        return [
+          ...m,
+          { role: "user", id: userId, text: composed },
+          newTwinBubble,
+        ];
+      });
+      if (!retry) {
+        setInput("");
+        setAttachments([]);
+      }
       setIsStreaming(true);
 
-      if (employeeId) {
+      // Skip the chat-history POST on retry — the user message was already
+      // persisted on the original submit, replaying would duplicate it.
+      if (!retry && employeeId) {
         void fetch(`/api/employees/${employeeId}/chat-history`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1181,10 +1258,11 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
         )}
 
         {/* Message list */}
-        {messages.map((m) =>
+        {messages.map((m, msgIdx) =>
           m.role === "user" ? (
             (() => {
               const parsed = parseUserBubble(m.text);
+              const unanswered = isUnanswered(msgIdx);
               return (
                 <motion.div
                   key={m.id}
@@ -1245,6 +1323,95 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                   >
                     {parsed.visibleText}
                   </div>
+                  {unanswered && (
+                    <div style={{ display: "flex", gap: "var(--sp-6)", alignItems: "center" }}>
+                      <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)", fontStyle: "italic" }}>
+                        No reply — the run ended early.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => submit("", { existingComposed: m.text, afterUserId: m.id })}
+                        title="Retry — re-run with the same message"
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: "var(--sp-4)",
+                          padding: "3px 9px", fontSize: "var(--fs-xs)", borderRadius: 6,
+                          border: "1px solid var(--hairline)",
+                          background: "var(--surface)",
+                          color: "var(--text-subtle)",
+                          cursor: "pointer",
+                          fontFamily: "var(--font)",
+                          transition: "background .15s, color .15s, border-color .15s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "var(--text)";
+                          e.currentTarget.style.color = "var(--bg)";
+                          e.currentTarget.style.borderColor = "var(--text)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "var(--surface)";
+                          e.currentTarget.style.color = "var(--text-subtle)";
+                          e.currentTarget.style.borderColor = "var(--hairline)";
+                        }}
+                      >
+                        <svg
+                          width={11}
+                          height={11}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M21 12a9 9 0 1 1-3-6.7" />
+                          <path d="M21 4v5h-5" />
+                        </svg>
+                        retry
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => editMessageAt(msgIdx)}
+                        title="Edit the message and send again"
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: "var(--sp-4)",
+                          padding: "3px 9px", fontSize: "var(--fs-xs)", borderRadius: 6,
+                          border: "1px solid var(--hairline)",
+                          background: "var(--surface)",
+                          color: "var(--text-subtle)",
+                          cursor: "pointer",
+                          fontFamily: "var(--font)",
+                          transition: "background .15s, color .15s, border-color .15s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "var(--text)";
+                          e.currentTarget.style.color = "var(--bg)";
+                          e.currentTarget.style.borderColor = "var(--text)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "var(--surface)";
+                          e.currentTarget.style.color = "var(--text-subtle)";
+                          e.currentTarget.style.borderColor = "var(--hairline)";
+                        }}
+                      >
+                        <svg
+                          width={11}
+                          height={11}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
+                        </svg>
+                        edit
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               );
             })()
