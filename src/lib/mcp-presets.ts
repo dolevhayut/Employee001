@@ -34,8 +34,12 @@ export type McpPreset = {
   /** Optional URL the user can click to grab their token. */
   tokenUrl?: string;
   /** Composio catalog slug used to fetch a brand logo via `ToolkitIcon`.
-   *  We only borrow the icon — Composio doesn't proxy the MCP traffic. */
+   *  We only borrow the icon — Composio doesn't proxy the MCP traffic.
+   *  Ignored when `iconUrl` is set. */
   iconSlug?: string;
+  /** Static asset path or absolute URL to a logo. Used when Composio
+   *  doesn't carry the brand (e.g. Higgsfield). Wins over `iconSlug`. */
+  iconUrl?: string;
 };
 
 export const MCP_PRESETS: McpPreset[] = [
@@ -133,6 +137,7 @@ export const MCP_PRESETS: McpPreset[] = [
     auth: "oauth",
     tokenHint:
       "You'll be sent to Higgsfield in a popup to sign in. Tokens stay on this machine — they're never sent anywhere else.",
+    iconUrl: "/mcp-icons/higgsfield.png",
   },
 ];
 

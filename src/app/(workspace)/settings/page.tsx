@@ -1934,7 +1934,16 @@ function CustomMcpSection() {
                       e.currentTarget.style.borderColor = "var(--hairline)";
                     }}
                   >
-                    {p.iconSlug ? (
+                    {p.iconUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.iconUrl}
+                        alt=""
+                        width={16}
+                        height={16}
+                        style={{ flexShrink: 0, borderRadius: 3, objectFit: "cover" }}
+                      />
+                    ) : p.iconSlug ? (
                       <ToolkitIcon slug={p.iconSlug} size={16} />
                     ) : (
                       <Icons.Plus size={10} />
