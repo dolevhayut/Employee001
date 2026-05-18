@@ -7,6 +7,7 @@ import { runSingleTwin } from "@/lib/council-runner";
 import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
 import { bumpActivityOnDisk } from "@/lib/employees-disk";
 import { generateFollowups } from "@/lib/followup-suggestions";
+import { appendTaskRun } from "@/lib/task-history";
 
 const PROFILE_FILE_NAMES = [
   "EXPERTISE.md", "DECISIONS.md", "CONTEXT.md", "PEOPLE.md",
@@ -97,6 +98,19 @@ export async function POST(request: NextRequest) {
       // Accumulate response text so we can detect citations after the fact
       let responseText = "";
 
+      // Per-run counters so the persisted TaskRun reflects how busy this turn
+      // was — drives the cockpit + workspace cost views beyond just $.
+      let toolCallsCount = 0;
+      let approvalsRequestedCount = 0;
+      let approvalsApprovedCount = 0;
+      let approvalsDeniedCount = 0;
+      let blockedToolsCount = 0;
+      let runDone = false;
+      // Stable id per run, used for the JSONL row id. No need to coordinate
+      // with /api/employees/[id]/task — twin/chat is its own audit lane.
+      const runId = `chat_${employeeId ?? "anon"}_${Date.now()}`;
+      const startedAtIso = new Date().toISOString();
+
       // Stagger synthetic "Read" events across all pre-loaded profile files.
       // The council runner pre-loads all files into the prompt (no runtime Read calls),
       // so we emit these to drive the memory-graph glow animation while the model thinks.
@@ -130,6 +144,7 @@ export async function POST(request: NextRequest) {
             break;
           case "tool_use": {
             // If the model actually does call Read (e.g. for external files), pass it through.
+            toolCallsCount += 1;
             send({ type: "tool_call", name: evt.tool, args: evt.input as Record<string, unknown>, ts });
             break;
           }
@@ -153,6 +168,7 @@ export async function POST(request: NextRequest) {
             send({ type: "text_delta", delta: evt.delta, ts });
             break;
           case "tool_approval_request":
+            approvalsRequestedCount += 1;
             send({
               type: "tool_approval_request",
               approvalId: evt.approvalId,
@@ -164,6 +180,8 @@ export async function POST(request: NextRequest) {
             });
             break;
           case "tool_approval_resolved":
+            if (evt.decision === "allow") approvalsApprovedCount += 1;
+            else if (evt.decision === "deny") approvalsDeniedCount += 1;
             send({
               type: "tool_approval_resolved",
               approvalId: evt.approvalId,
@@ -187,6 +205,7 @@ export async function POST(request: NextRequest) {
             });
             break;
           case "tool_blocked":
+            blockedToolsCount += 1;
             send({ type: "tool_blocked", tool: evt.tool, reason: evt.reason, ts });
             break;
           case "scratch_write_denied":
@@ -213,10 +232,55 @@ export async function POST(request: NextRequest) {
               cited_files: citedFiles,
               ts,
             });
+            // Persist the run so the BudgetMeter + workspace cost view reflect
+            // chat spend, not just /tasks runs. Best-effort: appendTaskRun
+            // swallows IO errors internally.
+            if (!runDone) {
+              runDone = true;
+              appendTaskRun({
+                id: runId,
+                employeeId: employee.id,
+                employeeName: employee.name,
+                task: question.slice(0, 500),
+                startedAt: startedAtIso,
+                endedAt: new Date().toISOString(),
+                status: "complete",
+                finalText: responseText.slice(0, 2000),
+                toolCalls: toolCallsCount,
+                approvalsRequested: approvalsRequestedCount,
+                approvalsApproved: approvalsApprovedCount,
+                approvalsDenied: approvalsDeniedCount,
+                blockedTools: blockedToolsCount,
+                confidence: evt.confidence,
+                turns: evt.turns,
+                costUsd: evt.costUsd,
+                stoppedReason: evt.stoppedReason,
+              });
+            }
             break;
           }
           case "employee_error":
             send({ type: "done", confidence: 0, cited_files: [], ts });
+            if (!runDone) {
+              runDone = true;
+              appendTaskRun({
+                id: runId,
+                employeeId: employee.id,
+                employeeName: employee.name,
+                task: question.slice(0, 500),
+                startedAt: startedAtIso,
+                endedAt: new Date().toISOString(),
+                status: "error",
+                finalText: responseText.slice(0, 2000),
+                toolCalls: toolCallsCount,
+                approvalsRequested: approvalsRequestedCount,
+                approvalsApproved: approvalsApprovedCount,
+                approvalsDenied: approvalsDeniedCount,
+                blockedTools: blockedToolsCount,
+                errorMessage: evt.message,
+                costUsd: 0,
+              });
+            }
             break;
           default:
             break;
