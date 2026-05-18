@@ -648,6 +648,29 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  /** Most recently copied message id — drives the "copied" pill state for ~1.4s
+   *  before reverting. Stored as id only so re-renders don't accumulate timers. */
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyMessage = useCallback(async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((curr) => (curr === id ? null : curr)), 1400);
+    } catch {
+      // Older browsers / non-HTTPS contexts — fall back to a hidden textarea.
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch { /* nothing else to do */ }
+      document.body.removeChild(ta);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((curr) => (curr === id ? null : curr)), 1400);
+    }
+  }, []);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const sessionIdRef = useRef<string | null>(null);
@@ -1199,6 +1222,44 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       )}
                       <span>{loadingId === m.id ? "loading…" : playingId === m.id ? "stop" : "listen"}</span>
                     </button>
+
+                    <button
+                      onClick={() => copyMessage(m.id, m.text)}
+                      title={copiedId === m.id ? "Copied" : "Copy message"}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: "var(--sp-4)",
+                        padding: "2px 7px", fontSize: "var(--fs-xs)", borderRadius: 4,
+                        border: copiedId === m.id ? "1px solid var(--success, #4ade80)" : "1px solid var(--hairline)",
+                        background: copiedId === m.id
+                          ? "color-mix(in oklch, var(--success, #4ade80) 12%, var(--surface))"
+                          : "var(--surface)",
+                        color: copiedId === m.id ? "var(--success, #4ade80)" : "var(--text-subtle)",
+                        cursor: "pointer",
+                        fontFamily: "var(--font)",
+                        transition: "all .15s",
+                      }}
+                    >
+                      {copiedId === m.id ? (
+                        <Icons.Check size={9} />
+                      ) : (
+                        // Inline copy glyph — two stacked rounded rectangles
+                        <svg
+                          width={9}
+                          height={9}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <rect x="8" y="8" width="12" height="12" rx="2" />
+                          <path d="M4 16V6a2 2 0 0 1 2-2h10" />
+                        </svg>
+                      )}
+                      <span>{copiedId === m.id ? "copied" : "copy"}</span>
+                    </button>
                   </div>
                 )}
 
@@ -1221,9 +1282,9 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                         onClick={() => submit(s)}
                         disabled={isStreaming}
                         style={{
-                          padding: "5px 11px",
-                          fontSize: "var(--fs-xs)",
-                          borderRadius: 14,
+                          padding: "7px 14px",
+                          fontSize: "var(--fs-ui)",
+                          borderRadius: 16,
                           border: "1px solid var(--hairline)",
                           background: "var(--surface)",
                           color: "var(--text-muted)",
