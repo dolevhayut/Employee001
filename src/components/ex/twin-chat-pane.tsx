@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
+import { ClarificationCard } from "@/components/ex/clarification-card";
 import {
   EmployeeCanvasPanel,
   type EmployeeCanvas,
@@ -72,6 +73,17 @@ type PendingApproval = {
   ts: number;
 };
 
+type PendingClarification = {
+  approvalId: string;
+  questions: Array<{
+    question: string;
+    header: string;
+    multiSelect: boolean;
+    options: Array<{ label: string; description: string; preview?: string }>;
+  }>;
+  ts: number;
+};
+
 type Message =
   | { role: "user"; id: string; text: string }
   | {
@@ -83,6 +95,7 @@ type Message =
       confidence: number | null;
       cited: string[];
       pendingApprovals: PendingApproval[];
+      pendingClarifications: PendingClarification[];
       blocked: { tool: string; reason: string }[];
       artifacts: EmployeeCanvas[];
     };
@@ -675,7 +688,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
             : {
                 role: "twin" as const, id: m.id, text: m.text,
                 streaming: false, trace: [], confidence: m.confidence ?? null,
-                cited: m.cited ?? [], pendingApprovals: [], blocked: [],
+                cited: m.cited ?? [], pendingApprovals: [], pendingClarifications: [], blocked: [],
                 artifacts: m.artifacts ?? [],
               }
         ));
@@ -697,6 +710,21 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
     }, []
   );
 
+  // AskUserQuestion answers ride the same approval bus: action=deny + a JSON
+  // string in `message`. The server-side canUseTool decodes it back into the
+  // SDK's expected `answers` map. Same convention as council/page.tsx.
+  const resolveClarification = useCallback(
+    async (approvalId: string, answers: Record<string, string>) => {
+      try {
+        await fetch("/api/council/approve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ approvalId, action: "deny", message: JSON.stringify(answers) }),
+        });
+      } catch { /* best-effort */ }
+    }, []
+  );
+
   const submit = useCallback(
     async (question: string) => {
       const q = question.trim();
@@ -709,7 +737,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       setMessages((m) => [
         ...m,
         { role: "user", id: userId, text: q },
-        { role: "twin", id: twinId, text: "", streaming: true, trace: [], confidence: null, cited: [], pendingApprovals: [], blocked: [], artifacts: [] },
+        { role: "twin", id: twinId, text: "", streaming: true, trace: [], confidence: null, cited: [], pendingApprovals: [], pendingClarifications: [], blocked: [], artifacts: [] },
       ]);
       setInput("");
       setIsStreaming(true);
@@ -798,6 +826,8 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                   case "done": return { ...m, streaming: false, confidence: evt.confidence, cited: evt.cited_files };
                   case "tool_approval_request": return { ...m, pendingApprovals: [...m.pendingApprovals, { approvalId: evt.approvalId, tool: evt.tool, label: evt.label, input: evt.input, reason: evt.reason, ts: evt.ts }] };
                   case "tool_approval_resolved": return { ...m, pendingApprovals: m.pendingApprovals.filter((a) => a.approvalId !== evt.approvalId) };
+                  case "clarification_request": return { ...m, pendingClarifications: [...m.pendingClarifications, { approvalId: evt.approvalId, questions: evt.questions, ts: evt.ts }] };
+                  case "clarification_resolved": return { ...m, pendingClarifications: m.pendingClarifications.filter((c) => c.approvalId !== evt.approvalId) };
                   case "tool_blocked": return { ...m, blocked: [...m.blocked, { tool: evt.tool, reason: evt.reason }] };
                   case "scratch_write_denied": return { ...m, blocked: [...m.blocked, { tool: "Write (scratch denied)", reason: evt.reason }] };
                   case "artifact": return newArtifact ? { ...m, artifacts: [...m.artifacts, newArtifact] } : m;
@@ -1110,13 +1140,25 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                   ))}
                 </AnimatePresence>
 
+                {/* AskUserQuestion — pause the run until the CEO picks. */}
+                <AnimatePresence>
+                  {m.pendingClarifications.map((c) => (
+                    <ClarificationCard
+                      key={c.approvalId}
+                      approvalId={c.approvalId}
+                      questions={c.questions}
+                      onSubmit={(answers) => resolveClarification(c.approvalId, answers)}
+                    />
+                  ))}
+                </AnimatePresence>
+
                 {/* Blocked notices */}
                 {m.blocked.map((b, i) => (
                   <BlockedNotice key={i} tool={b.tool} reason={b.reason} />
                 ))}
 
                 {/* Confidence + TTS row */}
-                {!m.streaming && m.text && m.pendingApprovals.length === 0 && (
+                {!m.streaming && m.text && m.pendingApprovals.length === 0 && m.pendingClarifications.length === 0 && (
                   <div style={{ marginTop: "var(--sp-6)", display: "flex", alignItems: "center", gap: "var(--sp-6)" }}>
                     {m.confidence != null && (
                       <span className={confidenceBadgeClass(m.confidence)} style={{ fontSize: "var(--fs-2xs)" }}>

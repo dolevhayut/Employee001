@@ -40,7 +40,7 @@ const SIDEBAR_NAV: NavSection[] = [
       { href: "/employees", label: "Employees", icon: "Home" },
       { href: "/inbox", label: "Inbox", icon: "Bell" },
       { href: "/tasks", label: "Tasks", icon: "Zap" },
-      { href: "/flow", label: "Twins", icon: "Bot" },
+      { href: "/flow", label: "Chat With Twin", icon: "Bot" },
       { href: "/council", label: "Team Meeting", icon: "Team" },
     ],
   },

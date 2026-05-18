@@ -162,6 +162,28 @@ export type TwinTraceEvent =
       kind: "anthropic_unavailable" | "composio_degraded" | "internal";
       message: string;
       ts: number;
+    }
+  | {
+      /** Twin called AskUserQuestion — the run is paused on a promise keyed
+       *  by approvalId. The UI renders the question stack as preview cards
+       *  and POSTs the answers map back to `/api/council/approve` to resume. */
+      type: "clarification_request";
+      approvalId: string;
+      questions: Array<{
+        question: string;
+        header: string;
+        multiSelect: boolean;
+        options: Array<{ label: string; description: string; preview?: string }>;
+      }>;
+      ts: number;
+    }
+  | {
+      /** Sent right after the CEO submits their answers. The UI uses this to
+       *  drop the clarification card from the message before the model's next
+       *  text_delta lands. */
+      type: "clarification_resolved";
+      approvalId: string;
+      ts: number;
     };
 
 // ─── Skills (Paperclip-style typed tools) ────────────────────────────────────

@@ -170,6 +170,21 @@ export async function POST(request: NextRequest) {
               ts,
             });
             break;
+          case "clarification_request":
+            send({
+              type: "clarification_request",
+              approvalId: evt.approvalId,
+              questions: evt.questions,
+              ts,
+            });
+            break;
+          case "clarification_resolved":
+            send({
+              type: "clarification_resolved",
+              approvalId: evt.approvalId,
+              ts,
+            });
+            break;
           case "tool_blocked":
             send({ type: "tool_blocked", tool: evt.tool, reason: evt.reason, ts });
             break;
