@@ -652,6 +652,41 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
    *  before reverting. Stored as id only so re-renders don't accumulate timers. */
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  /** Files the CEO attached for the *next* submit. Cleared after the
+   *  message is sent. `uploading` covers the brief window between picking
+   *  the file and the upload endpoint returning the relative path. */
+  type Attachment = { path: string; filename: string; size: number; contentType: string };
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function pickFile(file: File) {
+    if (!employeeId) return;
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("employeeId", employeeId);
+      fd.append("file", file);
+      const res = await fetch("/api/twin/upload", { method: "POST", body: fd });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `Upload failed (${res.status})`);
+      }
+      const data = (await res.json()) as Attachment;
+      setAttachments((prev) => [...prev, data]);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function removeAttachment(p: string) {
+    setAttachments((prev) => prev.filter((a) => a.path !== p));
+  }
+
   const copyMessage = useCallback(async (id: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -756,23 +791,45 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       const q = question.trim();
       if (!q || isStreaming) return;
 
+      // Splice the attachment list (if any) onto the front of the question
+      // as a small structured block. The twin runner cd's into data/, so
+      // these paths are readable directly via its Read tool. We append the
+      // user's question afterwards so the model still treats the typed
+      // text as the primary instruction.
+      const attached = attachments;
+      const composed =
+        attached.length > 0
+          ? `<attached>\n${attached
+              .map((a) => `- ${a.path} (${a.filename}, ${a.contentType}, ${a.size} bytes)`)
+              .join("\n")}\nRead these with your Read tool before answering — they're the reference for what I'm asking.\n</attached>\n\n${q}`
+          : q;
+
       const userId = `u-${Date.now()}`;
       const twinId = `t-${Date.now()}`;
       const now = Date.now();
 
+      // Display the human-friendly form of the user bubble. The model sees
+      // the composed string with the <attached> block, but rendering the
+      // raw XML in the chat is ugly — show just the question and the
+      // attachment list as a separate hint underneath would mean a new
+      // Message shape. Acceptable trade-off for now: send composed, store
+      // composed so history replay stays consistent. The <attached> block
+      // renders inline as a small monospace chunk via the Markdown plain
+      // path which is fine.
       setMessages((m) => [
         ...m,
-        { role: "user", id: userId, text: q },
+        { role: "user", id: userId, text: composed },
         { role: "twin", id: twinId, text: "", streaming: true, trace: [], confidence: null, cited: [], pendingApprovals: [], pendingClarifications: [], blocked: [], artifacts: [], followups: [] },
       ]);
       setInput("");
+      setAttachments([]);
       setIsStreaming(true);
 
       if (employeeId) {
         void fetch(`/api/employees/${employeeId}/chat-history`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ role: "user", id: userId, text: q, ts: now }),
+          body: JSON.stringify({ role: "user", id: userId, text: composed, ts: now }),
         });
       }
 
@@ -790,7 +847,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
         const res = await fetch("/api/twin/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: q, employeeId, history, sessionId: sessionIdRef.current ?? undefined }),
+          body: JSON.stringify({ question: composed, employeeId, history, sessionId: sessionIdRef.current ?? undefined }),
           signal: ac.signal,
         });
 
@@ -878,7 +935,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
         abortRef.current = null;
       }
     },
-    [isStreaming, employeeId, onTrace, doneProcessing, messages]
+    [isStreaming, employeeId, onTrace, doneProcessing, messages, attachments]
   );
 
   useEffect(() => { submitRef.current = submit; }, [submit]);
@@ -1359,6 +1416,82 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
           position: "relative", zIndex: 1,
         }}
       >
+        {/* Attachment chips — render above the input field when the CEO
+            has staged one or more files for the next turn. */}
+        {(attachments.length > 0 || uploading || uploadError) && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-6)", marginBottom: "var(--sp-8)" }}>
+            {attachments.map((a) => (
+              <span
+                key={a.path}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: "var(--sp-6)",
+                  padding: "4px 6px 4px 10px",
+                  fontSize: "var(--fs-xs)",
+                  background: "var(--surface)",
+                  border: "1px solid var(--hairline)",
+                  borderRadius: 14,
+                  color: "var(--text)",
+                  maxWidth: 240,
+                }}
+                title={`${a.filename} · ${(a.size / 1024).toFixed(1)} KB`}
+              >
+                <svg
+                  width={11}
+                  height={11}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ color: "var(--text-subtle)", flexShrink: 0 }}
+                  aria-hidden="true"
+                >
+                  <path d="M21 12.5L12.5 21a5 5 0 0 1-7-7L14 5.5a3.5 3.5 0 0 1 5 5L10 19" />
+                </svg>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {a.filename}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(a.path)}
+                  title="Remove"
+                  style={{
+                    flexShrink: 0, width: 16, height: 16, borderRadius: 8,
+                    border: "none", background: "transparent",
+                    color: "var(--text-subtle)", cursor: "pointer",
+                    display: "grid", placeItems: "center",
+                  }}
+                >
+                  <Icons.X size={10} />
+                </button>
+              </span>
+            ))}
+            {uploading && (
+              <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", padding: "4px 10px" }}>
+                uploading…
+              </span>
+            )}
+            {uploadError && (
+              <span style={{ fontSize: "var(--fs-xs)", color: "var(--danger)", padding: "4px 10px" }}>
+                {uploadError}
+              </span>
+            )}
+          </div>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void pickFile(f);
+            // Reset so picking the same file twice still fires onChange
+            e.target.value = "";
+          }}
+        />
+
         <div
           style={{
             display: "flex", alignItems: "flex-end", gap: "var(--sp-6)",
@@ -1393,6 +1526,39 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
               lineHeight: 1.5, maxHeight: 100, overflowY: "auto",
             }}
           />
+
+          {/* Attach file */}
+          <motion.button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isStreaming || uploading || !employeeId}
+            whileTap={{ scale: 0.92 }}
+            title="Attach a file"
+            style={{
+              flexShrink: 0, width: 30, height: 30, borderRadius: 8,
+              border: "1px solid var(--hairline)",
+              background: "var(--surface)",
+              color: "var(--text-subtle)",
+              display: "grid", placeItems: "center",
+              cursor: isStreaming || uploading || !employeeId ? "not-allowed" : "pointer",
+              opacity: isStreaming || uploading || !employeeId ? 0.55 : 1,
+              transition: "all .15s",
+            }}
+          >
+            <svg
+              width={13}
+              height={13}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 12.5L12.5 21a5 5 0 0 1-7-7L14 5.5a3.5 3.5 0 0 1 5 5L10 19" />
+            </svg>
+          </motion.button>
 
           {/* Mic button */}
           {micSupported && (
