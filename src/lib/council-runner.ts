@@ -13,6 +13,7 @@ import {
   ARTIFACT_TOOL_FULL_NAME,
   type ArtifactPayload,
 } from "@/lib/artifacts-mcp";
+import { buildOrgBrainMcpServer } from "@/lib/org-brain-mcp";
 import {
   buildMeetingScratchMcpServer,
   SHARE_TOOL_FULL_NAME,
@@ -789,6 +790,11 @@ export async function runSingleTwin(
       ...(composioMcp ? { composio: composioMcp } : {}),
       // Always available — purely local UI render, no auth required
       artifacts: buildArtifactsMcpServer(),
+      // Always available — BM25 search across every employee's profile
+      // files + the shared org-brain. Read-only, no auth, no approval
+      // gate (the twin can already Read these files directly; the MCP
+      // tool is just a more efficient retrieval surface).
+      org_brain: buildOrgBrainMcpServer(),
       // Per-meeting scratch — only when we're inside a Team Meeting run.
       // The handler callback fires after persistence succeeds; we forward
       // it as `file_shared` so the UI can render the chip in the right
