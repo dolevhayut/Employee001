@@ -780,14 +780,26 @@ function CreateRoutineModal({
               style={{
                 fontSize: "var(--fs-sm)",
                 color: "var(--text-muted)",
-                padding: "8px 10px",
+                padding: "10px 12px",
                 background: "var(--bg-sunken)",
                 borderRadius: 6,
-                lineHeight: 1.5,
+                lineHeight: 1.55,
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--sp-6)",
               }}
             >
-              The twin will read its shift state (context, decisions, learnings) and decide
-              its own actions. No task prompt needed.
+              <div>
+                Each scheduled fire is <strong>one autonomous run</strong> (typically
+                a few minutes — not a long-lived background process). The twin
+                opens its shift memory — context, decisions, learnings, pending
+                tasks from other twins — and picks its own actions.
+              </div>
+              <div>
+                State <strong>accumulates across runs</strong>: today's decisions and
+                learnings are visible to tomorrow's shift. For continuous
+                autonomy, use <em>Every N min</em> with a small interval.
+              </div>
             </div>
           )}
 
