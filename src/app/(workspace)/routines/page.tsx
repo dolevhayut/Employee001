@@ -76,9 +76,63 @@ export default function RoutinesPage() {
     load();
   }
 
+  // Track which routines are currently running. The POST returns immediately
+  // (the routine runs fire-and-forget in the background), so without this the
+  // button has no visible feedback and the list reloads before the run has
+  // actually completed.
+  const [running, setRunning] = useState<Set<string>>(new Set());
+
   async function runNow(id: string) {
-    await fetch(`/api/routines/${id}/run`, { method: "POST" });
-    setTimeout(load, 800);
+    if (running.has(id)) return;
+    setRunning((prev) => new Set(prev).add(id));
+    try {
+      await fetch(`/api/routines/${id}/run`, { method: "POST" });
+    } catch {
+      // Surface as toast? For now we silently drop — the polling below will
+      // pick up whatever the routine actually wrote (status: error if it
+      // bombed). The button stays in "running" until lastRunAt advances.
+    }
+
+    // Poll for completion: the routine emits text deltas + tool calls in the
+    // background and only updates `lastRunAt` when it's done. We snapshot the
+    // current lastRunAt, poll every 2.5s for up to 3 minutes, and clear the
+    // running flag once we see a newer timestamp.
+    const before = await fetch(`/api/routines`, { cache: "no-store" })
+      .then((r) => r.json() as Promise<Routine[]>)
+      .then((all) => all.find((r) => r.id === id)?.lastRunAt ?? null)
+      .catch(() => null);
+    const deadline = Date.now() + 3 * 60 * 1000;
+    const tick = async () => {
+      try {
+        const list = (await fetch(`/api/routines`, { cache: "no-store" }).then(
+          (r) => r.json(),
+        )) as Routine[];
+        const r = list.find((x) => x.id === id);
+        if (r && r.lastRunAt && r.lastRunAt !== before) {
+          setRunning((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+          load();
+          return;
+        }
+      } catch {
+        // ignore transient errors; keep polling until the deadline
+      }
+      if (Date.now() < deadline) {
+        setTimeout(tick, 2500);
+      } else {
+        // Give up — clear the spinner so the user can retry.
+        setRunning((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        load();
+      }
+    };
+    setTimeout(tick, 2500);
   }
 
   return (
@@ -283,10 +337,15 @@ export default function RoutinesPage() {
                     <button
                       onClick={() => runNow(r.id)}
                       className="btn sm"
-                      style={{ height: 26 }}
+                      disabled={running.has(r.id)}
+                      style={{ height: 26, opacity: running.has(r.id) ? 0.7 : 1, cursor: running.has(r.id) ? "wait" : "pointer" }}
                     >
-                      <Icons.Arrow size={11} />
-                      Run now
+                      {running.has(r.id) ? (
+                        <Icons.Loader size={11} style={{ animation: "spin 1s linear infinite" }} />
+                      ) : (
+                        <Icons.Arrow size={11} />
+                      )}
+                      {running.has(r.id) ? "Running…" : "Run now"}
                     </button>
                     <button
                       onClick={() => toggle(r.id, !r.enabled)}
