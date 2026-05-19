@@ -16,13 +16,29 @@ export async function POST(req: NextRequest) {
     employeeId?: string;
     name?: string;
     task?: string;
+    kind?: "task" | "shift";
     schedule?: Schedule;
     enabled?: boolean;
   };
 
-  if (!body.employeeId || !body.task?.trim() || !body.name?.trim() || !body.schedule) {
+  // Shift routines are autonomous — the twin reads its shift state and
+  // picks its own action, so a task prompt isn't required (and the modal
+  // doesn't surface a Task field when Shift is selected). Only enforce
+  // task presence for kind === "task".
+  const kind = body.kind === "shift" ? "shift" : "task";
+  if (
+    !body.employeeId ||
+    !body.name?.trim() ||
+    !body.schedule ||
+    (kind === "task" && !body.task?.trim())
+  ) {
     return NextResponse.json(
-      { error: "employeeId, name, task and schedule are required" },
+      {
+        error:
+          kind === "shift"
+            ? "employeeId, name and schedule are required"
+            : "employeeId, name, task and schedule are required",
+      },
       { status: 400 }
     );
   }
@@ -30,7 +46,10 @@ export async function POST(req: NextRequest) {
   const r = createRoutine({
     employeeId: body.employeeId,
     name: body.name.trim(),
-    task: body.task.trim(),
+    // Stored as empty string for shift — Routine.task is non-optional in
+    // the type. The scheduler branches on `kind` before using `task`.
+    task: kind === "task" ? body.task!.trim() : "",
+    kind,
     schedule: body.schedule,
     enabled: body.enabled ?? true,
   });
