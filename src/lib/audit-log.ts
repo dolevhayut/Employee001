@@ -125,14 +125,86 @@ export type AuditFilter = {
   employeeId?: string;
   toolName?: string;   // substring match on bareName
   verdict?: AuditVerdict;
+  /** ISO timestamp — return entries with `ts >= since`. */
+  since?: string;
+  /** ISO timestamp — return entries with `ts <= until`. */
+  until?: string;
+  /** 1-based page; default 1. */
+  page?: number;
+  /** Rows per page; default 100, hard cap 500 so a buggy caller can't DoS. */
+  pageSize?: number;
+  /**
+   * Optional monthly archive to read instead of the live audit.jsonl, in the
+   * shape `"YYYY-MM"`. When set, we read `data/audit.YYYY-MM.jsonl` exclusively
+   * (no fall-through to the live file). Returns `[]` if the archive is missing.
+   */
+  archive?: string;
 };
 
-/** Read and parse the full audit log, newest-first, with optional filtering. */
-export function readAuditLog(filter: AuditFilter = {}): AuditEntry[] {
+export type AuditReadResult = {
+  entries: AuditEntry[];
+  /** Total rows after filtering, BEFORE pagination — drives UI pagination. */
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  /** All archive months found under data/, newest-first. The UI uses this to
+   *  populate a month-selector. Always returned so the client doesn't need a
+   *  second round-trip. */
+  archives: string[];
+};
+
+const ARCHIVE_RE = /^audit\.(\d{4}-\d{2})\.jsonl$/;
+
+/**
+ * List archived audit files under data/, newest-first, in the shape
+ * `["2026-05", "2026-04", …]`. Pure listing — doesn't parse the files.
+ */
+function listArchives(): string[] {
+  try {
+    const dir = path.dirname(AUDIT_FILE);
+    if (!fs.existsSync(dir)) return [];
+    const months: string[] = [];
+    for (const name of fs.readdirSync(dir)) {
+      const m = name.match(ARCHIVE_RE);
+      if (m) months.push(m[1]);
+    }
+    return months.sort().reverse();
+  } catch {
+    return [];
+  }
+}
+
+function pathForArchive(month: string): string {
+  return path.join(path.dirname(AUDIT_FILE), `audit.${month}.jsonl`);
+}
+
+/**
+ * Read and parse the audit log, newest-first, with optional filtering +
+ * date-range + pagination + archive selection.
+ *
+ * Filtering happens before pagination, so `totalCount` is the size of the
+ * filtered view (the UI uses it to render "page 1 of N").
+ */
+export function readAuditLog(filter: AuditFilter = {}): AuditReadResult {
+  const page = Math.max(1, filter.page ?? 1);
+  const pageSize = Math.min(500, Math.max(1, filter.pageSize ?? 100));
+  const archives = listArchives();
+
   try {
     ensureDir();
-    if (!fs.existsSync(AUDIT_FILE)) return [];
-    const raw = fs.readFileSync(AUDIT_FILE, "utf8");
+
+    // Pick the source file: a named archive if requested, otherwise the live
+    // audit.jsonl. We don't merge — querying an archive month gives you only
+    // that month's archived rows, not anything that's been rotated since.
+    const sourceFile = filter.archive
+      ? pathForArchive(filter.archive)
+      : AUDIT_FILE;
+
+    if (!fs.existsSync(sourceFile)) {
+      return { entries: [], totalCount: 0, page, pageSize, archives };
+    }
+
+    const raw = fs.readFileSync(sourceFile, "utf8");
     const entries: AuditEntry[] = raw
       .split("\n")
       .filter(Boolean)
@@ -145,6 +217,10 @@ export function readAuditLog(filter: AuditFilter = {}): AuditEntry[] {
       })
       .filter((e): e is AuditEntry => e !== null);
 
+    // Filter window
+    const sinceMs = filter.since ? Date.parse(filter.since) : Number.NEGATIVE_INFINITY;
+    const untilMs = filter.until ? Date.parse(filter.until) : Number.POSITIVE_INFINITY;
+
     const filtered = entries.filter((e) => {
       if (filter.employeeId && e.employeeId !== filter.employeeId) return false;
       if (
@@ -153,11 +229,29 @@ export function readAuditLog(filter: AuditFilter = {}): AuditEntry[] {
       )
         return false;
       if (filter.verdict && e.verdict !== filter.verdict) return false;
+      // Date window — `ts` is ISO so Date.parse handles it; bad values get
+      // NaN, which falls outside any comparison and drops the row.
+      const t = Date.parse(e.ts);
+      if (Number.isFinite(t)) {
+        if (t < sinceMs) return false;
+        if (t > untilMs) return false;
+      }
       return true;
     });
 
-    return filtered.reverse(); // newest-first
+    // Newest-first first, then page slice.
+    const sorted = filtered.reverse();
+    const start = (page - 1) * pageSize;
+    const slice = sorted.slice(start, start + pageSize);
+
+    return {
+      entries: slice,
+      totalCount: sorted.length,
+      page,
+      pageSize,
+      archives,
+    };
   } catch {
-    return [];
+    return { entries: [], totalCount: 0, page, pageSize, archives };
   }
 }

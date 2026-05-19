@@ -191,36 +191,71 @@ function ArgsCell({ input }: { input: Record<string, unknown> }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 100;
+
 export default function AuditPage() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [archives, setArchives] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterEmployee, setFilterEmployee] = useState("");
   const [filterTool, setFilterTool] = useState("");
   const [filterVerdict, setFilterVerdict] = useState<AuditVerdict | "">("");
+  // Date range — both ISO date strings like "2026-05-19". Empty = no bound.
+  const [filterSince, setFilterSince] = useState("");
+  const [filterUntil, setFilterUntil] = useState("");
+  // Archive month (e.g. "2026-04") or empty for the live audit.jsonl.
+  const [filterArchive, setFilterArchive] = useState("");
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (filterEmployee) params.set("employee", filterEmployee);
     if (filterTool) params.set("tool", filterTool);
     if (filterVerdict) params.set("verdict", filterVerdict);
+    // Browser date inputs return "YYYY-MM-DD". Convert to full-day ISO so the
+    // backend compares against the actual entry timestamp range.
+    if (filterSince) params.set("since", `${filterSince}T00:00:00.000Z`);
+    if (filterUntil) params.set("until", `${filterUntil}T23:59:59.999Z`);
+    if (filterArchive) params.set("archive", filterArchive);
+    params.set("page", String(page));
+    params.set("pageSize", String(PAGE_SIZE));
     const res = await fetch(`/api/audit?${params}`);
-    const data = await res.json();
-    setEntries(data);
+    const data = (await res.json()) as {
+      entries: AuditEntry[];
+      totalCount: number;
+      archives: string[];
+    };
+    setEntries(data.entries ?? []);
+    setTotalCount(data.totalCount ?? 0);
+    setArchives(data.archives ?? []);
     setLoading(false);
-  }, [filterEmployee, filterTool, filterVerdict]);
+  }, [filterEmployee, filterTool, filterVerdict, filterSince, filterUntil, filterArchive, page]);
 
   useEffect(() => {
     setLoading(true);
     load();
   }, [load]);
 
-  // Poll every 5 seconds so new entries appear without a refresh
+  // Reset page to 1 whenever a filter changes — otherwise we might be on a
+  // page that no longer exists in the filtered view.
   useEffect(() => {
+    setPage(1);
+  }, [filterEmployee, filterTool, filterVerdict, filterSince, filterUntil, filterArchive]);
+
+  // Poll every 5 seconds so new entries appear without a refresh — but only
+  // when viewing the live log on page 1 with no date window. Browsing an
+  // archive or scrolling deep is a "frozen view" and polling there would
+  // bounce the user around.
+  useEffect(() => {
+    const isLiveTop = !filterArchive && page === 1 && !filterSince && !filterUntil;
+    if (!isLiveTop) return;
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, filterArchive, page, filterSince, filterUntil]);
 
   const isEmpty = !loading && entries.length === 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
@@ -329,8 +364,66 @@ export default function AuditPage() {
           <option value="hard_blocked">Blocked</option>
         </select>
 
+        {/* Date range — both inputs are optional. Browser-native picker. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <input
+            type="date"
+            value={filterSince}
+            onChange={(e) => setFilterSince(e.target.value)}
+            title="Show entries from this date"
+            style={{
+              height: 30, padding: "0 8px",
+              fontSize: "var(--fs-sm)",
+              border: "1px solid var(--hairline)", borderRadius: 5,
+              background: "var(--surface)", color: "var(--text)",
+              fontFamily: "inherit",
+            }}
+          />
+          <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}>→</span>
+          <input
+            type="date"
+            value={filterUntil}
+            onChange={(e) => setFilterUntil(e.target.value)}
+            title="Show entries up to this date"
+            style={{
+              height: 30, padding: "0 8px",
+              fontSize: "var(--fs-sm)",
+              border: "1px solid var(--hairline)", borderRadius: 5,
+              background: "var(--surface)", color: "var(--text)",
+              fontFamily: "inherit",
+            }}
+          />
+        </div>
+
+        {/* Archive month selector — only renders if there's at least one archive. */}
+        {archives.length > 0 && (
+          <select
+            value={filterArchive}
+            onChange={(e) => setFilterArchive(e.target.value)}
+            title="Browse an archived month"
+            style={{
+              height: 30, padding: "0 8px",
+              fontSize: "var(--fs-sm)",
+              border: "1px solid var(--hairline)", borderRadius: 5,
+              background: "var(--surface)", color: "var(--text)",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            <option value="">Live log</option>
+            {archives.map((m) => (
+              <option key={m} value={m}>
+                Archive · {m}
+              </option>
+            ))}
+          </select>
+        )}
+
         <div style={{ marginLeft: "auto", fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}>
-          {loading ? "Loading…" : `${entries.length} entr${entries.length === 1 ? "y" : "ies"}`}
+          {loading
+            ? "Loading…"
+            : `${totalCount} entr${totalCount === 1 ? "y" : "ies"}${
+                totalPages > 1 ? ` · page ${page}/${totalPages}` : ""
+              }`}
         </div>
       </div>
 
@@ -468,6 +561,41 @@ export default function AuditPage() {
           </table>
         )}
       </div>
+
+      {/* Pagination — only render if there's more than one page. */}
+      {totalPages > 1 && (
+        <div
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: "var(--sp-10)",
+            padding: "10px 24px",
+            borderTop: "1px solid var(--hairline)",
+            background: "var(--bg)",
+            flexShrink: 0,
+            fontSize: "var(--fs-sm)",
+          }}
+        >
+          <button
+            className="btn ghost sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            style={{ opacity: page <= 1 ? 0.4 : 1 }}
+          >
+            ← Prev
+          </button>
+          <span style={{ color: "var(--text-subtle)" }}>
+            Page {page} of {totalPages}
+          </span>
+          <button
+            className="btn ghost sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            style={{ opacity: page >= totalPages ? 0.4 : 1 }}
+          >
+            Next →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

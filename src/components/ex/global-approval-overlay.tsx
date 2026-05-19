@@ -6,7 +6,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
 import { useRoster } from "@/components/ex/roster-context";
 
-type PendingApproval = {
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type LiveApproval = {
+  kind: "live";
   approvalId: string;
   runId: string;
   employeeId: string;
@@ -20,6 +23,27 @@ type PendingApproval = {
   context?: { type: "routine"; routineId: string; routineName: string };
 };
 
+type FeedReviewSource =
+  | { kind: "shift"; employeeId: string; runId: string }
+  | { kind: "routine"; employeeId: string; runId: string; routineId: string; routineName: string }
+  | { kind: "task-run"; employeeId: string; runId: string; task: string }
+  | { kind: "twin-task"; taskId: string; fromId: string; toId: string }
+  | { kind: "approval"; employeeId: string; runId: string; toolName: string; input: Record<string, unknown> }
+  | { kind: "off-track"; departmentId: string; metric: string };
+
+type FeedReview = {
+  kind: "feed";
+  id: string;
+  ts: string;
+  title: string;
+  detail?: string;
+  source: FeedReviewSource;
+};
+
+type PendingItem = LiveApproval | FeedReview;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function describeTool(toolName: string): string {
   const stripped = toolName.replace(/^mcp__[a-z_]+__/, "");
   const parts = stripped.split("_");
@@ -29,9 +53,23 @@ function describeTool(toolName: string): string {
   return stripped;
 }
 
+function employeeIdOf(item: PendingItem): string | null {
+  if (item.kind === "live") return item.employeeId;
+  const src = item.source;
+  if ("employeeId" in src) return src.employeeId;
+  if (src.kind === "twin-task") return src.toId;
+  return null;
+}
+
+function itemKey(item: PendingItem): string {
+  return item.kind === "live" ? item.approvalId : item.id;
+}
+
+// ─── Overlay ─────────────────────────────────────────────────────────────────
+
 export function GlobalApprovalOverlay() {
   const roster = useRoster();
-  const [pending, setPending] = useState<PendingApproval[]>([]);
+  const [pending, setPending] = useState<PendingItem[]>([]);
   const [editing, setEditing] = useState<Record<string, boolean>>({});
   const [editedJson, setEditedJson] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -39,15 +77,23 @@ export function GlobalApprovalOverlay() {
 
   useEffect(() => setMounted(true), []);
 
-  // Poll the approval bus every 2s for background-surface approvals
+  // Poll both sources every 2s — live approval-bus + persistent feed
+  // needs-review items. Every CEO approval must surface in the main app shell
+  // regardless of which subsystem produced it.
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const r = await fetch("/api/approvals/pending?surface=background", { cache: "no-store" });
-        if (!r.ok) return;
-        const data = (await r.json()) as PendingApproval[];
-        if (!cancelled) setPending(data);
+        const [liveRes, feedRes] = await Promise.all([
+          fetch("/api/approvals/pending", { cache: "no-store" }),
+          fetch("/api/feed?status=open&type=needs-review", { cache: "no-store" }),
+        ]);
+        const liveRaw = liveRes.ok ? ((await liveRes.json()) as Omit<LiveApproval, "kind">[]) : [];
+        const feedRaw = feedRes.ok ? ((await feedRes.json()) as Omit<FeedReview, "kind">[]) : [];
+        const live: PendingItem[] = liveRaw.map((a) => ({ ...a, kind: "live" }));
+        const feed: PendingItem[] = feedRaw.map((f) => ({ ...f, kind: "feed" }));
+        // Live approvals first (they block an in-flight agent), then feed items
+        if (!cancelled) setPending([...live, ...feed]);
       } catch {
         /* ignore */
       }
@@ -60,7 +106,7 @@ export function GlobalApprovalOverlay() {
     };
   }, []);
 
-  const resolve = useCallback(
+  const resolveLive = useCallback(
     async (approvalId: string, action: "allow" | "deny", updatedInput?: Record<string, unknown>) => {
       setBusyId(approvalId);
       try {
@@ -73,8 +119,24 @@ export function GlobalApprovalOverlay() {
             ...(updatedInput !== undefined ? { updatedInput } : {}),
           }),
         });
-        // Optimistically remove
-        setPending((p) => p.filter((a) => a.approvalId !== approvalId));
+        setPending((p) => p.filter((a) => itemKey(a) !== approvalId));
+      } finally {
+        setBusyId(null);
+      }
+    },
+    []
+  );
+
+  const resolveFeed = useCallback(
+    async (feedId: string, resolution: "approved" | "rejected" | "dismissed") => {
+      setBusyId(feedId);
+      try {
+        await fetch(`/api/feed/${feedId}/resolve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resolution }),
+        });
+        setPending((p) => p.filter((a) => itemKey(a) !== feedId));
       } finally {
         setBusyId(null);
       }
@@ -85,10 +147,33 @@ export function GlobalApprovalOverlay() {
   if (!mounted) return null;
   if (pending.length === 0) return null;
 
-  const current = pending[0]; // surface one at a time, queue the rest
-  const employee = roster.find((e) => e.id === current.employeeId);
-  const isEditing = !!editing[current.approvalId];
-  const editedText = editedJson[current.approvalId] ?? JSON.stringify(current.input, null, 2);
+  const current = pending[0];
+  const key = itemKey(current);
+  const empId = employeeIdOf(current);
+  const employee = empId ? roster.find((e) => e.id === empId) : undefined;
+  const busy = busyId === key;
+
+  const isLive = current.kind === "live";
+  const isEditing = isLive && !!editing[key];
+  const editedText = isLive
+    ? editedJson[key] ?? JSON.stringify((current as LiveApproval).input, null, 2)
+    : "";
+
+  const title = isLive ? "Approval needed" : "Needs review";
+  const subContext =
+    isLive && (current as LiveApproval).context?.type === "routine"
+      ? (current as LiveApproval).context!.routineName
+      : !isLive && (current as FeedReview).source.kind === "routine"
+        ? (current as FeedReview & { source: { kind: "routine"; routineName: string } }).source.routineName
+        : !isLive && (current as FeedReview).source.kind === "shift"
+          ? "shift"
+          : !isLive && (current as FeedReview).source.kind === "task-run"
+            ? "task"
+            : null;
+
+  const empLabel = isLive
+    ? (current as LiveApproval).employeeName ?? employee?.name ?? empId
+    : employee?.name ?? empId;
 
   return createPortal(
     <AnimatePresence>
@@ -112,7 +197,7 @@ export function GlobalApprovalOverlay() {
         }}
       >
         <motion.div
-          key={current.approvalId}
+          key={key}
           initial={{ opacity: 0, y: 12, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }}
@@ -124,10 +209,10 @@ export function GlobalApprovalOverlay() {
             border: "1.5px solid var(--warn)",
             borderRadius: 14,
             padding: "var(--sp-22)",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.25), 0 0 0 6px color-mix(in srgb, var(--warn) 14%, transparent)",
+            boxShadow:
+              "0 20px 60px rgba(0,0,0,0.25), 0 0 0 6px color-mix(in srgb, var(--warn) 14%, transparent)",
           }}
         >
-          {/* Queue indicator */}
           {pending.length > 1 && (
             <div
               style={{
@@ -146,200 +231,279 @@ export function GlobalApprovalOverlay() {
             </div>
           )}
 
-          {/* Header */}
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-10)", marginBottom: "var(--sp-4)" }}>
             <Icons.Lock size={16} style={{ color: "var(--warn)", flexShrink: 0 }} />
             <h2 style={{ margin: 0, fontSize: "var(--fs-lg)", fontWeight: 700, color: "var(--text)" }}>
-              Approval needed
+              {title}
             </h2>
           </div>
 
-          {/* Subhead with employee + context */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--sp-8)",
-              fontSize: "var(--fs-sm)",
-              color: "var(--text-muted)",
-              marginBottom: "var(--sp-14)",
-            }}
-          >
-            {employee && (
-              <span
-                style={{
-                  width: 18,
-                  height: 18,
-                  borderRadius: "50%",
-                  background: employee.avatarColor,
-                  display: "grid",
-                  placeItems: "center",
-                  fontSize: 8,
-                  fontWeight: 700,
-                  color: "var(--text)",
-                  flexShrink: 0,
-                }}
-              >
-                {employee.initials}
-              </span>
-            )}
-            <span>
-              {current.employeeName ?? employee?.name ?? current.employeeId}
-            </span>
-            {current.context?.type === "routine" && (
-              <>
-                <span style={{ color: "var(--text-subtle)" }}>·</span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-4)" }}>
-                  <Icons.Refresh size={11} />
-                  {current.context.routineName}
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* Tool name */}
-          <div
-            style={{
-              fontSize: "var(--fs-ui)",
-              fontWeight: 600,
-              color: "var(--text)",
-              marginBottom: "var(--sp-6)",
-            }}
-          >
-            {describeTool(current.toolName)}
-          </div>
-
-          {/* Reason */}
-          <p
-            style={{
-              fontSize: "var(--fs-sm)",
-              color: "var(--text-muted)",
-              margin: "0 0 14px",
-              lineHeight: 1.5,
-            }}
-          >
-            {current.reason}
-          </p>
-
-          {/* Args */}
-          {Object.keys(current.input).length > 0 && (
-            <div style={{ marginBottom: "var(--sp-14)" }}>
-              {isEditing ? (
-                <textarea
-                  value={editedText}
-                  onChange={(e) =>
-                    setEditedJson((m) => ({ ...m, [current.approvalId]: e.target.value }))
-                  }
-                  rows={8}
+          {(empLabel || subContext) && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--sp-8)",
+                fontSize: "var(--fs-sm)",
+                color: "var(--text-muted)",
+                marginBottom: "var(--sp-14)",
+              }}
+            >
+              {employee && (
+                <span
                   style={{
-                    width: "100%",
-                    fontFamily: "var(--font-mono, monospace)",
-                    fontSize: "var(--fs-meta)",
-                    padding: "var(--sp-10)",
-                    border: "1px solid var(--hairline)",
-                    borderRadius: 6,
-                    background: "var(--bg-sunken)",
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    background: employee.avatarColor,
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: 8,
+                    fontWeight: 700,
                     color: "var(--text)",
-                    resize: "vertical",
-                    boxSizing: "border-box",
-                    outline: "none",
-                  }}
-                />
-              ) : (
-                <pre
-                  style={{
-                    margin: 0,
-                    padding: "10px 12px",
-                    background: "var(--bg-sunken)",
-                    borderRadius: 6,
-                    fontSize: "var(--fs-meta)",
-                    fontFamily: "var(--font-mono, monospace)",
-                    color: "var(--text-muted)",
-                    overflow: "auto",
-                    maxHeight: 200,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-all",
-                    lineHeight: 1.55,
+                    flexShrink: 0,
                   }}
                 >
-                  {JSON.stringify(current.input, null, 2)}
-                </pre>
+                  {employee.initials}
+                </span>
+              )}
+              {empLabel && <span>{empLabel}</span>}
+              {subContext && (
+                <>
+                  <span style={{ color: "var(--text-subtle)" }}>·</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-4)" }}>
+                    <Icons.Refresh size={11} />
+                    {subContext}
+                  </span>
+                </>
               )}
             </div>
           )}
 
-          {/* Buttons */}
-          <div style={{ display: "flex", gap: "var(--sp-8)" }}>
-            <button
-              onClick={() => {
-                if (isEditing) {
-                  try {
-                    const parsed = JSON.parse(editedText);
-                    resolve(current.approvalId, "allow", parsed);
-                  } catch {
-                    alert("Invalid JSON");
-                  }
-                } else {
-                  resolve(current.approvalId, "allow");
-                }
-              }}
-              disabled={busyId === current.approvalId}
-              style={{
-                flex: 1,
-                padding: "8px 14px",
-                background: "var(--text)",
-                color: "var(--bg)",
-                border: "none",
-                borderRadius: 6,
-                fontSize: "var(--fs-ui)",
-                fontWeight: 600,
-                cursor: busyId ? "not-allowed" : "pointer",
-                opacity: busyId === current.approvalId ? 0.6 : 1,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "var(--sp-6)",
-              }}
-            >
-              <Icons.Check size={13} />
-              Approve
-            </button>
-            <button
-              onClick={() =>
-                setEditing((m) => ({ ...m, [current.approvalId]: !m[current.approvalId] }))
-              }
-              disabled={busyId === current.approvalId}
-              style={{
-                padding: "8px 14px",
-                background: "var(--surface)",
-                color: "var(--text-muted)",
-                border: "1px solid var(--hairline)",
-                borderRadius: 6,
-                fontSize: "var(--fs-ui)",
-                fontWeight: 500,
-                cursor: "pointer",
-              }}
-            >
-              {isEditing ? "Cancel edit" : "Edit args"}
-            </button>
-            <button
-              onClick={() => resolve(current.approvalId, "deny")}
-              disabled={busyId === current.approvalId}
-              style={{
-                padding: "8px 14px",
-                background: "var(--surface)",
-                color: "var(--text-muted)",
-                border: "1px solid var(--hairline)",
-                borderRadius: 6,
-                fontSize: "var(--fs-ui)",
-                fontWeight: 500,
-                cursor: busyId ? "not-allowed" : "pointer",
-                opacity: busyId === current.approvalId ? 0.6 : 1,
-              }}
-            >
-              Skip
-            </button>
-          </div>
+          {isLive ? (
+            <>
+              <div
+                style={{
+                  fontSize: "var(--fs-ui)",
+                  fontWeight: 600,
+                  color: "var(--text)",
+                  marginBottom: "var(--sp-6)",
+                }}
+              >
+                {describeTool((current as LiveApproval).toolName)}
+              </div>
+              <p
+                style={{
+                  fontSize: "var(--fs-sm)",
+                  color: "var(--text-muted)",
+                  margin: "0 0 14px",
+                  lineHeight: 1.5,
+                }}
+              >
+                {(current as LiveApproval).reason}
+              </p>
+              {Object.keys((current as LiveApproval).input).length > 0 && (
+                <div style={{ marginBottom: "var(--sp-14)" }}>
+                  {isEditing ? (
+                    <textarea
+                      value={editedText}
+                      onChange={(e) =>
+                        setEditedJson((m) => ({ ...m, [key]: e.target.value }))
+                      }
+                      rows={8}
+                      style={{
+                        width: "100%",
+                        fontFamily: "var(--font-mono, monospace)",
+                        fontSize: "var(--fs-meta)",
+                        padding: "var(--sp-10)",
+                        border: "1px solid var(--hairline)",
+                        borderRadius: 6,
+                        background: "var(--bg-sunken)",
+                        color: "var(--text)",
+                        resize: "vertical",
+                        boxSizing: "border-box",
+                        outline: "none",
+                      }}
+                    />
+                  ) : (
+                    <pre
+                      style={{
+                        margin: 0,
+                        padding: "10px 12px",
+                        background: "var(--bg-sunken)",
+                        borderRadius: 6,
+                        fontSize: "var(--fs-meta)",
+                        fontFamily: "var(--font-mono, monospace)",
+                        color: "var(--text-muted)",
+                        overflow: "auto",
+                        maxHeight: 200,
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-all",
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      {JSON.stringify((current as LiveApproval).input, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: "var(--sp-8)" }}>
+                <button
+                  onClick={() => {
+                    if (isEditing) {
+                      try {
+                        const parsed = JSON.parse(editedText);
+                        resolveLive(key, "allow", parsed);
+                      } catch {
+                        alert("Invalid JSON");
+                      }
+                    } else {
+                      resolveLive(key, "allow");
+                    }
+                  }}
+                  disabled={busy}
+                  style={{
+                    flex: 1,
+                    padding: "8px 14px",
+                    background: "var(--text)",
+                    color: "var(--bg)",
+                    border: "none",
+                    borderRadius: 6,
+                    fontSize: "var(--fs-ui)",
+                    fontWeight: 600,
+                    cursor: busy ? "not-allowed" : "pointer",
+                    opacity: busy ? 0.6 : 1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "var(--sp-6)",
+                  }}
+                >
+                  <Icons.Check size={13} />
+                  Approve
+                </button>
+                <button
+                  onClick={() => setEditing((m) => ({ ...m, [key]: !m[key] }))}
+                  disabled={busy}
+                  style={{
+                    padding: "8px 14px",
+                    background: "var(--surface)",
+                    color: "var(--text-muted)",
+                    border: "1px solid var(--hairline)",
+                    borderRadius: 6,
+                    fontSize: "var(--fs-ui)",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  {isEditing ? "Cancel edit" : "Edit args"}
+                </button>
+                <button
+                  onClick={() => resolveLive(key, "deny")}
+                  disabled={busy}
+                  style={{
+                    padding: "8px 14px",
+                    background: "var(--surface)",
+                    color: "var(--text-muted)",
+                    border: "1px solid var(--hairline)",
+                    borderRadius: 6,
+                    fontSize: "var(--fs-ui)",
+                    fontWeight: 500,
+                    cursor: busy ? "not-allowed" : "pointer",
+                    opacity: busy ? 0.6 : 1,
+                  }}
+                >
+                  Skip
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  fontSize: "var(--fs-ui)",
+                  fontWeight: 600,
+                  color: "var(--text)",
+                  marginBottom: "var(--sp-6)",
+                  lineHeight: 1.4,
+                }}
+              >
+                {(current as FeedReview).title}
+              </div>
+              {(current as FeedReview).detail && (
+                <p
+                  style={{
+                    fontSize: "var(--fs-sm)",
+                    color: "var(--text-muted)",
+                    margin: "0 0 14px",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {(current as FeedReview).detail}
+                </p>
+              )}
+
+              <div style={{ display: "flex", gap: "var(--sp-8)" }}>
+                <button
+                  onClick={() => resolveFeed(key, "approved")}
+                  disabled={busy}
+                  style={{
+                    flex: 1,
+                    padding: "8px 14px",
+                    background: "var(--text)",
+                    color: "var(--bg)",
+                    border: "none",
+                    borderRadius: 6,
+                    fontSize: "var(--fs-ui)",
+                    fontWeight: 600,
+                    cursor: busy ? "not-allowed" : "pointer",
+                    opacity: busy ? 0.6 : 1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "var(--sp-6)",
+                  }}
+                >
+                  <Icons.Check size={13} />
+                  Approve
+                </button>
+                <button
+                  onClick={() => resolveFeed(key, "rejected")}
+                  disabled={busy}
+                  style={{
+                    padding: "8px 14px",
+                    background: "var(--surface)",
+                    color: "var(--text-muted)",
+                    border: "1px solid var(--hairline)",
+                    borderRadius: 6,
+                    fontSize: "var(--fs-ui)",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  Reject
+                </button>
+                <button
+                  onClick={() => resolveFeed(key, "dismissed")}
+                  disabled={busy}
+                  style={{
+                    padding: "8px 14px",
+                    background: "var(--surface)",
+                    color: "var(--text-muted)",
+                    border: "1px solid var(--hairline)",
+                    borderRadius: 6,
+                    fontSize: "var(--fs-ui)",
+                    fontWeight: 500,
+                    cursor: busy ? "not-allowed" : "pointer",
+                    opacity: busy ? 0.6 : 1,
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>,
@@ -356,10 +520,13 @@ export function NotificationBell() {
     let cancelled = false;
     async function load() {
       try {
-        const r = await fetch("/api/approvals/pending?surface=background", { cache: "no-store" });
-        if (!r.ok) return;
-        const data = (await r.json()) as unknown[];
-        if (!cancelled) setCount(data.length);
+        const [liveRes, feedRes] = await Promise.all([
+          fetch("/api/approvals/pending", { cache: "no-store" }),
+          fetch("/api/feed?status=open&type=needs-review", { cache: "no-store" }),
+        ]);
+        const live = liveRes.ok ? ((await liveRes.json()) as unknown[]) : [];
+        const feed = feedRes.ok ? ((await feedRes.json()) as unknown[]) : [];
+        if (!cancelled) setCount(live.length + feed.length);
       } catch {
         /* ignore */
       }

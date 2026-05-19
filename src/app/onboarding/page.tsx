@@ -106,6 +106,9 @@ function OnboardingPageInner() {
   const defaultName = emp?.name ?? inviteHint.name ?? "Sarah Chen";
   const defaultRole = emp?.role ?? inviteHint.role ?? "Head of Engineering";
 
+  // When arriving via an invite link the viewer is always the employee —
+  // lock the mode so they can't flip to CEO view.
+  const viewerIsEmployee = !!inviteToken;
   const [viewMode, setViewMode] = useState<ViewMode>("employee");
   // Persistence: scope all wizard state to the invite token so a mid-flow
   // refresh (or the Composio OAuth redirect) doesn't drop the user's
@@ -365,10 +368,12 @@ function OnboardingPageInner() {
 
       {/* Center: form */}
       <div style={{ padding: "56px 64px 32px", maxWidth: 720, width: "100%" }}>
-        {/* View toggle */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--sp-32)" }}>
-          <ViewToggle mode={viewMode} onChange={setViewMode} />
-        </div>
+        {/* View toggle — hidden when the page is opened via an invite link */}
+        {!viewerIsEmployee && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--sp-32)" }}>
+            <ViewToggle mode={viewMode} onChange={setViewMode} />
+          </div>
+        )}
 
         <div
           style={{
