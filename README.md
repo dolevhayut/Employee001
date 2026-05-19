@@ -21,7 +21,7 @@ npx employee001 start
 
 Then open <http://localhost:3000>.
 
-Requires Node.js 22+, an Anthropic API key, and a Composio API key (for MCP tool integrations). All data stays in `./data/` on your machine. MIT licensed. No telemetry. No cloud.
+Requires Node.js 22+ and an [Anthropic API key](https://console.anthropic.com). A [Composio API key](https://app.composio.dev) is needed only when you invite a real employee for training — marketplace agents work without it. All data stays in `./data/` on your machine. MIT licensed. No telemetry. No cloud.
 
 ## What it does
 
@@ -165,6 +165,10 @@ If you want to see the source of truth, it's all in [`src/lib/sdk-defaults.ts`](
 - Custom integrations
 
 If that's interesting, [open a discussion](https://github.com/dolevhayut/Employee001/discussions) or email office@bulldog-adv.com.
+
+### Cloud edition (planned, separate)
+
+This repository is the **local-first OSS edition**. A managed cloud edition is on the roadmap as a separate product — for teams that want long-running shifts, audit logs in a hosted console, private MCP networks, and don't want to run their own Mac mini. The cloud edition will be a paid service, not a feature gate on this code. Everything you see in the repo today stays MIT and local-first.
 
 ## Stack
 

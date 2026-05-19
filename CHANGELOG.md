@@ -8,6 +8,116 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — `/flow` chat experience
+- **`AskUserQuestion` wired end-to-end.** The SDK's clarification tool
+  was firing but events fell through both the SSE route and the chat
+  pane; the agent paused forever on "Thinking…". Now renders the same
+  `ClarificationCard` the council page uses.
+- **Three follow-up suggestion chips after each twin reply**, generated
+  by a small `claude-haiku-4-5` call in the user's language. Suppressed
+  when the twin's reply itself ends with a question, so chips don't
+  compete with the agent's own beat.
+- **Copy button** on every twin reply, sized up alongside the existing
+  confidence + listen pills.
+- **File attachments via paperclip.** Uploads to
+  `data/uploads/<employeeId>/`, spliced into the next prompt as an
+  `<attached>` block with absolute paths so the SDK Read tool works
+  on first try. 25 MB cap, filename slugified.
+- **Retry + edit affordances** on user messages that didn't get a
+  reply (run cut off, fetch failed). Retry replays the original
+  composed prompt; the new reply lands at the end of the thread;
+  `answeredBy` linkage clears the retry chip the moment text streams.
+- **`beforeunload` guard while streaming.** Browser confirm dialog
+  fires only during an in-flight turn, so closing the tab mid-stream
+  doesn't silently lose the answer.
+
+### Added — `/settings` custom MCP servers
+- **Preset catalog with one-click Quick add** for Apify, Stripe,
+  GitHub, Linear, Firecrawl, Vapi (Bearer-token) and Higgsfield (OAuth).
+- **Brand logos** via Composio's toolkit catalog, with a static-asset
+  override path for vendors Composio doesn't carry (Higgsfield).
+- **Full OAuth bridge for MCP servers.** Discovery,
+  Dynamic Client Registration, PKCE S256, code exchange,
+  refresh-on-expiry, injection of `Authorization: Bearer <token>` at
+  runtime. Unlocks every standards-compliant OAuth MCP server.
+- **Token refresh handled lazily** in `loadOrgCustomMcpServers` — the
+  runner never sees a stale token; expired refresh tokens surface as
+  a clean reconnect prompt.
+
+### Added — installer + observability
+- **Setup wizard: chained start.** Setup ends with a "Start
+  Employee001 now? [Y/n]" prompt; on yes the start command runs
+  in-process so the server boots + browser opens without a context
+  switch.
+- **`/employees` inline missing-key recovery.** When the invite gate
+  reports an unset Anthropic or Composio key, the banner now shows a
+  password input + Save button that PATCHes `/api/system/config`
+  (writes `.env` + mutates `process.env`) — no restart needed.
+- **`/api/twin/chat` logs to task-history.** Every chat run appends
+  `costUsd`, `turns`, `toolCalls`, `confidence`, so the sidebar
+  **Twin Spend · MTD** reflects real spend (previously: $0 forever,
+  because only `/api/employees/[id]/task` was logging).
+
+### Added — routines
+- **Visible feedback on "Run now"** — button flips to "Running…" with
+  a spinner; in-page polling waits for `lastRunAt` to advance (up to
+  3 minutes) before re-enabling. Shift runs previously gave zero
+  indication that anything happened.
+- **PATCH supports schedule + task + name changes.** Re-tuning a
+  routine no longer requires delete + recreate (which lost run
+  history). `nextRunAt` is recomputed on schedule change.
+- **Clearer Shift-kind copy** in the routine modal — explains each
+  fire is one autonomous run with accumulating state, points users
+  at `Every N min` for continuous autonomy.
+
+### Added — `/employees` + `/profile`
+- **Org chart on `/employees`** — collapsible react-flow tree of
+  CEO → human reports → managed agents.
+- **`/profile` Overview tab now reads per-twin.** Pulls bullets out
+  of the live `EXPERTISE.md` / `BOUNDARIES.md` instead of showing
+  hardcoded "Engineering leadership" + "escalate to Sarah".
+
+### Changed
+- **Setup wizard: Composio key is optional.** Marketplace agents
+  work entirely without Composio; the invite panel surfaces a paste
+  + save UI the moment a real-employee invite needs the key. Cuts
+  "from `npx` to first chat" from ~20 minutes to ~3.
+- **Sidebar: "Twins" → "Chat With Twin".** Previous label was
+  ambiguous against `/twin-build`.
+- **`/flow` user bubble strips the `<attached>` scaffolding** for
+  display. The backend still receives the composed prompt.
+- **Light-mode contrast pass** on three more surfaces — cockpit
+  StatusPill, marketplace success toast, council Download chip.
+
+### Fixed
+- **Pending invite ghosts no longer pollute `/employees` or the org
+  chart.** Sidecars with `pendingProfile: true` are skipped by
+  `loadEmployeesFromDisk`; the placeholder markdown was scoring as
+  "ready".
+- **Marketplace trial chat drawer** for previewing an agent before
+  hiring; the trial session never persists into the roster.
+
+---
+
+## [0.1.0-rc.8] — 2026-05-18
+
+### Added
+- **Marketplace trial chat drawer.** Try an agent before hiring —
+  right-side drawer with live SSE-streamed chat against the
+  marketplace profile. Trial session lives in a dotted directory
+  (`data/employees/.trial-<agentId>/`) so it never leaks into the
+  roster, org chart, or audit log.
+- **Org chart on `/employees`.** Collapsible react-flow tree of
+  CEO → human reports → managed agents. Solid lines for human
+  reports, dashed for AI agents; status ring on every node.
+
+### Changed
+- **Light-mode CTA contrast.** Marketplace "Hire agent" / "Looks
+  good — hire" CTAs, HirePlacementModal "Join team" button, trial
+  drawer user bubble — all moved from `var(--accent)` + `#fff` (which
+  vanishes in light theme) to the `var(--text)` / `var(--bg)`
+  inversion that reads in both themes.
+
 ---
 
 ## [0.1.0-rc.7] — 2026-05-16
@@ -96,7 +206,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CLI commands: `setup`, `start`, `update`, `doctor`, `help`
 - Human-controlled autonomy — approval gate before any sensitive tool call executes
 
-[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.6...HEAD
+[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.8...HEAD
+[0.1.0-rc.8]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.7...v0.1.0-rc.8
+[0.1.0-rc.7]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.6...v0.1.0-rc.7
 [0.1.0-rc.6]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.5...v0.1.0-rc.6
 [0.1.0-rc.5]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.4...v0.1.0-rc.5
 [0.1.0-rc.4]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.3...v0.1.0-rc.4
