@@ -14,6 +14,25 @@ That's it. `GITHUB_TOKEN` is provided automatically.
 
 ## Cutting a release
 
+### One-liner (recommended)
+
+Four scripts in `package.json` handle the bump + commit + tag + push in one
+shot. Each runs `lint` and `build` first via the `preversion` hook, then bumps
+the version, creates a `release: v<X.Y.Z>` commit + tag, and pushes both via
+the `postversion` hook (`git push --follow-tags`):
+
+```bash
+npm run release:rc       # next rc:  0.1.0-rc.8 → 0.1.0-rc.9
+npm run release:patch    # patch:    0.1.0 → 0.1.1
+npm run release:minor    # minor:    0.1.0 → 0.2.0
+npm run release:major    # major:    0.1.0 → 1.0.0
+```
+
+The tag push triggers `.github/workflows/release.yml`, which publishes to npm
+and creates the GitHub Release. Watch progress under the Actions tab.
+
+### Manual (if you need finer control)
+
 1. **Bump `version` in `package.json`** — follow [semver](https://semver.org/). Patch for fixes, minor for features, major for breaking changes.
 2. **Commit and push to `main`**:
    ```bash

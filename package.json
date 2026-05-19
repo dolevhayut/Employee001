@@ -45,7 +45,13 @@
     "start": "next start",
     "lint": "eslint",
     "pack:dry": "npm pack --dry-run",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "preversion": "npm run lint && npm run build",
+    "postversion": "git push --follow-tags",
+    "release:rc": "npm version prerelease --preid=rc -m \"release: v%s\"",
+    "release:patch": "npm version patch -m \"release: v%s\"",
+    "release:minor": "npm version minor --preid=\"\" -m \"release: v%s\"",
+    "release:major": "npm version major --preid=\"\" -m \"release: v%s\""
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.123",
