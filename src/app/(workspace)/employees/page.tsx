@@ -640,6 +640,171 @@ type SystemConfig = {
   ready: boolean;
 };
 
+/**
+ * Renders the "you're missing keys to invite anyone" banner with inline
+ * inputs so the CEO can paste the missing key + save without leaving the
+ * page. PATCHes /api/system/config which writes .env AND updates
+ * process.env — both the Anthropic invite gate and the Composio client
+ * re-read on every request, so no restart needed.
+ */
+function MissingKeysCard({
+  config,
+  onSaved,
+}: {
+  config: SystemConfig;
+  onSaved: () => void;
+}) {
+  const [anthropicVal, setAnthropicVal] = useState("");
+  const [composioVal, setComposioVal] = useState("");
+  const [saving, setSaving] = useState<null | "anthropic" | "composio">(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(key: "ANTHROPIC_API_KEY" | "COMPOSIO_API_KEY", value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setSaving(key === "ANTHROPIC_API_KEY" ? "anthropic" : "composio");
+    setError(null);
+    try {
+      const res = await fetch("/api/system/config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value: trimmed }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `Save failed (${res.status})`);
+      }
+      if (key === "ANTHROPIC_API_KEY") setAnthropicVal("");
+      else setComposioVal("");
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        padding: "14px 16px",
+        marginBottom: "var(--sp-14)",
+        background: "rgba(160, 75, 61, 0.08)",
+        border: "1px solid rgba(160, 75, 61, 0.32)",
+        borderRadius: 8,
+        fontSize: "var(--fs-meta)",
+        color: "var(--text)",
+        lineHeight: 1.5,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4, fontSize: "var(--fs-sm)" }}>
+        One more thing before inviting a real employee
+      </div>
+      <div style={{ color: "var(--text-subtle)", marginBottom: 12 }}>
+        Inviting a teammate kicks off an autonomous training pass that needs
+        both keys. Paste them below — saved straight to{" "}
+        <span className="mono">.env</span>, no restart needed.
+      </div>
+
+      {!config.anthropic && (
+        <KeyRow
+          label="Anthropic API key"
+          hint="https://console.anthropic.com — starts with sk-ant-"
+          placeholder="sk-ant-…"
+          value={anthropicVal}
+          onChange={setAnthropicVal}
+          onSave={() => save("ANTHROPIC_API_KEY", anthropicVal)}
+          saving={saving === "anthropic"}
+          disabled={!!saving}
+        />
+      )}
+
+      {!config.composio && (
+        <KeyRow
+          label="Composio API key"
+          hint="https://app.composio.dev — only used when training new twins"
+          placeholder="paste your Composio key"
+          value={composioVal}
+          onChange={setComposioVal}
+          onSave={() => save("COMPOSIO_API_KEY", composioVal)}
+          saving={saving === "composio"}
+          disabled={!!saving}
+        />
+      )}
+
+      {error && (
+        <div style={{ marginTop: 8, color: "var(--danger)", fontSize: "var(--fs-meta)" }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KeyRow({
+  label,
+  hint,
+  placeholder,
+  value,
+  onChange,
+  onSave,
+  saving,
+  disabled,
+}: {
+  label: string;
+  hint: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  saving: boolean;
+  disabled: boolean;
+}) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+        <span style={{ fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}>{hint}</span>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          type="password"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && value.trim()) onSave();
+          }}
+          style={{
+            flex: 1,
+            height: 32,
+            padding: "0 10px",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--hairline)",
+            borderRadius: 4,
+            fontFamily: "var(--font-mono, ui-monospace, monospace)",
+            fontSize: "var(--fs-meta)",
+            color: "var(--text)",
+          }}
+        />
+        <button
+          onClick={onSave}
+          disabled={disabled || !value.trim()}
+          className="btn sm"
+          style={{
+            height: 32,
+            opacity: !value.trim() ? 0.5 : 1,
+            cursor: !value.trim() ? "not-allowed" : "pointer",
+          }}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function InvitePanel({
   invites,
   onInvitesChanged,
@@ -750,52 +915,32 @@ function InvitePanel({
           marginBottom: "var(--sp-10)",
         }}
       >
-        Invite an employee
+        Generate an invite link
       </div>
       <div
         style={{
           fontSize: "var(--fs-meta)",
           color: "var(--text-subtle)",
           marginBottom: "var(--sp-14)",
+          lineHeight: 1.5,
         }}
       >
-        Generate a one-time link. Share it on Slack, WhatsApp, or however you
-        normally reach the person. The link works on this local network only.
+        Nothing is sent automatically — no email, no SMS. You&apos;ll get a
+        one-time link to copy and share yourself (Slack, WhatsApp, wherever you
+        normally reach the person). The link works on this local network only.
       </div>
 
       {config && !config.ready && (
-        <div
-          style={{
-            padding: "12px 14px",
-            marginBottom: "var(--sp-14)",
-            background: "rgba(160, 75, 61, 0.08)",
-            border: "1px solid rgba(160, 75, 61, 0.32)",
-            borderRadius: 6,
-            fontSize: "var(--fs-meta)",
-            color: "var(--text)",
-            lineHeight: 1.5,
+        <MissingKeysCard
+          config={config}
+          onSaved={() => {
+            // Re-fetch the gate state so the form unlocks immediately.
+            fetch("/api/system/config")
+              .then((r) => r.json() as Promise<SystemConfig>)
+              .then(setConfig)
+              .catch(() => {});
           }}
-        >
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>
-            Configure API keys before inviting anyone
-          </div>
-          <div style={{ color: "var(--text-subtle)" }}>
-            Missing:{" "}
-            <span style={{ fontFamily: "var(--font-mono, ui-monospace, monospace)" }}>
-              {[
-                !config.anthropic && "ANTHROPIC_API_KEY",
-                !config.composio && "COMPOSIO_API_KEY",
-              ]
-                .filter(Boolean)
-                .join(", ")}
-            </span>
-            . Without them the twin can&apos;t think (Anthropic) or use tools
-            (Composio) — the employee would fill out a profile that goes
-            nowhere. Edit <span className="mono">.env</span> or re-run{" "}
-            <span className="mono">npx employee001 setup</span>, then restart
-            the server.
-          </div>
-        </div>
+        />
       )}
 
       <div
@@ -988,6 +1133,8 @@ function InvitePanel({
           {pending.map((inv) => {
             const url = inviteUrl(inv.token);
             const copied = copiedToken === inv.token;
+            const started = !!inv.employeeId;
+            const expired = new Date(inv.expiresAt).getTime() < Date.now();
             return (
               <div
                 key={inv.token}
@@ -995,12 +1142,22 @@ function InvitePanel({
                   display: "flex",
                   alignItems: "center",
                   gap: "var(--sp-8)",
-                  padding: "8px 10px",
+                  padding: "10px 12px",
                   background: "var(--bg-sunken)",
-                  borderRadius: 6,
+                  borderRadius: 8,
                   fontSize: "var(--fs-meta)",
+                  flexWrap: "wrap",
                 }}
               >
+                {/* Status dot */}
+                <span
+                  title={started ? "Employee started onboarding" : expired ? "Link expired" : "Waiting for employee to open link"}
+                  style={{ flexShrink: 0 }}
+                >
+                  <span className={`dot ${started ? "success" : expired ? "danger" : "idle"}`} style={{ boxShadow: "none" }} />
+                </span>
+
+                {/* Name + URL */}
                 <div
                   style={{
                     minWidth: 0,
@@ -1013,6 +1170,16 @@ function InvitePanel({
                   <div style={{ fontWeight: 600, color: "var(--text)" }}>
                     {inv.name || "Unnamed invite"}
                     {inv.role ? ` · ${inv.role}` : ""}
+                    {started && (
+                      <span style={{ marginLeft: 8, fontSize: "var(--fs-xs)", fontWeight: 500, color: "var(--success, #15803d)" }}>
+                        · In progress
+                      </span>
+                    )}
+                    {expired && !started && (
+                      <span style={{ marginLeft: 8, fontSize: "var(--fs-xs)", fontWeight: 500, color: "var(--danger, #A04B3D)" }}>
+                        · Expired
+                      </span>
+                    )}
                   </div>
                   <div
                     style={{
@@ -1021,20 +1188,45 @@ function InvitePanel({
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
+                      fontSize: "var(--fs-xs)",
                     }}
                   >
                     {url}
                   </div>
                 </div>
+
+                {/* Share with employee */}
                 <button
                   type="button"
                   onClick={() => copy(inv.token)}
                   className="btn ghost"
-                  style={{ height: 28, fontSize: "var(--fs-meta)" }}
+                  style={{ height: 28, fontSize: "var(--fs-meta)", flexShrink: 0 }}
+                  title="Copy the link to share with the employee"
                 >
-                  {copied ? <Icons.Check size={12} /> : null}
-                  {copied ? "Copied" : "Copy link"}
+                  {copied ? <Icons.Check size={12} /> : <Icons.Send size={12} />}
+                  {copied ? "Copied" : "Share link"}
                 </button>
+
+                {/* Watch training progress */}
+                {started && (
+                  <a
+                    href={`/join?invite=${encodeURIComponent(inv.token)}&done=1`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn ghost"
+                    style={{
+                      height: 28,
+                      fontSize: "var(--fs-meta)",
+                      textDecoration: "none",
+                      flexShrink: 0,
+                    }}
+                    title="Watch the twin training progress in real time"
+                  >
+                    <Icons.Eye size={12} /> Watch training
+                  </a>
+                )}
+
+                {/* Revoke */}
                 <button
                   type="button"
                   onClick={() => revoke(inv.token)}
@@ -1043,6 +1235,7 @@ function InvitePanel({
                     height: 28,
                     fontSize: "var(--fs-meta)",
                     color: "var(--danger, #A04B3D)",
+                    flexShrink: 0,
                   }}
                   title="Revoke this invite — link stops working immediately"
                 >
@@ -1071,7 +1264,12 @@ export default function EmployeesPage() {
   const [query, setQuery] = useState("");
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [allEmployees, setAllEmployees] = useState<EmployeeWithTwin[]>(EMPLOYEES_WITH_TWIN);
-  const [orgChartOpen, setOrgChartOpen] = useState(true);
+  const [tab, setTab] = useState<"people" | "org" | "invites">("people");
+
+  const pendingInvites = useMemo(
+    () => invites.filter((i) => !i.completedAt).length,
+    [invites],
+  );
 
   // Fetch all employees (static + hired marketplace agents)
   useEffect(() => {
@@ -1152,19 +1350,14 @@ export default function EmployeesPage() {
             <Link href="/marketplace" className="btn ghost" style={{ textDecoration: "none" }}>
               <Icons.Store size={13} /> Marketplace
             </Link>
-            <a
-              href="#invite"
+            <button
+              type="button"
               className="btn primary"
               style={{ textDecoration: "none" }}
-              onClick={(e) => {
-                e.preventDefault();
-                document
-                  .getElementById("invite")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
+              onClick={() => setTab("invites")}
             >
               <Icons.Plus size={13} /> Invite employee
-            </a>
+            </button>
           </div>
         }
       />
@@ -1217,64 +1410,79 @@ export default function EmployeesPage() {
           />
         </div>
 
-        {/* Org chart — reporting structure */}
+        {/* Tabs */}
         <div
-          className="card"
+          role="tablist"
+          aria-label="Employees sections"
           style={{
-            marginBottom: "var(--sp-28)",
-            padding: 0,
-            overflow: "hidden",
+            display: "flex",
+            gap: "var(--sp-2)",
+            borderBottom: "1px solid var(--hairline)",
+            marginBottom: "var(--sp-20)",
           }}
         >
-          <button
-            onClick={() => setOrgChartOpen((v) => !v)}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "14px 18px",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              color: "var(--fg)",
-            }}
-            aria-expanded={orgChartOpen}
-          >
-            <span style={{ display: "flex", alignItems: "center", gap: "var(--sp-10)" }}>
-              <Icons.Team size={14} />
-              <span style={{ fontWeight: 600, fontSize: "var(--fs-base)" }}>
-                Org chart
-              </span>
-              <span
-                className="subtle mono"
-                style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}
+          {(
+            [
+              ["people", "People", allEmployees.length],
+              ["org", "Org chart", null],
+              ["invites", "Invites", pendingInvites || null],
+            ] as [typeof tab, string, number | null][]
+          ).map(([key, label, count]) => {
+            const active = tab === key;
+            return (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(key)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: `2px solid ${active ? "var(--text)" : "transparent"}`,
+                  padding: "10px 14px",
+                  marginBottom: -1,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontSize: "var(--fs-ui)",
+                  fontWeight: active ? 600 : 500,
+                  color: active ? "var(--text)" : "var(--text-subtle)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "var(--sp-6)",
+                }}
               >
-                who reports to whom
-              </span>
-            </span>
-            <Icons.Chevron
-              size={14}
-              style={{
-                transform: orgChartOpen ? "rotate(90deg)" : "rotate(0deg)",
-                transition: "transform 0.18s",
-                color: "var(--text-subtle)",
-              }}
-            />
-          </button>
-          {orgChartOpen && (
-            <div style={{ borderTop: "1px solid var(--hairline)" }}>
-              <OrgChart employees={allEmployees} />
-            </div>
-          )}
+                {label}
+                {count !== null && count !== undefined && (
+                  <span
+                    className="mono"
+                    style={{
+                      fontSize: "var(--fs-xs)",
+                      padding: "1px 6px",
+                      borderRadius: 8,
+                      background: "var(--bg-sunken)",
+                      color: "var(--text-subtle)",
+                    }}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Invite panel — anchored so the topbar CTA can scroll to it */}
-        <div id="invite">
+        {tab === "org" && (
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <OrgChart employees={allEmployees} />
+          </div>
+        )}
+
+        {tab === "invites" && (
           <InvitePanel invites={invites} onInvitesChanged={refreshInvites} />
-        </div>
+        )}
 
+        {tab === "people" && (
+        <>
         {/* Search + filter row */}
         <div
           className="row"
@@ -1416,6 +1624,8 @@ export default function EmployeesPage() {
               />
             ))}
           </div>
+        )}
+        </>
         )}
       </div>
     </>

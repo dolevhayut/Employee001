@@ -135,34 +135,36 @@ export default async function setup() {
     spin.stop("Key did not authenticate (saving anyway — you can fix it later).");
   }
 
-  // Explain WHY Composio is required before asking for it. Past users
-  // (and other agents) have read the prompt as "tool integrations =
-  // optional" and skipped it. It's not optional: it's the input pipeline
-  // for the autonomous training loop that generates the 9 profile
-  // markdown files for every employee. No Composio → no training → no
-  // twins, full stop.
+  // Composio is optional at setup time. The Anthropic key alone gets you
+  // a working install — you can already hire marketplace agents (Alex
+  // Morgan etc.) and chat with them. Composio is only needed when you
+  // invite a real employee to onboard their twin (the training pipeline
+  // backfills from Slack/Gmail/GitHub/Linear/calendar through Composio
+  // MCP). The /employees invite panel surfaces a one-click "add Composio
+  // key" affordance the moment you actually need one — no .env edits, no
+  // server restart.
   p.note(
     [
-      "For every invite, the CEO chooses a lookback window between 30 and",
-      "360 days (default 90). An autonomous Claude agent then studies that",
-      "window of the employee's work through Composio MCP — Slack, Gmail,",
-      "GitHub PRs, Linear tickets, calendar — and writes the 9 profile",
-      "markdown files that define who that twin is and how they think.",
+      "Composio powers the autonomous training pipeline that builds new",
+      "employee twins from 30-360 days of their real work signal (Slack,",
+      "Gmail, GitHub, Linear, calendar).",
       "",
-      "Bigger window = more accurate twin, more API spend, longer wait.",
-      "Without Composio there is no training pipeline, and no twins.",
-      "That's why the next key is required, not optional.",
+      "It's NOT required to get started. You can:",
+      "  • Hire any of the 9 marketplace agents (Alex Morgan / SDR, etc.)",
+      "    and chat with them right away — they have no training pipeline.",
+      "  • Skip Composio now and add the key later from /employees, the",
+      "    moment you want to invite a real employee.",
+      "",
+      "If you already have a Composio key handy, pasting it now saves a",
+      "round-trip. Otherwise hit Enter to skip.",
     ].join("\n"),
-    "How twin training works",
+    "Composio — optional, only for inviting real employees",
   );
 
   const composioKey = await p.password({
     message:
-      "Composio API key (required — powers the 30-360 day training backfill) — get one at https://app.composio.dev",
+      "Composio API key (optional — leave blank to add later) — https://app.composio.dev",
     mask: "•",
-    validate(value) {
-      if (!value) return "A Composio API key is required — no training pipeline without it";
-    },
   });
   if (p.isCancel(composioKey)) {
     p.cancel("Setup cancelled");
@@ -206,12 +208,13 @@ export default async function setup() {
     "# Required. Get one from https://console.anthropic.com",
     `ANTHROPIC_API_KEY=${anthropicKey}`,
     "",
-    "# Required. Composio MCP powers the autonomous training loop:",
-    "# when you onboard an employee, a Claude agent studies the CEO-chosen",
-    "# lookback window (30-360 days, default 90) of their work (Slack,",
-    "# Gmail, GitHub, Linear, calendar) and writes the 9 profile markdown",
-    "# files. Without this key, no twins can be created — twin chat and",
-    "# tool execution all depend on it too.",
+    "# Optional. Composio MCP powers the autonomous training loop for",
+    "# inviting real employees: a Claude agent studies the CEO-chosen",
+    "# lookback window (30-360 days, default 90) of their work signal",
+    "# (Slack, Gmail, GitHub, Linear, calendar) and writes the 9 profile",
+    "# markdown files. Marketplace agents (Alex Morgan etc.) work without",
+    "# it. Add the key here later or from /employees when you're ready to",
+    "# invite your first real employee.",
     `COMPOSIO_API_KEY=${composioKey ?? ""}`,
     "",
     "# Optional. ElevenLabs for cloned twin voices.",
@@ -237,14 +240,34 @@ export default async function setup() {
     [
       `Wrote ${ENV_PATH}`,
       `Created ${DATA_DIR}`,
-      "",
-      "Next:",
-      "  employee001 start",
-      "",
-      "Then open http://localhost:" + port,
     ].join("\n"),
     "All set",
   );
 
-  p.outro("Done.");
+  // Offer to launch the server right away — saves a context switch
+  // ("now type employee001 start") for the >99% case.
+  const startNow = await p.confirm({
+    message: `Start Employee001 now? It'll boot on port ${port} and open your browser.`,
+    initialValue: true,
+  });
+
+  if (p.isCancel(startNow) || !startNow) {
+    p.outro(
+      [
+        "Done. Whenever you're ready:",
+        "  employee001 start",
+        "",
+        "Then open http://localhost:" + port,
+      ].join("\n"),
+    );
+    return;
+  }
+
+  p.outro("Booting…");
+
+  // Hand off to the start command in-process. It blocks on the child
+  // server until the user hits Ctrl-C, so this is effectively the last
+  // thing setup does. Forward whatever CLI flags came in (e.g. --port).
+  const start = await import("./start.mjs");
+  await start.default([]);
 }
