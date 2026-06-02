@@ -9,6 +9,7 @@ import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { Topbar } from "@/components/ex/shell";
 import { Markdown } from "@/components/ex/markdown";
 import { PageHead } from "@/components/ex/page-head";
+import { TwinEditor } from "@/components/editor/TwinEditor";
 import {
   EMPLOYEES_WITH_TWIN,
   CLAUDE_MODELS,
@@ -84,12 +85,26 @@ type FileNode = {
   tags: string[];
 };
 
-type FileBody = {
-  frontmatter: FileNode | null;
-  body: string;
+type Tab = "overview" | "files" | "versions" | "danger";
+
+// A knowledge file as returned by GET /api/employees/<id>/knowledge.
+type KnowledgeFileMeta = {
+  name: string;
+  size: number;
+  tokens: number;
+  ext: string;
+  mtime: string;
 };
 
-type Tab = "overview" | "files" | "preview" | "versions" | "danger";
+// Which group the currently-selected file lives in. "profile" files are the
+// 9 base files (twin-builder may overwrite them); "knowledge" files are
+// CEO-owned enrichment files that are never overwritten.
+type FileGroup = "profile" | "knowledge";
+
+type SelectedFile = { group: FileGroup; name: string };
+
+// Extensions the knowledge upload picker accepts — text only (agent-readable).
+const KNOWLEDGE_ACCEPT = ".md,.markdown,.txt,.csv,.json";
 
 type EmployeeSkillsPayload = {
   skills: OrgSkillPlaybook[];
@@ -453,14 +468,14 @@ function ProfilePageContent() {
   const employeeId = employee?.id;
 
   const [tab, setTab] = useState<Tab>("overview");
-  const [activeFileName, setActiveFileName] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [activeToolkits, setActiveToolkits] = useState<string[]>([]);
 
   // Reset to overview when switching employee
   useEffect(() => {
     setTab("overview");
-    setActiveFileName(null);
+    setSelectedFile(null);
   }, [employeeId]);
 
   // Fetch connections
@@ -573,7 +588,7 @@ function ProfilePageContent() {
             borderBottom: "1px solid var(--hairline)",
           }}
         >
-          {(["overview", "files", "preview", "versions", "danger"] as const).map((t) => (
+          {(["overview", "files", "versions", "danger"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -624,28 +639,10 @@ function ProfilePageContent() {
                 transition={{ duration: 0.15 }}
               >
                 <FilesTab
-                  files={files}
-                  onSelect={(name) => {
-                    setActiveFileName(name);
-                    setTab("preview");
-                  }}
-                />
-              </motion.div>
-            )}
-            {tab === "preview" && (
-              <motion.div
-                key="preview"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-              >
-                <PreviewTab
                   employeeId={employee.id}
-                  filename={activeFileName}
-                  files={files}
-                  onChangeFile={setActiveFileName}
-                  onBackToFiles={() => setTab("files")}
+                  profileFiles={files}
+                  selected={selectedFile}
+                  onSelect={setSelectedFile}
                 />
               </motion.div>
             )}
@@ -1744,278 +1741,536 @@ function OverviewTab({
   );
 }
 
-// ─── Files Tab ────────────────────────────────────────────────────────────────
+// ─── Files Tab (split-pane editor) ────────────────────────────────────────────
+// LEFT: a two-group file tree — profile/ (the 9 base files) and knowledge/
+// (CEO-uploaded enrichment files). RIGHT: the TwinEditor, editing the selected
+// file's markdown. profile/ files load/save via /api/employees/<id>/file/<name>;
+// knowledge/ files via /api/employees/<id>/knowledge/<name>.
 
 function FilesTab({
-  files,
+  employeeId,
+  profileFiles,
+  selected,
   onSelect,
 }: {
-  files: FileNode[];
-  onSelect: (name: string) => void;
+  employeeId: string;
+  profileFiles: FileNode[];
+  selected: SelectedFile | null;
+  onSelect: (sel: SelectedFile) => void;
 }) {
-  // Always-on hover tracking — driving the row background through React state
-  // rather than inline onMouseEnter / onMouseLeave keeps the file-tree clean
-  // (no per-row event handlers, no flicker on fast cursor moves).
-  const [hovered, setHovered] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(true);
+  const [knowledge, setKnowledge] = useState<KnowledgeFileMeta[]>([]);
 
-  if (files.length === 0) {
-    return (
-      <div
-        className="card"
-        style={{
-          padding: "var(--sp-20)",
-          background: "var(--bg-elevated)",
-        }}
-      >
-        <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0 }}>
-          No profile files yet. Run the twin builder to generate them.
-        </p>
-      </div>
-    );
+  const loadKnowledge = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/employees/${employeeId}/knowledge`, {
+        cache: "no-store",
+      });
+      if (!r.ok) return;
+      const data = (await r.json()) as { files?: KnowledgeFileMeta[] };
+      setKnowledge(data.files ?? []);
+    } catch {
+      /* leave list as-is on transient error */
+    }
+  }, [employeeId]);
+
+  useEffect(() => {
+    void loadKnowledge();
+  }, [loadKnowledge]);
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(220px, 280px) 1fr",
+        gap: "var(--sp-16)",
+        alignItems: "start",
+      }}
+    >
+      <FileTreePane
+        employeeId={employeeId}
+        profileFiles={profileFiles}
+        knowledge={knowledge}
+        selected={selected}
+        onSelect={onSelect}
+        onKnowledgeChanged={loadKnowledge}
+      />
+      <FileEditorPane
+        employeeId={employeeId}
+        selected={selected}
+        onKnowledgeChanged={loadKnowledge}
+      />
+    </div>
+  );
+}
+
+// ─── File tree (left pane) ────────────────────────────────────────────────────
+
+function FileTreePane({
+  employeeId,
+  profileFiles,
+  knowledge,
+  selected,
+  onSelect,
+  onKnowledgeChanged,
+}: {
+  employeeId: string;
+  profileFiles: FileNode[];
+  knowledge: KnowledgeFileMeta[];
+  selected: SelectedFile | null;
+  onSelect: (sel: SelectedFile) => void;
+  onKnowledgeChanged: () => void | Promise<void>;
+}) {
+  const [profileOpen, setProfileOpen] = useState(true);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(true);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const uploadFiles = useCallback(
+    async (fileList: FileList | File[]) => {
+      const items = Array.from(fileList);
+      if (items.length === 0) return;
+      setUploading(true);
+      setError(null);
+      try {
+        for (const file of items) {
+          const fd = new FormData();
+          fd.append("file", file);
+          const r = await fetch(`/api/employees/${employeeId}/knowledge`, {
+            method: "POST",
+            body: fd,
+          });
+          if (!r.ok) {
+            const data = (await r.json().catch(() => ({}))) as { error?: string };
+            throw new Error(data.error ?? `Upload failed (${r.status})`);
+          }
+        }
+        await onKnowledgeChanged();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Upload failed");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [employeeId, onKnowledgeChanged]
+  );
+
+  async function createFile() {
+    const raw = window.prompt("New knowledge file name (must end in .md):", "notes.md");
+    if (!raw) return;
+    const name = raw.trim().toLowerCase().endsWith(".md") ? raw.trim() : `${raw.trim()}.md`;
+    setError(null);
+    try {
+      const r = await fetch(`/api/employees/${employeeId}/knowledge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, body: "" }),
+      });
+      const data = (await r.json().catch(() => ({}))) as {
+        file?: KnowledgeFileMeta;
+        error?: string;
+      };
+      if (!r.ok || !data.file) throw new Error(data.error ?? "Could not create file");
+      await onKnowledgeChanged();
+      onSelect({ group: "knowledge", name: data.file.name });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create file");
+    }
   }
+
+  async function deleteFile(name: string) {
+    if (!window.confirm(`Delete ${name}? This permanently removes it from the twin's knowledge.`)) return;
+    setError(null);
+    try {
+      const r = await fetch(
+        `/api/employees/${employeeId}/knowledge/${encodeURIComponent(name)}`,
+        { method: "DELETE" }
+      );
+      if (!r.ok) {
+        const data = (await r.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `Delete failed (${r.status})`);
+      }
+      await onKnowledgeChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed");
+    }
+  }
+
+  const isSelected = (group: FileGroup, name: string) =>
+    selected?.group === group && selected.name === name;
 
   return (
     <div
       className="card"
       style={{
-        padding: "var(--sp-10) var(--sp-8) var(--sp-10) var(--sp-10)",
+        padding: "var(--sp-10) var(--sp-8)",
         background: "var(--bg-elevated)",
         border: "1px solid var(--hairline)",
         fontFamily: "var(--font-mono, monospace)",
+        position: "sticky",
+        top: 0,
       }}
     >
-      {/* Root folder row */}
+      {/* ── profile/ group ── */}
       <button
-        onClick={() => setExpanded((v) => !v)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--sp-8)",
-          width: "100%",
-          padding: "6px 8px",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          fontFamily: "inherit",
-          color: "var(--text)",
-          borderRadius: 4,
-          transition: "background .12s",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "var(--surface-soft)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "transparent";
-        }}
+        onClick={() => setProfileOpen((v) => !v)}
+        style={folderRowStyle}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-soft)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
       >
         <motion.span
-          animate={{ rotate: expanded ? 90 : 0 }}
+          animate={{ rotate: profileOpen ? 90 : 0 }}
           transition={{ duration: 0.15 }}
           style={{ display: "inline-flex", color: "var(--text-muted)" }}
         >
           <Icons.Chevron size={11} />
         </motion.span>
         <Icons.Doc size={13} style={{ color: "var(--accent)" }} />
-        <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>
-          profile/
-        </span>
+        <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>profile/</span>
         <div style={{ flex: 1 }} />
-        <span
-          className="subtle"
-          style={{ fontSize: "var(--fs-xs)", fontWeight: 400 }}
-        >
-          {files.length} files
+        <span className="subtle" style={{ fontSize: "var(--fs-xs)", fontWeight: 400 }}>
+          {profileFiles.length}
         </span>
       </button>
 
-      {/* Tree body */}
       <AnimatePresence initial={false}>
-        {expanded && (
+        {profileOpen && (
           <motion.div
-            key="files"
+            key="profile-body"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            style={{
-              overflow: "hidden",
-              marginLeft: 12,
-              borderLeft: "1px solid var(--hairline)",
-              paddingLeft: 0,
-            }}
+            style={{ overflow: "hidden", marginLeft: 12, borderLeft: "1px solid var(--hairline)" }}
           >
-            {files.map((f, i) => {
-              const description = PROFILE_FILE_DESCRIPTIONS[f.name] ?? "";
-              const isHover = hovered === f.name;
-              const isLast = i === files.length - 1;
-              return (
-                <button
+            {profileFiles.length === 0 ? (
+              <div className="subtle" style={{ fontSize: "var(--fs-xs)", padding: "6px 8px 6px 16px", fontFamily: "var(--font-sans, sans-serif)" }}>
+                No profile files yet — run the twin builder.
+              </div>
+            ) : (
+              profileFiles.map((f) => (
+                <FileTreeRow
                   key={f.name}
-                  onClick={() => onSelect(f.name)}
-                  onMouseEnter={() => setHovered(f.name)}
-                  onMouseLeave={() => setHovered(null)}
-                  title={description}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "var(--sp-8)",
-                    width: "calc(100% - 8px)",
-                    padding: "5px 8px 5px 14px",
-                    marginLeft: 8,
-                    background: isHover ? "var(--surface-soft)" : "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    color: isHover ? "var(--text)" : "var(--text-muted)",
-                    borderRadius: 4,
-                    textAlign: "left",
-                    position: "relative",
-                    transition: "background .1s, color .1s",
-                  }}
-                >
-                  {/* Tree connector ── feeds from the parent's left border. */}
-                  <span
-                    aria-hidden
-                    style={{
-                      position: "absolute",
-                      left: -1,
-                      top: 0,
-                      width: 12,
-                      height: isLast ? "50%" : "100%",
-                      borderLeft: "1px solid var(--hairline)",
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <span
-                    aria-hidden
-                    style={{
-                      position: "absolute",
-                      left: -1,
-                      top: "50%",
-                      width: 11,
-                      borderTop: "1px solid var(--hairline)",
-                      pointerEvents: "none",
-                    }}
-                  />
-
-                  <Icons.Doc
-                    size={12}
-                    style={{
-                      color: isHover ? "var(--text)" : "var(--text-subtle)",
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: "var(--fs-sm)",
-                      fontWeight: 500,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {f.name}
-                  </span>
-                  {description && (
-                    <span
-                      className="subtle"
-                      style={{
-                        fontSize: "var(--fs-xs)",
-                        fontWeight: 400,
-                        fontFamily: "var(--font-sans, sans-serif)",
-                        marginLeft: 6,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        opacity: 0.7,
-                      }}
-                    >
-                      — {description}
-                    </span>
-                  )}
-                  <div style={{ flex: 1, minWidth: 8 }} />
-                  <span
-                    style={{
-                      fontSize: "var(--fs-xs)",
-                      color: "var(--text-subtle)",
-                      flexShrink: 0,
-                    }}
-                  >
-                    ~{f.tokens.toLocaleString()} tok
-                  </span>
-                </button>
-              );
-            })}
+                  name={f.name}
+                  tokens={f.tokens}
+                  active={isSelected("profile", f.name)}
+                  hovered={hovered === `profile:${f.name}`}
+                  title={PROFILE_FILE_DESCRIPTIONS[f.name] ?? ""}
+                  onHover={(h) => setHovered(h ? `profile:${f.name}` : null)}
+                  onClick={() => onSelect({ group: "profile", name: f.name })}
+                />
+              ))
+            )}
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── knowledge/ group ── */}
+      <button
+        onClick={() => setKnowledgeOpen((v) => !v)}
+        style={{ ...folderRowStyle, marginTop: "var(--sp-6)" }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-soft)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+      >
+        <motion.span
+          animate={{ rotate: knowledgeOpen ? 90 : 0 }}
+          transition={{ duration: 0.15 }}
+          style={{ display: "inline-flex", color: "var(--text-muted)" }}
+        >
+          <Icons.Chevron size={11} />
+        </motion.span>
+        <Icons.Doc size={13} style={{ color: "var(--twin)" }} />
+        <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>knowledge/</span>
+        <div style={{ flex: 1 }} />
+        <span className="subtle" style={{ fontSize: "var(--fs-xs)", fontWeight: 400 }}>
+          {knowledge.length}
+        </span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {knowledgeOpen && (
+          <motion.div
+            key="knowledge-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            style={{ overflow: "hidden", marginLeft: 12, borderLeft: "1px solid var(--hairline)" }}
+          >
+            {knowledge.map((f) => (
+              <FileTreeRow
+                key={f.name}
+                name={f.name}
+                tokens={f.tokens}
+                active={isSelected("knowledge", f.name)}
+                hovered={hovered === `knowledge:${f.name}`}
+                onHover={(h) => setHovered(h ? `knowledge:${f.name}` : null)}
+                onClick={() => onSelect({ group: "knowledge", name: f.name })}
+                onDelete={() => deleteFile(f.name)}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Upload + new-file controls (drag-and-drop zone is the whole footer) */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (e.dataTransfer.files.length > 0) void uploadFiles(e.dataTransfer.files);
+        }}
+        style={{
+          marginTop: "var(--sp-10)",
+          padding: "var(--sp-10)",
+          borderRadius: 6,
+          border: `1px dashed ${dragOver ? "var(--accent)" : "var(--hairline-strong)"}`,
+          background: dragOver ? "var(--accent-soft)" : "transparent",
+          transition: "all .12s",
+          fontFamily: "var(--font-sans, sans-serif)",
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={KNOWLEDGE_ACCEPT}
+          style={{ display: "none" }}
+          onChange={(e) => {
+            if (e.target.files) void uploadFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <div className="subtle" style={{ fontSize: "var(--fs-2xs)", textAlign: "center", marginBottom: "var(--sp-8)", lineHeight: 1.4 }}>
+          {dragOver ? "Drop to upload" : "Drag files here, or"}
+        </div>
+        <div style={{ display: "flex", gap: "var(--sp-6)" }}>
+          <button
+            className="btn sm"
+            style={{ flex: 1, justifyContent: "center" }}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            <Icons.Plus size={11} /> {uploading ? "Uploading…" : "Upload"}
+          </button>
+          <button
+            className="btn sm"
+            style={{ flex: 1, justifyContent: "center" }}
+            onClick={createFile}
+            disabled={uploading}
+          >
+            <Icons.Plus size={11} /> New file
+          </button>
+        </div>
+        <div className="subtle" style={{ fontSize: "var(--fs-2xs)", textAlign: "center", marginTop: "var(--sp-6)", lineHeight: 1.4 }}>
+          .md, .txt, .csv, .json · PDF/DOCX coming soon
+        </div>
+        {error && (
+          <div style={{ fontSize: "var(--fs-2xs)", color: "var(--danger)", marginTop: "var(--sp-6)", textAlign: "center" }}>
+            {error}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ─── Preview Tab (with editor) ────────────────────────────────────────────────
+const folderRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--sp-8)",
+  width: "100%",
+  padding: "6px 8px",
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  color: "var(--text)",
+  borderRadius: 4,
+  transition: "background .12s",
+};
 
-function PreviewTab({
+function FileTreeRow({
+  name,
+  tokens,
+  active,
+  hovered,
+  title,
+  onHover,
+  onClick,
+  onDelete,
+}: {
+  name: string;
+  tokens: number;
+  active: boolean;
+  hovered: boolean;
+  title?: string;
+  onHover: (hovering: boolean) => void;
+  onClick: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--sp-6)",
+        marginLeft: 8,
+        background: active
+          ? "var(--accent-soft)"
+          : hovered
+          ? "var(--surface-soft)"
+          : "transparent",
+        borderRadius: 4,
+        transition: "background .1s",
+      }}
+    >
+      <button
+        onClick={onClick}
+        title={title}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--sp-8)",
+          flex: 1,
+          minWidth: 0,
+          padding: "5px 4px 5px 10px",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          color: active ? "var(--accent-deep)" : hovered ? "var(--text)" : "var(--text-muted)",
+          textAlign: "left",
+        }}
+      >
+        <Icons.Doc
+          size={12}
+          style={{ color: active ? "var(--accent-deep)" : "var(--text-subtle)", flexShrink: 0 }}
+        />
+        <span
+          style={{
+            fontSize: "var(--fs-sm)",
+            fontWeight: active ? 600 : 500,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {name}
+        </span>
+        <div style={{ flex: 1, minWidth: 4 }} />
+        <span style={{ fontSize: "var(--fs-2xs)", color: "var(--text-subtle)", flexShrink: 0 }}>
+          ~{tokens.toLocaleString()}
+        </span>
+      </button>
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          title={`Delete ${name}`}
+          style={{
+            display: "grid",
+            placeItems: "center",
+            width: 22,
+            height: 22,
+            marginRight: 4,
+            flexShrink: 0,
+            background: "transparent",
+            border: "none",
+            borderRadius: 4,
+            cursor: "pointer",
+            color: hovered ? "var(--danger)" : "var(--text-subtle)",
+            opacity: hovered ? 1 : 0.4,
+            transition: "opacity .1s, color .1s",
+          }}
+        >
+          <Icons.Trash size={11} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── File editor (right pane) ─────────────────────────────────────────────────
+
+function FileEditorPane({
   employeeId,
-  filename,
-  files,
-  onChangeFile,
-  onBackToFiles,
+  selected,
+  onKnowledgeChanged,
 }: {
   employeeId: string;
-  filename: string | null;
-  files: FileNode[];
-  onChangeFile: (name: string) => void;
-  onBackToFiles: () => void;
+  selected: SelectedFile | null;
+  onKnowledgeChanged: () => void | Promise<void>;
 }) {
-  const effective = filename ?? files[0]?.name ?? null;
-  const [body, setBody] = useState<string>("");
-  const [original, setOriginal] = useState<string>("");
-  const [editing, setEditing] = useState(false);
+  const [body, setBody] = useState("");
+  const [original, setOriginal] = useState("");
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const load = useCallback(
-    async (name: string) => {
-      setLoading(true);
-      setError("");
-      setEditing(false);
-      try {
-        const r = await fetch(`/api/employees/${employeeId}/file/${name}`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data = (await r.json()) as FileBody;
-        setBody(data.body ?? "");
-        setOriginal(data.body ?? "");
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load");
-      } finally {
-        setLoading(false);
-      }
-    },
+  const fileUrl = useCallback(
+    (sel: SelectedFile) =>
+      sel.group === "profile"
+        ? `/api/employees/${employeeId}/file/${encodeURIComponent(sel.name)}`
+        : `/api/employees/${employeeId}/knowledge/${encodeURIComponent(sel.name)}`,
     [employeeId]
   );
 
+  // Load the selected file's body. Both APIs return { body, ... }.
   useEffect(() => {
-    if (effective) load(effective);
-  }, [effective, load]);
+    if (!selected) return;
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    setSavedAt(null);
+    fetch(fileUrl(selected))
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return (await r.json()) as { body?: string };
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setBody(data.body ?? "");
+        setOriginal(data.body ?? "");
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Failed to load");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selected, fileUrl]);
 
   async function save() {
-    if (!effective) return;
+    if (!selected) return;
     setSaving(true);
     setError("");
     try {
-      const r = await fetch(`/api/employees/${employeeId}/file/${effective}`, {
+      const r = await fetch(fileUrl(selected), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body }),
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = (await r.json()) as FileBody;
-      setBody(data.body ?? "");
-      setOriginal(data.body ?? "");
-      setEditing(false);
+      if (!r.ok) {
+        const data = (await r.json().catch(() => ({}))) as { error?: string; code?: string };
+        throw new Error(
+          data.code === "disk_write_failed"
+            ? "Couldn't write to disk — the data directory may be read-only or full."
+            : data.error ?? `Save failed (${r.status})`
+        );
+      }
+      setOriginal(body);
       setSavedAt(Date.now());
+      // A knowledge file's token count / mtime may have changed — refresh the tree.
+      if (selected.group === "knowledge") await onKnowledgeChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save");
     } finally {
@@ -2023,142 +2278,117 @@ function PreviewTab({
     }
   }
 
-  function cancel() {
-    setBody(original);
-    setEditing(false);
-  }
-
-  if (!effective) {
+  if (!selected) {
     return (
-      <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0 }}>
-        Select a file from the Files tab to preview.
-      </p>
+      <div
+        className="card"
+        style={{
+          padding: "48px var(--sp-24)",
+          background: "var(--bg-elevated)",
+          textAlign: "center",
+          minHeight: 420,
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
+        <div>
+          <Icons.Doc size={22} style={{ color: "var(--text-subtle)", marginBottom: "var(--sp-10)" }} />
+          <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, lineHeight: 1.55 }}>
+            Select a file on the left to view and edit it. Profile files shape the
+            twin&apos;s voice; knowledge files enrich what it knows.
+          </p>
+        </div>
+      </div>
     );
   }
 
-  const dirty = editing && body !== original;
+  const dirty = body !== original;
 
   return (
-    <div>
-      {/* File header */}
+    <div
+      className="card"
+      style={{ padding: 0, background: "var(--bg-elevated)", overflow: "hidden" }}
+    >
+      {/* Header */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: "var(--sp-10)",
-          paddingBottom: "var(--sp-12)",
-          marginBottom: "var(--sp-14)",
+          padding: "12px 16px",
           borderBottom: "1px solid var(--hairline)",
         }}
       >
-        <button
-          onClick={onBackToFiles}
-          className="btn ghost sm"
-          style={{ height: 26 }}
-          title="Back to files"
-        >
-          <Icons.Chevron size={11} style={{ transform: "rotate(180deg)" }} />
-        </button>
         <Icons.Doc size={14} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
-        <select
-          value={effective}
-          onChange={(e) => onChangeFile(e.target.value)}
-          style={{
-            fontSize: "var(--fs-ui)",
-            fontWeight: 600,
-            fontFamily: "var(--font-mono, monospace)",
-            background: "transparent",
-            border: "1px solid transparent",
-            borderRadius: 5,
-            padding: "4px 6px",
-            color: "var(--text)",
-            cursor: "pointer",
-            outline: "none",
-          }}
-        >
-          {files.map((f) => (
-            <option key={f.name} value={f.name}>{f.name}</option>
-          ))}
-        </select>
+        <span className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>
+          {selected.group}/{selected.name}
+        </span>
         <div style={{ flex: 1 }} />
-
-        {savedAt && !dirty && !editing && (
-          <span style={{ fontSize: "var(--fs-meta)", color: "var(--success, #16a34a)" }}>
-            Saved
-          </span>
+        {dirty && (
+          <span
+            aria-label="Unsaved changes"
+            title="Unsaved changes"
+            style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--warn)", flexShrink: 0 }}
+          />
         )}
+        {!dirty && savedAt && (
+          <span style={{ fontSize: "var(--fs-meta)", color: "var(--success)" }}>Saved</span>
+        )}
+        <button
+          onClick={save}
+          className="btn primary sm"
+          style={{ height: 28 }}
+          disabled={saving || !dirty || loading}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
 
-        {!editing ? (
-          <button
-            onClick={() => setEditing(true)}
-            className="btn sm"
-            style={{ height: 28 }}
-          >
-            <Icons.Pencil size={11} /> Edit
-          </button>
+      {/* Ownership note */}
+      <div
+        style={{
+          padding: "8px 16px",
+          borderBottom: "1px solid var(--hairline)",
+          fontSize: "var(--fs-meta)",
+          color: "var(--text-subtle)",
+          background: "var(--bg-sunken)",
+          lineHeight: 1.45,
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--sp-6)",
+        }}
+      >
+        {selected.group === "profile" ? (
+          <>
+            <Icons.Spark size={11} style={{ color: "var(--warn)", flexShrink: 0 }} />
+            A base profile file — the Twin Builder may overwrite it on the next rebuild.
+          </>
         ) : (
-          <div style={{ display: "flex", gap: "var(--sp-6)" }}>
-            <button onClick={cancel} className="btn sm" style={{ height: 28 }} disabled={saving}>
-              Cancel
-            </button>
-            <button
-              onClick={save}
-              className="btn primary sm"
-              style={{ height: 28 }}
-              disabled={saving || !dirty}
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
+          <>
+            <Icons.Lock size={11} style={{ color: "var(--twin)", flexShrink: 0 }} />
+            CEO-owned knowledge — the twin reads this but never overwrites it.
+          </>
         )}
       </div>
 
       {error && (
-        <div style={{ fontSize: "var(--fs-sm)", color: "var(--danger)", marginBottom: "var(--sp-12)" }}>{error}</div>
+        <div style={{ fontSize: "var(--fs-sm)", color: "var(--danger)", padding: "10px 16px", borderBottom: "1px solid var(--hairline)" }}>
+          {error}
+        </div>
       )}
 
       {loading ? (
-        <p className="muted" style={{ fontSize: "var(--fs-ui)" }}>Loading…</p>
-      ) : editing ? (
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          spellCheck={false}
-          style={{
-            width: "100%",
-            minHeight: 480,
-            padding: "16px 18px",
-            background: "var(--bg-sunken)",
-            border: "1px solid var(--hairline)",
-            borderRadius: 8,
-            fontFamily: "var(--font-mono, ui-monospace, monospace)",
-            fontSize: 12.5,
-            lineHeight: 1.7,
-            color: "var(--text)",
-            outline: "none",
-            resize: "vertical",
-            boxSizing: "border-box",
-            tabSize: 2,
-          }}
-        />
+        <p className="muted" style={{ fontSize: "var(--fs-ui)", padding: "24px 16px", margin: 0 }}>
+          Loading…
+        </p>
       ) : (
-        <div
-          style={{
-            padding: "20px 24px",
-            background: "var(--surface)",
-            border: "1px solid var(--hairline)",
-            borderRadius: 8,
-            fontSize: "var(--fs-base)",
-            lineHeight: 1.65,
-          }}
-        >
-          {body ? (
-            <Markdown>{body}</Markdown>
-          ) : (
-            <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0 }}>
-              This file is empty. Click <strong>Edit</strong> to add content.
-            </p>
-          )}
+        <div style={{ padding: "var(--sp-8)" }}>
+          <TwinEditor
+            key={`${selected.group}:${selected.name}`}
+            value={original}
+            onChange={setBody}
+            placeholder="Start writing…"
+          />
         </div>
       )}
     </div>

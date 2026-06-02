@@ -8,6 +8,27 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — per-twin knowledge directory + editor
+- **`knowledge/` directory per twin.** A new
+  `data/employees/<id>/knowledge/` folder where the CEO uploads and
+  edits extra reference files that enrich the twin's brain, kept
+  **separate** from the 9 base profile files (EXPERTISE, TONE, CONTEXT,
+  DECISIONS, PREFERENCES, PEOPLE, PROJECTS, BOUNDARIES, EMPLOYMENT).
+- **Text formats are editable and agent-readable:** `.md`, `.markdown`,
+  `.txt`, `.csv`, `.json`. Any non-blocked binary can be uploaded (25 MB
+  cap); an executable/script blocklist (`.exe`, `.sh`, `.js`, `.ts`, …)
+  is always rejected, and filenames are sanitized against path traversal.
+- **Twin consumption is lazy, not pre-loaded.** Only a compact index of
+  the files (path + approx token count) is injected into the twin's
+  system prompt. The agent reads the relevant file on demand via its
+  existing Read/Grep/Glob tools (cwd = `data/` root) — no new MCP tool.
+- **Own parallel API**, separate from the base-file route:
+  `GET/POST /api/employees/[id]/knowledge` (list / create-or-upload) and
+  `GET/PUT/DELETE /api/employees/[id]/knowledge/[name]`.
+- **`/profile` "Files" tab is now a split-pane TipTap editor** (the old
+  "Preview" tab was removed). TipTap is pinned to `3.23.6` via
+  `package.json` `overrides` to honor the 7-day npm supply-chain rule.
+
 ### Added — `/flow` chat experience
 - **`AskUserQuestion` wired end-to-end.** The SDK's clarification tool
   was firing but events fell through both the SSE route and the chat

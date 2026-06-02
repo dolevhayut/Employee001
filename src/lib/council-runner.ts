@@ -60,6 +60,7 @@ import {
   SUBAGENT_LABELS,
   type TwinSubagentName,
 } from "@/lib/twin-subagents";
+import { knowledgeIndexMarkdown } from "@/lib/knowledge-files";
 
 // ─── Event types ──────────────────────────────────────────────────────────────
 
@@ -275,6 +276,16 @@ function buildSystemPromptBlocks(
   responseIntentBlock?: string
 ): string[] {
   const profileContent = loadProfileFiles(employeeDir);
+  const knowledgeIndex = knowledgeIndexMarkdown(employee.id);
+  const knowledgeBlock = knowledgeIndex
+    ? `
+
+# Uploaded knowledge files (index)
+
+The CEO has uploaded extra reference material to enrich your brain. These are **NOT** pre-loaded — only the index below is. When a question might be answered by one of them, **Read** the relevant file on demand from \`employees/${employee.id}/knowledge/\`.
+
+${knowledgeIndex}`
+    : "";
 
   // Static block — eligible for cross-session prompt cache when nothing else
   // changes. Contains the full profile so most turns don't need Read at all,
@@ -292,7 +303,7 @@ You are speaking with the **CEO of Employee001** (your boss). Every reference to
 
 The following are your actual profile files — they are pre-loaded so you can reference them directly without any tool calls. Use them as your default source of truth about yourself.
 
-${profileContent}
+${profileContent}${knowledgeBlock}
 
 # Reading from disk — when and how
 
@@ -303,6 +314,7 @@ Your cwd is the workspace **data root**. All paths below are relative to it.
 Workspace layout:
 
 - \`employees/${employee.id}/*.md\` — your own profile (already pre-loaded above; don't re-read).
+- \`employees/${employee.id}/knowledge/*\` — extra reference material the CEO uploaded to enrich this twin (notes, specs, CSVs, JSON). Read or Grep these when a question might be answered by uploaded material; they are NOT pre-loaded.
 - \`employees/{other-employee-id}/*.md\` — your colleagues' 9 profile files (CONTEXT, EXPERTISE, TONE, BOUNDARIES, DECISIONS, PREFERENCES, PEOPLE, PROJECTS, EMPLOYMENT). Read when a question references another teammate's domain.
 - \`org-brain/nodes/*.md\` — the **company brain**: pricing policies, customer-segment definitions, decisions, incident postmortems, product facts. **This is where most "what's our policy on X" answers live.** Glob this directory or Grep across it when the question touches company-wide knowledge.
 - \`org-skills/*/SKILL.md\` — operating playbooks (assignment-gated; relevant ones are auto-injected as a dynamic block when triggers match).
