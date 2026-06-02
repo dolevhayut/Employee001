@@ -95,7 +95,32 @@ function readJsonl<T>(filePath: string): T[] {
 }
 
 function appendJsonl(filePath: string, value: unknown): void {
-  fs.appendFileSync(filePath, `${JSON.stringify(value)}\n`, "utf8");
+  const line = `${JSON.stringify(value)}\n`;
+  fs.appendFileSync(filePath, line, "utf8");
+  // Mirror to Fabric lakehouse when STORAGE_BACKEND=fabric. Lazy-loaded to
+  // avoid a circular import (storage/onelake-client → audit-log → twin-memory).
+  if (process.env.STORAGE_BACKEND === "fabric") {
+    void (async () => {
+      try {
+        const mod = await import("@/lib/storage/onelake-client");
+        if (!mod.isOneLakeConfigured()) return;
+        // Path convention: twin_memory/<employeeId>/<filename>.jsonl
+        const rel = path
+          .relative(path.join(process.cwd(), "data"), filePath)
+          .replace(/\\/g, "/");
+        const segments = rel.split("/");
+        const filename = segments.pop() ?? "memory.jsonl";
+        const table = ["twin_memory", ...segments.slice(1)].join("/");
+        await mod.appendOneLake({ table, filename, data: line });
+      } catch (err) {
+        console.warn(
+          `[twin-memory] Fabric mirror failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      }
+    })();
+  }
 }
 
 function truncate(text: string, max: number): string {

@@ -439,7 +439,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       });
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!process.env.AZURE_OPENAI_ENDPOINT) {
       // Can't run the builder, but onboarding succeeded — defer politely.
       try {
         await writePendingBuild(employeeId, {

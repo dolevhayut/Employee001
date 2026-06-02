@@ -283,7 +283,7 @@ export async function planEmployeeResponseIntent(
   ctx: ResponseIntentContext
 ): Promise<ResponseIntentPlan> {
   const fallback = fallbackPlan(question, ctx);
-  if (!process.env.ANTHROPIC_API_KEY || process.env.TWIN_INTENT_PLANNER === "0") {
+  if (!process.env.AZURE_OPENAI_ENDPOINT || process.env.TWIN_INTENT_PLANNER === "0") {
     return fallback;
   }
 
@@ -327,7 +327,7 @@ export async function planEmployeeResponseIntent(
         },
         permissionMode: "bypassPermissions",
         settingSources: [],
-        env: { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY },
+        env: { AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT },
       },
     });
 

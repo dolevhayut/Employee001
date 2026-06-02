@@ -19,9 +19,15 @@ import { appendAuditEntry } from "@/lib/audit-log";
 const PKG_VERSION = "Employee001/0.2.0";
 
 /** Models we know about. Keep in lock-step with the dropdown in /settings. */
-export const TWIN_MODEL_PRIMARY = "claude-sonnet-4-6";
-export const TWIN_MODEL_FALLBACK = "claude-sonnet-4-5";
-export const TWIN_MODEL_OPUS = "claude-opus-4-7";
+// All twin runs hit the Azure OpenAI Foundry deployment named in
+// AZURE_OPENAI_DEPLOYMENT (gpt-4o by default, gpt-5.1 under it). The
+// "primary / fallback / opus" distinction collapses on Azure — the deployment
+// dictates the model — but we keep these constants so call sites that read
+// them for the audit/log payload keep working.
+export const TWIN_MODEL_PRIMARY =
+  process.env.AZURE_OPENAI_DEPLOYMENT ?? "gpt-4o";
+export const TWIN_MODEL_FALLBACK = TWIN_MODEL_PRIMARY;
+export const TWIN_MODEL_OPUS = TWIN_MODEL_PRIMARY;
 
 /** Tools we never want a twin to call, ever. Removes them from the model's
  *  context entirely (smaller prompt, clearer intent, no Bash escape hatch).

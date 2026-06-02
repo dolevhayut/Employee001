@@ -57,9 +57,9 @@ export async function POST(
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.AZURE_OPENAI_ENDPOINT) {
     return Response.json(
-      { error: "ANTHROPIC_API_KEY is not configured" },
+      { error: "AZURE_OPENAI_ENDPOINT is not configured" },
       { status: 500 }
     );
   }

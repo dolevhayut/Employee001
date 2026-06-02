@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   // twin. Sending an invite without keys means the employee fills out their
   // profile, then nothing works — bad first impression, broken promise.
   const missing: string[] = [];
-  if (!process.env.ANTHROPIC_API_KEY) missing.push("ANTHROPIC_API_KEY");
+  if (!process.env.AZURE_OPENAI_ENDPOINT) missing.push("ANTHROPIC_API_KEY");
   if (!process.env.COMPOSIO_API_KEY) missing.push("COMPOSIO_API_KEY");
   if (missing.length > 0) {
     return NextResponse.json(

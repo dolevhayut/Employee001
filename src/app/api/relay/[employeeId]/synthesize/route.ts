@@ -20,7 +20,7 @@ export async function POST(
 
   if (!hasApiKey()) {
     return Response.json(
-      { error: "ANTHROPIC_API_KEY is not configured (live synthesis needs a key)." },
+      { error: "AZURE_OPENAI_ENDPOINT is not configured (live synthesis needs a key)." },
       { status: 500 },
     );
   }
