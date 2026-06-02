@@ -1358,8 +1358,10 @@ export type RunCouncilArgs = {
 export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: string }> {
   const { responders, question, allParticipants, onEvent } = args;
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not set");
+  if (!process.env.AZURE_OPENAI_ENDPOINT) {
+    throw new Error(
+      "AZURE_OPENAI_ENDPOINT is not set — configure the Azure OpenAI Foundry deployment first."
+    );
   }
 
   const MAX_DELEGATION_ROUNDS = 3;

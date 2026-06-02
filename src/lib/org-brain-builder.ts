@@ -162,8 +162,10 @@ export async function buildBrainNodesFromText(
       notes: "empty input",
     };
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY not set — Brain Builder unavailable");
+  if (!process.env.AZURE_OPENAI_ENDPOINT) {
+    throw new Error(
+      "AZURE_OPENAI_ENDPOINT not set — Brain Builder unavailable. Configure the Azure OpenAI Foundry first."
+    );
   }
 
   const model = process.env.BRAIN_BUILDER_MODEL ?? TWIN_MODEL_PRIMARY;
@@ -187,7 +189,7 @@ export async function buildBrainNodesFromText(
       },
       permissionMode: "bypassPermissions",
       settingSources: [],
-      env: { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY },
+      env: { AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT },
     },
   });
 

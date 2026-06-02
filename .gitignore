@@ -26,3 +26,9 @@ Thumbs.db
 # Local-only docs — session summaries, build notes, scratch
 # Anything under docs/local/ stays on disk only.
 docs/local/
+
+# Overnight Azure-Fabric port secrets
+.azure-secrets/
+.env.azure
+data/
+.omc/

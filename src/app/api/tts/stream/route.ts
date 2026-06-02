@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
+import { isVoiceConfigured, synthesizeStream } from "@/lib/voice";
 
 const MAX_CHARS = 5000;
-const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
-const MODEL_ID = "eleven_flash_v2_5";
 
 function stripMarkdown(md: string): string {
   return md
@@ -21,9 +20,14 @@ function stripMarkdown(md: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) {
-    return Response.json({ error: "ELEVENLABS_API_KEY is not configured" }, { status: 500 });
+  if (!isVoiceConfigured()) {
+    return Response.json(
+      {
+        error:
+          "Azure Speech is not configured. Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.",
+      },
+      { status: 500 }
+    );
   }
 
   const body = (await request.json()) as { text?: string; voiceId?: string };
@@ -33,35 +37,28 @@ export async function POST(request: NextRequest) {
   }
 
   const text = stripMarkdown(rawText).slice(0, MAX_CHARS);
-  const voiceId = body.voiceId ?? DEFAULT_VOICE_ID;
+  const voice = body.voiceId ?? process.env.AZURE_SPEECH_VOICE ?? undefined;
 
-  const upstream = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
-    {
-      method: "POST",
-      headers: {
-        "xi-api-key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text,
-        model_id: MODEL_ID,
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-      }),
+  try {
+    const upstream = await synthesizeStream(text, voice);
+    if (!upstream.ok) {
+      const errText = await upstream.text();
+      console.error("[tts/stream] Azure Speech error", upstream.status, errText);
+      return Response.json(
+        { error: `TTS stream failed: ${upstream.status}` },
+        { status: 502 }
+      );
     }
-  );
-
-  if (!upstream.ok) {
-    const err = await upstream.text();
-    console.error("[tts/stream] ElevenLabs error", upstream.status, err);
-    return Response.json({ error: `TTS stream failed: ${upstream.status}` }, { status: 502 });
+    return new Response(upstream.body, {
+      headers: {
+        "Content-Type": "audio/mpeg",
+        "Cache-Control": "no-cache",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[tts/stream] Azure Speech error", message);
+    return Response.json({ error: message }, { status: 502 });
   }
-
-  return new Response(upstream.body, {
-    headers: {
-      "Content-Type": "audio/mpeg",
-      "Cache-Control": "no-cache",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
 }

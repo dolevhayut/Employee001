@@ -1,5 +1,7 @@
 import fs from "fs";
 import path from "path";
+import { appendOneLake } from "@/lib/storage/onelake-client";
+import { getStorageBackend } from "@/lib/storage";
 
 // ─── Rotation ─────────────────────────────────────────────────────────────────
 
@@ -101,7 +103,10 @@ function makeId(): string {
   return `aud_${Date.now().toString(36)}_${_counter}`;
 }
 
-/** Append one entry to data/audit.jsonl (non-blocking). */
+/** Append one entry to data/audit.jsonl (non-blocking). When
+ *  STORAGE_BACKEND=fabric, also mirror the same line to the Microsoft Fabric
+ *  lakehouse under Files/audit/<YYYY-MM-DD>.jsonl. The Fabric write is
+ *  fire-and-forget so the agent run is never blocked on lakehouse latency. */
 export function appendAuditEntry(
   entry: Omit<AuditEntry, "id" | "ts">
 ): void {
@@ -113,7 +118,20 @@ export function appendAuditEntry(
       ts: new Date().toISOString(),
       ...entry,
     };
-    fs.appendFileSync(AUDIT_FILE, JSON.stringify(row) + "\n", "utf8");
+    const line = JSON.stringify(row) + "\n";
+    fs.appendFileSync(AUDIT_FILE, line, "utf8");
+    if (getStorageBackend() === "fabric") {
+      const dayFile = `audit-${row.ts.slice(0, 10)}.jsonl`;
+      void appendOneLake({ table: "audit", filename: dayFile, data: line }).catch(
+        (err) => {
+          console.warn(
+            `[audit] Fabric mirror failed: ${
+              err instanceof Error ? err.message : String(err)
+            }`
+          );
+        }
+      );
+    }
   } catch {
     // Audit writes must never crash the agent run.
   }
