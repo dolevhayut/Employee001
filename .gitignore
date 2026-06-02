@@ -21,7 +21,9 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
-.claude/
+# Ignore local Claude config (settings.local.json, etc.) but VERSION the skills.
+.claude/*
+!.claude/skills/
 
 # Local-only docs — session summaries, build notes, scratch
 # Anything under docs/local/ stays on disk only.
