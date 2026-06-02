@@ -1,6 +1,6 @@
 {
   "name": "employee001",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Your company's organizational brain — agent twins of your real employees, running entirely on your own machine. MIT, no cloud, no telemetry.",
   "license": "MIT",
   "author": "Dolev Hayut",
