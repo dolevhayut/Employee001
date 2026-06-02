@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-export type RunSurface = "shift" | "routine" | "task" | "council" | "builder";
+export type RunSurface = "shift" | "routine" | "task" | "council" | "builder" | "relay";
 export type RunStatus = "running" | "complete" | "error" | "aborted";
 
 export type ActiveRun = {

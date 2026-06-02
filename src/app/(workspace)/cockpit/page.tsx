@@ -131,7 +131,7 @@ function StatusPill({ status }: { status: RunStatus }) {
 }
 
 function SurfaceChip({ surface }: { surface: RunSurface }) {
-  const s = SURFACE_STYLES[surface];
+  const s = SURFACE_STYLES[surface] ?? { bg: "var(--bg-sunken)", color: "var(--text-muted)" };
   return (
     <span
       style={{

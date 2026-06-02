@@ -15,13 +15,14 @@ import type { AgentDefinition } from "@anthropic-ai/claude-agent-sdk";
 
 const RESEARCHER_MODEL = "claude-haiku-4-5-20251001";
 
-export const TWIN_SUBAGENT_NAMES = ["web-researcher", "brain-explorer"] as const;
+export const TWIN_SUBAGENT_NAMES = ["web-researcher", "brain-explorer", "gap-finder"] as const;
 export type TwinSubagentName = (typeof TWIN_SUBAGENT_NAMES)[number];
 
 /** Used by the cockpit to render a friendly badge. */
 export const SUBAGENT_LABELS: Record<TwinSubagentName, string> = {
   "web-researcher": "🌐 Web research",
   "brain-explorer": "🧠 Brain explorer",
+  "gap-finder": "🔍 Gap finder",
 };
 
 export function buildTwinAgentDefinitions(): Record<string, AgentDefinition> {
@@ -82,6 +83,51 @@ export function buildTwinAgentDefinitions(): Record<string, AgentDefinition> {
         "- Do NOT add opinions or speculation. Quote facts; cite paths.",
         "- Maximum 10 bullets. Brevity > breadth.",
         "- If nothing relevant exists, say so plainly with the searches you tried.",
+      ].join("\n"),
+    },
+
+    "gap-finder": {
+      description: [
+        "Use this agent to score the coverage gaps in an in-progress Relay",
+        "Role Context Package (RCP). It globs the interview working notes under",
+        "scratch/<employeeId>/ plus the in-progress RCP, scores each RCP field",
+        "against the coverage rubric (minItems + weight), and returns the THINNEST",
+        "areas (which fields are under minItems, what's missing) plus a 0..1",
+        "weighted score. Read-only — it never writes. Spawn ONCE near the end of a",
+        "handover capture phase to find what's still missing.",
+      ].join(" "),
+      tools: ["Grep", "Glob", "Read"],
+      model: RESEARCHER_MODEL,
+      effort: "low",
+      prompt: [
+        "You are a read-only coverage scorer dispatched during a Relay handover.",
+        "Your cwd is the workspace data root. Look ONLY in:",
+        "- scratch/<employeeId>/*.json (interview working notes, one file per area)",
+        "- handovers/<id>/rcp.json (the in-progress Role Context Package, if present)",
+        "",
+        "The coverage rubric (field → minItems, weight):",
+        "- decision_rules: minItems 4, weight 0.25",
+        "- playbooks: minItems 3, weight 0.20",
+        "- contact_graph: minItems 4, weight 0.15",
+        "- edge_cases: minItems 3, weight 0.15",
+        "- tooling_map: minItems 3, weight 0.10",
+        "- open_loops: minItems 2, weight 0.10",
+        "- glossary: minItems 3, weight 0.05",
+        "weightedScore = sum over fields of weight * min(1, items / minItems).",
+        "status is 'handover-ready' when weightedScore >= 0.7, else 'draft'.",
+        "",
+        "Workflow:",
+        "1. Glob the scratch notes + RCP, Read them, and count populated items",
+        "   per field.",
+        "2. Compute each field's score and the overall weighted score.",
+        "3. Return a TIGHT markdown bullet list of the thinnest areas — which",
+        "   fields are under minItems and what is missing — then a final line",
+        "   `weightedScore: <0..1>` and `status: draft|handover-ready`.",
+        "",
+        "Rules:",
+        "- NEVER write or modify any file. You only read and score.",
+        "- Do NOT invent items. Count only what is actually present.",
+        "- Maximum 10 bullets. Brevity > breadth.",
       ].join("\n"),
     },
   };

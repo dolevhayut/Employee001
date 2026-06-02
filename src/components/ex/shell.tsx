@@ -42,6 +42,8 @@ const SIDEBAR_NAV: NavSection[] = [
       { href: "/tasks", label: "Tasks", icon: "Zap" },
       { href: "/flow", label: "Chat With Twin", icon: "Bot" },
       { href: "/council", label: "Team Meeting", icon: "Team" },
+      { href: "/handover", label: "Handover", icon: "Send" },
+      { href: "/handover/live", label: "Live Interview", icon: "Bot" },
     ],
   },
   {
@@ -127,6 +129,8 @@ const STATIC_COMMANDS: CommandItem[] = [
   { id: "connections", label: "Connections", href: "/connections", icon: "Plug", group: "Navigate", hint: "Manage connected tools", keywords: "integrations composio slack github gmail tools" },
   { id: "marketplace", label: "Marketplace", href: "/marketplace", icon: "Store", group: "Navigate", hint: "Hire specialized agents", keywords: "agents hire catalog" },
   { id: "council", label: "Team Meeting", href: "/council", icon: "Team", group: "Navigate", hint: "Open the council room", keywords: "meeting team debate room" },
+  { id: "handover", label: "Handover", href: "/handover", icon: "Send", group: "Navigate", hint: "Run a Relay role-context handover interview", keywords: "relay handover offboarding rcp role context successor coverage" },
+  { id: "handover-live", label: "Live Interview", href: "/handover/live", icon: "Bot", group: "Navigate", hint: "Run a real interactive handover interview (tune the interviewer prompt)", keywords: "relay live interview handover chat answer real opus synthesize tune prompt" },
   { id: "templates", label: "Templates", href: "/templates", icon: "Doc", group: "Navigate", hint: "Browse task templates", keywords: "slash commands prompts snippets" },
   { id: "routines", label: "Routines", href: "/routines", icon: "Refresh", group: "Navigate", hint: "Schedule recurring work", keywords: "automation schedule recurring cron" },
   { id: "focus", label: "Focus", href: "/focus", icon: "Eye", group: "Navigate", hint: "Configure per-twin world prefetch (PRs, Linear, Gmail) before each shift", keywords: "focus prefetch composio github linear gmail world state" },

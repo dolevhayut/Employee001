@@ -34,7 +34,7 @@ export const TWIN_HARD_DISALLOWED: string[] = [
   "ExitWorktree",
 ];
 
-export type TwinSurfaceKind = "builder" | "chat" | "meeting" | "routine";
+export type TwinSurfaceKind = "builder" | "chat" | "meeting" | "routine" | "relay";
 
 export type BaseOptionsArgs = {
   /** What kind of run this is — selects effort + max-tokens defaults. */
@@ -75,7 +75,7 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
   | "strictMcpConfig"
 > {
   const effort: EffortLevel =
-    args.surface === "builder"
+    args.surface === "builder" || args.surface === "relay"
       ? "high"
       : args.surface === "routine"
         ? "low"
