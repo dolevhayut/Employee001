@@ -54,11 +54,11 @@
     "release:major": "npm version major --preid=\"\" -m \"release: v%s\""
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.123",
-    "@anthropic-ai/sdk": "^0.91.1",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.160",
+    "@anthropic-ai/sdk": "^0.100.1",
     "@clack/prompts": "^0.9.1",
-    "@composio/claude-agent-sdk": "^0.8.0",
-    "@composio/core": "^0.8.0",
+    "@composio/claude-agent-sdk": "^0.9.2",
+    "@composio/core": "^0.10.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@react-three/postprocessing": "^3.0.4",
