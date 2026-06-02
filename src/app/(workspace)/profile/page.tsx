@@ -613,8 +613,9 @@ function ProfilePageContent() {
           ))}
         </div>
 
-        {/* Tab content */}
-        <div style={{ maxWidth: 880, marginTop: "var(--sp-24)" }}>
+        {/* Tab content — the Files split-pane editor wants more room than the
+            reading-oriented tabs, so widen it; keep 880 for the rest. */}
+        <div style={{ maxWidth: tab === "files" ? 1280 : 880, marginTop: "var(--sp-24)" }}>
           <AnimatePresence mode="wait">
             {tab === "overview" && (
               <motion.div
