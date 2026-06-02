@@ -704,6 +704,7 @@ function RcpItemList({ items, isTooling }: { items: (CapturedItem | ToolingRef)[
 
 function RcpView({ rcp }: { rcp: RoleContextPackage }) {
   const [rawJson, setRawJson] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const sections: { field: CaptureArea; items: (CapturedItem | ToolingRef)[] }[] = useMemo(
     () =>
@@ -714,10 +715,48 @@ function RcpView({ rcp }: { rcp: RoleContextPackage }) {
     [rcp],
   );
 
+  const downloadRcp = () => {
+    const subject = rcp.provenance?.consent?.subjectId ?? "handover";
+    const blob = new Blob([JSON.stringify(rcp, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rcp-${subject}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
+    <>
     <Panel>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", marginBottom: 12 }}>
         <SectionLabel>Role Context Package</SectionLabel>
+        <button
+          type="button"
+          onClick={() => setShowInfo(true)}
+          title="What is this package and how to load it into an agent?"
+          aria-label="About this package"
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: "50%",
+            border: "1px solid var(--text-subtle)",
+            background: "transparent",
+            color: "var(--text-muted)",
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: 1,
+            flexShrink: 0,
+          }}
+        >
+          ?
+        </button>
         <span
           className="mono"
           style={{
@@ -733,10 +772,18 @@ function RcpView({ rcp }: { rcp: RoleContextPackage }) {
         <div style={{ flex: 1 }} />
         <button
           type="button"
-          className="btn ghost sm"
+          className="btn sm"
           onClick={() => setRawJson((v) => !v)}
         >
           {rawJson ? "Sectioned view" : "Raw JSON"}
+        </button>
+        <button
+          type="button"
+          className="btn primary sm"
+          onClick={downloadRcp}
+          title="Download the Role Context Package as a JSON file"
+        >
+          ↓ Download rcp.json
         </button>
       </div>
 
@@ -801,6 +848,131 @@ function RcpView({ rcp }: { rcp: RoleContextPackage }) {
         </div>
       )}
     </Panel>
+    {showInfo && <RcpInfoModal subject={rcp.provenance?.consent?.subjectId ?? "the role"} onClose={() => setShowInfo(false)} />}
+    </>
+  );
+}
+
+// ─── "What is this package?" explainer modal ────────────────────────────────────
+
+function RcpInfoModal({ subject, onClose }: { subject: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="About the Role Context Package"
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(0,0,0,0.55)",
+        display: "grid",
+        placeItems: "center",
+        padding: "var(--sp-24)",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="scrollbar"
+        style={{
+          width: "min(640px, 100%)",
+          maxHeight: "82vh",
+          overflowY: "auto",
+          background: "var(--surface)",
+          border: "1px solid var(--hairline-strong)",
+          borderRadius: 12,
+          padding: "var(--sp-24)",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.45)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", marginBottom: "var(--sp-12)" }}>
+          <h2 style={{ fontSize: "var(--fs-base)", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
+            What is a Role Context Package?
+          </h2>
+          <div style={{ flex: 1 }} />
+          <button type="button" className="btn ghost sm" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+
+        <p style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", lineHeight: 1.6, margin: "0 0 var(--sp-14)" }}>
+          A portable JSON file that captures {subject}&apos;s <strong style={{ color: "var(--text)" }}>undocumented
+          working knowledge</strong> — the &ldquo;how,&rdquo; not just the &ldquo;what&rdquo; — across 7 dimensions:
+          decision rules, playbooks, the contact graph, edge cases, the tooling map, glossary, and open loops. It carries
+          <strong style={{ color: "var(--text)" }}> zero Employee001 coupling</strong>, so a successor — human or AI agent —
+          can ingest it anywhere. Tooling is stored as <em>references only</em>, never credentials.
+        </p>
+
+        <div style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--text)", margin: "0 0 var(--sp-8)" }}>
+          How to load it into an agent like Claude
+        </div>
+
+        <InfoStep n={1} title="Into a successor's Employee001 twin">
+          Drop <span className="mono">rcp-*.json</span> into the new hire&apos;s <span className="mono">knowledge/</span> folder
+          (Profile → <strong style={{ color: "var(--text)" }}>Files</strong> → knowledge/). The twin reads it on demand — the
+          successor inherits the playbooks and decision rules from day one.
+        </InfoStep>
+
+        <InfoStep n={2} title="Claude API / Agent SDK — system-prompt context">
+          Inject the file as an authoritative context block in your system prompt:
+          <pre
+            className="scrollbar mono"
+            style={{
+              marginTop: 8, marginBottom: 0, padding: 12, background: "var(--bg-sunken)",
+              border: "1px solid var(--hairline)", borderRadius: 6, overflowX: "auto",
+              fontSize: "var(--fs-2xs)", lineHeight: 1.5, color: "var(--text)",
+            }}
+          >{`import { readFileSync } from "fs";
+const rcp = readFileSync("rcp-${subject}.json", "utf8");
+
+const system = \`You are taking over this role. The Role Context
+Package below is your authoritative source for how the work is done
+— decision rules, playbooks, contacts, edge cases, tooling, open loops:
+
+\${rcp}\`;
+
+// Anthropic SDK
+await client.messages.create({ model, system, messages });`}</pre>
+        </InfoStep>
+
+        <InfoStep n={3} title="Claude Code / Claude.ai — drop-in context">
+          Save the file in your project and tell Claude to <span className="mono">Read</span> it, or attach it to the
+          conversation. For persistent context across sessions, paste the key sections into your{" "}
+          <span className="mono">CLAUDE.md</span>.
+        </InfoStep>
+
+        <p style={{ fontSize: "var(--fs-2xs)", color: "var(--text-subtle)", lineHeight: 1.5, margin: "var(--sp-14) 0 0" }}>
+          The schema (<span className="mono">relay-rcp-1</span>) is provider-agnostic — the same file works for any agent
+          framework that accepts text context, not just Claude.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function InfoStep({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: "var(--sp-10)", marginBottom: "var(--sp-12)" }}>
+      <div
+        style={{
+          width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+          background: "var(--text)", color: "var(--bg)",
+          fontSize: 11, fontWeight: 700,
+          display: "grid", placeItems: "center", marginTop: 1,
+        }}
+      >
+        {n}
+      </div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>{title}</div>
+        <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", lineHeight: 1.55 }}>{children}</div>
+      </div>
+    </div>
   );
 }
 
