@@ -31,3 +31,4 @@ docs/local/
 .azure-secrets/
 .env.azure
 data/
+.omc/

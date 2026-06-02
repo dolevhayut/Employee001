@@ -102,6 +102,12 @@ App is configured with `isFallbackPublicClient=true` for device-code auth.
 - **Capacity discipline:** when finished, suspend `fc25lq6rhm2vqg4` via `az fabric capacity suspend -g rg-confluenceetl -n fc25lq6rhm2vqg4`. F32 is $5.78/hr.
 - **End signal:** literally print `PR_URL: <https-github-url>` as the last line. The Hermes watcher greps for that and pings Roey.
 
+## Gotchas already discovered
+
+- The `gpt-4o` deployment is actually backed by **gpt-5.1** which rejects `max_tokens` — use **`max_completion_tokens`** in every request.
+- Foundry has `disableLocalAuth=true` — there is NO API key. You MUST use AAD bearer tokens. Use `DefaultAzureCredential` from `@azure/identity` with the SP env vars.
+- Admin consent for Application permissions on Graph is blocked in this tenant — that's why we're on **delegated permissions + device code**. Each user signs in once per browser session.
+
 ## Useful commands
 
 ```bash
