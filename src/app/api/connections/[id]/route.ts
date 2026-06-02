@@ -33,9 +33,14 @@ export async function GET(
   }
 
   const configured = isComposioConfigured();
-  const state = configured
-    ? await refreshConnections(id)
-    : await readState(id);
+  let state;
+  try {
+    state = configured ? await refreshConnections(id) : await readState(id);
+  } catch (err) {
+    const m = err instanceof Error ? err.message : String(err);
+    console.error(`[connections/${id}] refreshConnections failed: ${m}`);
+    state = await readState(id);
+  }
   const allowedToolkits = getEmployeeToolkits(id);
 
   // ─── Auto-resume deferred twin-build (Wave 2A) ──────────────────────────

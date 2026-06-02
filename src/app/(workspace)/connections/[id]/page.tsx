@@ -141,23 +141,9 @@ export default function ConnectionsForEmployeePage({
     }
   }
 
-  if (!employee) {
-    return (
-      <>
-        <Topbar crumbs={["Workspace", "Connections"]} />
-        <div style={{ padding: "var(--sp-32)", color: "var(--text-muted)" }}>
-          Employee not found.
-        </div>
-      </>
-    );
-  }
-
   const allowed = data?.allowedToolkits ?? [];
-
-  // Build lookup of connection state by slug
   const connBySlug = data?.connections ?? {};
 
-  // Recommended subset (allow-list)
   const recommended = useMemo(() => {
     if (catalog.length === 0) return [];
     const lookup = new Map(catalog.map((t) => [t.slug, t]));
@@ -166,7 +152,6 @@ export default function ConnectionsForEmployeePage({
       .filter(Boolean) as ToolkitSummary[];
   }, [catalog, allowed]);
 
-  // Filtered catalog by search
   const filteredCatalog = useMemo(() => {
     if (!search.trim()) return catalog;
     const q = search.trim().toLowerCase();
@@ -178,7 +163,6 @@ export default function ConnectionsForEmployeePage({
     );
   }, [catalog, search]);
 
-  // Connections that are active or pending — "Your connections" section
   const myConnections = useMemo(() => {
     const slugs = Object.keys(connBySlug);
     if (slugs.length === 0 || catalog.length === 0) return [];
@@ -191,6 +175,17 @@ export default function ConnectionsForEmployeePage({
       conn: ConnectionRecord;
     }>;
   }, [connBySlug, catalog]);
+
+  if (!employee) {
+    return (
+      <>
+        <Topbar crumbs={["Workspace", "Connections"]} />
+        <div style={{ padding: "var(--sp-32)", color: "var(--text-muted)" }}>
+          Employee not found.
+        </div>
+      </>
+    );
+  }
 
   // Active count (top stat)
   const activeCount = Object.values(connBySlug).filter(
@@ -253,25 +248,43 @@ export default function ConnectionsForEmployeePage({
           </div>
         </motion.div>
 
-        {/* Architectural rule banner — OAuth is the employee's job. */}
-        <div
-          style={{
-            marginTop: "var(--sp-20)",
-            padding: "12px 14px",
-            borderRadius: 8,
-            border: "1px solid var(--hairline-strong)",
-            background: "var(--bg-sunken)",
-            fontSize: "var(--fs-sm)",
-            color: "var(--text-muted)",
-            lineHeight: 1.5,
-          }}
-        >
-          <strong style={{ color: "var(--text)" }}>For real employees, send their invite link.</strong>{" "}
-          They&apos;ll connect their own accounts from <span className="mono">/onboarding</span>,
-          authorizing each tool while signed into <em>their</em> Slack, Gmail, Linear, etc.
-          The Connect buttons below are for marketplace agents or for testing — they bind to the
-          CEO&apos;s identity, which is the wrong audit trail for a real person&apos;s twin.
-        </div>
+        {/* Context banner — behavior differs for real employees vs marketplace agents */}
+        {employee.placement ? (
+          <div
+            style={{
+              marginTop: "var(--sp-20)",
+              padding: "12px 14px",
+              borderRadius: 8,
+              border: "1px solid var(--hairline-strong)",
+              background: "var(--bg-sunken)",
+              fontSize: "var(--fs-sm)",
+              color: "var(--text-muted)",
+              lineHeight: 1.5,
+            }}
+          >
+            <strong style={{ color: "var(--text)" }}>Marketplace agent.</strong>{" "}
+            Connect buttons authenticate as <em>you</em> (the workspace admin). The agent will
+            act on your behalf using the tools you connect here.
+          </div>
+        ) : (
+          <div
+            style={{
+              marginTop: "var(--sp-20)",
+              padding: "12px 14px",
+              borderRadius: 8,
+              border: "1px solid var(--hairline-strong)",
+              background: "var(--bg-sunken)",
+              fontSize: "var(--fs-sm)",
+              color: "var(--text-muted)",
+              lineHeight: 1.5,
+            }}
+          >
+            <strong style={{ color: "var(--text)" }}>This page shows {employee.firstName}&apos;s active connections.</strong>{" "}
+            To connect additional tools, {employee.firstName} must do it themselves via their personal
+            invite link at <span className="mono">/onboarding</span> — that way each tool is
+            authorized under <em>their</em> identity, not yours.
+          </div>
+        )}
         {/* Status banners */}
         {data && !data.configured && (
           <motion.div
@@ -337,11 +350,11 @@ export default function ConnectionsForEmployeePage({
           </motion.div>
         )}
 
-        {/* Your connections (if any) */}
+        {/* Active connections */}
         {myConnections.length > 0 && (
           <Section
-            title="Your connections"
-            subtitle="Tools this twin can already act on"
+            title="Active connections"
+            subtitle="Tools this twin can act on"
           >
             <Grid>
               {myConnections.map(({ slug, toolkit, conn }, i) => (
@@ -351,6 +364,7 @@ export default function ConnectionsForEmployeePage({
                   conn={conn}
                   busy={busyToolkit === slug}
                   configured={data?.configured ?? false}
+                  canConnect={!!employee.placement}
                   delay={i * 0.03}
                   isRecommended={allowed.includes(slug)}
                   onConnect={() => connect(slug)}
@@ -361,8 +375,8 @@ export default function ConnectionsForEmployeePage({
           </Section>
         )}
 
-        {/* Recommended for role */}
-        {recommended.length > 0 && (
+        {/* Recommended + catalog — only for marketplace agents */}
+        {employee.placement && recommended.length > 0 && (
           <Section
             title={`Recommended for ${employee.firstName}`}
             subtitle="Curated tools for the role · click to connect"
@@ -375,6 +389,7 @@ export default function ConnectionsForEmployeePage({
                   conn={connBySlug[toolkit.slug]}
                   busy={busyToolkit === toolkit.slug}
                   configured={data?.configured ?? false}
+                  canConnect
                   delay={i * 0.03}
                   isRecommended
                   onConnect={() => connect(toolkit.slug)}
@@ -385,8 +400,8 @@ export default function ConnectionsForEmployeePage({
           </Section>
         )}
 
-        {/* Full catalog with search */}
-        <div style={{ marginTop: "var(--sp-36)" }}>
+        {/* Full catalog with search — only for marketplace agents */}
+        {employee.placement && <div style={{ marginTop: "var(--sp-36)" }}>
           <div
             style={{
               display: "flex",
@@ -487,6 +502,7 @@ export default function ConnectionsForEmployeePage({
                         conn={connBySlug[toolkit.slug]}
                         busy={busyToolkit === toolkit.slug}
                         configured={data?.configured ?? false}
+                        canConnect
                         delay={Math.min(i * 0.012, 0.4)}
                         isRecommended={allowed.includes(toolkit.slug)}
                         onConnect={() => connect(toolkit.slug)}
@@ -511,7 +527,7 @@ export default function ConnectionsForEmployeePage({
               )}
             </motion.div>
           )}
-        </div>
+        </div>}
 
         {/* Footer */}
         <div
@@ -607,6 +623,7 @@ function ToolkitCard({
   conn,
   busy,
   configured,
+  canConnect = false,
   isRecommended,
   delay = 0,
   onConnect,
@@ -616,6 +633,7 @@ function ToolkitCard({
   conn?: ConnectionRecord;
   busy: boolean;
   configured: boolean;
+  canConnect?: boolean;
   isRecommended: boolean;
   delay?: number;
   onConnect: () => void;
@@ -734,7 +752,7 @@ function ToolkitCard({
           marginTop: "auto",
         }}
       >
-        {!isActive && !isPending && (
+        {canConnect && !isActive && !isPending && (
           <button
             onClick={onConnect}
             disabled={busy || !configured}
@@ -755,7 +773,7 @@ function ToolkitCard({
             {busy ? "Opening…" : isBroken ? "Reconnect" : "Connect"}
           </button>
         )}
-        {isPending && (
+        {canConnect && isPending && (
           <>
             <a
               href={conn?.redirectUrl}
@@ -815,7 +833,7 @@ function ToolkitCard({
               <Check width={11} height={11} strokeWidth={1.8} />
               Connected
             </div>
-            <button
+            {canConnect && <button
               onClick={onDisconnect}
               disabled={busy}
               style={{
@@ -831,7 +849,7 @@ function ToolkitCard({
               }}
             >
               Disconnect
-            </button>
+            </button>}
           </>
         )}
       </div>
