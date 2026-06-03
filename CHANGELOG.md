@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Shift history.** The routine detail modal now lists every past run of
+  a twin's shift (status, time, one-line summary, deliverable count), read
+  from the per-shift archives. Selecting a run loads its summary and
+  deliverables, so you can browse what the twin produced across days — not
+  just the latest run. Backed by `GET /api/shifts?employeeId=` and a
+  `listShiftArchives` reader.
 - **Shift deliverables are visible in the UI.** The routine detail modal
   now has a **Deliverables** section that lists what an autonomous shift
   actually produced — written documents (openable in an inline markdown

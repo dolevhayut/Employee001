@@ -153,6 +153,27 @@ export function readShiftArchive(runId: string): ShiftArchiveData {
   return { manifest, outputs, artifacts };
 }
 
+/** List shift archives (manifests only), newest first. Optionally filter by twin. */
+export function listShiftArchives(opts?: { employeeId?: string; limit?: number }): ShiftManifest[] {
+  const root = path.join(process.cwd(), "data", "shifts");
+  let dirs: string[];
+  try {
+    dirs = fs.readdirSync(root);
+  } catch {
+    return [];
+  }
+  const out: ShiftManifest[] = [];
+  for (const runId of dirs) {
+    if (runId.startsWith(".")) continue;
+    const m = readManifest(runId);
+    if (!m) continue;
+    if (opts?.employeeId && m.employeeId !== opts.employeeId) continue;
+    out.push(m);
+  }
+  out.sort((a, b) => (b.startedAt ?? "").localeCompare(a.startedAt ?? ""));
+  return typeof opts?.limit === "number" ? out.slice(0, opts.limit) : out;
+}
+
 /** Read a specific artifact file as UTF-8 text. Returns null if not found or too large. */
 export function readArtifactContent(runId: string, artifactName: string): string | null {
   try {

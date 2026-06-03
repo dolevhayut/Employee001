@@ -412,8 +412,20 @@ type ShiftOutput = {
   note?: string;
 };
 type ShiftArtifact = { name: string; relativePath: string; sizeBytes: number };
+type ShiftManifest = {
+  runId: string;
+  trigger?: string;
+  startedAt?: string;
+  endedAt?: string;
+  status?: string;
+  summary?: string;
+  outputCount?: number;
+  costUsd?: number;
+  turns?: number;
+  approvals?: Array<{ tool: string; decision: string }>;
+};
 type ShiftArchiveData = {
-  manifest: { outputCount: number; costUsd?: number; turns?: number; approvals?: Array<{ tool: string; decision: string }> } | null;
+  manifest: ShiftManifest | null;
   outputs: ShiftOutput[];
   artifacts: ShiftArtifact[];
 };
@@ -430,21 +442,41 @@ function RoutineDetailModal({
   const employee = useRoster().find((e) => e.id === routine.employeeId);
   const status = routine.lastRunStatus ? STATUS_META[routine.lastRunStatus] : null;
 
-  // Load shift archive when the modal opens (shift-kind routines only)
+  // Shift history + archive (shift-kind routines only)
+  const [history, setHistory] = useState<ShiftManifest[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<string | undefined>(routine.lastRunId);
   const [shiftData, setShiftData] = useState<ShiftArchiveData | null>(null);
   const [openArtifact, setOpenArtifact] = useState<{ name: string; content: string } | null>(null);
+
+  // Load the run history for this twin.
   useEffect(() => {
-    if (routine.kind !== "shift" || !routine.lastRunId) return;
-    fetch(`/api/shifts/${routine.lastRunId}`, { cache: "no-store" })
-      .then((r) => r.ok ? r.json() as Promise<ShiftArchiveData> : null)
+    if (routine.kind !== "shift") return;
+    fetch(`/api/shifts?employeeId=${routine.employeeId}`, { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<ShiftManifest[]>) : []))
+      .then((list) => {
+        setHistory(list);
+        setSelectedRunId((cur) => cur ?? list[0]?.runId);
+      })
+      .catch(() => {});
+  }, [routine.kind, routine.employeeId]);
+
+  // Load the archive for the selected run.
+  useEffect(() => {
+    if (routine.kind !== "shift" || !selectedRunId) return;
+    setShiftData(null);
+    fetch(`/api/shifts/${selectedRunId}`, { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<ShiftArchiveData>) : null))
       .then((d) => { if (d) setShiftData(d); })
       .catch(() => {});
-  }, [routine.kind, routine.lastRunId]);
+  }, [routine.kind, selectedRunId]);
+
+  const selectedManifest = shiftData?.manifest ?? history.find((h) => h.runId === selectedRunId);
+  const displaySummary = selectedManifest?.summary ?? routine.lastRunSummary;
 
   async function viewArtifact(artifact: ShiftArtifact) {
-    if (!routine.lastRunId) return;
+    if (!selectedRunId) return;
     try {
-      const r = await fetch(`/api/shifts/${routine.lastRunId}?artifact=${encodeURIComponent(artifact.name)}`);
+      const r = await fetch(`/api/shifts/${selectedRunId}?artifact=${encodeURIComponent(artifact.name)}`);
       if (!r.ok) return;
       const { content } = await r.json() as { content: string };
       setOpenArtifact({ name: artifact.name, content });
@@ -585,9 +617,9 @@ function RoutineDetailModal({
             </div>
           </div>
 
-          {/* Last run */}
-          {routine.lastRunSummary && (
-            <div>
+          {/* Shift history */}
+          {routine.kind === "shift" && history.length > 0 && (
+            <div style={{ marginBottom: "var(--sp-20)" }}>
               <div
                 style={{
                   fontSize: "var(--fs-meta)",
@@ -598,7 +630,83 @@ function RoutineDetailModal({
                   marginBottom: "var(--sp-6)",
                 }}
               >
-                Latest response
+                Shift history
+                <span style={{ fontWeight: 400, textTransform: "none", marginLeft: 6, opacity: 0.6 }}>
+                  ({history.length})
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)", maxHeight: 200, overflowY: "auto" }} className="scrollbar">
+                {history.map((h) => {
+                  const sel = h.runId === selectedRunId;
+                  const st = h.status === "complete" ? { c: "#22C55E", l: "done" }
+                    : h.status === "error" ? { c: "#EF4444", l: "error" }
+                    : { c: "#F59E0B", l: h.status ?? "running" };
+                  return (
+                    <button
+                      key={h.runId}
+                      type="button"
+                      onClick={() => setSelectedRunId(h.runId)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "var(--sp-10)",
+                        padding: "8px 10px",
+                        background: sel ? "var(--bg-sunken)" : "transparent",
+                        border: `1px solid ${sel ? "var(--hairline)" : "transparent"}`,
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        fontFamily: "inherit",
+                        width: "100%",
+                        transition: "background 0.12s",
+                      }}
+                      onMouseEnter={(e) => { if (!sel) e.currentTarget.style.background = "var(--bg-sunken)"; }}
+                      onMouseLeave={(e) => { if (!sel) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: st.c, flexShrink: 0 }} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: "var(--fs-sm)", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {h.summary ?? "(no summary)"}
+                        </div>
+                        <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>
+                          {relTime(h.startedAt)} · {st.l}
+                          {h.trigger ? ` · ${h.trigger}` : ""}
+                        </div>
+                      </div>
+                      {(h.outputCount ?? 0) > 0 && (
+                        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", fontWeight: 600, flexShrink: 0 }}>
+                          {h.outputCount} 📎
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Selected-run response */}
+          {displaySummary && (
+            <div>
+              <div
+                style={{
+                  fontSize: "var(--fs-meta)",
+                  fontWeight: 600,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  marginBottom: "var(--sp-6)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--sp-8)",
+                }}
+              >
+                {selectedManifest && history.length > 1 ? "Run summary" : "Latest response"}
+                {selectedManifest?.startedAt && (
+                  <span style={{ fontWeight: 400, textTransform: "none", color: "var(--text-subtle)" }}>
+                    · {relTime(selectedManifest.startedAt)}
+                  </span>
+                )}
               </div>
               <div
                 style={{
@@ -611,7 +719,7 @@ function RoutineDetailModal({
                   lineHeight: 1.6,
                 }}
               >
-                <Markdown>{routine.lastRunSummary}</Markdown>
+                <Markdown>{displaySummary}</Markdown>
               </div>
             </div>
           )}
