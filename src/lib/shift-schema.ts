@@ -58,6 +58,20 @@ export const ShiftReport = z.object({
     .array(z.string())
     .optional()
     .describe("Relative paths the twin created or modified."),
+  outputs: z
+    .array(
+      z.object({
+        kind: z.enum(["image", "video", "file", "link", "text"]).optional(),
+        title: z.string(),
+        url: z.string().optional(),
+        path: z.string().optional(),
+        note: z.string().optional(),
+      })
+    )
+    .optional()
+    .describe(
+      "Every concrete deliverable you produced this shift — generated image/video URLs, created files, published links. Always list them here so the CEO has a clean record of what came out of the shift."
+    ),
 });
 
 export type ShiftReportType = z.infer<typeof ShiftReport>;

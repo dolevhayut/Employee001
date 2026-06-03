@@ -88,8 +88,19 @@ export function resolveApproval(
   return true;
 }
 
-/** Auto-clean stale approvals after 10 minutes (memory hygiene). */
-const TTL_MS = 10 * 60 * 1000;
+// Auto-clean stale approvals (memory hygiene + backstop so an awaiting runner
+// never hangs forever). TTL is per-surface: a `chat` approval assumes the CEO
+// is present right now, so it expires fast; a `background` approval comes from
+// an unattended shift the CEO may not see for hours, so it waits much longer
+// (the shift genuinely blocks on it — see shift-runner). On expiry we still
+// resolve `deny` as a final backstop.
+const CHAT_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const BACKGROUND_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+function ttlFor(surface: ApprovalSurface): number {
+  return surface === "background" ? BACKGROUND_TTL_MS : CHAT_TTL_MS;
+}
+
 if (typeof globalThis !== "undefined") {
   // Avoid spawning multiple intervals in dev hot-reload
   type GlobalWithInterval = typeof globalThis & {
@@ -100,11 +111,13 @@ if (typeof globalThis !== "undefined") {
     g.__approvalSweep = setInterval(() => {
       const now = Date.now();
       for (const [id, entry] of PENDING.entries()) {
-        if (now - entry.request.createdAt > TTL_MS) {
+        const ttl = ttlFor(entry.request.surface);
+        if (now - entry.request.createdAt > ttl) {
           PENDING.delete(id);
+          const mins = Math.round(ttl / 60_000);
           entry.resolve({
             action: "deny",
-            message: "Approval timed out — no human response within 10 minutes.",
+            message: `Approval timed out — no human response within ${mins >= 60 ? `${Math.round(mins / 60)}h` : `${mins} minutes`}.`,
           });
         }
       }

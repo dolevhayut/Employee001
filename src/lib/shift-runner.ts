@@ -19,6 +19,15 @@ import { appendRunLog, logPathFor } from "@/lib/run-logs";
 import { recordSpend } from "@/lib/twin-budget";
 import { createConsultContext } from "@/lib/twin-consult";
 import { buildConsultMcpServer } from "@/lib/consult-mcp";
+import { registerApproval } from "@/lib/approval-bus";
+import {
+  initShiftArchive,
+  archiveEvent,
+  archiveOutput,
+  archiveToolResult,
+  finalizeShiftArchive,
+  summariseOutput,
+} from "@/lib/shift-archive";
 
 // ─── Return type ──────────────────────────────────────────────────────────────
 
@@ -86,8 +95,9 @@ You are running in autonomous shift mode. No CEO is present. Your job is to:
 **Rules for this shift:**
 - Read before you write. Prefer read-only tools first.
 - Do NOT send messages, emails, or post to external channels without a prior decision recorded in your shift log.
-- Destructive or external-facing actions are automatically deferred to /flow for CEO review.
+- You CAN take real actions (including generating images/video, posting, sending). For any action that isn't read-only, a live approval request is raised to the CEO and the run pauses until they approve or decline — so go ahead and use the tool when the work calls for it; don't pre-emptively skip it.
 - If a decision needs a colleague's expertise or sign-off, use \`consult_twin\` for advice or \`request_approval\` for a go/no-go — don't guess outside your lane. Use sparingly, only when their input changes what you'd do.
+- **Record every deliverable you produce** (generated image/video URLs, created files, published links) in the \`outputs\` field of your ShiftReport, so the CEO has a clean record of what came out of the shift.
 - Keep the summary to one short line: what actually happened, not what you planned.`;
 
   const shiftLog = readShiftLog(employee.id);
@@ -173,6 +183,7 @@ export async function runShift(args: {
     logPath: logPathFor("shift", runId),
   });
   appendRunLog("shift", runId, { type: "meta", message: `Shift started — trigger: ${trigger}` });
+  initShiftArchive({ runId, employeeId: employee.id, employeeName: employee.name, trigger });
 
   let turns = 0;
   let costUsd = 0;
@@ -214,6 +225,12 @@ export async function runShift(args: {
         console.warn("[shift-runner] no-mcp feed item failed:", err);
       }
       appendRunLog("shift", runId, { type: "meta", message: "Skipped: no MCP connections" });
+      finalizeShiftArchive(runId, {
+        status: "complete",
+        summary: `Skipped: no MCP connections active for ${employee.firstName}.`,
+        costUsd: 0,
+        turns: 0,
+      });
       unregisterRun(runId, { status: "complete", costUsd: 0 });
       return {
         report: null,
@@ -285,7 +302,49 @@ export async function runShift(args: {
         return { behavior: "deny", message: decision.reason };
       }
 
-      // "ask" in shift mode → deny immediately; tell the model WHY and what to do
+      // "ask" in shift mode → raise a live approval request the CEO can resolve
+      // from the GlobalApprovalOverlay (it polls /api/approvals/pending), exactly
+      // like chat/council. The shift BLOCKS here until the CEO responds (or the
+      // background TTL backstop fires). This is what lets a content-creation
+      // shift call image/video tools — the action runs only once approved.
+      const { approvalId, promise } = registerApproval({
+        runId,
+        employeeId: employee.id,
+        employeeName: employee.name,
+        toolName,
+        bareName: bare,
+        input: typedInput,
+        reason: decision.reason,
+        surface: "background",
+      });
+      appendRunLog("shift", runId, {
+        type: "meta",
+        message: `Awaiting CEO approval: ${bare} — ${decision.reason}`,
+      });
+      updateRun(runId, { currentTool: `⏳ approval: ${bare}` });
+      archiveEvent(runId, { kind: "approval_request", tool: bare, reason: decision.reason });
+
+      const verdict = await promise;
+
+      appendRunLog("shift", runId, { type: "approval", tool: bare, decision: verdict.action });
+      archiveEvent(runId, { kind: "approval", tool: bare, decision: verdict.action });
+
+      if (verdict.action === "allow") {
+        const finalInput = verdict.updatedInput ?? typedInput;
+        appendAuditEntry({
+          runId,
+          employeeId: employee.id,
+          employeeName: employee.name,
+          toolName,
+          bareName: bare,
+          input: finalInput,
+          verdict: "ceo_approved",
+          approvalId,
+          inputEdited: verdict.updatedInput !== undefined,
+        });
+        return { behavior: "allow", updatedInput: finalInput as typeof input };
+      }
+
       appendAuditEntry({
         runId,
         employeeId: employee.id,
@@ -293,13 +352,14 @@ export async function runShift(args: {
         toolName,
         bareName: bare,
         input: typedInput,
-        verdict: "deferred_to_flow",
+        verdict: "ceo_denied",
+        approvalId,
       });
       return {
         behavior: "deny",
         message:
-          `${decision.reason} — This action requires CEO approval and cannot run in unattended shift mode. ` +
-          `Do not retry. Instead, note the intended action in your ShiftReport under "pending_actions" so the CEO can approve it later.`,
+          verdict.message ??
+          `${decision.reason} — The CEO declined this action. Do not retry; note it in your ShiftReport under "pending_actions" and continue with what you can.`,
       };
     };
 
@@ -340,6 +400,8 @@ export async function runShift(args: {
 
     let toolCallCount = 0;
     let textBuf = "";
+    // Map tool_use id → bare tool name so we can label tool_result payloads.
+    const toolUseNames = new Map<string, string>();
     const flushTextBuf = () => {
       if (!textBuf.trim()) {
         textBuf = "";
@@ -377,6 +439,12 @@ export async function runShift(args: {
               tool: bare,
               input: block.input as Record<string, unknown>,
             });
+            archiveEvent(runId, {
+              kind: "tool_use",
+              tool: bare,
+              input: block.input as Record<string, unknown>,
+            });
+            toolUseNames.set(block.id, bare);
             updateRun(runId, { toolCalls: toolCallCount, currentTool: bare });
           }
         }
@@ -388,7 +456,30 @@ export async function runShift(args: {
         if (Array.isArray(content)) {
           for (const block of content) {
             if (typeof block === "object" && block !== null && "type" in block && block.type === "tool_result") {
-              appendRunLog("shift", runId, { type: "tool_result", tool: "result" });
+              const tr = block as { tool_use_id?: string; content?: unknown };
+              const tool = (tr.tool_use_id && toolUseNames.get(tr.tool_use_id)) || "result";
+              // Flatten the result content to text so we can document outputs.
+              let resultText = "";
+              if (typeof tr.content === "string") {
+                resultText = tr.content;
+              } else if (Array.isArray(tr.content)) {
+                resultText = tr.content
+                  .map((b) =>
+                    b && typeof b === "object" && "text" in b && typeof (b as { text?: unknown }).text === "string"
+                      ? (b as { text: string }).text
+                      : typeof b === "string"
+                        ? b
+                        : ""
+                  )
+                  .join("\n");
+              }
+              appendRunLog("shift", runId, {
+                type: "tool_result",
+                tool,
+                ...(resultText ? { output: summariseOutput(resultText) } : {}),
+              });
+              // Durable archive: capture the payload + distil any produced URLs.
+              archiveToolResult(runId, tool, resultText);
             }
           }
         }
@@ -416,6 +507,24 @@ export async function runShift(args: {
             costUsd,
             turns,
           });
+          // Record the twin's self-declared deliverables into the shift archive.
+          for (const o of parsed.data.outputs ?? []) {
+            archiveOutput(runId, {
+              tool: "shift-report",
+              kind: o.kind ?? (o.url ? "link" : "text"),
+              ...(o.url ? { urls: [o.url] } : {}),
+              note: o.path ? `${o.title} (${o.path})` : o.title,
+            });
+          }
+          for (const p of parsed.data.artifacts ?? []) {
+            archiveOutput(runId, { tool: "shift-report", kind: "file", note: p });
+          }
+          finalizeShiftArchive(runId, {
+            status: "complete",
+            summary: parsed.data.summary,
+            costUsd,
+            turns,
+          });
           unregisterRun(runId, { status: "complete", costUsd });
           if (costUsd > 0) recordSpend(employee.id, costUsd);
           return {
@@ -438,6 +547,12 @@ export async function runShift(args: {
       costUsd,
       turns,
     });
+    finalizeShiftArchive(runId, {
+      status: stoppedReason === "max_budget" || stoppedReason === "max_turns" ? "error" : "complete",
+      summary: fallbackSummary,
+      costUsd,
+      turns,
+    });
     unregisterRun(runId, {
       status: stoppedReason === "max_budget" || stoppedReason === "max_turns" ? "error" : "complete",
       costUsd,
@@ -454,6 +569,7 @@ export async function runShift(args: {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     appendRunLog("shift", runId, { type: "error", message });
+    finalizeShiftArchive(runId, { status: "error", summary: `Shift failed: ${message}`, costUsd: 0, turns: 0 });
     unregisterRun(runId, { status: "error", costUsd: 0 });
     return {
       report: null,

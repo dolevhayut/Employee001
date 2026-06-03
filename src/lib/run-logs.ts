@@ -13,7 +13,7 @@ export type RunLogEvent =
       payload: { type: "html" | "svg"; title: string; content: string };
     }
   | { ts: string; type: "tool_use"; tool: string; input?: Record<string, unknown> }
-  | { ts: string; type: "tool_result"; tool: string }
+  | { ts: string; type: "tool_result"; tool: string; output?: string }
   | { ts: string; type: "approval"; tool: string; decision: "allow" | "deny" | "deferred" }
   | { ts: string; type: "meta"; message: string }
   | { ts: string; type: "error"; message: string }

@@ -8,6 +8,35 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — shifts take real action with live CEO approval
+- **Autonomous shifts can now run action tools (generate images/video,
+  post, send) — gated by a live approval, not silently blocked.**
+  Previously an unattended shift *denied* every non-read-only tool and
+  told the twin to defer it, so a "create marketing content" shift could
+  never actually call an image/video service. Now any such call raises a
+  real approval request and the shift **pauses** until the CEO responds.
+- **Reuses the existing approval surface.** The request appears in the
+  same `GlobalApprovalOverlay` (Approve / Edit args / Skip) used by chat
+  and council — no new UI. Approving with edited args is supported.
+- **Background approvals wait far longer than chat ones.** Per-surface
+  TTL in the approval bus: `chat` stays 10 min (CEO is present), a
+  shift's `background` approval waits up to **6 hours** before the
+  backstop denies it — so a shift genuinely blocks on the CEO.
+
+### Added — per-shift output archive
+- **Every shift now writes a durable, organised record** under
+  `data/shifts/<runId>/`: `manifest.json` (who/when/cost/status +
+  approval decisions + output count), `events.jsonl` (full chronological
+  history — tool calls, tool *results*, approvals), and `outputs.jsonl`
+  (distilled deliverables: image/video URLs, files, links).
+- **Tool results are captured, not just tool calls.** URLs are extracted
+  from results automatically and recorded as outputs; oversized/base64
+  payloads are summarised so the archive never bloats.
+- **`ShiftReport.outputs`** — a new structured field the twin fills with
+  every deliverable it produced, merged into the archive. The shift
+  run-log (`tool_result`) now carries the (truncated) result payload too,
+  so the live cockpit view shows what each tool returned.
+
 ## [0.2.0] — 2026-06-03
 
 ### Added — twin-to-twin consultation during shifts
