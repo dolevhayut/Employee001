@@ -8,6 +8,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-06-03
+
 ### Added — twin-to-twin consultation during shifts
 - **A twin on an autonomous shift can now consult another twin,
   synchronously, mid-run.** Previously a single-twin shift (e.g. a
@@ -256,7 +258,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CLI commands: `setup`, `start`, `update`, `doctor`, `help`
 - Human-controlled autonomy — approval gate before any sensitive tool call executes
 
-[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.8...HEAD
+[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/dolevhayut/Employee001/compare/v0.1.3...v0.2.0
 [0.1.0-rc.8]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.7...v0.1.0-rc.8
 [0.1.0-rc.7]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.6...v0.1.0-rc.7
 [0.1.0-rc.6]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.5...v0.1.0-rc.6
