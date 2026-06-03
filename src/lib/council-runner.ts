@@ -61,6 +61,8 @@ import {
   type TwinSubagentName,
 } from "@/lib/twin-subagents";
 import { knowledgeIndexMarkdown } from "@/lib/knowledge-files";
+import { buildConsultMcpServer } from "@/lib/consult-mcp";
+import type { ConsultContext } from "@/lib/twin-consult";
 
 // ─── Event types ──────────────────────────────────────────────────────────────
 
@@ -578,6 +580,21 @@ export type RunOptions = {
    * `claude-sonnet-4-6`; CEO can pick `claude-opus-4-7` for harder asks.
    */
   modelOverride?: string;
+  /**
+   * Lightweight consultation run — this twin is being consulted by another
+   * twin's run, not driving its own. Skips the personal Composio + org MCP
+   * setup and the intent planner, and caps turns lower, so a consultation
+   * chain stays cheap. The twin still has its profile, org-brain search,
+   * artifacts, and (when `consultContext` is set) the ability to consult on.
+   */
+  consultMode?: boolean;
+  /**
+   * When set, registers the twin-to-twin consultation MCP server for this run
+   * so the twin can consult / request approval from peers. Threaded one hop
+   * deeper on each consultation; the shared `visited` set + depth cap inside
+   * prevent runaway chains. See twin-consult.ts.
+   */
+  consultContext?: ConsultContext;
 };
 
 // ─── Mention detection ────────────────────────────────────────────────────────
@@ -775,25 +792,31 @@ export async function runSingleTwin(
     // and merge in any org-wide custom MCP servers the CEO configured in /settings.
     // Composio outages must NOT abort the twin's turn — degrade gracefully by
     // omitting the toolkit so the twin can still answer from its profile files.
-    const [composioMcp, orgMcpServers] = await Promise.all([
-      buildEmployeeMcpServer(employee.id).catch((err) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[composio] tools unavailable, twin will answer without them: ${msg}`);
-        onEvent({
-          type: "tool_blocked",
-          employeeId: employee.id,
-          tool: "composio",
-          reason: `Composio is temporarily unavailable — tools are degraded. ${msg}`,
-          ts: ts(),
-        });
-        return null;
-      }),
-      loadOrgCustomMcpServers().catch((err) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[org-mcp] load failed: ${msg}`);
-        return {};
-      }),
-    ]);
+    // Consultation runs stay light: skip the personal Composio + org-wide MCP
+    // setup entirely (the consulted twin gives advice from its profile +
+    // org-brain, it doesn't act on external systems on this hop).
+    const consultMode = options.consultMode === true;
+    const [composioMcp, orgMcpServers] = consultMode
+      ? [null, {} as Awaited<ReturnType<typeof loadOrgCustomMcpServers>>]
+      : await Promise.all([
+          buildEmployeeMcpServer(employee.id).catch((err) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.warn(`[composio] tools unavailable, twin will answer without them: ${msg}`);
+            onEvent({
+              type: "tool_blocked",
+              employeeId: employee.id,
+              tool: "composio",
+              reason: `Composio is temporarily unavailable — tools are degraded. ${msg}`,
+              ts: ts(),
+            });
+            return null;
+          }),
+          loadOrgCustomMcpServers().catch((err) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.warn(`[org-mcp] load failed: ${msg}`);
+            return {};
+          }),
+        ]);
 
     const meetingId = options.teamMeetingContext?.meetingId;
 
@@ -807,6 +830,12 @@ export async function runSingleTwin(
       // gate (the twin can already Read these files directly; the MCP
       // tool is just a more efficient retrieval surface).
       org_brain: buildOrgBrainMcpServer(),
+      // Twin-to-twin consultation — only when the caller threaded a context.
+      // Lets this twin synchronously consult / request approval from peers;
+      // the context's depth cap + shared visited-set guard against loops.
+      ...(options.consultContext
+        ? { twin_consult: buildConsultMcpServer(options.consultContext) }
+        : {}),
       // Per-meeting scratch — only when we're inside a Team Meeting run.
       // The handler callback fires after persistence succeeds; we forward
       // it as `file_shared` so the UI can render the chip in the right
@@ -902,7 +931,8 @@ export async function runSingleTwin(
           : "chat";
 
     let responseIntentBlock = "";
-    try {
+    // Skip the intent-planner LLM call on consultation hops — keeps chains cheap.
+    if (!consultMode) try {
       const plan = await planEmployeeResponseIntent(question, {
         employeeName: employee.name,
         employeeRole: employee.role,
@@ -1126,7 +1156,7 @@ export async function runSingleTwin(
         agents: buildTwinAgentDefinitions(),
         toolConfig: { askUserQuestion: { previewFormat: "html" } },
         ...(hasMcp ? { mcpServers } : {}),
-        maxTurns: hasMcp ? 20 : 6,
+        maxTurns: consultMode ? 8 : hasMcp ? 20 : 6,
         ...(options.maxBudgetUsd ? { maxBudgetUsd: options.maxBudgetUsd } : {}),
         includePartialMessages: true,
         permissionMode: hasMcp ? "default" : "bypassPermissions",

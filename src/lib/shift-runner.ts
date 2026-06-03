@@ -17,6 +17,8 @@ import { appendFeedItem } from "@/lib/feed-store";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
 import { recordSpend } from "@/lib/twin-budget";
+import { createConsultContext } from "@/lib/twin-consult";
+import { buildConsultMcpServer } from "@/lib/consult-mcp";
 
 // ─── Return type ──────────────────────────────────────────────────────────────
 
@@ -85,6 +87,7 @@ You are running in autonomous shift mode. No CEO is present. Your job is to:
 - Read before you write. Prefer read-only tools first.
 - Do NOT send messages, emails, or post to external channels without a prior decision recorded in your shift log.
 - Destructive or external-facing actions are automatically deferred to /flow for CEO review.
+- If a decision needs a colleague's expertise or sign-off, use \`consult_twin\` for advice or \`request_approval\` for a go/no-go — don't guess outside your lane. Use sparingly, only when their input changes what you'd do.
 - Keep the summary to one short line: what actually happened, not what you planned.`;
 
   const shiftLog = readShiftLog(employee.id);
@@ -241,6 +244,21 @@ export async function runShift(args: {
       }
     }
 
+    // Twin-to-twin consultation: this twin can synchronously consult / request
+    // approval from peers mid-shift. Created AFTER the no-MCP gate above so the
+    // gate still measures real action tools — consultation augments an
+    // action-capable shift, it isn't a reason to run an actionless one.
+    const consultCtx = await createConsultContext({
+      requester: employee,
+      runId,
+      surface: "shift",
+      maxDepth: 3,
+    });
+    const mcpServersWithConsult = {
+      ...mcpServers,
+      twin_consult: buildConsultMcpServer(consultCtx),
+    };
+
     const canUseTool: CanUseTool = async (
       toolName,
       input
@@ -306,7 +324,7 @@ export async function runShift(args: {
         cwd: employeeDir,
         systemPrompt: buildSystemPromptBlocks(employee, employeeDir, trigger, focusBlock),
         allowedTools: ["TodoWrite"],
-        ...(hasMcp ? { mcpServers } : {}),
+        mcpServers: mcpServersWithConsult,
         maxTurns: 12,
         includePartialMessages: true,
         permissionMode: hasMcp ? "default" : "bypassPermissions",

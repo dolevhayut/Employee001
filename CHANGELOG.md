@@ -8,6 +8,35 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — twin-to-twin consultation during shifts
+- **A twin on an autonomous shift can now consult another twin,
+  synchronously, mid-run.** Previously a single-twin shift (e.g. a
+  designer's "create marketing content" routine) had no way to get a
+  colleague's input without filing an async task and waiting for that
+  twin's next shift. Now it can ask and keep working in the same run.
+- **Two new in-process MCP tools**, the twin chooses which fits:
+  - `consult_twin(targetEmployeeId, question)` — ask a peer for advice;
+    their reply comes back as the tool result and the asking twin
+    continues with it in hand.
+  - `request_approval(approverEmployeeId, what, context)` — ask a peer
+    (e.g. the CEO-twin) for a go/no-go before acting. Returns an
+    approve/reject verdict **and** logs the decision to `/inbox` so a
+    human can review and override it.
+- **Fully local** — a consultation is just a nested twin run; the only
+  external call is the Anthropic API the app already uses. No cloud
+  state, in keeping with the on-prem design. (Anthropic's hosted
+  *Managed Agents* was evaluated and rejected for this: it persists
+  session state server-side, which conflicts with local-first.)
+- **Loop-safe by construction.** A shared `visited` set (seeded with the
+  requester) means no twin is consulted twice in a run and a twin can't
+  consult itself; a depth cap (`maxDepth = 3`) bounds consultation
+  chains — mirrors the council `@mention` delegation guard. Each
+  consultation hop runs "light" (no personal/org MCP, lower turn + $0.50
+  budget cap) so chains stay cheap.
+- New `src/lib/twin-consult.ts` (orchestration) + `src/lib/consult-mcp.ts`
+  (tool surface); `runSingleTwin` gained `consultMode` / `consultContext`
+  options and `shift-runner` wires a consult context into every shift.
+
 ### Added — per-twin knowledge directory + editor
 - **`knowledge/` directory per twin.** A new
   `data/employees/<id>/knowledge/` folder where the CEO uploads and

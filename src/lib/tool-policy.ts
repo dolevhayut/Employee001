@@ -52,6 +52,12 @@ const LOCAL_SAFE_TOOLS = new Set([
   "view_meeting_image",
   "analyze_csv",
   "query_csv",
+  // Twin-to-twin consultation — purely internal orchestration (a nested twin
+  // run on the same host). Loop-guarded by depth cap + visited set in
+  // twin-consult.ts; request_approval additionally logs to /inbox for the
+  // human to override. No external side effects of their own.
+  "consult_twin",
+  "request_approval",
 ]);
 
 /**
