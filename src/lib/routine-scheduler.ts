@@ -208,6 +208,7 @@ export async function fireRoutine(
     }
   };
 
+  let shiftRunId: string | undefined;
   try {
     if (r.kind === "shift") {
       const result = await runShift({
@@ -215,6 +216,7 @@ export async function fireRoutine(
         trigger,
       });
       textOut = result.summary;
+      shiftRunId = result.runId;
       if (result.stoppedReason === "error") errored = true;
     } else {
       await runSingleTwin(employee, r.task, onEvent, [], {
@@ -254,6 +256,7 @@ export async function fireRoutine(
     lastRunAt: new Date().toISOString(),
     lastRunStatus: status,
     lastRunSummary: summary,
+    ...(shiftRunId ? { lastRunId: shiftRunId } : {}),
   });
 
   // CEO visibility: every routine run lands in /inbox. Skip shift-kind because

@@ -403,6 +403,21 @@ export default function RoutinesPage() {
 
 // ─── Routine detail modal ─────────────────────────────────────────────────────
 
+type ShiftOutput = {
+  ts: string;
+  tool: string;
+  kind?: string;
+  urls?: string[];
+  path?: string;
+  note?: string;
+};
+type ShiftArtifact = { name: string; relativePath: string; sizeBytes: number };
+type ShiftArchiveData = {
+  manifest: { outputCount: number; costUsd?: number; turns?: number; approvals?: Array<{ tool: string; decision: string }> } | null;
+  outputs: ShiftOutput[];
+  artifacts: ShiftArtifact[];
+};
+
 function RoutineDetailModal({
   routine,
   onClose,
@@ -414,6 +429,27 @@ function RoutineDetailModal({
 }) {
   const employee = useRoster().find((e) => e.id === routine.employeeId);
   const status = routine.lastRunStatus ? STATUS_META[routine.lastRunStatus] : null;
+
+  // Load shift archive when the modal opens (shift-kind routines only)
+  const [shiftData, setShiftData] = useState<ShiftArchiveData | null>(null);
+  const [openArtifact, setOpenArtifact] = useState<{ name: string; content: string } | null>(null);
+  useEffect(() => {
+    if (routine.kind !== "shift" || !routine.lastRunId) return;
+    fetch(`/api/shifts/${routine.lastRunId}`, { cache: "no-store" })
+      .then((r) => r.ok ? r.json() as Promise<ShiftArchiveData> : null)
+      .then((d) => { if (d) setShiftData(d); })
+      .catch(() => {});
+  }, [routine.kind, routine.lastRunId]);
+
+  async function viewArtifact(artifact: ShiftArtifact) {
+    if (!routine.lastRunId) return;
+    try {
+      const r = await fetch(`/api/shifts/${routine.lastRunId}?artifact=${encodeURIComponent(artifact.name)}`);
+      if (!r.ok) return;
+      const { content } = await r.json() as { content: string };
+      setOpenArtifact({ name: artifact.name, content });
+    } catch { /* ignore */ }
+  }
 
   return (
     <motion.div
@@ -576,6 +612,131 @@ function RoutineDetailModal({
                 }}
               >
                 <Markdown>{routine.lastRunSummary}</Markdown>
+              </div>
+            </div>
+          )}
+
+          {/* Deliverables — shift archive */}
+          {routine.kind === "shift" && shiftData && (shiftData.outputs.length > 0 || shiftData.artifacts.length > 0) && (
+            <div style={{ marginTop: "var(--sp-20)" }}>
+              <div
+                style={{
+                  fontSize: "var(--fs-meta)",
+                  fontWeight: 600,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  marginBottom: "var(--sp-8)",
+                }}
+              >
+                Deliverables
+                <span style={{ fontWeight: 400, textTransform: "none", marginLeft: 6, opacity: 0.6 }}>
+                  ({shiftData.outputs.length + shiftData.artifacts.length})
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-6)" }}>
+                {/* artifacts first (written docs) */}
+                {shiftData.artifacts.map((a) => (
+                  <button
+                    key={a.relativePath}
+                    type="button"
+                    onClick={() => viewArtifact(a)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--sp-10)",
+                      padding: "10px 12px",
+                      background: "var(--surface)",
+                      border: "1px solid var(--hairline)",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontFamily: "inherit",
+                      width: "100%",
+                      transition: "background 0.12s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-sunken)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "var(--surface)"; }}
+                  >
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>📄</span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--text)" }}>
+                        {a.name.replace(/\.md$/, "")}
+                      </div>
+                      <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
+                        Markdown document · {(a.sizeBytes / 1024).toFixed(1)} KB
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "var(--fs-xs)", color: "var(--accent, var(--text-muted))", fontWeight: 600, flexShrink: 0 }}>
+                      View →
+                    </span>
+                  </button>
+                ))}
+                {/* other outputs (urls, files, links) — exclude ones already
+                    shown as openable artifacts above */}
+                {shiftData.outputs
+                  .filter((o) => !o.path || !shiftData.artifacts.some((a) => o.path === a.relativePath))
+                  .map((o, i) => {
+                    const kindEmoji = o.kind === "image" ? "🖼️" : o.kind === "video" ? "🎬" : o.kind === "link" ? "🔗" : o.kind === "document" ? "📄" : "📎";
+                    const href = o.urls?.[0];
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "var(--sp-10)",
+                          padding: "10px 12px",
+                          background: "var(--surface)",
+                          border: "1px solid var(--hairline)",
+                          borderRadius: 8,
+                        }}
+                      >
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{kindEmoji}</span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--text)" }}>
+                            {o.note ?? o.tool}
+                          </div>
+                          {(href ?? o.path) && (
+                            <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {href ?? o.path}
+                            </div>
+                          )}
+                        </div>
+                        {href && (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: "var(--fs-xs)", color: "var(--accent, var(--text-muted))", fontWeight: 600, flexShrink: 0, textDecoration: "none" }}
+                          >
+                            Open →
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* Artifact viewer overlay */}
+          {openArtifact && (
+            <div
+              style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(15,18,24,0.7)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: "var(--sp-24)" }}
+              onClick={() => setOpenArtifact(null)}
+            >
+              <div
+                style={{ width: "100%", maxWidth: 760, maxHeight: "80vh", background: "var(--bg-elevated)", borderRadius: 12, border: "1px solid var(--hairline)", display: "flex", flexDirection: "column", overflow: "hidden" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--hairline)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>📄 {openArtifact.name.replace(/\.md$/, "")}</span>
+                  <button onClick={() => setOpenArtifact(null)} className="btn ghost sm"><Icons.X size={12} /></button>
+                </div>
+                <div className="scrollbar md-body" style={{ flex: 1, overflow: "auto", padding: "16px 24px 20px" }}>
+                  <Markdown>{openArtifact.content}</Markdown>
+                </div>
               </div>
             </div>
           )}

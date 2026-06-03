@@ -528,7 +528,7 @@ export async function runShift(args: {
             }
           }
           for (const p of parsed.data.artifacts ?? []) {
-            archiveOutput(runId, { tool: "shift-report", kind: "file", note: p });
+            archiveOutput(runId, { tool: "shift-report", kind: "file", path: p, note: p });
           }
           finalizeShiftArchive(runId, {
             status: "complete",

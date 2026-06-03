@@ -121,6 +121,49 @@ function writeManifest(m: ShiftManifest): void {
 
 // ─── Public API (all fail-safe) ───────────────────────────────────────────────
 
+// ─── Reader ───────────────────────────────────────────────────────────────────
+
+export type ShiftArchiveData = {
+  manifest: ShiftManifest | null;
+  outputs: ShiftOutput[];
+  artifacts: Array<{ name: string; relativePath: string; sizeBytes: number }>;
+};
+
+/** Read a shift's archive from disk. Safe — returns nulls/empty on missing dir. */
+export function readShiftArchive(runId: string): ShiftArchiveData {
+  const dir = shiftDir(runId);
+  const manifest = readManifest(runId);
+  const outputs: ShiftOutput[] = [];
+  try {
+    const raw = fs.readFileSync(path.join(dir, "outputs.jsonl"), "utf8");
+    for (const line of raw.split("\n")) {
+      if (!line.trim()) continue;
+      try { outputs.push(JSON.parse(line) as ShiftOutput); } catch { /* skip */ }
+    }
+  } catch { /* file absent */ }
+  const artifacts: ShiftArchiveData["artifacts"] = [];
+  const artifactsDir = path.join(dir, "artifacts");
+  try {
+    for (const name of fs.readdirSync(artifactsDir)) {
+      const full = path.join(artifactsDir, name);
+      const stat = fs.statSync(full);
+      artifacts.push({ name, relativePath: path.join("artifacts", name), sizeBytes: stat.size });
+    }
+  } catch { /* dir absent */ }
+  return { manifest, outputs, artifacts };
+}
+
+/** Read a specific artifact file as UTF-8 text. Returns null if not found or too large. */
+export function readArtifactContent(runId: string, artifactName: string): string | null {
+  try {
+    const full = path.join(shiftDir(runId), "artifacts", path.basename(artifactName));
+    if (!fs.existsSync(full)) return null;
+    const stat = fs.statSync(full);
+    if (stat.size > MAX_DOC_BYTES) return null;
+    return fs.readFileSync(full, "utf8");
+  } catch { return null; }
+}
+
 export function initShiftArchive(meta: {
   runId: string;
   employeeId: string;

@@ -24,6 +24,8 @@ export type Routine = {
   lastRunAt?: string;    // ISO
   lastRunStatus?: RoutineRunStatus;
   lastRunSummary?: string;
+  /** runId of the most recent shift run — used to look up the shift archive. */
+  lastRunId?: string;
   nextRunAt?: string;    // ISO
 };
 

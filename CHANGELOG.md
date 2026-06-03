@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Shift deliverables are visible in the UI.** The routine detail modal
+  now has a **Deliverables** section that lists what an autonomous shift
+  actually produced — written documents (openable in an inline markdown
+  viewer), generated image/video URLs, files, and links — read from the
+  per-shift archive. Backed by a new `GET /api/shifts/[runId]` endpoint
+  (`readShiftArchive` / `readArtifactContent`); routines now persist
+  `lastRunId` so the modal can find the run's archive.
 - **Markdown documents are first-class shift deliverables.** A shift twin
   can return a written document (brief, report, draft, post, spec) by
   putting the full markdown in `outputs[].content`; it's saved as a real
