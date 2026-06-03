@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Full activity log per shift run.** The routine detail modal now has an
+  expandable **Activity log** showing the run's complete timeline the way
+  agentic frameworks do — the twin's extended-thinking, its narration, every
+  tool call **with inputs**, tool results, and approval requests/decisions,
+  in order. Shifts now capture `thinking` and `text` events into the archive
+  (`events.jsonl`) and run-log; exposed via `GET /api/shifts/[runId]?events=1`.
 - **Shift history.** The routine detail modal now lists every past run of
   a twin's shift (status, time, one-line summary, deliverable count), read
   from the per-shift archives. Selecting a run loads its summary and

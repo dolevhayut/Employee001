@@ -18,6 +18,8 @@ export type ShiftOutputKind = "image" | "video" | "file" | "link" | "text" | "do
 
 export type ShiftArchiveEvent =
   | { ts: string; kind: "meta"; message: string }
+  | { ts: string; kind: "text"; text: string }
+  | { ts: string; kind: "thinking"; text: string }
   | { ts: string; kind: "tool_use"; tool: string; input?: Record<string, unknown> }
   | { ts: string; kind: "tool_result"; tool: string; output?: string; urls?: string[] }
   | { ts: string; kind: "approval_request"; tool: string; reason: string }
@@ -151,6 +153,19 @@ export function readShiftArchive(runId: string): ShiftArchiveData {
     }
   } catch { /* dir absent */ }
   return { manifest, outputs, artifacts };
+}
+
+/** Read the full chronological event timeline for a run (thinking, tools, results). */
+export function readShiftEvents(runId: string): ShiftArchiveEvent[] {
+  const events: ShiftArchiveEvent[] = [];
+  try {
+    const raw = fs.readFileSync(path.join(shiftDir(runId), "events.jsonl"), "utf8");
+    for (const line of raw.split("\n")) {
+      if (!line.trim()) continue;
+      try { events.push(JSON.parse(line) as ShiftArchiveEvent); } catch { /* skip */ }
+    }
+  } catch { /* absent */ }
+  return events;
 }
 
 /** List shift archives (manifests only), newest first. Optionally filter by twin. */

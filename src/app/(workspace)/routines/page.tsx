@@ -429,6 +429,19 @@ type ShiftArchiveData = {
   outputs: ShiftOutput[];
   artifacts: ShiftArtifact[];
 };
+type ArchiveEvent = {
+  ts: string;
+  kind: "meta" | "text" | "thinking" | "tool_use" | "tool_result" | "approval_request" | "approval" | "done";
+  message?: string;
+  text?: string;
+  tool?: string;
+  input?: Record<string, unknown>;
+  output?: string;
+  urls?: string[];
+  reason?: string;
+  decision?: string;
+  summary?: string;
+};
 
 function RoutineDetailModal({
   routine,
@@ -447,6 +460,8 @@ function RoutineDetailModal({
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(routine.lastRunId);
   const [shiftData, setShiftData] = useState<ShiftArchiveData | null>(null);
   const [openArtifact, setOpenArtifact] = useState<{ name: string; content: string } | null>(null);
+  const [events, setEvents] = useState<ArchiveEvent[] | null>(null);
+  const [showLog, setShowLog] = useState(false);
 
   // Load the run history for this twin.
   useEffect(() => {
@@ -469,6 +484,18 @@ function RoutineDetailModal({
       .then((d) => { if (d) setShiftData(d); })
       .catch(() => {});
   }, [routine.kind, selectedRunId]);
+
+  // Reset the activity log when switching runs.
+  useEffect(() => { setEvents(null); setShowLog(false); }, [selectedRunId]);
+
+  async function loadEvents() {
+    setShowLog(true);
+    if (events || !selectedRunId) return;
+    try {
+      const r = await fetch(`/api/shifts/${selectedRunId}?events=1`, { cache: "no-store" });
+      if (r.ok) { const d = await r.json() as { events: ArchiveEvent[] }; setEvents(d.events ?? []); }
+    } catch { /* ignore */ }
+  }
 
   const selectedManifest = shiftData?.manifest ?? history.find((h) => h.runId === selectedRunId);
   const displaySummary = selectedManifest?.summary ?? routine.lastRunSummary;
@@ -589,7 +616,7 @@ function RoutineDetailModal({
 
         {/* Body — scrollable */}
         <div className="scrollbar" style={{ flex: 1, overflow: "auto", padding: "16px 24px 20px" }}>
-          {/* Task */}
+          {/* Task / mandate */}
           <div style={{ marginBottom: "var(--sp-20)" }}>
             <div
               style={{
@@ -601,19 +628,24 @@ function RoutineDetailModal({
                 marginBottom: "var(--sp-6)",
               }}
             >
-              Task
+              {routine.kind === "shift" ? "Mandate" : "Task"}
             </div>
             <div
               style={{
                 fontSize: "var(--fs-ui)",
-                color: "var(--text)",
+                color: routine.task?.trim() ? "var(--text)" : "var(--text-muted)",
                 padding: "10px 12px",
                 background: "var(--bg-sunken)",
                 borderRadius: 6,
                 lineHeight: 1.55,
+                fontStyle: routine.task?.trim() ? "normal" : "italic",
               }}
             >
-              {routine.task}
+              {routine.task?.trim()
+                ? routine.task
+                : routine.kind === "shift"
+                  ? `Autonomous shift — no fixed task. ${employee?.firstName ?? "The twin"} reviews its shift memory (context, decisions, learnings, pending tasks) and its profile, then picks its own actions each run.`
+                  : "No task specified."}
             </div>
           </div>
 
@@ -828,6 +860,61 @@ function RoutineDetailModal({
             </div>
           )}
 
+          {/* Activity log — full run timeline (thinking, tools, results) */}
+          {routine.kind === "shift" && selectedRunId && (
+            <div style={{ marginTop: "var(--sp-20)" }}>
+              <button
+                type="button"
+                onClick={() => (showLog ? setShowLog(false) : loadEvents())}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--sp-6)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
+                  fontSize: "var(--fs-meta)",
+                  fontWeight: 600,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  fontFamily: "inherit",
+                }}
+              >
+                <Icons.Chevron size={10} style={{ transform: showLog ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
+                Activity log
+                <span style={{ fontWeight: 400, textTransform: "none", opacity: 0.6 }}>
+                  — thinking, tools &amp; results
+                </span>
+              </button>
+
+              {showLog && (
+                <div
+                  className="scrollbar"
+                  style={{
+                    marginTop: "var(--sp-10)",
+                    maxHeight: 360,
+                    overflowY: "auto",
+                    borderLeft: "2px solid var(--hairline)",
+                    paddingLeft: "var(--sp-12)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "var(--sp-8)",
+                  }}
+                >
+                  {events === null && (
+                    <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>Loading…</div>
+                  )}
+                  {events?.length === 0 && (
+                    <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>No activity recorded.</div>
+                  )}
+                  {events?.map((e, i) => <LogRow key={i} e={e} />)}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Artifact viewer overlay */}
           {openArtifact && (
             <div
@@ -876,6 +963,72 @@ function RoutineDetailModal({
       </motion.div>
     </motion.div>
   );
+}
+
+// ─── Activity-log row ─────────────────────────────────────────────────────────
+
+function LogRow({ e }: { e: ArchiveEvent }) {
+  const meta = (label: string, color: string) => (
+    <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color }}>
+      {label}
+    </span>
+  );
+  const wrap: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 3 };
+  const bodyText: React.CSSProperties = { fontSize: "var(--fs-sm)", color: "var(--text)", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" };
+  const subtle: React.CSSProperties = { ...bodyText, color: "var(--text-muted)" };
+
+  switch (e.kind) {
+    case "thinking":
+      return (
+        <div style={wrap}>
+          {meta("💭 Thinking", "var(--text-subtle)")}
+          <span style={{ ...subtle, fontStyle: "italic" }}>{e.text}</span>
+        </div>
+      );
+    case "text":
+      return (
+        <div style={wrap}>
+          {meta("🗣 Twin", "var(--accent-deep, var(--text-muted))")}
+          <span style={bodyText}>{e.text}</span>
+        </div>
+      );
+    case "tool_use":
+      return (
+        <div style={wrap}>
+          {meta(`🔧 Tool · ${e.tool}`, "#3B82F6")}
+          {e.input && Object.keys(e.input).length > 0 && (
+            <pre style={{ margin: 0, fontSize: "var(--fs-2xs)", color: "var(--text-muted)", background: "var(--bg-sunken)", padding: "6px 8px", borderRadius: 5, overflow: "auto", maxHeight: 120 }}>
+              {JSON.stringify(e.input, null, 2)}
+            </pre>
+          )}
+        </div>
+      );
+    case "tool_result":
+      return (
+        <div style={wrap}>
+          {meta(`✓ Result · ${e.tool}`, "#22C55E")}
+          {e.output && <span style={{ ...subtle, fontSize: "var(--fs-2xs)" }}>{e.output.slice(0, 600)}</span>}
+        </div>
+      );
+    case "approval_request":
+      return (
+        <div style={wrap}>
+          {meta(`⏳ Approval requested · ${e.tool}`, "#F59E0B")}
+          {e.reason && <span style={subtle}>{e.reason}</span>}
+        </div>
+      );
+    case "approval":
+      return (
+        <div style={wrap}>
+          {meta(`${e.decision === "allow" ? "✅ Approved" : "🚫 Declined"} · ${e.tool}`, e.decision === "allow" ? "#22C55E" : "#EF4444")}
+        </div>
+      );
+    case "done":
+      return <div style={wrap}>{meta("■ Shift ended", "var(--text-subtle)")}</div>;
+    case "meta":
+    default:
+      return <div style={wrap}><span style={{ ...subtle, fontSize: "var(--fs-2xs)" }}>{e.message ?? e.text}</span></div>;
+  }
 }
 
 // ─── Create form ──────────────────────────────────────────────────────────────

@@ -401,6 +401,7 @@ export async function runShift(args: {
 
     let toolCallCount = 0;
     let textBuf = "";
+    let thinkingBuf = "";
     // Map tool_use id → bare tool name so we can label tool_result payloads.
     const toolUseNames = new Map<string, string>();
     const flushTextBuf = () => {
@@ -409,8 +410,18 @@ export async function runShift(args: {
         return;
       }
       appendRunLog("shift", runId, { type: "text", text: textBuf });
+      archiveEvent(runId, { kind: "text", text: textBuf });
       updateRun(runId, { lastText: textBuf.slice(-200) });
       textBuf = "";
+    };
+    const flushThinkingBuf = () => {
+      if (!thinkingBuf.trim()) {
+        thinkingBuf = "";
+        return;
+      }
+      appendRunLog("shift", runId, { type: "thinking", text: thinkingBuf });
+      archiveEvent(runId, { kind: "thinking", text: thinkingBuf });
+      thinkingBuf = "";
     };
 
     for await (const message of stream) {
@@ -421,15 +432,28 @@ export async function runShift(args: {
           event.delta.type === "text_delta" &&
           event.delta.text
         ) {
+          flushThinkingBuf();
           finalText += event.delta.text;
           textBuf += event.delta.text;
           // Flush on sentence boundary so the cockpit gets readable chunks, not character-by-character.
           if (/[.!?\n]\s*$/.test(textBuf) && textBuf.length > 30) flushTextBuf();
+        } else if (
+          event.type === "content_block_delta" &&
+          event.delta.type === "thinking_delta"
+        ) {
+          // Extended-thinking deltas — the twin's reasoning. Captured to the
+          // log + archive so the CEO can audit how the shift thought.
+          const t = (event.delta as { thinking?: string }).thinking ?? "";
+          if (t) {
+            thinkingBuf += t;
+            if (thinkingBuf.length > 80) flushThinkingBuf();
+          }
         }
         continue;
       }
 
       if (message.type === "assistant") {
+        flushThinkingBuf();
         flushTextBuf();
         for (const block of message.message.content) {
           if (block.type === "tool_use") {
@@ -488,6 +512,7 @@ export async function runShift(args: {
       }
 
       if (message.type === "result") {
+        flushThinkingBuf();
         flushTextBuf();
         turns = message.num_turns ?? 0;
         costUsd = (message as { total_cost_usd?: number }).total_cost_usd ?? 0;
@@ -550,6 +575,7 @@ export async function runShift(args: {
       }
     }
 
+    flushThinkingBuf();
     flushTextBuf();
     const fallbackSummary = finalText.trim().slice(0, 200) || "Shift completed";
     appendRunLog("shift", runId, {
