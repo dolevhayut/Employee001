@@ -8,6 +8,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **Routine modal: employee field is now a proper twin picker.** The bare
+  browser `<select>` was replaced with the (previously unused) themed
+  `EmployeePicker` dropdown — avatar + name + **role** + twin-status dot,
+  matching the rest of the app. Generalised it into a controlled,
+  routing-free, theme-aware form control (`value` / `onSelect` /
+  `navigate={false}`) so it works inside modals, not just the /flow top bar.
+
 ## [0.3.0] — 2026-06-03
 
 ### Added — shifts take real action with live CEO approval

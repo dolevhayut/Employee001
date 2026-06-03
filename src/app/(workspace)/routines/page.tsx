@@ -7,6 +7,7 @@ import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { PageHead } from "@/components/ex/page-head";
 import { useRoster } from "@/components/ex/roster-context";
+import { EmployeePicker } from "@/components/ex/employee-picker";
 import type { Routine, Schedule, RoutineRunStatus } from "@/lib/routines";
 import { isValidCron } from "@/lib/cron";
 
@@ -741,17 +742,11 @@ function CreateRoutineModal({
           </Field>
 
           <Field label="Employee">
-            <select
+            <EmployeePicker
               value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              style={selectStyle}
-            >
-              {roster.map((e) => (
-                <option key={e.id} value={e.id} disabled={e.twinStatus !== "ready"}>
-                  {e.name} {e.twinStatus !== "ready" ? "(not ready)" : ""}
-                </option>
-              ))}
-            </select>
+              onSelect={setEmployeeId}
+              navigate={false}
+            />
           </Field>
 
           <Field label="Name">
