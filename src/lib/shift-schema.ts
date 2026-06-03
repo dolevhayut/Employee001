@@ -61,16 +61,22 @@ export const ShiftReport = z.object({
   outputs: z
     .array(
       z.object({
-        kind: z.enum(["image", "video", "file", "link", "text"]).optional(),
+        kind: z.enum(["image", "video", "file", "link", "text", "document"]).optional(),
         title: z.string(),
         url: z.string().optional(),
         path: z.string().optional(),
         note: z.string().optional(),
+        content: z
+          .string()
+          .optional()
+          .describe(
+            "For a document deliverable (a report, brief, draft, spec, post) — put the FULL markdown body here. It is saved as a real .md file in the shift's archive so the CEO can open it."
+          ),
       })
     )
     .optional()
     .describe(
-      "Every concrete deliverable you produced this shift — generated image/video URLs, created files, published links. Always list them here so the CEO has a clean record of what came out of the shift."
+      "Every concrete deliverable you produced this shift — written documents (put the full markdown in `content`), generated image/video URLs, created files, published links. Always list them here so the CEO has a clean record of what came out of the shift."
     ),
 });
 

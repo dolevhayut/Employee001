@@ -14,7 +14,7 @@ import "server-only";
 import fs from "fs";
 import path from "path";
 
-export type ShiftOutputKind = "image" | "video" | "file" | "link" | "text";
+export type ShiftOutputKind = "image" | "video" | "file" | "link" | "text" | "document";
 
 export type ShiftArchiveEvent =
   | { ts: string; kind: "meta"; message: string }
@@ -34,6 +34,8 @@ export type ShiftOutput = {
   tool: string;
   kind: ShiftOutputKind;
   urls?: string[];
+  /** Relative path (within the shift folder) to a saved deliverable file. */
+  path?: string;
   note?: string;
 };
 
@@ -191,6 +193,53 @@ export function archiveToolResult(runId: string, tool: string, rawResult: string
       urls,
       note: `Produced by ${tool}`,
     });
+  }
+}
+
+const MAX_DOC_BYTES = 256 * 1024;
+
+function slugify(s: string): string {
+  return (
+    (s || "document")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "document"
+  );
+}
+
+/**
+ * Persist a document deliverable (markdown body) as a real file under
+ * data/shifts/<runId>/artifacts/<slug>.md and record it as an output. This is
+ * the "the agent wrote a doc" deliverable that agentic workflows produce —
+ * stored as an openable file, not just a mention. Returns the relative path.
+ */
+export function archiveDocument(
+  runId: string,
+  doc: { title: string; content: string; kind?: ShiftOutputKind }
+): string | null {
+  try {
+    const artifactsDir = path.join(ensureDir(runId), "artifacts");
+    fs.mkdirSync(artifactsDir, { recursive: true });
+    let name = `${slugify(doc.title)}.md`;
+    let full = path.join(artifactsDir, name);
+    for (let i = 1; fs.existsSync(full); i++) {
+      name = `${slugify(doc.title)}-${i}.md`;
+      full = path.join(artifactsDir, name);
+    }
+    const body = doc.content.length > MAX_DOC_BYTES ? doc.content.slice(0, MAX_DOC_BYTES) : doc.content;
+    fs.writeFileSync(full, body, "utf8");
+    const rel = path.join("artifacts", name);
+    archiveOutput(runId, {
+      tool: "shift-report",
+      kind: doc.kind ?? "document",
+      path: rel,
+      note: doc.title,
+    });
+    return rel;
+  } catch (err) {
+    console.warn("[shift-archive] document failed", runId, err);
+    return null;
   }
 }
 

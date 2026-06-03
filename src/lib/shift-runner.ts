@@ -25,6 +25,7 @@ import {
   archiveEvent,
   archiveOutput,
   archiveToolResult,
+  archiveDocument,
   finalizeShiftArchive,
   summariseOutput,
 } from "@/lib/shift-archive";
@@ -97,7 +98,7 @@ You are running in autonomous shift mode. No CEO is present. Your job is to:
 - Do NOT send messages, emails, or post to external channels without a prior decision recorded in your shift log.
 - You CAN take real actions (including generating images/video, posting, sending). For any action that isn't read-only, a live approval request is raised to the CEO and the run pauses until they approve or decline — so go ahead and use the tool when the work calls for it; don't pre-emptively skip it.
 - If a decision needs a colleague's expertise or sign-off, use \`consult_twin\` for advice or \`request_approval\` for a go/no-go — don't guess outside your lane. Use sparingly, only when their input changes what you'd do.
-- **Record every deliverable you produce** (generated image/video URLs, created files, published links) in the \`outputs\` field of your ShiftReport, so the CEO has a clean record of what came out of the shift.
+- **Record every deliverable you produce** in the \`outputs\` field of your ShiftReport. A deliverable can be a **written document** — a brief, report, draft, post, or spec — in which case put the FULL markdown in \`outputs[].content\` (it's saved as a real .md file the CEO can open). It can also be a generated image/video URL, a created file, or a published link. Always list them so the CEO has a clean record of what came out of the shift.
 - Keep the summary to one short line: what actually happened, not what you planned.`;
 
   const shiftLog = readShiftLog(employee.id);
@@ -509,12 +510,22 @@ export async function runShift(args: {
           });
           // Record the twin's self-declared deliverables into the shift archive.
           for (const o of parsed.data.outputs ?? []) {
-            archiveOutput(runId, {
-              tool: "shift-report",
-              kind: o.kind ?? (o.url ? "link" : "text"),
-              ...(o.url ? { urls: [o.url] } : {}),
-              note: o.path ? `${o.title} (${o.path})` : o.title,
-            });
+            if (o.content) {
+              // A written document — persist the markdown as a real file.
+              archiveDocument(runId, {
+                title: o.title,
+                content: o.content,
+                kind: o.kind === "text" || o.kind === "file" ? o.kind : "document",
+              });
+            } else {
+              archiveOutput(runId, {
+                tool: "shift-report",
+                kind: o.kind ?? (o.url ? "link" : "text"),
+                ...(o.url ? { urls: [o.url] } : {}),
+                ...(o.path ? { path: o.path } : {}),
+                note: o.title,
+              });
+            }
           }
           for (const p of parsed.data.artifacts ?? []) {
             archiveOutput(runId, { tool: "shift-report", kind: "file", note: p });

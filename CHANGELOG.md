@@ -8,6 +8,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Markdown documents are first-class shift deliverables.** A shift twin
+  can return a written document (brief, report, draft, post, spec) by
+  putting the full markdown in `outputs[].content`; it's saved as a real
+  `.md` file under `data/shifts/<runId>/artifacts/` and recorded in
+  `outputs.jsonl` — so a doc the twin writes is an openable artifact, the
+  way agentic workflows produce them, not just a mention.
+
 ### Changed
 - **Routine modal: employee field is now a proper twin picker.** The bare
   browser `<select>` was replaced with the (previously unused) themed
