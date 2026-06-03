@@ -900,351 +900,665 @@ function InvitePanel({
     }
   }
 
+  const ready = !!config?.ready;
+  const inputStyle = {
+    height: 40,
+    padding: "0 12px",
+    border: "1px solid var(--hairline-strong)",
+    borderRadius: "var(--radius-lg)",
+    background: "var(--surface)",
+    fontSize: "var(--fs-ui)",
+    color: "var(--text)",
+    fontFamily: "inherit",
+    width: "100%",
+    opacity: ready ? 1 : 0.55,
+  };
+
+  // Human label for the lookback window so the raw number has meaning.
+  const tier =
+    lookbackDays <= 30
+      ? "Light touch"
+      : lookbackDays <= 90
+        ? "Standard"
+        : lookbackDays <= 180
+          ? "Deep"
+          : "Full history";
+  const cost = (0.005 * lookbackDays).toFixed(2);
+  const totalSec = 2 * lookbackDays;
+  const estMins = Math.floor(totalSec / 60);
+  const estSecs = totalSec % 60;
+  const timeStr =
+    estMins > 0
+      ? estSecs > 0
+        ? `${estMins}min ${estSecs}s`
+        : `${estMins}min`
+      : `${estSecs}s`;
+
   return (
-    <div
-      className="card"
-      style={{
-        padding: "var(--sp-16)",
-        marginBottom: "var(--sp-20)",
-      }}
-    >
-      <div
-        style={{
-          fontSize: "var(--fs-sm)",
-          fontWeight: 600,
-          marginBottom: "var(--sp-10)",
-        }}
-      >
-        Generate an invite link
-      </div>
-      <div
-        style={{
-          fontSize: "var(--fs-meta)",
-          color: "var(--text-subtle)",
-          marginBottom: "var(--sp-14)",
-          lineHeight: 1.5,
-        }}
-      >
-        Nothing is sent automatically — no email, no SMS. You&apos;ll get a
-        one-time link to copy and share yourself (Slack, WhatsApp, wherever you
-        normally reach the person). The link works on this local network only.
-      </div>
-
-      {config && !config.ready && (
-        <MissingKeysCard
-          config={config}
-          onSaved={() => {
-            // Re-fetch the gate state so the form unlocks immediately.
-            fetch("/api/system/config")
-              .then((r) => r.json() as Promise<SystemConfig>)
-              .then(setConfig)
-              .catch(() => {});
-          }}
-        />
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "var(--sp-8)",
-          alignItems: "center",
-          marginBottom: pending.length ? "var(--sp-14)" : 0,
-        }}
-      >
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Name (optional)"
-          disabled={!config?.ready}
-          style={{
-            flex: "1 1 200px",
-            height: 32,
-            padding: "0 10px",
-            border: "1px solid var(--hairline-strong)",
-            borderRadius: 6,
-            background: "var(--surface)",
-            fontSize: "var(--fs-sm)",
-            opacity: config?.ready ? 1 : 0.55,
-          }}
-        />
-        <input
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          placeholder="Role (optional)"
-          disabled={!config?.ready}
-          style={{
-            flex: "1 1 200px",
-            height: 32,
-            padding: "0 10px",
-            border: "1px solid var(--hairline-strong)",
-            borderRadius: 6,
-            background: "var(--surface)",
-            fontSize: "var(--fs-sm)",
-            opacity: config?.ready ? 1 : 0.55,
-          }}
-        />
+    <div style={{ display: "grid", gap: "var(--sp-20)" }}>
+      {/* ── Composer ──────────────────────────────────────────── */}
+      <div className="card" style={{ padding: "var(--sp-24)" }}>
         <div
           style={{
-            flex: "1 1 100%",
             display: "flex",
-            flexDirection: "column",
-            gap: 4,
-            padding: "6px 10px",
-            border: "1px solid var(--hairline-strong)",
-            borderRadius: 6,
-            background: "var(--surface)",
-            opacity: config?.ready ? 1 : 0.55,
+            alignItems: "flex-start",
+            gap: "var(--sp-14)",
+            marginBottom: "var(--sp-20)",
+          }}
+        >
+          <div
+            style={{
+              flexShrink: 0,
+              width: 40,
+              height: 40,
+              display: "grid",
+              placeItems: "center",
+              borderRadius: "var(--radius-lg)",
+              background: "var(--accent-soft)",
+              border: "1px solid var(--hairline)",
+            }}
+          >
+            <Icons.UserPlus size={18} style={{ color: "var(--text)" }} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "var(--fs-lg)",
+                fontWeight: 600,
+                letterSpacing: "var(--ls-snug)",
+              }}
+            >
+              Invite a real employee
+            </h2>
+            <p
+              style={{
+                margin: "var(--sp-6) 0 0",
+                fontSize: "var(--fs-sm)",
+                color: "var(--text-muted)",
+                lineHeight: 1.6,
+                maxWidth: 640,
+              }}
+            >
+              Generate a one-time link and share it yourself — Slack, WhatsApp,
+              wherever you normally reach the person. Nothing is sent
+              automatically. When they open it, an autonomous pass studies their
+              work and builds their twin. The link works on this local network
+              only.
+            </p>
+          </div>
+        </div>
+
+        {config && !config.ready && (
+          <MissingKeysCard
+            config={config}
+            onSaved={() => {
+              // Re-fetch the gate state so the form unlocks immediately.
+              fetch("/api/system/config")
+                .then((r) => r.json() as Promise<SystemConfig>)
+                .then(setConfig)
+                .catch(() => {});
+            }}
+          />
+        )}
+
+        {/* Name + role */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "var(--sp-14)",
+            marginBottom: "var(--sp-18)",
+          }}
+        >
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sp-6)",
+            }}
+          >
+            <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>
+              Name{" "}
+              <span
+                style={{
+                  fontWeight: 500,
+                  color: "var(--text-subtle)",
+                  fontSize: "var(--fs-xs)",
+                }}
+              >
+                optional
+              </span>
+            </span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Maya Cohen"
+              disabled={!ready}
+              style={inputStyle}
+            />
+          </label>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sp-6)",
+            }}
+          >
+            <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>
+              Role{" "}
+              <span
+                style={{
+                  fontWeight: 500,
+                  color: "var(--text-subtle)",
+                  fontSize: "var(--fs-xs)",
+                }}
+              >
+                optional
+              </span>
+            </span>
+            <input
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder="e.g. Product Designer"
+              disabled={!ready}
+              style={inputStyle}
+            />
+          </label>
+        </div>
+
+        {/* Lookback */}
+        <div
+          style={{
+            border: "1px solid var(--hairline)",
+            borderRadius: "var(--radius-lg)",
+            background: "var(--surface-soft)",
+            padding: "var(--sp-16) var(--sp-18)",
+            marginBottom: "var(--sp-20)",
+            opacity: ready ? 1 : 0.55,
           }}
         >
           <div
             style={{
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-start",
               justifyContent: "space-between",
-              gap: 12,
-              fontSize: "var(--fs-sm)",
+              gap: "var(--sp-12)",
+              flexWrap: "wrap",
             }}
           >
-            <label
-              htmlFor="lookback-days"
-              title="How far back the AI will study this person's work (Slack, GitHub, Linear, Gmail, calendar) to build their twin. Longer = more accurate, more expensive."
-              style={{ cursor: "help", userSelect: "none" }}
-            >
-              Lookback: {lookbackDays} days
-            </label>
-            <input
-              id="lookback-days"
-              type="range"
-              min={30}
-              max={360}
-              step={30}
-              value={lookbackDays}
-              onChange={(e) => setLookbackDays(Number(e.target.value))}
-              disabled={!config?.ready}
-              style={{
-                flex: "1 1 auto",
-                maxWidth: 360,
-                accentColor: "var(--text)",
-                cursor: config?.ready ? "pointer" : "not-allowed",
-              }}
-            />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>
+                Lookback window
+              </div>
+              <div
+                style={{
+                  fontSize: "var(--fs-xs)",
+                  color: "var(--text-subtle)",
+                  marginTop: 2,
+                  maxWidth: 360,
+                  lineHeight: 1.5,
+                }}
+              >
+                How far back the twin studies their work across connected tools.
+                Longer is more accurate but costs more.
+              </div>
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div
+                style={{
+                  fontSize: "var(--fs-h3)",
+                  fontWeight: 600,
+                  lineHeight: 1.1,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {lookbackDays}
+                <span
+                  style={{
+                    fontSize: "var(--fs-sm)",
+                    color: "var(--text-subtle)",
+                    fontWeight: 500,
+                  }}
+                >
+                  {" "}
+                  days
+                </span>
+              </div>
+              <div
+                style={{
+                  fontSize: "var(--fs-2xs)",
+                  color: "var(--accent-deep)",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "var(--ls-wide)",
+                }}
+              >
+                {tier}
+              </div>
+            </div>
           </div>
+
+          {/* Presets */}
           <div
             style={{
-              fontSize: "var(--fs-meta)",
-              color: "var(--text-subtle)",
+              display: "flex",
+              gap: "var(--sp-6)",
+              marginTop: "var(--sp-12)",
             }}
           >
-            {(() => {
-              const cost = (0.005 * lookbackDays).toFixed(2);
-              const totalSec = 2 * lookbackDays;
-              const mins = Math.floor(totalSec / 60);
-              const secs = totalSec % 60;
-              const timeStr =
-                mins > 0
-                  ? secs > 0
-                    ? `${mins}min ${secs}s`
-                    : `${mins}min`
-                  : `${secs}s`;
-              return `~ $${cost} · ${timeStr}. Estimate — varies with signal density.`;
-            })()}
+            {([
+              [30, "30d"],
+              [90, "90d"],
+              [180, "180d"],
+              [360, "1 year"],
+            ] as [number, string][]).map(([val, lbl]) => {
+              const on = lookbackDays === val;
+              return (
+                <button
+                  key={val}
+                  type="button"
+                  disabled={!ready}
+                  onClick={() => setLookbackDays(val)}
+                  style={{
+                    flex: 1,
+                    padding: "7px 8px",
+                    borderRadius: "var(--radius)",
+                    border: `1px solid ${on ? "var(--text)" : "var(--hairline-strong)"}`,
+                    background: on ? "var(--text)" : "var(--surface)",
+                    color: on ? "var(--bg)" : "var(--text-muted)",
+                    fontSize: "var(--fs-sm)",
+                    fontWeight: on ? 600 : 500,
+                    fontFamily: "inherit",
+                    cursor: ready ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {lbl}
+                </button>
+              );
+            })}
           </div>
-        </div>
-        <button
-          type="button"
-          onClick={createInvite}
-          disabled={creating || !config?.ready}
-          className="btn primary"
-          style={{ height: 32 }}
-          title={
-            !config?.ready
-              ? "Configure ANTHROPIC_API_KEY and COMPOSIO_API_KEY first"
-              : undefined
-          }
-        >
-          <Icons.Plus size={13} /> {creating ? "Creating…" : "Create invite"}
-        </button>
-      </div>
 
-      {pending.length > 0 && (() => {
-        const now = Date.now();
-        const expiredCount = pending.filter(
-          (i) => new Date(i.expiresAt).getTime() < now,
-        ).length;
-        const unusedCount = pending.filter((i) => !i.employeeId).length;
-        if (expiredCount === 0 && unusedCount === 0) return null;
-        return (
+          <input
+            id="lookback-days"
+            type="range"
+            min={30}
+            max={360}
+            step={30}
+            value={lookbackDays}
+            onChange={(e) => setLookbackDays(Number(e.target.value))}
+            disabled={!ready}
+            style={{
+              width: "100%",
+              marginTop: "var(--sp-12)",
+              accentColor: "var(--text)",
+              cursor: ready ? "pointer" : "not-allowed",
+            }}
+          />
+
+          {/* Cost + time estimates */}
           <div
             style={{
               display: "flex",
               gap: "var(--sp-8)",
-              alignItems: "center",
-              marginBottom: "var(--sp-8)",
-              fontSize: "var(--fs-meta)",
-              color: "var(--text-subtle)",
+              marginTop: "var(--sp-14)",
             }}
           >
-            <span>Bulk actions:</span>
-            <button
-              type="button"
-              onClick={() => bulkRevoke("expired", expiredCount)}
-              disabled={expiredCount === 0}
-              className="btn ghost"
-              style={{
-                height: 26,
-                fontSize: "var(--fs-meta)",
-                color: expiredCount === 0 ? "var(--text-subtle)" : "var(--danger, #A04B3D)",
-                opacity: expiredCount === 0 ? 0.5 : 1,
-              }}
-              title={
-                expiredCount === 0
-                  ? "No expired invites"
-                  : `Revoke ${expiredCount} expired invite${expiredCount === 1 ? "" : "s"}`
-              }
-            >
-              Revoke expired ({expiredCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => bulkRevoke("unused", unusedCount)}
-              disabled={unusedCount === 0}
-              className="btn ghost"
-              style={{
-                height: 26,
-                fontSize: "var(--fs-meta)",
-                color: unusedCount === 0 ? "var(--text-subtle)" : "var(--danger, #A04B3D)",
-                opacity: unusedCount === 0 ? 0.5 : 1,
-              }}
-              title={
-                unusedCount === 0
-                  ? "No unused invites"
-                  : `Revoke ${unusedCount} invite${unusedCount === 1 ? "" : "s"} that no employee has started — includes expired ones`
-              }
-            >
-              Revoke unused ({unusedCount})
-            </button>
-          </div>
-        );
-      })()}
-
-      {pending.length > 0 && (
-        <div style={{ display: "grid", gap: "var(--sp-6)" }}>
-          {pending.map((inv) => {
-            const url = inviteUrl(inv.token);
-            const copied = copiedToken === inv.token;
-            const started = !!inv.employeeId;
-            const expired = new Date(inv.expiresAt).getTime() < Date.now();
-            return (
+            {[
+              {
+                icon: <Icons.DollarSign size={14} />,
+                label: "Est. cost",
+                val: `~ $${cost}`,
+              },
+              {
+                icon: <Icons.Clock size={14} />,
+                label: "Est. time",
+                val: timeStr,
+              },
+            ].map((s) => (
               <div
-                key={inv.token}
+                key={s.label}
                 style={{
+                  flex: 1,
                   display: "flex",
                   alignItems: "center",
                   gap: "var(--sp-8)",
-                  padding: "10px 12px",
-                  background: "var(--bg-sunken)",
-                  borderRadius: 8,
-                  fontSize: "var(--fs-meta)",
-                  flexWrap: "wrap",
+                  padding: "8px 12px",
+                  background: "var(--surface)",
+                  border: "1px solid var(--hairline)",
+                  borderRadius: "var(--radius)",
                 }}
               >
-                {/* Status dot */}
-                <span
-                  title={started ? "Employee started onboarding" : expired ? "Link expired" : "Waiting for employee to open link"}
-                  style={{ flexShrink: 0 }}
-                >
-                  <span className={`dot ${started ? "success" : expired ? "danger" : "idle"}`} style={{ boxShadow: "none" }} />
+                <span style={{ color: "var(--text-subtle)", display: "grid" }}>
+                  {s.icon}
                 </span>
-
-                {/* Name + URL */}
-                <div
-                  style={{
-                    minWidth: 0,
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 2,
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: "var(--text)" }}>
-                    {inv.name || "Unnamed invite"}
-                    {inv.role ? ` · ${inv.role}` : ""}
-                    {started && (
-                      <span style={{ marginLeft: 8, fontSize: "var(--fs-xs)", fontWeight: 500, color: "var(--success, #15803d)" }}>
-                        · In progress
-                      </span>
-                    )}
-                    {expired && !started && (
-                      <span style={{ marginLeft: 8, fontSize: "var(--fs-xs)", fontWeight: 500, color: "var(--danger, #A04B3D)" }}>
-                        · Expired
-                      </span>
-                    )}
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: "var(--fs-2xs)",
+                      color: "var(--text-subtle)",
+                      textTransform: "uppercase",
+                      letterSpacing: "var(--ls-wide)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {s.label}
                   </div>
                   <div
                     style={{
-                      fontFamily: "var(--font-mono, ui-monospace, monospace)",
-                      color: "var(--text-subtle)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      fontSize: "var(--fs-xs)",
+                      fontSize: "var(--fs-sm)",
+                      fontWeight: 600,
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
-                    {url}
+                    {s.val}
                   </div>
                 </div>
-
-                {/* Share with employee */}
-                <button
-                  type="button"
-                  onClick={() => copy(inv.token)}
-                  className="btn ghost"
-                  style={{ height: 28, fontSize: "var(--fs-meta)", flexShrink: 0 }}
-                  title="Copy the link to share with the employee"
-                >
-                  {copied ? <Icons.Check size={12} /> : <Icons.Send size={12} />}
-                  {copied ? "Copied" : "Share link"}
-                </button>
-
-                {/* Watch training progress */}
-                {started && (
-                  <a
-                    href={`/join?invite=${encodeURIComponent(inv.token)}&done=1`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn ghost"
-                    style={{
-                      height: 28,
-                      fontSize: "var(--fs-meta)",
-                      textDecoration: "none",
-                      flexShrink: 0,
-                    }}
-                    title="Watch the twin training progress in real time"
-                  >
-                    <Icons.Eye size={12} /> Watch training
-                  </a>
-                )}
-
-                {/* Revoke */}
-                <button
-                  type="button"
-                  onClick={() => revoke(inv.token)}
-                  className="btn ghost"
-                  style={{
-                    height: 28,
-                    fontSize: "var(--fs-meta)",
-                    color: "var(--danger, #A04B3D)",
-                    flexShrink: 0,
-                  }}
-                  title="Revoke this invite — link stops working immediately"
-                >
-                  Revoke
-                </button>
               </div>
-            );
-          })}
+            ))}
+          </div>
+          <div
+            style={{
+              fontSize: "var(--fs-2xs)",
+              color: "var(--text-subtle)",
+              marginTop: "var(--sp-8)",
+            }}
+          >
+            Estimates only — actual cost and time vary with signal density.
+          </div>
         </div>
+
+        <button
+          type="button"
+          onClick={createInvite}
+          disabled={creating || !ready}
+          className="btn primary lg"
+          style={{ width: "100%", justifyContent: "center" }}
+          title={
+            !ready
+              ? "Configure ANTHROPIC_API_KEY and COMPOSIO_API_KEY first"
+              : undefined
+          }
+        >
+          {creating ? (
+            <>
+              <Icons.Loader size={14} /> Creating…
+            </>
+          ) : (
+            <>
+              <Icons.Plus size={14} /> Create invite link
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* ── Pending invites ───────────────────────────────────── */}
+      {pending.length > 0 ? (
+        <div className="card" style={{ padding: "var(--sp-20)" }}>
+          {(() => {
+            const now = Date.now();
+            const expiredCount = pending.filter(
+              (i) => new Date(i.expiresAt).getTime() < now,
+            ).length;
+            const unusedCount = pending.filter((i) => !i.employeeId).length;
+            const showBulk = expiredCount > 0 || unusedCount > 0;
+            return (
+              <header
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "var(--sp-12)",
+                  marginBottom: "var(--sp-14)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "var(--fs-ui)",
+                    fontWeight: 600,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "var(--sp-8)",
+                  }}
+                >
+                  Pending invites
+                  <span
+                    className="mono"
+                    style={{
+                      fontSize: "var(--fs-xs)",
+                      padding: "1px 7px",
+                      borderRadius: 8,
+                      background: "var(--bg-sunken)",
+                      color: "var(--text-subtle)",
+                    }}
+                  >
+                    {pending.length}
+                  </span>
+                </h3>
+                {showBulk && (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "var(--sp-6)",
+                      alignItems: "center",
+                    }}
+                  >
+                    {expiredCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => bulkRevoke("expired", expiredCount)}
+                        className="btn ghost sm"
+                        style={{ color: "var(--danger)" }}
+                        title={`Revoke ${expiredCount} expired invite${expiredCount === 1 ? "" : "s"}`}
+                      >
+                        Clear expired ({expiredCount})
+                      </button>
+                    )}
+                    {unusedCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => bulkRevoke("unused", unusedCount)}
+                        className="btn ghost sm"
+                        style={{ color: "var(--danger)" }}
+                        title={`Revoke ${unusedCount} invite${unusedCount === 1 ? "" : "s"} no employee has started — includes expired ones`}
+                      >
+                        Clear unused ({unusedCount})
+                      </button>
+                    )}
+                  </div>
+                )}
+              </header>
+            );
+          })()}
+
+          <div style={{ display: "grid", gap: "var(--sp-8)" }}>
+            {pending.map((inv) => {
+              const url = inviteUrl(inv.token);
+              const copied = copiedToken === inv.token;
+              const started = !!inv.employeeId;
+              const expired = new Date(inv.expiresAt).getTime() < Date.now();
+              const status = started
+                ? { cls: "success", label: "In progress", color: "var(--success)" }
+                : expired
+                  ? { cls: "danger", label: "Expired", color: "var(--danger)" }
+                  : { cls: "idle", label: "Waiting", color: "var(--text-subtle)" };
+              return (
+                <div
+                  key={inv.token}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "var(--sp-12)",
+                    padding: "var(--sp-12) var(--sp-14)",
+                    background: "var(--bg-sunken)",
+                    borderRadius: "var(--radius-lg)",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span
+                    title={
+                      started
+                        ? "Employee started onboarding"
+                        : expired
+                          ? "Link expired"
+                          : "Waiting for employee to open link"
+                    }
+                    style={{ flexShrink: 0, display: "grid" }}
+                  >
+                    <span
+                      className={`dot ${status.cls}`}
+                      style={{ boxShadow: "none" }}
+                    />
+                  </span>
+
+                  <div
+                    style={{
+                      minWidth: 0,
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 3,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "var(--sp-8)",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          fontSize: "var(--fs-sm)",
+                          color: "var(--text)",
+                        }}
+                      >
+                        {inv.name || "Unnamed invite"}
+                        {inv.role ? (
+                          <span
+                            style={{
+                              fontWeight: 500,
+                              color: "var(--text-subtle)",
+                            }}
+                          >
+                            {" "}
+                            · {inv.role}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "var(--fs-2xs)",
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: "var(--ls-wide)",
+                          color: status.color,
+                          padding: "1px 6px",
+                          borderRadius: 6,
+                          background: "var(--surface)",
+                          border: "1px solid var(--hairline)",
+                        }}
+                      >
+                        {status.label}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "var(--font-mono, ui-monospace, monospace)",
+                        color: "var(--text-subtle)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        fontSize: "var(--fs-xs)",
+                      }}
+                    >
+                      {url}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => copy(inv.token)}
+                    className="btn sm"
+                    style={{ flexShrink: 0 }}
+                    title="Copy the link to share with the employee"
+                  >
+                    {copied ? (
+                      <Icons.Check size={12} />
+                    ) : (
+                      <Icons.Send size={12} />
+                    )}
+                    {copied ? "Copied" : "Share link"}
+                  </button>
+
+                  {started && (
+                    <a
+                      href={`/join?invite=${encodeURIComponent(inv.token)}&done=1`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn ghost sm"
+                      style={{ textDecoration: "none", flexShrink: 0 }}
+                      title="Watch the twin training progress in real time"
+                    >
+                      <Icons.Eye size={12} /> Watch
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => revoke(inv.token)}
+                    className="btn ghost sm"
+                    style={{ color: "var(--danger)", flexShrink: 0 }}
+                    title="Revoke this invite — link stops working immediately"
+                  >
+                    <Icons.Trash size={12} /> Revoke
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        ready && (
+          <div
+            className="card"
+            style={{
+              padding: "var(--sp-28) var(--sp-24)",
+              textAlign: "center",
+              color: "var(--text-subtle)",
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                margin: "0 auto var(--sp-10)",
+                display: "grid",
+                placeItems: "center",
+                borderRadius: "50%",
+                background: "var(--bg-sunken)",
+              }}
+            >
+              <Icons.Send size={16} style={{ color: "var(--text-subtle)" }} />
+            </div>
+            <div
+              style={{
+                fontSize: "var(--fs-sm)",
+                fontWeight: 600,
+                color: "var(--text-muted)",
+              }}
+            >
+              No pending invites
+            </div>
+            <div style={{ fontSize: "var(--fs-xs)", marginTop: 2 }}>
+              Links you create will show up here until they&apos;re opened.
+            </div>
+          </div>
+        )
       )}
     </div>
   );
