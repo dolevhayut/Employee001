@@ -8,6 +8,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-03
+
 ### Added — shifts take real action with live CEO approval
 - **Autonomous shifts can now run action tools (generate images/video,
   post, send) — gated by a live approval, not silently blocked.**
@@ -287,7 +289,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CLI commands: `setup`, `start`, `update`, `doctor`, `help`
 - Human-controlled autonomy — approval gate before any sensitive tool call executes
 
-[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/dolevhayut/Employee001/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dolevhayut/Employee001/compare/v0.1.3...v0.2.0
 [0.1.0-rc.8]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.7...v0.1.0-rc.8
 [0.1.0-rc.7]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.6...v0.1.0-rc.7
