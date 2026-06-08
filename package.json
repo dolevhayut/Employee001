@@ -56,7 +56,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.123",
     "@anthropic-ai/sdk": "^0.91.1",
-    "@clack/prompts": "^0.9.1",
+    "@clack/prompts": "^1.5.1",
     "@composio/claude-agent-sdk": "^0.8.0",
     "@composio/core": "^0.8.0",
     "@react-three/drei": "^10.7.7",
