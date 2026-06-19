@@ -37,7 +37,7 @@ export async function POST(
       };
 
       if (!hasApiKey()) {
-        send({ type: "error", message: "ANTHROPIC_API_KEY is not configured (live interview needs a key)." });
+        send({ type: "error", message: "AZURE_OPENAI_ENDPOINT is not configured (live interview needs a key)." });
         send({ type: "done", text: "" });
         try { controller.close(); } catch { /* noop */ }
         return;

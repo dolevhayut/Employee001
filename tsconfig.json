@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@anthropic-ai/claude-agent-sdk": ["./src/lib/agent-sdk/index.ts"]
     }
   },
   "include": [

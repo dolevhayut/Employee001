@@ -1,12 +1,7 @@
 import { NextRequest } from "next/server";
+import { isVoiceConfigured, synthesize } from "@/lib/voice";
 
 const MAX_CHARS = 5000;
-
-// Default voice: Sarah — soft, conversational
-const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
-
-// eleven_flash_v2_5: ~75ms latency, 32 languages — best for real-time chat
-const MODEL_ID = "eleven_flash_v2_5";
 
 function stripMarkdown(md: string): string {
   return md
@@ -25,9 +20,14 @@ function stripMarkdown(md: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) {
-    return Response.json({ error: "ELEVENLABS_API_KEY is not configured" }, { status: 500 });
+  if (!isVoiceConfigured()) {
+    return Response.json(
+      {
+        error:
+          "Azure Speech is not configured. Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.",
+      },
+      { status: 500 }
+    );
   }
 
   const body = (await request.json()) as { text?: string; voiceId?: string };
@@ -37,33 +37,17 @@ export async function POST(request: NextRequest) {
   }
 
   const text = stripMarkdown(rawText).slice(0, MAX_CHARS);
-  const voiceId = body.voiceId ?? process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID;
+  const voice = body.voiceId ?? process.env.AZURE_SPEECH_VOICE ?? undefined;
 
-  const res = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-    {
-      method: "POST",
-      headers: {
-        "xi-api-key": apiKey,
-        "Content-Type": "application/json",
-        Accept: "audio/mpeg",
-      },
-      body: JSON.stringify({
-        text,
-        model_id: MODEL_ID,
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error("[tts] ElevenLabs error", res.status, errBody);
-    return Response.json({ error: `TTS request failed: ${res.status}` }, { status: 502 });
+  try {
+    const { audio, mimeType } = await synthesize(text, voice);
+    return Response.json({
+      audioContent: audio.toString("base64"),
+      mimeType,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[tts] Azure Speech error", message);
+    return Response.json({ error: message }, { status: 502 });
   }
-
-  const audioBuffer = await res.arrayBuffer();
-  const audioBase64 = Buffer.from(audioBuffer).toString("base64");
-
-  return Response.json({ audioContent: audioBase64, mimeType: "audio/mpeg" });
 }

@@ -52,7 +52,7 @@ export async function GET(
     const pending = await readPendingBuild(id);
     if (pending && countActiveConnections(state) > 0 && !getActiveBuild(id)) {
       await clearPendingBuild(id);
-      if (process.env.ANTHROPIC_API_KEY) {
+      if (process.env.AZURE_OPENAI_ENDPOINT) {
         const fromDisk = await loadEmployeesFromDisk();
         const employee = fromDisk.find((e) => e.id === id);
         if (employee) {

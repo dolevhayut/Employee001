@@ -57,11 +57,11 @@ export async function POST(
 
   // The key is ONLY required for the model-synthesis path. Fixture mode (the
   // demo default) produces a complete rcp.json with zero model calls.
-  if (synthMode === "model" && !process.env.ANTHROPIC_API_KEY) {
+  if (synthMode === "model" && !process.env.AZURE_OPENAI_ENDPOINT) {
     return Response.json(
       {
         error:
-          "ANTHROPIC_API_KEY is not configured (only required for synthMode: 'model')",
+          "AZURE_OPENAI_ENDPOINT is not configured (only required for synthMode: 'model')",
       },
       { status: 500 }
     );

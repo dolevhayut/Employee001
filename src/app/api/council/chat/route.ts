@@ -47,9 +47,9 @@ export async function POST(request: NextRequest) {
     (e) => e.twinStatus === "ready" && hasEmployeeFiles(e.id)
   );
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.AZURE_OPENAI_ENDPOINT) {
     return new Response(
-      JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
+      JSON.stringify({ error: "AZURE_OPENAI_ENDPOINT is not configured" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
