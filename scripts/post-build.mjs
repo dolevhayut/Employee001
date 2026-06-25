@@ -40,6 +40,11 @@ const FORBIDDEN = [
   join(STANDALONE, ".env.local"),
   join(STANDALONE, ".env.development"),
   join(STANDALONE, ".env.production"),
+  // docs/ is not in package.json "files" and no runtime code reads it, but the
+  // file tracer has pulled the whole tree into standalone (~13MB, including
+  // internal docs/local/ — KICKOFF, ROADMAP, SESSION logs, SHOW-HN drafts).
+  // outputFileTracingExcludes handles it; this is the belt-and-suspenders.
+  join(STANDALONE, "docs"),
 ];
 for (const p of FORBIDDEN) {
   if (existsSync(p)) {
