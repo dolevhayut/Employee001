@@ -1,0 +1,319 @@
+{
+  "cards": [
+    {
+      "idx": 0,
+      "question": "A customer's card was charged twice for the Pro plan this month. How do we refund the duplicate?",
+      "answer": "It's a known Stripe idempotency gap. Find the duplicate charge in the Stripe dashboard, issue a full refund on the second PaymentIntent, and tag the customer in billing-ops so the retry job skips them."
+    },
+    {
+      "idx": 1,
+      "question": "Why did the monthly invoice for the Enterprise account show a $0 line for seats?",
+      "answer": "The seat-count webhook from our app didn't fire before invoice finalization, so Stripe billed 0 seats. Re-run the usage sync, then void and reissue the invoice with the corrected quantity."
+    },
+    {
+      "idx": 2,
+      "question": "How do I add a new payment method besides credit card to checkout?",
+      "answer": "Enable the method in the Stripe payment_method_types array and add it to the PaymentElement. SEPA and ACH need extra mandate text. Test in Stripe test mode before flipping the live flag."
+    },
+    {
+      "idx": 3,
+      "question": "Our login page throws 'invalid token' for some users after they reset their password. Why?",
+      "answer": "The old JWT is still cached in localStorage after a password reset. Force a token refresh on the reset-success redirect and clear the stale auth cookie, or sessions keep validating against the rotated signing key."
+    },
+    {
+      "idx": 4,
+      "question": "How do we enable SSO login with Okta for the enterprise tier?",
+      "answer": "Register the SAML app in Okta, drop the metadata XML into our auth provider config, map the email and groups claims, and gate it behind the enterprise feature flag. Test with one pilot account first."
+    },
+    {
+      "idx": 5,
+      "question": "Users on the mobile app get logged out every few hours. What's going on?",
+      "answer": "The refresh-token rotation interval was set to 2h but the mobile client never calls the silent-refresh endpoint in background. Add a refresh on app-foreground and extend the access-token TTL to match."
+    },
+    {
+      "idx": 6,
+      "question": "The deploy to production failed at the build step in CI. Where do I look?",
+      "answer": "Check the GitHub Actions run for the failed job — it's the Turbopack build OOM-ing on the 4GB runner. Bump the runner to large or split the build matrix. The lint job passed, only build failed."
+    },
+    {
+      "idx": 7,
+      "question": "How do I roll back the last production deployment quickly?",
+      "answer": "Re-run the previous green deploy from the Actions history, or push the prior tag — the release workflow is tag-triggered. Don't hotfix on main; cut a revert commit and let CI redeploy it cleanly."
+    },
+    {
+      "idx": 8,
+      "question": "CI lint keeps failing on import order but it passes locally. Why the mismatch?",
+      "answer": "Local eslint uses a cached config; CI runs a clean install with a newer plugin version. Pin the eslint-plugin-import version in package.json and run npm ci locally to reproduce the exact failure."
+    },
+    {
+      "idx": 9,
+      "question": "How do I run a database migration to add a 'last_seen' column without downtime?",
+      "answer": "Add the column as nullable in one migration, backfill in batches off-peak, then a second migration sets NOT NULL with a default. Never lock the whole table — use a concurrent index if you add one."
+    },
+    {
+      "idx": 10,
+      "question": "A Postgres migration got stuck holding a lock and blocked all writes. How do we recover?",
+      "answer": "Find the blocking pid via pg_stat_activity, cancel it, and check pg_locks for orphaned ACCESS EXCLUSIVE locks. The migration tried to ALTER a 50M-row table in-place; redo it with a shadow-table swap."
+    },
+    {
+      "idx": 11,
+      "question": "How do we seed the staging database from a production snapshot safely?",
+      "answer": "Restore the nightly snapshot into a fresh staging instance, then run the PII-scrub migration to mask emails and payment fields before any engineer connects. Never copy prod credentials into staging env."
+    },
+    {
+      "idx": 12,
+      "question": "We're hiring two backend engineers. What's the interview loop look like?",
+      "answer": "Recruiter screen, a take-home or live coding round, a system-design round, and a values/culture interview with the hiring manager. Debrief within 24h in the ATS. Aim for a 2-week offer turnaround."
+    },
+    {
+      "idx": 13,
+      "question": "How do we handle the migration to the new HR tool for onboarding paperwork?",
+      "answer": "Export employee records as CSV from the old HRIS, map fields to the new tool's schema, and run the import in a sandbox first. Payroll and PTO balances must reconcile before we cut over the live workspace."
+    },
+    {
+      "idx": 14,
+      "question": "What's our parental leave policy for new hires?",
+      "answer": "16 weeks fully paid for the primary caregiver, 8 weeks for the secondary, available after 90 days of employment. Coordinate the leave start date with HR and your manager at least 4 weeks ahead."
+    },
+    {
+      "idx": 15,
+      "question": "What's the GTM plan for the v2 launch next quarter?",
+      "answer": "Lead with a product-hunt launch, a founder LinkedIn thread, and an email blast to the waitlist. Position around local-first, not feature parity. Sales-assist for the top 20 enterprise leads; self-serve for the rest."
+    },
+    {
+      "idx": 16,
+      "question": "Which marketing channel drove the most qualified signups last month?",
+      "answer": "Organic content and the LinkedIn founder posts converted best by far; paid search had volume but low intent. Double down on the technical blog and cut the broad-match Google campaign — it's burning budget."
+    },
+    {
+      "idx": 17,
+      "question": "How should we position pricing on the new landing page?",
+      "answer": "Anchor on the Pro plan, show the Enterprise 'contact us' tier, and hide the free tier below the fold. Emphasize value per seat, not a feature checklist. A/B test the annual-discount badge before committing."
+    },
+    {
+      "idx": 18,
+      "question": "The mobile app crashes on launch for some Android users after the latest update. What's the fix?",
+      "answer": "A null deref in the onboarding deep-link handler when the intent extras are missing. Guard the parse, ship a patch via the store, and add a Crashlytics non-fatal log so we catch the next one earlier."
+    },
+    {
+      "idx": 19,
+      "question": "Push notifications aren't arriving on iOS in the latest build. Where do I start?",
+      "answer": "The APNs auth key expired and the token-based provider rejected the push. Rotate the .p8 key, update the server config, and resend a test push to a sandbox device. FCM Android path is unaffected."
+    },
+    {
+      "idx": 20,
+      "question": "The mobile checkout screen freezes when applying a coupon. Any idea?",
+      "answer": "The coupon validation call blocks the main thread and the spinner never clears on a 4xx. Move the request off-thread and handle the invalid-coupon error state so the UI doesn't hang on a bad code."
+    },
+    {
+      "idx": 21,
+      "question": "Our nightly data pipeline failed and the dashboards are stale. What broke?",
+      "answer": "The Airflow ingestion DAG timed out because the upstream API rate-limited the export. Add backoff-retry to the extract task and stagger the partitions. Backfill the missed window once it's green."
+    },
+    {
+      "idx": 22,
+      "question": "How do we deduplicate rows landing in the analytics warehouse?",
+      "answer": "Events arrive twice when the producer retries. Add a dedupe step keyed on event_id in the transform layer and a unique constraint on the staging table so duplicates are dropped before the load step."
+    },
+    {
+      "idx": 23,
+      "question": "The ETL job is dropping records silently. How do I debug the data loss?",
+      "answer": "A schema drift in the source added a column the parser rejected, and the error was swallowed. Enable strict-mode logging on the transform, alert on row-count deltas, and add a dead-letter queue for bad rows."
+    },
+    {
+      "idx": 24,
+      "question": "A customer says they can't reach support and their ticket went unanswered for 3 days. How do we respond?",
+      "answer": "Apologize, escalate the ticket to a senior agent, and credit their account. The ticket fell out of the queue because the routing rule didn't tag the Enterprise SLA. Fix the rule so VIP tickets page on-call."
+    },
+    {
+      "idx": 25,
+      "question": "What's our SLA for first response on support tickets?",
+      "answer": "Free tier: best-effort within 48h. Pro: 8 business hours. Enterprise: 1 hour with 24/7 on-call paging. The SLA timer starts when the ticket is created, not when an agent opens it."
+    },
+    {
+      "idx": 26,
+      "question": "How do we set up a canned-response macro for common refund requests in the help desk?",
+      "answer": "Create a macro in the support tool that inserts the refund-policy snippet and a link to the self-serve billing portal, then tags the ticket 'refund-handled'. Keep the tone warm and offer a follow-up."
+    },
+    {
+      "idx": 27,
+      "question": "Our AWS bill jumped 40% this month. Where's the spend coming from?",
+      "answer": "NAT-gateway data-processing charges from the new data pipeline traffic, plus an oversized RDS instance left running in staging. Right-size the RDS, add a VPC endpoint for S3, and schedule staging to sleep nightly."
+    },
+    {
+      "idx": 28,
+      "question": "How do we reduce our infra costs without hurting reliability?",
+      "answer": "Move batch workloads to spot instances, buy savings plans for the steady-state compute, set S3 lifecycle rules to Glacier for old logs, and kill idle dev environments after hours. Don't touch the prod HA pair."
+    },
+    {
+      "idx": 29,
+      "question": "The Kubernetes cluster is over-provisioned. How do we right-size the node pool?",
+      "answer": "Pull actual CPU/memory usage from Prometheus over 30 days, set requests to p95 and limits modestly above, then enable the cluster autoscaler. Most pods are requesting 4x what they use — that's the waste."
+    },
+    {
+      "idx": 30,
+      "question": "How do I rotate the API keys we use for the payment provider?",
+      "answer": "Generate a new Stripe restricted key, deploy it to the secret manager, verify webhooks still sign-verify, then revoke the old key after a 24h overlap. Never commit the key — it lives in the secret store only."
+    },
+    {
+      "idx": 31,
+      "question": "A user reports their dashboard shows another customer's data. Is this a leak?",
+      "answer": "Critical — a cache key omitted the tenant_id so a shared CDN entry bled across orgs. Purge the cache, add tenant scoping to the key, and audit logs for who saw what. Treat as a security incident and notify."
+    },
+    {
+      "idx": 32,
+      "question": "How do we onboard a new customer's data into our system via import?",
+      "answer": "Provide the CSV template, validate required columns on upload, run the import in a dry-run that reports row errors, then commit. Large imports go through the async pipeline with a progress webhook back to them."
+    },
+    {
+      "idx": 33,
+      "question": "What's the process to add a new environment variable to the production deploy?",
+      "answer": "Add it to the secret manager, reference it in the deploy config, and document it in .env.example without the value. Trigger a redeploy so the new env is picked up — env changes don't hot-reload in prod."
+    },
+    {
+      "idx": 34,
+      "question": "Our email open rates dropped after the last campaign send. Why?",
+      "answer": "Deliverability — the new sending domain wasn't warmed and SPF/DKIM weren't aligned, so a chunk landed in spam. Authenticate the domain, ramp volume gradually, and prune the cold segment that hurt the sender score."
+    },
+    {
+      "idx": 35,
+      "question": "How do we track conversion from free trial to paid in the funnel?",
+      "answer": "Instrument the trial-start and first-payment events, attribute by acquisition source, and build the cohort retention chart in the analytics tool. Watch the day-7 activation metric — it predicts trial conversion best."
+    }
+  ],
+  "queries": [
+    {
+      "id": "q-001",
+      "q": "Customer got billed twice on their card — how do I refund the duplicate charge?",
+      "relevant": [0],
+      "hard": false,
+      "note": "Direct match on duplicate-charge refund. Card 26 (refund macro) and 30 (rotate payment key) share 'refund'/'payment' words but aren't about a duplicate charge."
+    },
+    {
+      "id": "q-002",
+      "q": "How do I set up SSO with Okta for our enterprise customers?",
+      "relevant": [4],
+      "hard": false,
+      "note": "Direct SSO/Okta match."
+    },
+    {
+      "id": "q-003",
+      "q": "Users keep getting logged out or see invalid token errors — what causes auth session problems?",
+      "relevant": [3, 5],
+      "hard": false,
+      "note": "Both auth-session cards (token reset, mobile logout). Card 30 mentions keys/rotation but is payment-key rotation, not auth sessions."
+    },
+    {
+      "id": "q-004",
+      "q": "The production deploy failed in CI — how do I diagnose and roll it back?",
+      "relevant": [6, 7],
+      "hard": false,
+      "note": "Both deploy/CI cards. Card 8 is CI lint (related but about a different failure); 33 is env-var deploy config."
+    },
+    {
+      "id": "q-005",
+      "q": "How do I add a database column with a zero-downtime migration?",
+      "relevant": [9],
+      "hard": false,
+      "note": "Direct match. Card 10 is a stuck migration recovery (related topic), 13 is HR-tool migration (hard negative on 'migration')."
+    },
+    {
+      "id": "q-006",
+      "q": "Our data pipeline is producing duplicate rows in the warehouse — how do we dedupe?",
+      "relevant": [22],
+      "hard": false,
+      "note": "Direct dedupe match. Card 0/1 use 'duplicate' but for billing, not pipeline rows."
+    },
+    {
+      "id": "q-007",
+      "q": "The mobile app is crashing on launch for Android users — how do we fix it?",
+      "relevant": [18],
+      "hard": false,
+      "note": "Direct mobile-crash match. Card 19 (push) and 20 (checkout freeze) are mobile bugs but different symptoms."
+    },
+    {
+      "id": "q-008",
+      "q": "Our cloud bill spiked this month — where is the cost coming from and how do we cut it?",
+      "relevant": [27, 28],
+      "hard": false,
+      "note": "Both infra-cost cards. Card 29 (k8s right-size) is cost-adjacent; 17 prices a plan, not infra."
+    },
+    {
+      "id": "q-009",
+      "q": "What's our support SLA and how do we handle an escalated unanswered ticket?",
+      "relevant": [24, 25],
+      "hard": false,
+      "note": "Escalation card + SLA card. Card 26 is a refund macro (support tool, different intent)."
+    },
+    {
+      "id": "q-010",
+      "q": "What's the GTM and launch plan, and which marketing channels are working?",
+      "relevant": [15, 16],
+      "hard": false,
+      "note": "GTM plan + channel performance. Card 17 (pricing on landing page) and 34 (email deliverability) are marketing-adjacent but off-topic."
+    },
+    {
+      "id": "q-011",
+      "q": "We need to migrate employee records when switching HR systems — how do we do the import?",
+      "relevant": [13],
+      "hard": true,
+      "note": "Relevant card is HR-tool migration (idx 13). Hard negatives: db-migration cards 9/10/11 and the customer data-import card 32 all share 'migration'/'import'/'CSV' but are not HR."
+    },
+    {
+      "id": "q-012",
+      "q": "iOS users aren't receiving notifications in the new build — what's broken?",
+      "relevant": [19],
+      "hard": true,
+      "note": "Relevant card never says 'notification arriving' in the query's words; it's about APNs key expiry. Hard negatives: card 18 (crash) and 20 (freeze) are same-build mobile bugs sharing 'latest build'/'iOS'."
+    },
+    {
+      "id": "q-013",
+      "q": "A Postgres migration is holding a lock and blocking writes — how do I recover the database?",
+      "relevant": [10],
+      "hard": true,
+      "note": "Target uses 'stuck lock / pg_stat_activity'. Hard negative: card 9 (zero-downtime add column) is the most lexically similar migration card but doesn't cover lock recovery; 13 shares 'migration' as HR."
+    },
+    {
+      "id": "q-014",
+      "q": "How do I rotate the keys for our payment provider safely?",
+      "relevant": [30],
+      "hard": true,
+      "note": "Target is Stripe key rotation. Hard negatives: card 3/5 (auth token rotation) share 'rotate/key/token'; card 33 (add env var to deploy / secret manager) shares 'secret manager'."
+    },
+    {
+      "id": "q-015",
+      "q": "One customer can see another customer's data on their dashboard — is this a leak and how do we contain it?",
+      "relevant": [31],
+      "hard": true,
+      "note": "Target is the tenant-isolation cache leak. Hard negatives: card 11 (PII scrub / staging data) and 35 (dashboard funnel) share 'data'/'dashboard'/'customer' but aren't a cross-tenant leak."
+    },
+    {
+      "id": "q-016",
+      "q": "Our email campaign open rates fell — how do we improve deliverability?",
+      "relevant": [34],
+      "hard": false,
+      "note": "Direct deliverability match. Card 16 (marketing channels) shares 'campaign' but is about signup attribution."
+    },
+    {
+      "id": "q-017",
+      "q": "What's the recommended way to write a Terraform module for our VPC networking?",
+      "relevant": [],
+      "hard": false,
+      "note": "No card covers Terraform/IaC modules. Cards 27/28/29 are infra-cost, sharing 'VPC'/'infra' words — tempting false positives but not about authoring Terraform modules."
+    },
+    {
+      "id": "q-018",
+      "q": "How do we run a GDPR data-subject deletion request across all our systems?",
+      "relevant": [],
+      "hard": false,
+      "note": "No card covers GDPR/right-to-erasure. Cards 11 (PII scrub), 31 (data leak), 32 (data import) share 'data'/'PII' and are tempting but none handle a DSAR deletion."
+    },
+    {
+      "id": "q-019",
+      "q": "What's our company holiday calendar and how many vacation days do new employees get?",
+      "relevant": [],
+      "hard": false,
+      "note": "No card covers holidays/vacation allotment. Card 13 (parental leave) and 12 (hiring loop) are HR-domain and share 'new hires'/'leave' but answer a different question."
+    }
+  ]
+}

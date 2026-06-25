@@ -1,0 +1,21 @@
+{
+  "hybridRetrieval": {
+    "queriesScored": 16,
+    "precisionAt5": 0.263,
+    "recallAt5": 1,
+    "mrr": 0.802,
+    "hardRecallAt5": 1,
+    "easyRecallAt5": 1,
+    "emptyRelevantAbstention": "0/3"
+  },
+  "realDedup": {
+    "afterA": 1,
+    "afterB": 1,
+    "afterC": 2,
+    "afterD": 3,
+    "paraphraseDeduped": true,
+    "paraphraseReinforced": true,
+    "distinctTopicAppended": true,
+    "sameDomainDifferentFactAppended": true
+  }
+}

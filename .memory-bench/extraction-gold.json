@@ -1,0 +1,403 @@
+{
+  "cases": [
+    {
+      "id": "ex-001",
+      "lang": "en",
+      "question": "Which database should we use for the new analytics service?",
+      "answer": "I decided to go with Postgres for the analytics service. We can always add a read replica later if load grows.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "decision", "gist": "postgres analytics service" }
+      ],
+      "note": "Clean 'I decided to go with X' decision; the question alone is a near-miss but the answer carries the fact."
+    },
+    {
+      "id": "ex-002",
+      "lang": "en",
+      "question": "Any thoughts on formatting?",
+      "answer": "I prefer Prettier over ESLint for formatting, and I always use 2-space indentation across the repo.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "preference", "gist": "prefer prettier formatting" },
+        { "type": "preference", "gist": "always 2-space indentation" }
+      ],
+      "note": "Two preferences in one answer: 'I prefer' and 'I always use'."
+    },
+    {
+      "id": "ex-003",
+      "lang": "en",
+      "question": "How does auth work here?",
+      "answer": "The login service uses JWT tokens and requires a refresh token rotation every 24 hours.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "fact", "gist": "login service uses jwt" },
+        { "type": "fact", "gist": "requires refresh token rotation" }
+      ],
+      "note": "Two facts: '<noun> uses X' and '<noun> requires X' in the same sentence."
+    },
+    {
+      "id": "ex-004",
+      "lang": "en",
+      "question": "Who do I talk to about the billing integration?",
+      "answer": "Contact Sarah at sarah@finance.co for anything about the billing integration and invoicing.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "contact", "gist": "sarah billing integration" }
+      ],
+      "note": "Classic 'contact <name> at <email> for/about X' pattern."
+    },
+    {
+      "id": "ex-005",
+      "lang": "en",
+      "question": "What's left before launch?",
+      "answer": "We still need to migrate the legacy users table and we must rotate the API keys before Friday.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "todo", "gist": "migrate legacy users table" },
+        { "type": "todo", "gist": "rotate api keys" }
+      ],
+      "note": "Two todos: 'need to X' and 'must X'."
+    },
+    {
+      "id": "ex-006",
+      "lang": "en",
+      "question": "Any update on the mobile app?",
+      "answer": "We shipped the iOS build to TestFlight this morning and launched the referral program to all beta users.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "milestone", "gist": "shipped ios testflight" },
+        { "type": "milestone", "gist": "launched referral program" }
+      ],
+      "note": "Two milestones: 'shipped X' and 'launched X'."
+    },
+    {
+      "id": "ex-007",
+      "lang": "en",
+      "question": "Why is checkout failing?",
+      "answer": "There is a bug in the checkout flow where the discount code is applied twice on mobile Safari.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "problem", "gist": "bug checkout discount twice" }
+      ],
+      "note": "'There is a bug in X' problem pattern."
+    },
+    {
+      "id": "ex-008",
+      "lang": "en",
+      "question": "How are you feeling about the deadline?",
+      "answer": "Honestly I'm worried about the Q3 deadline, we are behind on the data migration and it's stressing the whole team.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "emotional", "gist": "worried q3 deadline" }
+      ],
+      "note": "'I'm worried about X' emotional state."
+    },
+    {
+      "id": "ex-009",
+      "lang": "en",
+      "question": "Vendor for the CRM?",
+      "answer": "After comparing options I chose HubSpot for our CRM. I prefer it over Salesforce because onboarding is faster.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "decision", "gist": "chose hubspot crm" },
+        { "type": "preference", "gist": "prefer hubspot over salesforce" }
+      ],
+      "note": "Decision plus preference in one answer; tests not double-counting the same fact."
+    },
+    {
+      "id": "ex-010",
+      "lang": "en",
+      "question": "Where do we stand on the new hire?",
+      "answer": "We finished onboarding for the new designer and deployed her access to Figma and the design system repo.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "milestone", "gist": "finished onboarding designer" },
+        { "type": "milestone", "gist": "deployed access figma" }
+      ],
+      "note": "HR-domain milestones: 'finished X' and 'deployed X'."
+    },
+    {
+      "id": "ex-011",
+      "lang": "en",
+      "question": "What's the status of the payments error?",
+      "answer": "There is an error in the Stripe webhook handler; it returns 500 when the signature header is missing.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "problem", "gist": "error stripe webhook handler" }
+      ],
+      "note": "'There is an error in X' problem."
+    },
+    {
+      "id": "ex-012",
+      "lang": "en",
+      "question": "Budget call?",
+      "answer": "I selected the annual Vercel Pro plan for hosting. We need to update the finance forecast to reflect the new line item.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "decision", "gist": "selected vercel pro plan" },
+        { "type": "todo", "gist": "update finance forecast" }
+      ],
+      "note": "Finance-domain decision + todo."
+    },
+    {
+      "id": "ex-013",
+      "lang": "en",
+      "question": "Who handles the on-call?",
+      "answer": "Reach Marcus for anything about the on-call rotation and production incidents this week.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "contact", "gist": "marcus on-call rotation" }
+      ],
+      "note": "'Reach <name> for X' contact without an email."
+    },
+    {
+      "id": "ex-015",
+      "lang": "en",
+      "question": "Personal note for later",
+      "answer": "I want to switch my standup to mornings, and TODO: book the dentist before the end of the month.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "preference", "gist": "want standup mornings" },
+        { "type": "todo", "gist": "book the dentist" }
+      ],
+      "note": "Personal domain: 'I want to X' preference + literal 'TODO:' marker."
+    },
+    {
+      "id": "ex-016",
+      "lang": "en",
+      "question": "Did the release go out?",
+      "answer": "Yes, we released v2.0 to production at noon. I'm really excited about how smooth the rollout was.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "milestone", "gist": "released v2.0 production" },
+        { "type": "emotional", "gist": "excited about rollout" }
+      ],
+      "note": "Milestone 'released X' + 'I'm excited' emotional."
+    },
+    {
+      "id": "ex-018",
+      "lang": "en",
+      "question": "Anything blocking the demo?",
+      "answer": "FIXME: the search index is stale on staging, and we have to reindex before the client demo tomorrow.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "todo", "gist": "fixme search index stale" },
+        { "type": "todo", "gist": "reindex before demo" }
+      ],
+      "note": "Literal 'FIXME:' + 'we have to X' both todos."
+    },
+    {
+      "id": "ex-019",
+      "lang": "en",
+      "question": "How was the customer call?",
+      "answer": "I'm frustrated with the procurement delays on their side; meanwhile the support portal has a problem where attachments fail to upload.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "emotional", "gist": "frustrated procurement delays" },
+        { "type": "problem", "gist": "problem attachments fail upload" }
+      ],
+      "note": "Emotional 'I'm frustrated' + 'has a problem where X'."
+    },
+    {
+      "id": "ex-020",
+      "lang": "en",
+      "question": "What did the team agree on for state management?",
+      "answer": "We went with Zustand for client state. The store requires a single provider at the app root.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "decision", "gist": "went with zustand state" },
+        { "type": "fact", "gist": "store requires single provider" }
+      ],
+      "note": "'We went with X' decision + '<noun> requires X' fact."
+    },
+    {
+      "id": "ex-021",
+      "lang": "en",
+      "question": "Email someone about the audit?",
+      "answer": "Email Dana at dana@legal.io about the SOC2 audit evidence; she owns the compliance folder.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "contact", "gist": "dana soc2 audit" }
+      ],
+      "note": "'Email <name> at <email> about X' contact; trailing third-person clause should not add a fact."
+    },
+    {
+      "id": "ex-022",
+      "lang": "en",
+      "question": "Quick gut check on morale and the pipeline.",
+      "answer": "I'm happy with how the team gelled this sprint. Also I love using Linear for issue tracking now.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "emotional", "gist": "happy team gelled" },
+        { "type": "preference", "gist": "love linear issue tracking" }
+      ],
+      "note": "'I'm happy' emotional + 'I love using X' preference."
+    },
+    {
+      "id": "ex-023",
+      "lang": "en",
+      "question": "Should I use Stripe or PayPal for the new store?",
+      "answer": "Both could work. It depends on your fee tolerance and which markets you sell into. What matters most to you?",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "Pure question + non-committal answer. No decision is made — adversarial near-miss to 'decision'."
+    },
+    {
+      "id": "ex-024",
+      "lang": "en",
+      "question": "What if we decided to move off AWS?",
+      "answer": "If we decided to move off AWS, we would need to rewrite the deployment scripts. But that's hypothetical for now.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "Conditional 'If we decided to...' — must NOT fire decision or todo despite 'need to' inside the hypothetical."
+    },
+    {
+      "id": "ex-025",
+      "lang": "en",
+      "question": "Tell me about the new PM.",
+      "answer": "She prefers async standups and she decided to move the roadmap to Notion. He likes Slack huddles though.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "Third-person 'She prefers / She decided / He likes' — facts about others, not the speaker. Adversarial for preference/decision."
+    },
+    {
+      "id": "ex-026",
+      "lang": "en",
+      "question": "Recap of what didn't happen.",
+      "answer": "I did not decide on a vendor yet, and we have not shipped anything this week. No bugs were reported either.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "Negations: 'did not decide', 'have not shipped', 'no bugs'. Must not produce decision/milestone/problem."
+    },
+    {
+      "id": "ex-027",
+      "lang": "en",
+      "question": "Can you summarize the article?",
+      "answer": "The author argues that teams should prefer monoliths early and only later split into services. It's a common viewpoint.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "'should prefer' is generic advice from an article, not the speaker's own preference or todo. Near-miss."
+    },
+    {
+      "id": "ex-028",
+      "lang": "en",
+      "question": "What does 'TODO' even mean in code?",
+      "answer": "A TODO comment is just a marker developers leave to flag work for later. It doesn't track anything by itself.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "The word 'TODO' appears but only as a topic being defined — not an actual task. Devious lexical near-miss."
+    },
+    {
+      "id": "ex-029",
+      "lang": "en",
+      "question": "Remind me what the docs said.",
+      "answer": "The README says \"the app requires Node 20\", but I think we are actually fine on Node 18 in practice.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "A quoted 'requires' inside narration the speaker then contradicts — not a held fact. Quote-trap near-miss."
+    },
+    {
+      "id": "ex-030",
+      "lang": "en",
+      "question": "How was last quarter?",
+      "answer": "Last quarter the previous team launched the old portal and chose MongoDB. We are not continuing either.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "Past-tense narration about a previous team plus an explicit 'not continuing'. Should not log milestone/decision."
+    },
+    {
+      "id": "ex-031",
+      "lang": "en",
+      "question": "Brainstorm some options out loud.",
+      "answer": "Maybe we could use Redis for caching, or possibly Memcached. Could go either way. Just thinking aloud here.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "Hedged brainstorming 'maybe/could/possibly' — no decision, no preference. Adversarial."
+    },
+    {
+      "id": "ex-032",
+      "lang": "en",
+      "question": "Is there an issue with the login page?",
+      "answer": "Is there a bug in the login page? I haven't seen one, but it's worth checking the error logs to be sure.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "'Is there a bug in X?' is a question, not an asserted problem. Negated observation follows. Near-miss for problem."
+    },
+    {
+      "id": "ex-035",
+      "lang": "en",
+      "question": "Would you be worried if traffic doubled?",
+      "answer": "Would you be worried if traffic doubled overnight? Probably the autoscaler handles it, so I wouldn't stress too much.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "Hypothetical/conditional emotion ('Would you be worried if...') plus 'wouldn't stress' — no real emotional state asserted."
+    },
+    {
+      "id": "ex-041",
+      "lang": "he",
+      "question": "מה שלומך היום?",
+      "answer": "הכל טוב, תודה. שתינו קפה ודיברנו קצת על הסופ\"ש. נתראה אחר כך.",
+      "mustExtractNothing": true,
+      "expected": [],
+      "note": "Hebrew small talk with zero durable facts — bilingual negative; correct behavior is to extract nothing regardless of language."
+    },
+    {
+      "id": "ex-036",
+      "lang": "he",
+      "question": "באיזה כלי לבחור לניהול המשימות?",
+      "answer": "החלטתי ללכת עם Linear לניהול המשימות שלנו, הוא הרבה יותר מהיר.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "decision", "gist": "linear task management" }
+      ],
+      "note": "Hebrew 'I decided to go with Linear' decision. English-anchored regex will likely MISS it — measures the known Hebrew gap."
+    },
+    {
+      "id": "ex-037",
+      "lang": "he",
+      "question": "מה מצב הפיצ'ר?",
+      "answer": "שילחנו את הגרסה החדשה לפרודקשן הבוקר, אני מאוד מרוצה מהתוצאה.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "milestone", "gist": "shipped new version production" },
+        { "type": "emotional", "gist": "satisfied happy result" }
+      ],
+      "note": "Hebrew milestone ('shipped to production') + emotional ('very satisfied'). Expected MISS by English regex."
+    },
+    {
+      "id": "ex-038",
+      "lang": "he",
+      "question": "מי אחראי על החיובים?",
+      "answer": "צרו קשר עם דנה בנושא החיובים והחשבוניות, היא מכירה את כל המערכת.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "contact", "gist": "dana billing invoices" }
+      ],
+      "note": "Hebrew 'contact Dana about billing' contact. English regex MISS expected; human gold is a contact."
+    },
+    {
+      "id": "ex-039",
+      "lang": "mixed",
+      "question": "מה הסטטוס של ה-API?",
+      "answer": "There is a bug in the API rate limiter. צריך לתקן את זה לפני ההשקה מחר.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "problem", "gist": "bug api rate limiter" },
+        { "type": "todo", "gist": "fix before launch" }
+      ],
+      "note": "Mixed: the English clause 'There is a bug in the API rate limiter' SHOULD match; the Hebrew 'need to fix' todo will likely be MISSED. Tests partial extraction."
+    },
+    {
+      "id": "ex-040",
+      "lang": "mixed",
+      "question": "Decision on the design tool?",
+      "answer": "I decided to go with Figma. אני מעדיף את זה על Sketch כי הקולבורציה יותר טובה.",
+      "mustExtractNothing": false,
+      "expected": [
+        { "type": "decision", "gist": "figma design tool" },
+        { "type": "preference", "gist": "prefer figma over sketch" }
+      ],
+      "note": "Mixed: English decision 'I decided to go with Figma' SHOULD match; the Hebrew preference clause will likely be MISSED. Honest partial-gold labeling."
+    }
+  ]
+}

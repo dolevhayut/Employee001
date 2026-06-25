@@ -1,0 +1,173 @@
+{
+  "extraction": {
+    "overallRecall": 0.61,
+    "goldHit": 25,
+    "goldTotal": 41,
+    "negativePrecision": 0.917,
+    "negativesClean": "11/12",
+    "falsePositiveFactsOnNegatives": 1,
+    "spuriousTypeFactsOnPositives": 0,
+    "recallByLang": {
+      "en": "0.727 (24/33)",
+      "he": "0 (0/4)",
+      "mixed": "0.25 (1/4)"
+    },
+    "sampleMisses": [
+      {
+        "id": "ex-003",
+        "type": "fact",
+        "gist": "login service uses jwt",
+        "lang": "en"
+      },
+      {
+        "id": "ex-003",
+        "type": "fact",
+        "gist": "requires refresh token rotation",
+        "lang": "en"
+      },
+      {
+        "id": "ex-004",
+        "type": "contact",
+        "gist": "sarah billing integration",
+        "lang": "en"
+      },
+      {
+        "id": "ex-015",
+        "type": "todo",
+        "gist": "book the dentist",
+        "lang": "en"
+      },
+      {
+        "id": "ex-016",
+        "type": "milestone",
+        "gist": "released v2.0 production",
+        "lang": "en"
+      },
+      {
+        "id": "ex-016",
+        "type": "emotional",
+        "gist": "excited about rollout",
+        "lang": "en"
+      },
+      {
+        "id": "ex-019",
+        "type": "problem",
+        "gist": "problem attachments fail upload",
+        "lang": "en"
+      },
+      {
+        "id": "ex-020",
+        "type": "decision",
+        "gist": "went with zustand state",
+        "lang": "en"
+      }
+    ]
+  },
+  "retrieval": {
+    "queriesScored": 16,
+    "precisionAt5": 0.163,
+    "recallAt5": 0.656,
+    "mrr": 0.404,
+    "hard": {
+      "n": 5,
+      "P5": 0.16,
+      "R5": 0.8
+    },
+    "easy": {
+      "n": 11,
+      "P5": 0.164,
+      "R5": 0.591
+    },
+    "emptyRelevant": "0/3 returned no lexically-matching top hit"
+  },
+  "salienceMath": {
+    "checks": [
+      {
+        "name": "fresh card > 60-day-stale card (decay)",
+        "pass": true,
+        "detail": {
+          "freshCold": 1,
+          "staleCold": 0.051
+        }
+      },
+      {
+        "name": "60-day card reinforced 20x (last touched today) > fresh-cold",
+        "pass": true,
+        "detail": {
+          "oldWarm": 2.522,
+          "freshCold": 1
+        }
+      },
+      {
+        "name": "salience monotonic in recall count",
+        "pass": true,
+        "detail": {
+          "r0": 1,
+          "r5": 1.896,
+          "r50": 2.966
+        }
+      },
+      {
+        "name": "reinforcement has diminishing returns (log curve)",
+        "pass": true,
+        "detail": {}
+      },
+      {
+        "name": "untouched card at 14d half-life ≈ 0.5×base",
+        "pass": true,
+        "detail": {
+          "value": 0.5
+        }
+      }
+    ],
+    "allPass": true
+  },
+  "saliencePipeline": {
+    "topCardId": "warm-old",
+    "reinforcedWins": true,
+    "scores": [
+      {
+        "id": "warm-old",
+        "score": 0.0294,
+        "kw": 1,
+        "sal": 2.857
+      },
+      {
+        "id": "cold-fresh",
+        "score": 0.0288,
+        "kw": 1,
+        "sal": 0.952
+      }
+    ]
+  },
+  "dedupPolicy": {
+    "threshold": 0.92,
+    "similarityVsPerturbation": [
+      {
+        "eps": 0.01,
+        "sim": 0.9991
+      },
+      {
+        "eps": 0.05,
+        "sim": 0.979
+      },
+      {
+        "eps": 0.1,
+        "sim": 0.9148
+      },
+      {
+        "eps": 0.2,
+        "sim": 0.7217
+      },
+      {
+        "eps": 0.4,
+        "sim": 0.4901
+      }
+    ],
+    "distinctPairSim": -0.1071,
+    "monotonicDecay": true,
+    "nearDuplicateCaught": true,
+    "distinctPairRejected": true,
+    "allPass": true
+  }
+}
