@@ -33,7 +33,7 @@ import {
 
 /** PRD: capture = sonnet (fast/warm), synthesis = opus (deep reasoning). */
 export const CAPTURE_MODEL = "claude-sonnet-4-6";
-export const SYNTHESIS_MODEL = "claude-opus-4-7";
+export const SYNTHESIS_MODEL = "claude-opus-4-8";
 
 /** The mandatory demo banner (ConsentRecord.banner literal, PRD 13.5). */
 const DEMO_BANNER =

@@ -802,7 +802,7 @@ export default function LearningPage() {
           </div>
           <div style={{ flex: 1 }} />
           <div className="subtle" style={{ fontSize: "var(--fs-meta)", maxWidth: 260, lineHeight: 1.5, textAlign: "right" }}>
-            Costs use Claude Opus 4.7. Prompt caching reduces input costs by ~70% on refreshes.
+            Costs use Claude Opus 4.8. Prompt caching reduces input costs by ~70% on refreshes.
           </div>
         </div>
       </div>

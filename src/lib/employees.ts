@@ -19,7 +19,7 @@ export const EMPLOYEES: Employee[] = [];
 export type TwinStatus = "ready" | "building" | "pending";
 
 export type ClaudeModel =
-  | "claude-opus-4-7"
+  | "claude-opus-4-8"
   | "claude-sonnet-4-6"
   | "claude-haiku-4-5";
 
@@ -31,8 +31,8 @@ export const CLAUDE_MODELS: {
   refreshCostMultiplier: number;
 }[] = [
   {
-    id: "claude-opus-4-7",
-    label: "Claude Opus 4.7",
+    id: "claude-opus-4-8",
+    label: "Claude Opus 4.8",
     sub: "Highest quality — best for complex reasoning & nuanced profiles",
     seedCostMultiplier: 1.0,
     refreshCostMultiplier: 1.0,

@@ -57,7 +57,7 @@ export const DEMO_BANNER =
 /** Capture model id (sonnet) recorded in provenance in model mode. */
 const CAPTURE_MODEL = "claude-sonnet-4-6";
 /** Synthesis model id (opus) recorded in provenance in model mode. */
-const SYNTHESIS_MODEL = "claude-opus-4-7";
+const SYNTHESIS_MODEL = "claude-opus-4-8";
 
 const RELAY_PHASES = [
   "consent",

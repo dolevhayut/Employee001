@@ -577,7 +577,7 @@ export type RunOptions = {
   abortController?: AbortController;
   /**
    * Override the primary model for this single run. Defaults to
-   * `claude-sonnet-4-6`; CEO can pick `claude-opus-4-7` for harder asks.
+   * `claude-sonnet-4-6`; CEO can pick `claude-opus-4-8` for harder asks.
    */
   modelOverride?: string;
   /**

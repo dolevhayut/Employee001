@@ -209,7 +209,7 @@ No twin runs shell commands on your machine. Enforced in two places at once (the
 
 **Web citations.** After any `WebSearch` or `WebFetch`, a `PostToolUse` hook injects an instruction telling the model to cite the URL and the fetch date. Twins can look things up online, but they can't pretend they "just knew" something.
 
-**Models.** `claude-sonnet-4-6` default with `claude-sonnet-4-5` fallback. Override to `claude-opus-4-7` for a single message from the chat UI. Source of truth: [`src/lib/sdk-defaults.ts`](src/lib/sdk-defaults.ts).
+**Models.** `claude-sonnet-4-6` default with `claude-sonnet-4-5` fallback. Override to `claude-opus-4-8` for a single message from the chat UI. Source of truth: [`src/lib/sdk-defaults.ts`](src/lib/sdk-defaults.ts).
 
 </details>
 
