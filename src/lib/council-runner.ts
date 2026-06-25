@@ -32,8 +32,10 @@ import { registerApproval } from "@/lib/approval-bus";
 import type { ApprovalSurface, ApprovalContext } from "@/lib/approval-bus";
 import { appendAuditEntry } from "@/lib/audit-log";
 import {
+  formatStructuredMemoryBlock,
   formatTwinMemoryBlock,
   rememberTwinRun,
+  searchStructuredMemory,
   searchTwinMemory,
   type TwinMemorySurface,
 } from "@/lib/twin-memory";
@@ -870,9 +872,17 @@ export async function runSingleTwin(
 
     let memoryBlock = "";
     try {
-      memoryBlock = formatTwinMemoryBlock(
-        await searchTwinMemory(employee.id, question)
-      );
+      const [episodic, structured] = await Promise.all([
+        searchTwinMemory(employee.id, question),
+        Promise.resolve(searchStructuredMemory(employee.id, question)),
+      ]);
+      // Durable facts first (higher authority), then episodic recall.
+      memoryBlock = [
+        formatStructuredMemoryBlock(structured),
+        formatTwinMemoryBlock(episodic),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       console.warn(`[twin-memory] search skipped: ${message}`);

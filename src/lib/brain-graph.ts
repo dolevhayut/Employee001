@@ -152,8 +152,14 @@ export async function buildOrgBrainGraph(): Promise<EmployeeGraph> {
     const empName = `emp:${emp.id}`;
     const scratchFiles = readScratchFiles(emp.id);
     const memoryCards = readRecentMemoryCards(emp.id, MEMORY_CARDS_PER_EMPLOYEE);
+    const structuredFacts = readStructuredFacts(emp.id, MEMORY_CARDS_PER_EMPLOYEE);
 
-    if (scratchFiles.length === 0 && memoryCards.length === 0) continue;
+    if (
+      scratchFiles.length === 0 &&
+      memoryCards.length === 0 &&
+      structuredFacts.length === 0
+    )
+      continue;
 
     // Ensure the employee node exists (might not, if no brain links).
     const hasEmployeeNode = nodes.some((n) => n.name === empName);
@@ -200,6 +206,26 @@ export async function buildOrgBrainGraph(): Promise<EmployeeGraph> {
         sources: ["memory"],
         linkedFiles: [],
         tags: ["memory", card.preview ?? "recall", "short-term"],
+      });
+      const key = `${empName}→${nodeName}`;
+      if (!seenEdge.has(key)) {
+        seenEdge.add(key);
+        edges.push({ from: empName, to: nodeName, bidirectional: false });
+      }
+    }
+
+    // Durable facts (the "Dreamer" output) — distilled long-term memory.
+    // Rendered as memory-yellow nodes, distinguished by the "durable-fact" tag.
+    for (const fact of structuredFacts) {
+      const nodeName = `memory:${emp.id}:fact-${fact.id}`;
+      nodes.push({
+        name: nodeName,
+        tokens: Math.max(20, Math.round(fact.label.length / 4)),
+        confidence: fact.confidence,
+        lastUpdated: fact.createdAt,
+        sources: ["memory"],
+        linkedFiles: [],
+        tags: ["memory", `[${fact.type}] ${fact.label}`, "durable-fact"],
       });
       const key = `${empName}→${nodeName}`;
       if (!seenEdge.has(key)) {
@@ -276,6 +302,58 @@ function readRecentMemoryCards(
           id,
           preview,
           createdAt: card.createdAt ?? "",
+        });
+      } catch {
+        /* skip malformed line */
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** Read the most recent durable facts from data/memory/<id>/structured.jsonl.
+ *  These are the Dreamer's typed promotions (decision/preference/fact/…). */
+type StructuredFactLite = {
+  id: string;
+  type: string;
+  label: string;
+  confidence: number;
+  createdAt: string;
+};
+function readStructuredFacts(
+  employeeId: string,
+  limit: number
+): StructuredFactLite[] {
+  const file = path.join(
+    process.cwd(),
+    "data",
+    "memory",
+    employeeId,
+    "structured.jsonl"
+  );
+  try {
+    if (!fs.existsSync(file)) return [];
+    const lines = fs.readFileSync(file, "utf8").split("\n").filter(Boolean);
+    const out: StructuredFactLite[] = [];
+    for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {
+      try {
+        const fact = JSON.parse(lines[i]) as {
+          id?: string;
+          type?: string;
+          value?: string;
+          confidence?: number;
+          createdAt?: string;
+        };
+        const label = (fact.value ?? "").slice(0, 80);
+        if (!label) continue;
+        out.push({
+          id: fact.id ?? `f-${i}`,
+          type: fact.type ?? "fact",
+          label,
+          confidence: typeof fact.confidence === "number" ? fact.confidence : 0.6,
+          createdAt: fact.createdAt ?? "",
         });
       } catch {
         /* skip malformed line */

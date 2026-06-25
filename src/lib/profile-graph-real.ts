@@ -230,6 +230,31 @@ export function buildEmployeeGraph(employeeId: string): EmployeeGraph {
     }
   }
 
+  // Durable facts (the "Dreamer" output) — distilled long-term memory,
+  // rendered memory-yellow and tagged "durable-fact".
+  const facts = readStructuredFacts(employeeId, MEMORY_CARDS_PER_EMPLOYEE);
+  for (const fact of facts) {
+    const nodeName = `memory:fact-${fact.id}`;
+    nodes.push({
+      name: nodeName,
+      tokens: Math.max(40, Math.round(fact.label.length / 4)),
+      confidence: fact.confidence,
+      lastUpdated: fact.createdAt,
+      sources: ["memory"],
+      linkedFiles: anchor ? [anchor] : [],
+      tags: ["memory", `[${fact.type}] ${fact.label}`, "durable-fact"],
+    });
+    if (anchor) {
+      const a = anchor < nodeName ? anchor : nodeName;
+      const b = anchor < nodeName ? nodeName : anchor;
+      const key = `${a}→${b}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        edges.push({ from: anchor, to: nodeName, bidirectional: false });
+      }
+    }
+  }
+
   return { nodes, edges };
 }
 
@@ -285,6 +310,56 @@ function readRecentMemoryCards(
         const preview = (c.question ?? c.answerPreview ?? "").slice(0, 60);
         if (!preview) continue;
         out.push({ id, preview, createdAt: c.createdAt ?? "" });
+      } catch {
+        /* skip */
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+type StructuredFactLite = {
+  id: string;
+  type: string;
+  label: string;
+  confidence: number;
+  createdAt: string;
+};
+function readStructuredFacts(
+  employeeId: string,
+  limit: number
+): StructuredFactLite[] {
+  const file = path.join(
+    process.cwd(),
+    "data",
+    "memory",
+    employeeId,
+    "structured.jsonl"
+  );
+  try {
+    if (!fs.existsSync(file)) return [];
+    const lines = fs.readFileSync(file, "utf8").split("\n").filter(Boolean);
+    const out: StructuredFactLite[] = [];
+    for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {
+      try {
+        const f = JSON.parse(lines[i]) as {
+          id?: string;
+          type?: string;
+          value?: string;
+          confidence?: number;
+          createdAt?: string;
+        };
+        const label = (f.value ?? "").slice(0, 60);
+        if (!label) continue;
+        out.push({
+          id: f.id ?? `f-${i}`,
+          type: f.type ?? "fact",
+          label,
+          confidence: typeof f.confidence === "number" ? f.confidence : 0.6,
+          createdAt: f.createdAt ?? "",
+        });
       } catch {
         /* skip */
       }

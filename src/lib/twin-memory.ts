@@ -6,6 +6,19 @@ const MEMORY_ROOT = path.join(process.cwd(), "data", "memory");
 const DEFAULT_LIMIT = 5;
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const RRF_K = 50;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// ─── Reinforcement + decay (Memongo "importance decay" / access tracking) ─────
+// Frequently-recalled cards stay salient; untouched ones fade. We keep the
+// mutable reinforcement signal in a small sidecar (access.json) so the canonical
+// cards.jsonl stays an append-only, race-free log — the same denormalized split
+// Memongo uses between its canonical collections and `access_events`.
+const DEFAULT_HALF_LIFE_DAYS = 14; // a card's decay halves every N days since last touch
+const REINFORCE_GAIN = 0.5; // how hard repeated recalls boost salience
+
+// ─── Dedup-on-write (Memongo near-duplicate prune, cosine > 0.92) ─────────────
+const DEFAULT_DEDUP_THRESHOLD = 0.92;
+const DEDUP_SCAN_LIMIT = 200; // only the recent tail is checked for duplicates
 
 export type TwinMemorySurface = "chat" | "background" | "council" | "task";
 
@@ -19,8 +32,15 @@ export type TwinMemoryCard = {
   answerPreview: string;
   embedding?: number[];
   embeddingModel?: string;
+  /** Base salience at write time (default 1). Reinforcement lives in the
+   *  access sidecar, not here — this stays an immutable per-card baseline. */
+  importance?: number;
   createdAt: string;
 };
+
+/** Mutable per-card reinforcement, stored in data/memory/<id>/access.json. */
+type AccessRecord = { count: number; lastAccessedAt: string };
+type AccessMap = Record<string, AccessRecord>;
 
 export type TwinMemoryEpisode = {
   id: string;
@@ -37,7 +57,32 @@ export type TwinMemoryHit = {
   score: number;
   keywordScore: number;
   semanticScore: number;
+  salienceScore: number;
 };
+
+// ─── Recall profiles (ported from Memongo MEMONGO_MONGODB_RECALL_PROFILE) ─────
+// Tune the fusion weights for the three signals. `balanced` is the default.
+type FusionWeights = { keyword: number; semantic: number; salience: number };
+const RECALL_PROFILES: Record<string, FusionWeights> = {
+  latency: { keyword: 1, semantic: 0.5, salience: 0.5 },
+  balanced: { keyword: 1, semantic: 1, salience: 0.5 },
+  proof: { keyword: 1, semantic: 1.5, salience: 0.25 },
+};
+
+function recallWeights(): FusionWeights {
+  const profile = (process.env.TWIN_MEMORY_RECALL_PROFILE ?? "balanced").toLowerCase();
+  return RECALL_PROFILES[profile] ?? RECALL_PROFILES.balanced;
+}
+
+function halfLifeDays(): number {
+  const raw = Number.parseFloat(process.env.TWIN_MEMORY_HALF_LIFE_DAYS ?? "");
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_HALF_LIFE_DAYS;
+}
+
+function dedupThreshold(): number {
+  const raw = Number.parseFloat(process.env.TWIN_MEMORY_DEDUP_THRESHOLD ?? "");
+  return Number.isFinite(raw) && raw > 0 && raw <= 1 ? raw : DEFAULT_DEDUP_THRESHOLD;
+}
 
 type EmbeddingResponse = {
   data?: Array<{ embedding?: number[] }>;
@@ -64,6 +109,43 @@ function cardsPath(employeeId: string): string {
 
 function episodesPath(employeeId: string): string {
   return path.join(memoryDir(employeeId), "episodes.jsonl");
+}
+
+function accessPath(employeeId: string): string {
+  return path.join(memoryDir(employeeId), "access.json");
+}
+
+function structuredPath(employeeId: string): string {
+  return path.join(memoryDir(employeeId), "structured.jsonl");
+}
+
+function readAccessMap(employeeId: string): AccessMap {
+  try {
+    const file = accessPath(employeeId);
+    if (!fs.existsSync(file)) return {};
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as AccessMap;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Reinforce the given cards: bump their recall count and last-touch time.
+ *  Best-effort — failures are swallowed so recall never breaks on a write. */
+function reinforce(employeeId: string, cardIds: string[]): void {
+  if (cardIds.length === 0) return;
+  try {
+    const map = readAccessMap(employeeId);
+    const now = new Date().toISOString();
+    for (const id of cardIds) {
+      const prev = map[id];
+      map[id] = { count: (prev?.count ?? 0) + 1, lastAccessedAt: now };
+    }
+    ensureDir(employeeId);
+    fs.writeFileSync(accessPath(employeeId), JSON.stringify(map), "utf8");
+  } catch {
+    /* reinforcement is advisory; never throw into the recall path */
+  }
 }
 
 function ensureDir(employeeId: string): void {
@@ -165,7 +247,7 @@ function keywordScore(query: string, content: string): number {
   return hits / queryTokens.size;
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
+export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length || a.length === 0) return 0;
   let dot = 0;
   let magA = 0;
@@ -231,14 +313,43 @@ function rrf(rank: number | undefined, weight = 1): number {
 
 function ranksByScore(
   cards: TwinMemoryCard[],
-  score: (card: TwinMemoryCard) => number
+  score: (card: TwinMemoryCard) => number,
+  // Tie-break equal scores deterministically. Without this, RRF would order
+  // ties by array position — so a heavily-reinforced card could lose a pure
+  // keyword tie to whichever card happened to be written first. Breaking ties
+  // by salience lets reinforcement actually decide when relevance is equal.
+  tiebreak?: (a: TwinMemoryCard, b: TwinMemoryCard) => number
 ): Map<string, number> {
   const ranked = cards
     .map((card) => ({ card, score: score(card) }))
     .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score || (tiebreak ? tiebreak(a.card, b.card) : 0));
 
   return new Map(ranked.map((item, index) => [item.card.id, index]));
+}
+
+/**
+ * Salience = base importance × time-decay × reinforcement.
+ *
+ *   decay         halves every `halfLifeDays` since the card was last touched
+ *                 (recall OR write), so a frequently-recalled card never decays.
+ *   reinforcement grows logarithmically with recall count, so the 10th recall
+ *                 matters less than the 1st — mirrors Memongo's importance decay.
+ *
+ * This single signal subsumes the old standalone recency rank (a fresh card has
+ * lastTouch ≈ createdAt → decay ≈ 1).
+ */
+export function salience(card: TwinMemoryCard, access: AccessMap, nowMs: number): number {
+  const base = card.importance ?? 1;
+  const rec = access[card.id];
+  const lastTouch = rec?.lastAccessedAt ?? card.createdAt;
+  const lastTouchMs = new Date(lastTouch).getTime();
+  const ageDays = Number.isFinite(lastTouchMs)
+    ? Math.max(0, (nowMs - lastTouchMs) / DAY_MS)
+    : 0;
+  const decay = Math.pow(0.5, ageDays / halfLifeDays());
+  const reinforcement = 1 + Math.log1p(rec?.count ?? 0) * REINFORCE_GAIN;
+  return base * decay * reinforcement;
 }
 
 export async function searchTwinMemory(
@@ -250,6 +361,10 @@ export async function searchTwinMemory(
 
   const cards = readJsonl<TwinMemoryCard>(cardsPath(employeeId));
   if (cards.length === 0) return [];
+
+  const access = readAccessMap(employeeId);
+  const nowMs = Date.now();
+  const weights = recallWeights();
 
   const queryEmbedding = await createEmbedding(query, employeeId);
   const keywordScores = new Map(
@@ -263,33 +378,43 @@ export async function searchTwinMemory(
         : 0,
     ])
   );
-
-  const keywordRanks = ranksByScore(cards, (card) => keywordScores.get(card.id) ?? 0);
-  const semanticRanks = ranksByScore(cards, (card) => semanticScores.get(card.id) ?? 0);
-  const recencyRanks = new Map(
-    [...cards]
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
-      .map((card, index) => [card.id, index])
+  const salienceScores = new Map(
+    cards.map((card) => [card.id, salience(card, access, nowMs)])
   );
 
-  return cards
+  // Relevance lanes (keyword, semantic) break ties by salience, so among
+  // equally-relevant cards the more reinforced one ranks higher. The salience
+  // lane breaks its own ties by recency.
+  const bySalience = (a: TwinMemoryCard, b: TwinMemoryCard) =>
+    (salienceScores.get(b.id) ?? 0) - (salienceScores.get(a.id) ?? 0);
+  const byRecency = (a: TwinMemoryCard, b: TwinMemoryCard) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+
+  const keywordRanks = ranksByScore(cards, (card) => keywordScores.get(card.id) ?? 0, bySalience);
+  const semanticRanks = ranksByScore(cards, (card) => semanticScores.get(card.id) ?? 0, bySalience);
+  const salienceRanks = ranksByScore(cards, (card) => salienceScores.get(card.id) ?? 0, byRecency);
+
+  const hits = cards
     .map((card) => {
       const score =
-        rrf(keywordRanks.get(card.id), 1) +
-        rrf(semanticRanks.get(card.id), 1) +
-        rrf(recencyRanks.get(card.id), 0.25);
+        rrf(keywordRanks.get(card.id), weights.keyword) +
+        rrf(semanticRanks.get(card.id), weights.semantic) +
+        rrf(salienceRanks.get(card.id), weights.salience);
       return {
         card,
         score,
         keywordScore: keywordScores.get(card.id) ?? 0,
         semanticScore: semanticScores.get(card.id) ?? 0,
+        salienceScore: salienceScores.get(card.id) ?? 0,
       };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
+
+  // Reinforce what we surfaced — recall is itself a signal of usefulness.
+  reinforce(employeeId, hits.map((hit) => hit.card.id));
+
+  return hits;
 }
 
 export function formatTwinMemoryBlock(hits: TwinMemoryHit[]): string {
@@ -335,8 +460,41 @@ export async function rememberTwinRun(input: {
     createdAt,
   };
 
+  // The episode log is the raw, immutable history — always append it.
+  appendJsonl(episodesPath(input.employeeId), episode);
+
+  // Promote durable typed facts (the "Dreamer") regardless of card dedup.
+  promoteStructuredMemory({
+    employeeId: input.employeeId,
+    runId: input.runId,
+    createdAt,
+    question,
+    answer,
+  });
+
   const content = cardContent(question, answer);
   const embedding = await createEmbedding(content, input.employeeId);
+
+  // ─── Dedup-on-write — reinforce instead of duplicating ────────────────────
+  // If a near-identical card already exists, bump its reinforcement rather than
+  // appending a twin. Bounds growth and lets repeated topics rise in salience.
+  if (embedding) {
+    const recent = readJsonl<TwinMemoryCard>(cardsPath(input.employeeId)).slice(
+      -DEDUP_SCAN_LIMIT
+    );
+    const threshold = dedupThreshold();
+    let best: { id: string; sim: number } | null = null;
+    for (const existing of recent) {
+      if (!existing.embedding) continue;
+      const sim = cosineSimilarity(embedding, existing.embedding);
+      if (!best || sim > best.sim) best = { id: existing.id, sim };
+    }
+    if (best && best.sim >= threshold) {
+      reinforce(input.employeeId, [best.id]);
+      return;
+    }
+  }
+
   const card: TwinMemoryCard = {
     id: randomUUID(),
     employeeId: input.employeeId,
@@ -345,6 +503,7 @@ export async function rememberTwinRun(input: {
     content,
     question: truncate(question, 500),
     answerPreview: truncate(answer, 900),
+    importance: 1,
     ...(embedding
       ? {
           embedding,
@@ -355,6 +514,254 @@ export async function rememberTwinRun(input: {
     createdAt,
   };
 
-  appendJsonl(episodesPath(input.employeeId), episode);
   appendJsonl(cardsPath(input.employeeId), card);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Structured memory — the "Dreamer" (Memongo consolidation, Phase 2)
+//
+// A lightweight, LLM-free consolidator: rule-based regex patterns promote raw
+// Q/A text into durable, typed facts (decisions, preferences, open todos, …).
+// These are surfaced as a HIGHER-authority prompt block than episodic memory —
+// they're the distilled, long-lived knowledge about the twin, not transient
+// recall. Stored in data/memory/<id>/structured.jsonl.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type TwinStructuredType =
+  | "decision"
+  | "preference"
+  | "fact"
+  | "contact"
+  | "todo"
+  | "milestone"
+  | "problem"
+  | "emotional";
+
+export type TwinStructuredFact = {
+  id: string;
+  employeeId: string;
+  runId: string;
+  type: TwinStructuredType;
+  /** Short slug derived from the value — a stable handle for dedup. */
+  key: string;
+  value: string;
+  confidence: number;
+  source: "user" | "agent";
+  createdAt: string;
+};
+
+// Confidence by who said it — the CEO's own words outrank the twin's inference.
+// Ported from Memongo's CONFIDENCE_BY_SOURCE.
+const STRUCTURED_CONFIDENCE: Record<TwinStructuredFact["source"], number> = {
+  user: 0.8,
+  agent: 0.6,
+};
+
+// Conservative rule patterns (false negatives OK, false positives NOT OK).
+// Ported from Memongo's consolidator CATEGORY_PATTERNS (8 categories).
+const STRUCTURED_PATTERNS: Array<{ type: TwinStructuredType; pattern: RegExp }> = [
+  {
+    type: "decision",
+    pattern: /\b(?:I\s+(?:decided|chose|picked|selected|went with))\s+(.+)/i,
+  },
+  {
+    type: "preference",
+    pattern: /\b(?:I\s+(?:prefer|like|want|always use|love))\s+(.+)/i,
+  },
+  {
+    type: "fact",
+    pattern: /\b(?:The\s+\w+\s+(?:uses?|is|has|runs?|supports?|requires?))\s+(.+)/i,
+  },
+  {
+    type: "contact",
+    pattern: /\b(?:(?:contact|reach|email|call|ask)\s+\w+\s+(?:at|for|about))\s+(.+)/i,
+  },
+  {
+    type: "todo",
+    pattern: /\b(?:TODO|FIXME|need\s+to|have\s+to|must|should)\s*:?\s+(.+)/i,
+  },
+  {
+    type: "milestone",
+    pattern:
+      /\b(?:(?:shipped|launched|released|completed|finished|deployed)\s+(.+))/i,
+  },
+  {
+    type: "problem",
+    pattern:
+      /\b(?:(?:there\s+is\s+a\s+(?:bug|issue|problem|error)|(?:bug|issue|problem|error)\s+in))\s+(.+)/i,
+  },
+  {
+    type: "emotional",
+    pattern:
+      /\b(?:I'm\s+(?:frustrated|happy|excited|worried|concerned|anxious|confused|delighted))\s*(.+)/i,
+  },
+];
+
+// Guard clauses — the patterns were designed (in Memongo) to run inside a gated
+// consolidation pipeline over curated event bodies. Applied raw to conversation
+// turns, they over-fire on questions, hypotheticals, negations, and narration
+// about other people. Since the contract is "false negatives OK, false positives
+// NOT OK", we drop any segment that looks like one of those before matching.
+const GUARD_INTERROGATIVE =
+  /^(?:what|why|how|when|where|who|which|should|could|would|can|is|are|am|do|does|did|have|has|whether|wonder(?:ing)?)\b/i;
+const GUARD_CONDITIONAL = /^(?:if|suppose|imagine|assuming|maybe|perhaps)\b/i;
+const GUARD_NEGATION =
+  /\b(?:not|never|no|none|cannot|can't|don't|doesn't|didn't|won't|wouldn't|haven't|hasn't|isn't|aren't|wasn't|weren't|shouldn't)\b/i;
+// Narration about third parties / the past — not the speaker's own state.
+const GUARD_NARRATION =
+  /\b(?:the\s+author|the\s+article|the\s+docs?|the\s+readme|the\s+previous\s+team|another\s+team|last\s+(?:quarter|week|month|year))\b/i;
+
+function isGuardedSegment(segment: string): boolean {
+  return (
+    GUARD_INTERROGATIVE.test(segment) ||
+    GUARD_CONDITIONAL.test(segment) ||
+    GUARD_NEGATION.test(segment) ||
+    GUARD_NARRATION.test(segment)
+  );
+}
+
+const MAX_FACTS_PER_TEXT = 4;
+const STRUCTURED_VALUE_MIN = 4;
+const STRUCTURED_VALUE_MAX = 200;
+// Long agent answers are scanned only at the top to keep extraction tight.
+const STRUCTURED_ANSWER_SCAN = 1500;
+
+function structuredEnabled(): boolean {
+  return process.env.TWIN_MEMORY_STRUCTURED_ENABLED !== "false";
+}
+
+function slugFromValue(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 6)
+    .join("-")
+    .slice(0, 60);
+}
+
+function extractFactsFrom(
+  text: string,
+  source: TwinStructuredFact["source"]
+): Array<Pick<TwinStructuredFact, "type" | "key" | "value" | "confidence" | "source">> {
+  const out: Array<
+    Pick<TwinStructuredFact, "type" | "key" | "value" | "confidence" | "source">
+  > = [];
+  const seen = new Set<string>();
+  // Split on sentence + clause boundaries (incl. ? and ! so interrogative and
+  // exclamatory clauses isolate) so a pattern anchored on "I decided …" matches
+  // per claim and a guarded clause doesn't poison its neighbours.
+  const lines = text.split(/[\n.;?!]+/).map((l) => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    if (out.length >= MAX_FACTS_PER_TEXT) break;
+    if (isGuardedSegment(line)) continue;
+    for (const { type, pattern } of STRUCTURED_PATTERNS) {
+      const match = pattern.exec(line);
+      if (!match) continue;
+      const value = truncate(match[1] ?? "", STRUCTURED_VALUE_MAX);
+      if (value.length < STRUCTURED_VALUE_MIN) continue;
+      const key = slugFromValue(value);
+      const dedupKey = `${type}::${key}`;
+      if (!key || seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      out.push({ type, key, value, confidence: STRUCTURED_CONFIDENCE[source], source });
+      break; // one fact per line — first matching category wins
+    }
+  }
+  return out;
+}
+
+/** Run the Dreamer over one Q/A pair and append any new durable facts.
+ *  Best-effort + synchronous fs — never throws into the run path. */
+function promoteStructuredMemory(input: {
+  employeeId: string;
+  runId: string;
+  createdAt: string;
+  question: string;
+  answer: string;
+}): void {
+  if (!structuredEnabled()) return;
+  try {
+    const candidates = [
+      ...extractFactsFrom(input.question, "user"),
+      ...extractFactsFrom(input.answer.slice(0, STRUCTURED_ANSWER_SCAN), "agent"),
+    ];
+    if (candidates.length === 0) return;
+
+    const existing = readJsonl<TwinStructuredFact>(structuredPath(input.employeeId));
+    const known = new Set(existing.map((fact) => `${fact.type}::${fact.key}`));
+
+    for (const cand of candidates) {
+      const dedupKey = `${cand.type}::${cand.key}`;
+      if (known.has(dedupKey)) continue;
+      known.add(dedupKey);
+      const fact: TwinStructuredFact = {
+        id: randomUUID(),
+        employeeId: input.employeeId,
+        runId: input.runId,
+        createdAt: input.createdAt,
+        ...cand,
+      };
+      appendJsonl(structuredPath(input.employeeId), fact);
+    }
+  } catch {
+    /* consolidation is advisory; never break the run */
+  }
+}
+
+/** Recall durable facts for a query: keyword-overlap first, then backfill with
+ *  the most recent high-confidence facts so identity/preferences always surface. */
+export function searchStructuredMemory(
+  employeeId: string,
+  query: string,
+  limit = 6
+): TwinStructuredFact[] {
+  if (!isEnabled() || !structuredEnabled()) return [];
+  const facts = readJsonl<TwinStructuredFact>(structuredPath(employeeId));
+  if (facts.length === 0) return [];
+
+  const scored = facts.map((fact) => ({
+    fact,
+    score: keywordScore(query, `${fact.key} ${fact.value}`),
+  }));
+
+  const matched = scored
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || cmpRecent(a.fact, b.fact))
+    .map((item) => item.fact);
+
+  if (matched.length >= limit) return matched.slice(0, limit);
+
+  // Backfill with recent, confident facts not already matched.
+  const picked = new Set(matched.map((fact) => fact.id));
+  const backfill = [...facts]
+    .filter((fact) => !picked.has(fact.id))
+    .sort((a, b) => b.confidence - a.confidence || cmpRecent(a, b))
+    .slice(0, limit - matched.length);
+
+  return [...matched, ...backfill];
+}
+
+function cmpRecent(a: TwinStructuredFact, b: TwinStructuredFact): number {
+  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+}
+
+export function formatStructuredMemoryBlock(facts: TwinStructuredFact[]): string {
+  if (facts.length === 0) return "";
+
+  const lines = facts
+    .map((fact) => {
+      const created = fact.createdAt.slice(0, 10);
+      return `- [${fact.type}] ${fact.value} _(conf ${fact.confidence}, ${created})_`;
+    })
+    .join("\n");
+
+  return `# Durable facts about this twin
+
+Consolidated, typed facts distilled from past interactions (decisions,
+preferences, open todos, known problems). Treat these as higher authority than
+the episodic memory below — but still below the profile files if they conflict.
+
+${lines}`;
 }
