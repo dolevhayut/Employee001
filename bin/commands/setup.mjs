@@ -181,6 +181,27 @@ export default async function setup() {
     return;
   }
 
+  p.note(
+    [
+      "An OpenAI key optimizes your agents' memory — they recall the most",
+      "relevant context more accurately, so their answers stay sharp and",
+      "consistent over time.",
+      "",
+      "Optional. Everything works without it — this just makes memory better.",
+    ].join("\n"),
+    "Memory boost — optional",
+  );
+
+  const openaiKey = await p.password({
+    message:
+      "OpenAI API key (optional — sharpens your agents' memory) — leave blank to skip",
+    mask: "•",
+  });
+  if (p.isCancel(openaiKey)) {
+    p.cancel("Setup cancelled");
+    return;
+  }
+
   const port = await p.text({
     message: "Port for the local server",
     placeholder: "3000",
@@ -219,6 +240,11 @@ export default async function setup() {
     "",
     "# Optional. ElevenLabs for cloned twin voices.",
     `ELEVENLABS_API_KEY=${elevenLabsKey ?? ""}`,
+    "",
+    "# Optional. Optimizes the twins' memory — more accurate recall of the",
+    "# most relevant past context, so answers stay sharp over time. Everything",
+    "# works without it (memory falls back to keyword recall).",
+    `OPENAI_API_KEY=${openaiKey ?? ""}`,
     "",
     "# Bind address. Default 127.0.0.1 — only this machine can reach the app.",
     "# Set to 0.0.0.0 to expose on your LAN (use a firewall or Tailscale!).",
