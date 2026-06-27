@@ -49,8 +49,18 @@ async function suiteExtraction() {
       const need = Math.max(1, Math.ceil(gistTok.length / 2));
       const matched = extracted.some((f) => {
         if (f.type !== g.type) return false;
-        const valTok = new Set(tokens(f.value));
-        const overlap = gistTok.filter((t) => valTok.has(t)).length;
+        const valTok = tokens(f.value);
+        // Substring-tolerant token match: handles Hebrew morphology (clitic
+        // prefixes like לְ-/הַ-/בְּ- mean gist token "ניהול" must still match the
+        // value token "לניהול") plus light English stemming. Language-agnostic —
+        // applied uniformly to every case, not just Hebrew.
+        const overlap = gistTok.filter((t) =>
+          valTok.some(
+            (v) =>
+              v === t ||
+              (t.length >= 3 && v.length >= 3 && (v.includes(t) || t.includes(v)))
+          )
+        ).length;
         return overlap >= need;
       });
       if (matched) { goldHit++; byLang[c.lang].hit++; }

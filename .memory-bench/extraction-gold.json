@@ -348,9 +348,9 @@
       "answer": "החלטתי ללכת עם Linear לניהול המשימות שלנו, הוא הרבה יותר מהיר.",
       "mustExtractNothing": false,
       "expected": [
-        { "type": "decision", "gist": "linear task management" }
+        { "type": "decision", "gist": "Linear ניהול המשימות" }
       ],
-      "note": "Hebrew 'I decided to go with Linear' decision. English-anchored regex will likely MISS it — measures the known Hebrew gap."
+      "note": "Hebrew 'I decided to go with Linear' decision. Gist in Hebrew (matches the source language) so the LLM Dreamer's Hebrew extraction is measurable; the old English regex misses it entirely."
     },
     {
       "id": "ex-037",
@@ -359,10 +359,10 @@
       "answer": "שילחנו את הגרסה החדשה לפרודקשן הבוקר, אני מאוד מרוצה מהתוצאה.",
       "mustExtractNothing": false,
       "expected": [
-        { "type": "milestone", "gist": "shipped new version production" },
-        { "type": "emotional", "gist": "satisfied happy result" }
+        { "type": "milestone", "gist": "שילחנו הגרסה החדשה לפרודקשן" },
+        { "type": "emotional", "gist": "מרוצה מהתוצאה" }
       ],
-      "note": "Hebrew milestone ('shipped to production') + emotional ('very satisfied'). Expected MISS by English regex."
+      "note": "Hebrew milestone ('shipped to production') + emotional ('very satisfied'). Hebrew gists so the LLM Dreamer is measurable; English regex misses both."
     },
     {
       "id": "ex-038",
@@ -371,9 +371,9 @@
       "answer": "צרו קשר עם דנה בנושא החיובים והחשבוניות, היא מכירה את כל המערכת.",
       "mustExtractNothing": false,
       "expected": [
-        { "type": "contact", "gist": "dana billing invoices" }
+        { "type": "contact", "gist": "דנה החיובים והחשבוניות" }
       ],
-      "note": "Hebrew 'contact Dana about billing' contact. English regex MISS expected; human gold is a contact."
+      "note": "Hebrew 'contact Dana about billing' contact. Hebrew gist so the LLM Dreamer is measurable; English regex misses it."
     },
     {
       "id": "ex-039",

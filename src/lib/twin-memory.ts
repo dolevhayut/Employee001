@@ -464,7 +464,12 @@ export async function rememberTwinRun(input: {
   appendJsonl(episodesPath(input.employeeId), episode);
 
   // Promote durable typed facts (the "Dreamer") regardless of card dedup.
-  promoteStructuredMemory({
+  // Extraction is async (an LLM call when a key is present). We await it here so
+  // the fact is persisted before rememberTwinRun resolves — no lost facts. The
+  // whole of rememberTwinRun is already `void`-ed by its caller (council-runner),
+  // so this never blocks the twin's response. promoteStructuredMemory swallows
+  // its own errors and never throws.
+  await promoteStructuredMemory({
     employeeId: input.employeeId,
     runId: input.runId,
     createdAt,
@@ -672,21 +677,184 @@ function extractFactsFrom(
   return out;
 }
 
+// ─── LLM Dreamer (multilingual) ───────────────────────────────────────────────
+// The regex patterns above are English-only — Hebrew (our primary user base)
+// extracts at 0%. When an Anthropic key is present we distill facts with Claude
+// instead: it handles Hebrew + English natively and judges questions, negations
+// and hypotheticals far better than the guard regexes. We deliberately reuse the
+// ONE key the CLI already collects (Anthropic) — no OpenAI dependency. Falls back
+// to the regex patterns when there's no key (offline / cost-capped). Mirrors the
+// query() + json_schema pattern in employee-intent-planner.ts.
+type RawFact = Pick<
+  TwinStructuredFact,
+  "type" | "key" | "value" | "confidence" | "source"
+>;
+
+const DREAMER_MODEL_DEFAULT = "claude-haiku-4-5"; // cheap/fast; runs per turn
+const DREAMER_FALLBACK_MODEL = "claude-sonnet-4-5"; // mirrors TWIN_MODEL_FALLBACK
+
+const DREAMER_TYPES: ReadonlySet<string> = new Set<TwinStructuredType>([
+  "decision",
+  "preference",
+  "fact",
+  "contact",
+  "todo",
+  "milestone",
+  "problem",
+  "emotional",
+]);
+
+const DREAMER_SCHEMA = {
+  type: "object",
+  properties: {
+    facts: {
+      type: "array",
+      maxItems: 8,
+      items: {
+        type: "object",
+        properties: {
+          type: { type: "string", enum: [...DREAMER_TYPES] },
+          value: {
+            type: "string",
+            description: "the fact in its ORIGINAL language, ≤ 200 chars",
+          },
+          source: { type: "string", enum: ["user", "agent"] },
+        },
+        required: ["type", "value", "source"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["facts"],
+  additionalProperties: false,
+} as const;
+
+const DREAMER_SYSTEM = [
+  "You distill durable, long-lived facts from a single conversation turn between a CEO (user) and their digital twin (agent), for Employee001's structured memory.",
+  "Work in ANY language — Hebrew and English are both first-class. Keep each fact's value in its ORIGINAL language, ≤ 200 chars.",
+  "Extract ONLY durable knowledge worth remembering long-term, each classified as exactly one of: decision, preference, fact, contact, todo, milestone, problem, emotional.",
+  "Set source to 'user' for things the CEO stated and 'agent' for things the twin asserted.",
+  "Do NOT extract from questions, hypotheticals (if/suppose/maybe), negations (\"we did NOT decide\"), or narration about third parties. When unsure, omit it — false positives are worse than misses.",
+  'Return {"facts": []} when the turn has no durable facts (small talk, acknowledgements, pure Q&A).',
+].join(" ");
+
+function dreamerLlmEnabled(): boolean {
+  return (
+    !!process.env.ANTHROPIC_API_KEY && process.env.TWIN_MEMORY_DREAMER_LLM !== "0"
+  );
+}
+
+function sanitizeLlmFacts(value: unknown): RawFact[] {
+  const facts = (value as { facts?: unknown } | null)?.facts;
+  if (!Array.isArray(facts)) return [];
+  const out: RawFact[] = [];
+  const seen = new Set<string>();
+  for (const raw of facts) {
+    if (out.length >= MAX_FACTS_PER_TEXT * 2) break;
+    if (!raw || typeof raw !== "object") continue;
+    const o = raw as Record<string, unknown>;
+    const type = String(o.type) as TwinStructuredType;
+    if (!DREAMER_TYPES.has(type)) continue;
+    const source =
+      o.source === "user" ? "user" : o.source === "agent" ? "agent" : null;
+    if (!source) continue;
+    const val = truncate(
+      typeof o.value === "string" ? o.value.trim() : "",
+      STRUCTURED_VALUE_MAX
+    );
+    if (val.length < STRUCTURED_VALUE_MIN) continue;
+    const key = slugFromValue(val);
+    const dedupKey = `${type}::${key}`;
+    if (!key || seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
+    out.push({ type, key, value: val, confidence: STRUCTURED_CONFIDENCE[source], source });
+  }
+  return out;
+}
+
+/** LLM extraction over one Q/A pair. Returns null (not []) to signal the caller
+ *  to fall back to the regex patterns — e.g. no API key or the call failed.
+ *  An empty array means "the model ran and found no durable facts". */
+async function extractFactsViaLLM(
+  question: string,
+  answer: string
+): Promise<RawFact[] | null> {
+  if (!dreamerLlmEnabled()) return null;
+  try {
+    // Dynamic import keeps the heavy Agent SDK off the recall hot path — it only
+    // loads when extraction actually runs.
+    const { query } = await import("@anthropic-ai/claude-agent-sdk");
+    const model = process.env.TWIN_MEMORY_DREAMER_MODEL ?? DREAMER_MODEL_DEFAULT;
+    const prompt = JSON.stringify({
+      user: truncate(question, 2000),
+      agent: truncate(answer.slice(0, STRUCTURED_ANSWER_SCAN), STRUCTURED_ANSWER_SCAN),
+    });
+
+    let structuredOutput: unknown = null;
+    const stream = query({
+      prompt,
+      options: {
+        model,
+        fallbackModel: DREAMER_FALLBACK_MODEL,
+        systemPrompt: DREAMER_SYSTEM,
+        allowedTools: [],
+        // Structured-output extraction needs a couple of internal turns (the
+        // model answers, then the SDK has it conform to the schema); 1–2 flaked
+        // ~12% of the time → silent regex fallback. 4 gives reliable headroom
+        // and stays cheap on Haiku.
+        maxTurns: 4,
+        outputFormat: { type: "json_schema", schema: DREAMER_SCHEMA },
+        permissionMode: "bypassPermissions",
+        settingSources: [],
+        env: { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY },
+      },
+    });
+
+    for await (const message of stream) {
+      if (message.type === "result") {
+        if (
+          (message as { subtype?: string }).subtype ===
+          "error_max_structured_output_retries"
+        ) {
+          return null;
+        }
+        structuredOutput =
+          (message as { structured_output?: unknown }).structured_output ?? null;
+      }
+    }
+
+    if (structuredOutput == null) return null;
+    return sanitizeLlmFacts(structuredOutput);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.warn(`[twin-memory] dreamer LLM extraction failed: ${message}`);
+    return null;
+  }
+}
+
 /** Run the Dreamer over one Q/A pair and append any new durable facts.
- *  Best-effort + synchronous fs — never throws into the run path. */
-function promoteStructuredMemory(input: {
+ *  LLM-first (multilingual) with a regex fallback when there's no API key.
+ *  Best-effort — never throws into the run path. */
+async function promoteStructuredMemory(input: {
   employeeId: string;
   runId: string;
   createdAt: string;
   question: string;
   answer: string;
-}): void {
+}): Promise<void> {
   if (!structuredEnabled()) return;
   try {
-    const candidates = [
-      ...extractFactsFrom(input.question, "user"),
-      ...extractFactsFrom(input.answer.slice(0, STRUCTURED_ANSWER_SCAN), "agent"),
-    ];
+    const llmFacts = await extractFactsViaLLM(input.question, input.answer);
+    const candidates: RawFact[] =
+      llmFacts !== null
+        ? llmFacts
+        : [
+            ...extractFactsFrom(input.question, "user"),
+            ...extractFactsFrom(
+              input.answer.slice(0, STRUCTURED_ANSWER_SCAN),
+              "agent"
+            ),
+          ];
     if (candidates.length === 0) return;
 
     const existing = readJsonl<TwinStructuredFact>(structuredPath(input.employeeId));
