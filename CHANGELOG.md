@@ -9,6 +9,40 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Smarter twin memory layer.** Each memory now carries a **salience score**
+  that rises when recalled and decays with a 14-day half-life, so used memories
+  surface and stale ones fade — no manual cleanup. **Dedup-on-write** reinforces
+  a near-identical memory instead of storing a duplicate. The **Dreamer**
+  distills durable, typed facts (decision · preference · fact · contact · todo ·
+  milestone · problem · emotional) from conversations and surfaces them to the
+  twin as higher-authority memory.
+- **Multilingual fact extraction (Hebrew).** The Dreamer now distills facts with
+  Claude (Haiku) when an Anthropic key is present — handling **Hebrew and English
+  natively**, using the key the CLI already collects (no OpenAI dependency). It
+  falls back to the English regex patterns offline.
+- **Optional OpenAI key in `setup`.** The install wizard now offers an optional
+  OpenAI key that sharpens twin memory (more accurate recall of relevant past
+  context). Everything still works without it.
+- Deterministic memory-layer benchmark harness (`.memory-bench/`, dev-only).
+
+## [0.4.0] — 2026-06-25
+
+### Changed
+- Upgraded twin models from **Claude Opus 4.7 → 4.8** across defaults and copy.
+
+### Performance
+- **−52% download size** (packed 31 MB → 14.9 MB; unpacked 89.5 MB → 52.6 MB).
+  Disabled server-side image optimization (`images.unoptimized`) so the
+  transitive `sharp` dependency — ~33 MB of Linux-only native binaries, dead
+  weight on macOS/Windows — drops out of the standalone bundle.
+
+### Removed
+- Internal `docs/` (~13 MB, incl. private planning notes) no longer traced into
+  the published tarball — a size win and an information-leak fix.
+
+## [0.3.1] — 2026-06-03
+
+### Added
 - **Full activity log per shift run.** The routine detail modal now has an
   expandable **Activity log** showing the run's complete timeline the way
   agentic frameworks do — the twin's extended-thinking, its narration, every
@@ -42,6 +76,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   matching the rest of the app. Generalised it into a controlled,
   routing-free, theme-aware form control (`value` / `onSelect` /
   `navigate={false}`) so it works inside modals, not just the /flow top bar.
+- **Redesigned `/employees` invite panel.**
+
+### Fixed
+- **Skip the `/setup` wizard when an org already exists** — route straight to
+  the launchpad instead of re-running first-run setup.
 
 ## [0.3.0] — 2026-06-03
 
@@ -324,7 +363,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CLI commands: `setup`, `start`, `update`, `doctor`, `help`
 - Human-controlled autonomy — approval gate before any sensitive tool call executes
 
-[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/dolevhayut/Employee001/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/dolevhayut/Employee001/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/dolevhayut/Employee001/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dolevhayut/Employee001/compare/v0.1.3...v0.2.0
 [0.1.0-rc.8]: https://github.com/dolevhayut/Employee001/compare/v0.1.0-rc.7...v0.1.0-rc.8
