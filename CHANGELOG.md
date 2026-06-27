@@ -8,6 +8,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-27
+
 ### Added
 - **Smarter twin memory layer.** Each memory now carries a **salience score**
   that rises when recalled and decays with a 14-day half-life, so used memories
@@ -363,7 +365,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CLI commands: `setup`, `start`, `update`, `doctor`, `help`
 - Human-controlled autonomy — approval gate before any sensitive tool call executes
 
-[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/dolevhayut/Employee001/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dolevhayut/Employee001/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/dolevhayut/Employee001/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/dolevhayut/Employee001/compare/v0.2.0...v0.3.0
