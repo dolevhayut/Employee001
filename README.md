@@ -224,7 +224,8 @@ No twin runs shell commands on your machine. Enforced in two places at once (the
     ├── audit.jsonl       # every tool call, every approval
     ├── routines.json     # scheduled work
     ├── hired-agents.json # marketplace hires
-    └── memory/<id>/      # per-twin episodic memory
+    ├── memory/<id>/      # per-twin memory — episodic recall + distilled facts
+    └── shifts/<runId>/   # autonomous-shift archives (events · outputs)
 ```
 
 > [!TIP]
@@ -274,8 +275,11 @@ The product has shipped the core loop end-to-end. Tracking against the public ro
 - [x] Custom MCP servers with OAuth bridge (`/settings`)
 - [x] Backup / export / import
 - [x] Org-brain search across twin profiles
-- [ ] Voice playback for twin answers (ElevenLabs)
-- [ ] Hebrew + i18n
+- [x] Autonomous shifts — twins run scheduled work and take action behind a live approval gate, with per-run archives + observability (`/cockpit`)
+- [x] Voice playback for twin answers (ElevenLabs)
+- [x] Self-curating twin memory — salience-ranked recall, dedup-on-write, multilingual (Hebrew/English) fact extraction
+- [x] Hebrew — twins converse and extract memory in Hebrew (Anthropic-only, no extra key)
+- [ ] Full UI internationalization (i18n)
 - [ ] Multi-CEO / multi-tenant
 - [ ] Mac DMG / Electron wrapper for non-technical CEOs
 
