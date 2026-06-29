@@ -92,17 +92,17 @@
   "devDependencies": {
     "@remotion/cli": "^4.0.458",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/semver": "^7.7.1",
     "@types/three": "^0.184.0",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "16.2.4",
     "promptfoo": "^0.121.9",
     "remotion": "^4.0.458",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^6"
   },
   "overrides": {
     "@tiptap/pm": "3.23.6",
