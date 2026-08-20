@@ -1,3 +1,5 @@
+import { persistPendingApproval, removePendingApproval } from "@/lib/approval-store";
+
 // Per-process registry of in-flight tool approval requests.
 // The agent runner registers a Promise here when it hits a tool that needs
 // CEO approval; the API route resolves that Promise when the user clicks
@@ -36,6 +38,10 @@ type Pending = {
 
 // Module-level singleton. In a multi-process deployment, swap for Redis or
 // the realtime channel of your choice.
+// Durability: the resolver Promise can't survive a restart, but the FACT of
+// a pending approval now does — every register/resolve write-throughs to
+// approval-store, and orphans are surfaced to /inbox on the next boot
+// (see recoverOrphanedApprovals in work-dispatcher).
 const PENDING = new Map<string, Pending>();
 
 let counter = 0;
@@ -55,15 +61,14 @@ export function registerApproval(
   const promise = new Promise<ApprovalDecision>((r) => {
     resolve = r;
   });
-  PENDING.set(approvalId, {
-    request: {
-      ...request,
-      surface: request.surface ?? "chat",
-      approvalId,
-      createdAt: Date.now(),
-    },
-    resolve,
-  });
+  const full: ApprovalRequest = {
+    ...request,
+    surface: request.surface ?? "chat",
+    approvalId,
+    createdAt: Date.now(),
+  };
+  PENDING.set(approvalId, { request: full, resolve });
+  persistPendingApproval(full);
   return { approvalId, promise };
 }
 
@@ -84,6 +89,7 @@ export function resolveApproval(
   const entry = PENDING.get(approvalId);
   if (!entry) return false;
   PENDING.delete(approvalId);
+  removePendingApproval(approvalId);
   entry.resolve(decision);
   return true;
 }
@@ -114,6 +120,7 @@ if (typeof globalThis !== "undefined") {
         const ttl = ttlFor(entry.request.surface);
         if (now - entry.request.createdAt > ttl) {
           PENDING.delete(id);
+          removePendingApproval(id);
           const mins = Math.round(ttl / 60_000);
           entry.resolve({
             action: "deny",

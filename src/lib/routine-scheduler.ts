@@ -14,6 +14,8 @@ import { appendFeedItem } from "@/lib/feed-store";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
 import { isAutonomyArmed } from "@/lib/workspace-mode";
+import { dispatchWorkTick, recoverOrphanedApprovals } from "@/lib/work-dispatcher";
+import { pollEmailInboxes } from "@/lib/email-poller";
 
 const TICK_MS = 30_000; // check every 30s
 
@@ -33,6 +35,9 @@ function getState(): { interval: ReturnType<typeof setInterval> | null; running:
 export function ensureSchedulerStarted(): void {
   const state = getState();
   if (state.interval) return;
+  // Honesty pass before anything new registers: approvals orphaned by the
+  // previous process get surfaced to /inbox instead of vanishing.
+  recoverOrphanedApprovals();
   state.interval = setInterval(tick, TICK_MS);
   // Fire once immediately so a routine due "now" doesn't wait the full tick.
   setTimeout(tick, 1000);
@@ -45,6 +50,10 @@ function tick(): void {
   // EmployeeX kill switch: in base mode nothing fires unattended. Manual
   // "Run now" bypasses this (fireRoutine is called directly with "manual").
   if (!isAutonomyArmed()) return;
+  // EmployeeX work plane: pull new inbound email into the queue, then run
+  // at most one queued work item. Both are self-throttled and fire-and-forget.
+  void pollEmailInboxes().catch(() => {});
+  void dispatchWorkTick().catch(() => {});
   const now = Date.now();
   const routines = listRoutines();
   for (const r of routines) {
