@@ -47,10 +47,10 @@ export function ensureSchedulerStarted(): void {
 }
 
 function tick(): void {
-  // EmployeeX kill switch: in base mode nothing fires unattended. Manual
+  // Autonomy-mode kill switch: in base mode nothing fires unattended. Manual
   // "Run now" bypasses this (fireRoutine is called directly with "manual").
   if (!isAutonomyArmed()) return;
-  // EmployeeX work plane: pull new inbound email into the queue, then run
+  // Autonomy work plane: pull new inbound email into the queue, then run
   // at most one queued work item. Both are self-throttled and fire-and-forget.
   void pollEmailInboxes().catch(() => {});
   void dispatchWorkTick().catch(() => {});

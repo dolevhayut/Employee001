@@ -35,7 +35,8 @@ type CommandItem = {
 };
 
 // Two operation modes, one nav. Base = a twin you talk to (you initiate,
-// you're present). EmployeeX = a worker that accepts work and acts
+// you're present). Autonomy mode (formerly "EmployeeX" — that name now
+// belongs to the separate product) = a worker that accepts work and acts
 // unattended — it unlocks the operator surfaces: the feed of what happened
 // without you (Inbox), live runs (Cockpit), schedules (Routines), world
 // prefetch (Focus), spend caps (Budgets), and the trail (Audit).
@@ -52,7 +53,7 @@ function navForMode(mode: "base" | "x"): NavSection[] {
   const sections: NavSection[] = [{ label: "Operate", items: operate }];
   if (mode === "x") {
     sections.push({
-      label: "EmployeeX",
+      label: "Autonomy",
       items: [
         { href: "/cockpit", label: "Cockpit", icon: "Activity" },
         { href: "/routines", label: "Routines", icon: "Refresh" },
@@ -72,7 +73,7 @@ function navForMode(mode: "base" | "x"): NavSection[] {
   return sections;
 }
 
-// Command-palette entries that only make sense with EmployeeX armed.
+// Command-palette entries that only make sense with Autonomy mode armed.
 const X_ONLY_COMMAND_IDS = new Set([
   "inbox",
   "cockpit",
@@ -845,7 +846,8 @@ function TwinSwitcher() {
   );
 }
 
-// The EmployeeX arm/disarm control. Always visible (also when collapsed):
+// The Autonomy mode arm/disarm control (formerly EmployeeX — that name
+// now belongs to the separate product). Always visible (also when collapsed):
 // the user must be able to tell at a glance whether twins can act while
 // they're away. Flipping OFF is the kill switch — the scheduler stops
 // firing unattended work within one tick (≤30s).
@@ -860,7 +862,7 @@ function ModeToggle({ collapsed }: { collapsed: boolean }) {
         type="button"
         onClick={flip}
         disabled={!loaded}
-        title={armed ? "EmployeeX armed — click to disarm" : "EmployeeX off — click to arm"}
+        title={armed ? "Autonomy armed — click to disarm" : "Autonomy off — click to arm"}
         className="nav-item"
         style={{
           display: "flex",
@@ -902,7 +904,7 @@ function ModeToggle({ collapsed }: { collapsed: boolean }) {
       <span className={armed ? "dot success pulse" : "dot idle"} style={{ boxShadow: "none", flexShrink: 0 }} />
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block", fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--text)", letterSpacing: "-0.005em" }}>
-          EmployeeX
+          Autonomy
         </span>
         <span style={{ display: "block", fontSize: "var(--fs-meta)", color: "var(--text-muted)", lineHeight: 1.3 }}>
           {armed ? "Autonomy armed" : "Autonomy off"}

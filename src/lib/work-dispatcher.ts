@@ -8,7 +8,7 @@ import { appendFeedItem } from "@/lib/feed-store";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
 
-// The EmployeeX work plane's executor. Each armed tick leases at most ONE
+// The autonomy work plane's executor. Each armed tick leases at most ONE
 // work item and runs it to completion — serial on purpose: this is a
 // single-operator local install, and one unattended twin run at a time
 // keeps cost, approvals, and the Cockpit legible. The queue's lease/retry

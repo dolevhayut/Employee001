@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-// Durable work queue — the EmployeeX work plane, file-backed like everything
+// Durable work queue — the autonomy work plane, file-backed like everything
 // else in this repo. A WorkItem is a unit of unattended work (an inbound
 // email, a queued task) that survives process restarts: state lives in
 // data/work-items.json, never only in memory.

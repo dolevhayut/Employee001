@@ -1,11 +1,12 @@
 import fs from "fs";
 import path from "path";
 
-// Workspace operation mode — the EmployeeX toggle.
+// Workspace operation mode — the Autonomy toggle (formerly EmployeeX —
+// that name now belongs to the separate product).
 //
 //   "base" — Employee001 classic: a twin you talk to. You initiate, you're
 //            present, approvals happen inline in the conversation.
-//   "x"    — EmployeeX: twins accept work and act unattended. Unlocks the
+//   "x"    — Autonomy mode: twins accept work and act unattended. Unlocks the
 //            operator surfaces (Cockpit, Inbox, Audit, Budgets, Routines,
 //            Focus) AND arms autonomous execution.
 //
