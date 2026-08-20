@@ -13,6 +13,7 @@ import { runShift } from "@/lib/shift-runner";
 import { appendFeedItem } from "@/lib/feed-store";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
+import { isAutonomyArmed } from "@/lib/workspace-mode";
 
 const TICK_MS = 30_000; // check every 30s
 
@@ -41,6 +42,9 @@ export function ensureSchedulerStarted(): void {
 }
 
 function tick(): void {
+  // EmployeeX kill switch: in base mode nothing fires unattended. Manual
+  // "Run now" bypasses this (fireRoutine is called directly with "manual").
+  if (!isAutonomyArmed()) return;
   const now = Date.now();
   const routines = listRoutines();
   for (const r of routines) {
@@ -57,6 +61,7 @@ function tick(): void {
 const CATCH_UP_GRACE_MS = 60_000;
 
 function catchUpMissed(): void {
+  if (!isAutonomyArmed()) return; // disarmed workspaces don't catch up either
   const now = Date.now();
   const routines = listRoutines();
   for (const r of routines) {

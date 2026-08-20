@@ -11,6 +11,7 @@ import { type EmployeeWithTwin } from "@/lib/employees";
 import { GlobalApprovalOverlay, NotificationBell } from "./global-approval-overlay";
 import { ActiveBuildsBanner } from "./active-builds-banner";
 import { RosterProvider, useRoster } from "./roster-context";
+import { WorkspaceModeProvider, useWorkspaceMode } from "./workspace-mode-context";
 
 type NavItem = {
   href: string;
@@ -33,40 +34,54 @@ type CommandItem = {
   keywords: string;
 };
 
-const SIDEBAR_NAV: NavSection[] = [
-  {
-    label: "Operate",
-    items: [
-      { href: "/employees", label: "Employees", icon: "Home" },
-      { href: "/inbox", label: "Inbox", icon: "Bell" },
-      { href: "/tasks", label: "Tasks", icon: "Zap" },
-      { href: "/flow", label: "Chat With Twin", icon: "Bot" },
-      { href: "/council", label: "Team Meeting", icon: "Team" },
-      { href: "/handover", label: "Handover", icon: "Send" },
-      { href: "/handover/live", label: "Live Interview", icon: "Bot" },
-    ],
-  },
-  {
-    label: "Observe",
-    items: [
-      { href: "/cockpit", label: "Cockpit", icon: "Activity" },
-      { href: "/budgets", label: "Budgets", icon: "DollarSign" },
-    ],
-  },
-  {
-    label: "Automate",
-    items: [
-      { href: "/routines", label: "Routines", icon: "Refresh" },
-      { href: "/templates", label: "Templates", icon: "Doc" },
-    ],
-  },
-  {
+// Two operation modes, one nav. Base = a twin you talk to (you initiate,
+// you're present). EmployeeX = a worker that accepts work and acts
+// unattended — it unlocks the operator surfaces: the feed of what happened
+// without you (Inbox), live runs (Cockpit), schedules (Routines), world
+// prefetch (Focus), spend caps (Budgets), and the trail (Audit).
+function navForMode(mode: "base" | "x"): NavSection[] {
+  const operate: NavItem[] = [
+    { href: "/employees", label: "Employees", icon: "Home" },
+    ...(mode === "x" ? [{ href: "/inbox", label: "Inbox", icon: "Bell" } as NavItem] : []),
+    { href: "/tasks", label: "Tasks", icon: "Zap" },
+    { href: "/flow", label: "Chat With Twin", icon: "Bot" },
+    { href: "/council", label: "Team Meeting", icon: "Team" },
+    { href: "/handover", label: "Handover", icon: "Send" },
+    { href: "/handover/live", label: "Live Interview", icon: "Bot" },
+  ];
+  const sections: NavSection[] = [{ label: "Operate", items: operate }];
+  if (mode === "x") {
+    sections.push({
+      label: "EmployeeX",
+      items: [
+        { href: "/cockpit", label: "Cockpit", icon: "Activity" },
+        { href: "/routines", label: "Routines", icon: "Refresh" },
+        { href: "/focus", label: "Focus", icon: "Eye" },
+        { href: "/budgets", label: "Budgets", icon: "DollarSign" },
+        { href: "/audit", label: "Audit log", icon: "Logs" },
+      ],
+    });
+  }
+  sections.push({
     label: "Manage",
     items: [
       { href: "/connections", label: "Connections", icon: "Plug" },
+      { href: "/templates", label: "Templates", icon: "Doc" },
     ],
-  },
-];
+  });
+  return sections;
+}
+
+// Command-palette entries that only make sense with EmployeeX armed.
+const X_ONLY_COMMAND_IDS = new Set([
+  "inbox",
+  "cockpit",
+  "routines",
+  "focus",
+  "audit",
+  "budgets",
+  "workspace-costs",
+]);
 
 type ThemeId = "light" | "dark" | "cool";
 const THEME_ORDER: ThemeId[] = ["light", "dark", "cool"];
@@ -350,7 +365,14 @@ function CommandPalette({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const roster = useRoster();
-  const commands = useMemo(() => [...STATIC_COMMANDS, ...buildTwinCommands(roster)], [roster]);
+  const { mode } = useWorkspaceMode();
+  const commands = useMemo(
+    () =>
+      [...STATIC_COMMANDS, ...buildTwinCommands(roster)].filter(
+        (c) => mode === "x" || !X_ONLY_COMMAND_IDS.has(c.id)
+      ),
+    [roster, mode]
+  );
   const filteredCommands = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return commands;
@@ -823,10 +845,106 @@ function TwinSwitcher() {
   );
 }
 
+// The EmployeeX arm/disarm control. Always visible (also when collapsed):
+// the user must be able to tell at a glance whether twins can act while
+// they're away. Flipping OFF is the kill switch — the scheduler stops
+// firing unattended work within one tick (≤30s).
+function ModeToggle({ collapsed }: { collapsed: boolean }) {
+  const { mode, loaded, setMode } = useWorkspaceMode();
+  const armed = mode === "x";
+  const flip = () => setMode(armed ? "base" : "x");
+
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={flip}
+        disabled={!loaded}
+        title={armed ? "EmployeeX armed — click to disarm" : "EmployeeX off — click to arm"}
+        className="nav-item"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "7px 0",
+          borderRadius: 4,
+          background: "transparent",
+          border: "none",
+          cursor: loaded ? "pointer" : "default",
+          width: "100%",
+        }}
+      >
+        <span className={armed ? "dot success pulse" : "dot idle"} style={{ boxShadow: "none" }} />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={flip}
+      disabled={!loaded}
+      className="card"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--sp-8)",
+        padding: "8px 10px",
+        marginBottom: "var(--sp-2)",
+        background: armed ? "var(--surface-soft)" : "transparent",
+        border: "1px solid var(--hairline)",
+        borderRadius: 6,
+        cursor: loaded ? "pointer" : "default",
+        width: "100%",
+        textAlign: "left",
+      }}
+    >
+      <span className={armed ? "dot success pulse" : "dot idle"} style={{ boxShadow: "none", flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--text)", letterSpacing: "-0.005em" }}>
+          EmployeeX
+        </span>
+        <span style={{ display: "block", fontSize: "var(--fs-meta)", color: "var(--text-muted)", lineHeight: 1.3 }}>
+          {armed ? "Autonomy armed" : "Autonomy off"}
+        </span>
+      </span>
+      {/* Switch track */}
+      <span
+        aria-hidden
+        style={{
+          width: 28,
+          height: 16,
+          borderRadius: 999,
+          background: armed ? "var(--success)" : "var(--bg-sunken)",
+          border: "1px solid var(--hairline)",
+          position: "relative",
+          flexShrink: 0,
+          transition: "background .15s ease",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 1,
+            left: armed ? 13 : 1,
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            background: "var(--bg-elevated)",
+            boxShadow: "var(--shadow-sm)",
+            transition: "left .15s ease",
+          }}
+        />
+      </span>
+    </button>
+  );
+}
+
 const SIDEBAR_COLLAPSED_KEY = "em001-sidebar-collapsed";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { mode } = useWorkspaceMode();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -908,7 +1026,7 @@ export function Sidebar() {
       >
         {/* Workspace nav */}
         <div style={{ display: "flex", flexDirection: "column", gap: collapsed ? 2 : 9 }}>
-          {SIDEBAR_NAV.map((section) => (
+          {navForMode(mode).map((section) => (
             <div key={section.label} style={{ display: "flex", flexDirection: "column", gap: "var(--sp-1)" }}>
               {!collapsed && <div className="nav-label">{section.label}</div>}
               {collapsed && <div style={{ height: 6 }} />}
@@ -964,6 +1082,7 @@ export function Sidebar() {
           gap: "var(--sp-2)",
         }}
       >
+        <ModeToggle collapsed={collapsed} />
         <Link
           href="/settings"
           title={collapsed ? "Settings" : undefined}
@@ -1176,22 +1295,24 @@ export function Topbar({ crumbs = [], actions }: { crumbs?: Crumb[]; actions?: R
 export function Shell({ children }: { children: ReactNode }) {
   return (
     <RosterProvider>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "auto 1fr",
-          height: "100vh",
-          overflow: "hidden",
-          background: "var(--bg)",
-        }}
-      >
-        <Sidebar />
-        <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--bg)" }}>
-          {children}
+      <WorkspaceModeProvider>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "auto 1fr",
+            height: "100vh",
+            overflow: "hidden",
+            background: "var(--bg)",
+          }}
+        >
+          <Sidebar />
+          <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--bg)" }}>
+            {children}
+          </div>
+          <GlobalApprovalOverlay />
+          <ActiveBuildsBanner />
         </div>
-        <GlobalApprovalOverlay />
-        <ActiveBuildsBanner />
-      </div>
+      </WorkspaceModeProvider>
     </RosterProvider>
   );
 }
