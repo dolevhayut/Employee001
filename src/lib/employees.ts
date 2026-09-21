@@ -19,9 +19,13 @@ export const EMPLOYEES: Employee[] = [];
 export type TwinStatus = "ready" | "building" | "pending";
 
 export type ClaudeModel =
+  | "claude-opus-5"
+  | "claude-sonnet-5"
+  | "claude-haiku-4-5"
+  // Legacy ids — kept valid so twins created before the Claude 5 upgrade still
+  // type-check. Both remain valid, served API models.
   | "claude-opus-4-8"
-  | "claude-sonnet-4-6"
-  | "claude-haiku-4-5";
+  | "claude-sonnet-4-6";
 
 export const CLAUDE_MODELS: {
   id: ClaudeModel;
@@ -31,18 +35,20 @@ export const CLAUDE_MODELS: {
   refreshCostMultiplier: number;
 }[] = [
   {
-    id: "claude-opus-4-8",
-    label: "Claude Opus 4.8",
+    id: "claude-opus-5",
+    label: "Claude Opus 5",
     sub: "Highest quality — best for complex reasoning & nuanced profiles",
     seedCostMultiplier: 1.0,
     refreshCostMultiplier: 1.0,
   },
   {
-    id: "claude-sonnet-4-6",
-    label: "Claude Sonnet 4.6",
+    id: "claude-sonnet-5",
+    label: "Claude Sonnet 5",
     sub: "Balanced — recommended for most employees",
-    seedCostMultiplier: 0.38,
-    refreshCostMultiplier: 0.38,
+    // Sonnet 5 is cheaper than Sonnet 4.6 ($2/$10 vs $3/$15 per MTok), so the
+    // estimate drops accordingly (was 0.38 for 4.6).
+    seedCostMultiplier: 0.25,
+    refreshCostMultiplier: 0.25,
   },
   {
     id: "claude-haiku-4-5",

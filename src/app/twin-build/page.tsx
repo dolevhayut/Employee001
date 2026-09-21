@@ -836,7 +836,7 @@ function TwinBuildContent() {
               <span className="dot success pulse" />
               {reattached
                 ? "Reattached to in-flight build"
-                : "Sonnet 4.6 working"}{" "}
+                : "Sonnet 5 working"}{" "}
               — {completed}/9 files written
             </span>
             {activeBuildId && (
@@ -1146,7 +1146,7 @@ function PreFlight({
         Build {employee.firstName}&apos;s twin from connected systems
       </h1>
       <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6 }}>
-        Sonnet 4.6 will plan a research path across the systems {employee.firstName}{" "}
+        Sonnet 5 will plan a research path across the systems {employee.firstName}{" "}
         connected, run read-only tool calls to gather evidence, and write 9
         markdown files into <code>data/employees/{employee.id}/</code>.
         Every file the agent writes appears in the tree on the left in real time;

@@ -32,8 +32,8 @@ import {
 } from "./rcp.types";
 
 /** PRD: capture = sonnet (fast/warm), synthesis = opus (deep reasoning). */
-export const CAPTURE_MODEL = "claude-sonnet-4-6";
-export const SYNTHESIS_MODEL = "claude-opus-4-8";
+export const CAPTURE_MODEL = "claude-sonnet-5";
+export const SYNTHESIS_MODEL = "claude-opus-5";
 
 /** The mandatory demo banner (ConsentRecord.banner literal, PRD 13.5). */
 const DEMO_BANNER =

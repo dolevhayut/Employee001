@@ -19,9 +19,9 @@ import { appendAuditEntry } from "@/lib/audit-log";
 const PKG_VERSION = "Employee001/0.2.0";
 
 /** Models we know about. Keep in lock-step with the dropdown in /settings. */
-export const TWIN_MODEL_PRIMARY = "claude-sonnet-4-6";
+export const TWIN_MODEL_PRIMARY = "claude-sonnet-5";
 export const TWIN_MODEL_FALLBACK = "claude-sonnet-4-5";
-export const TWIN_MODEL_OPUS = "claude-opus-4-8";
+export const TWIN_MODEL_OPUS = "claude-opus-5";
 
 /** Tools we never want a twin to call, ever. Removes them from the model's
  *  context entirely (smaller prompt, clearer intent, no Bash escape hatch).

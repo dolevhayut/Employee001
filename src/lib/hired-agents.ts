@@ -192,8 +192,8 @@ function marketplaceAgentToEmployee(
     profileFilesComplete: Object.keys(agent.profileFiles).length,
     lastActiveAt: hiredAt,
     questionsThisWeek: 0,
-    seedModel: "claude-sonnet-4-6",
-    refreshModel: "claude-sonnet-4-6",
+    seedModel: "claude-sonnet-5",
+    refreshModel: "claude-sonnet-5",
     ttsVoiceId: "EXAVITQu4vr4xnSDxMaL",
     skills: agent.skills.map((s) => ({
       id: s.toLowerCase().replace(/\s+/g, "-"),

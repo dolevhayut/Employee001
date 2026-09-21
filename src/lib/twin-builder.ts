@@ -528,7 +528,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
         buildId,
         startedAt: buildStartedAt,
         finishedAt: new Date(),
-        modelUsed: "claude-sonnet-4-6",
+        modelUsed: "claude-sonnet-5",
         costUsd,
         turns,
         stoppedReason,

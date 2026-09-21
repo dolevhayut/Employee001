@@ -55,9 +55,9 @@ export const DEMO_BANNER =
   "DEMO — not legally reviewed, not for production, not published";
 
 /** Capture model id (sonnet) recorded in provenance in model mode. */
-const CAPTURE_MODEL = "claude-sonnet-4-6";
+const CAPTURE_MODEL = "claude-sonnet-5";
 /** Synthesis model id (opus) recorded in provenance in model mode. */
-const SYNTHESIS_MODEL = "claude-opus-4-8";
+const SYNTHESIS_MODEL = "claude-opus-5";
 
 const RELAY_PHASES = [
   "consent",

@@ -151,8 +151,8 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
         sidecar.weekOf === isoWeek(new Date()) ? (sidecar.questionsThisWeek ?? 0) : 0,
       skills: [],
       orgSkillIds: [],
-      seedModel: "claude-opus-4-8",
-      refreshModel: "claude-sonnet-4-6",
+      seedModel: "claude-opus-5",
+      refreshModel: "claude-sonnet-5",
       ttsVoiceId: "EXAVITQu4vr4xnSDxMaL",
     });
   }

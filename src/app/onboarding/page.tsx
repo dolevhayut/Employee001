@@ -1569,7 +1569,7 @@ function StepReview({
               <span className="mono" style={{ color: "var(--text)" }}>
                 $32–47
               </span>{" "}
-              using Claude Opus 4.8 across 9 profile files.
+              using Claude Opus 5 across 9 profile files.
             </div>
           </div>
         )}
