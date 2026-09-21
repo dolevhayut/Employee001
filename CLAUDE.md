@@ -45,7 +45,10 @@ watch + verify. Repo-specific details it should honor:
   server from that shell, `unset ANTHROPIC_API_KEY` first so `.env.local` wins.
 - **npm supply-chain:** never consume a dependency version published <7 days ago
   (Shai-Hulud worm family). See `docs/SECURITY-SHAI-HULUD.md` for the scan runbook.
-  TipTap is pinned to `3.23.6` via `package.json` overrides for this reason.
+  TipTap is pinned to `3.31.3` via `package.json` overrides (bumped from `3.23.6`
+  in v0.5.1 once 3.31.3 cleared the 7-day window — it fixes a markdown-parsing
+  ReDoS + prototype-pollution advisory). Keep the pin; only move it to a build
+  that is itself ≥7 days old.
 
 ## Key surfaces
 
