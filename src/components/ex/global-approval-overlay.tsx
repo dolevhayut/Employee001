@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
@@ -65,6 +65,17 @@ function itemKey(item: PendingItem): string {
   return item.kind === "live" ? item.approvalId : item.id;
 }
 
+// Client-only mount flag: false during SSR + hydration, true once mounted on the
+// client. Lets us defer the createPortal(document.body) render until after hydration.
+const subscribeNoop = () => () => {};
+function useMounted(): boolean {
+  return useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
+  );
+}
+
 // ─── Overlay ─────────────────────────────────────────────────────────────────
 
 export function GlobalApprovalOverlay() {
@@ -73,9 +84,7 @@ export function GlobalApprovalOverlay() {
   const [editing, setEditing] = useState<Record<string, boolean>>({});
   const [editedJson, setEditedJson] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
 
   // Poll both sources every 2s — live approval-bus + persistent feed
   // needs-review items. Every CEO approval must surface in the main app shell

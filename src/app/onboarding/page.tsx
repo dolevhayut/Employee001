@@ -871,7 +871,7 @@ function StepSources({
       const next = new Set(chosen);
       next.add(slug);
       setChosen(next);
-      window.location.href = body.redirectUrl;
+      window.location.assign(body.redirectUrl);
     } catch (err) {
       setConnError(err instanceof Error ? err.message : "Failed to connect");
     } finally {
@@ -908,23 +908,25 @@ function StepSources({
   });
 
   const [catalog, setCatalog] = useState<CatalogToolkit[] | null>(null);
-  const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [browseOpen, setBrowseOpen] = useState(false);
 
+  // Derived: we're loading whenever the drawer is open and we have neither a
+  // catalog nor an error yet. This mirrors the old setCatalogLoading(true)/false
+  // lifecycle without a synchronous setState inside the fetch effect.
+  const catalogLoading = browseOpen && catalog === null && catalogError === null;
+
   useEffect(() => {
-    if (!browseOpen || catalog || catalogLoading) return;
-    setCatalogLoading(true);
+    if (!browseOpen || catalog) return;
     fetch("/api/connections/toolkits")
       .then((r) => r.json())
       .then((data: { toolkits?: CatalogToolkit[]; error?: string }) => {
         if (data.error) setCatalogError(data.error);
         setCatalog(data.toolkits ?? []);
       })
-      .catch((e: Error) => setCatalogError(e.message))
-      .finally(() => setCatalogLoading(false));
-  }, [browseOpen, catalog, catalogLoading]);
+      .catch((e: Error) => setCatalogError(e.message));
+  }, [browseOpen, catalog]);
 
   const builtInSlugs = useMemo(() => {
     const s = new Set<string>();

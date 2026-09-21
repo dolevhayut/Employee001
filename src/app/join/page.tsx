@@ -207,11 +207,27 @@ function useBuildStream(
 ): {
   progress: ProgressState;
   connectionLost: boolean;
-  startedAt: number;
+  elapsedMs: number;
 } {
   const [progress, dispatch] = useReducer(progressReducer, initialProgress);
   const [connectionLost, setConnectionLost] = useState(false);
-  const startedAtRef = useRef<number>(Date.now());
+  // Elapsed-since-start, ticked from an interval so we never call the impure
+  // Date.now() during render. The start instant is captured in an effect (a
+  // ref write outside render) rather than read from a ref during render.
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const startedAtRef = useRef<number>(0);
+  // Reset transient per-stream state when the stream identity changes, via the
+  // render-phase "adjust state on prop change" pattern instead of synchronous
+  // setStates inside the subscription effect. (setState with pure args during
+  // render is allowed; Date.now() is not, so the timestamp itself is captured
+  // in the effect below.)
+  const streamKey = `${enabled ? 1 : 0}:${employeeId ?? ""}:${buildId ?? ""}`;
+  const [prevStreamKey, setPrevStreamKey] = useState(streamKey);
+  if (prevStreamKey !== streamKey) {
+    setPrevStreamKey(streamKey);
+    setConnectionLost(false);
+    setElapsedMs(0);
+  }
   const retryRef = useRef(0);
   const esRef = useRef<EventSource | null>(null);
   const cancelledRef = useRef(false);
@@ -220,7 +236,6 @@ function useBuildStream(
     if (!enabled || !employeeId) return;
     cancelledRef.current = false;
     startedAtRef.current = Date.now();
-    setConnectionLost(false);
 
     function open() {
       const qs = buildId ? `?buildId=${encodeURIComponent(buildId)}` : "";
@@ -265,6 +280,17 @@ function useBuildStream(
     };
   }, [employeeId, buildId, enabled]);
 
+  // Tick elapsed time every second while the stream is live and unfinished.
+  useEffect(() => {
+    if (!enabled || !employeeId || progress.finished) return;
+    const id = setInterval(() => {
+      if (startedAtRef.current) {
+        setElapsedMs(Date.now() - startedAtRef.current);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [enabled, employeeId, buildId, progress.finished]);
+
   // Stop reconnecting after we see `done`.
   useEffect(() => {
     if (progress.finished) {
@@ -274,7 +300,7 @@ function useBuildStream(
     }
   }, [progress.finished]);
 
-  return { progress, connectionLost, startedAt: startedAtRef.current };
+  return { progress, connectionLost, elapsedMs };
 }
 
 // ---------- UI primitives ----------
@@ -324,7 +350,7 @@ function ModeTraining({
   onFinished: (summary: ProgressState["finished"]) => void;
   onRetry: () => void;
 }) {
-  const { progress, connectionLost, startedAt } = useBuildStream(
+  const { progress, connectionLost, elapsedMs } = useBuildStream(
     employeeId,
     buildId,
     true,
@@ -334,15 +360,6 @@ function ModeTraining({
   useEffect(() => {
     if (progress.finished) onFinished(progress.finished);
   }, [progress.finished, onFinished]);
-
-  const elapsedMs = Date.now() - startedAt;
-  // Force a render every second while training so elapsed time ticks visibly.
-  const [, tick] = useState(0);
-  useEffect(() => {
-    if (progress.finished) return;
-    const id = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, [progress.finished]);
 
   return (
     <Card>
@@ -642,7 +659,13 @@ function Page() {
     | { kind: "error"; status: ValidateResponse["status"] }
     | { kind: "ready"; invite: InviteShape }
     | { kind: "done" }
-  >(justFinished ? { kind: "done" } : { kind: "loading" });
+  >(
+    justFinished
+      ? { kind: "done" }
+      : token
+        ? { kind: "loading" }
+        : { kind: "no_token" },
+  );
 
   const [doneView, setDoneView] = useState<DoneViewState>({ kind: "resolving" });
 
@@ -730,11 +753,7 @@ function Page() {
 
   // Pre-redemption invite validation (unchanged from previous behaviour).
   useEffect(() => {
-    if (justFinished) return;
-    if (!token) {
-      setState({ kind: "no_token" });
-      return;
-    }
+    if (justFinished || !token) return;
     fetch(`/api/invites/${encodeURIComponent(token)}`)
       .then(async (r) => {
         const data: ValidateResponse = await r.json();

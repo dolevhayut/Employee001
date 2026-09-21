@@ -232,16 +232,33 @@ export default function AuditPage() {
     setLoading(false);
   }, [filterEmployee, filterTool, filterVerdict, filterSince, filterUntil, filterArchive, page]);
 
-  useEffect(() => {
+  // Show the loading state whenever the query (filters + page) changes — which
+  // is exactly when `load` gets a new identity. Setting it during render avoids
+  // a synchronous setState inside the effect (and the cascading render it
+  // causes) while keeping the spinner off for background polling / manual
+  // refresh, which reuse the same `load`.
+  const queryKey = `${filterEmployee}|${filterTool}|${filterVerdict}|${filterSince}|${filterUntil}|${filterArchive}|${page}`;
+  const [loadingKey, setLoadingKey] = useState(queryKey);
+  if (loadingKey !== queryKey) {
+    setLoadingKey(queryKey);
     setLoading(true);
-    load();
+  }
+
+  useEffect(() => {
+    // Wrapped so the (post-await) setState in `load` lands in an async
+    // continuation rather than running synchronously in the effect body.
+    void (async () => { await load(); })();
   }, [load]);
 
   // Reset page to 1 whenever a filter changes — otherwise we might be on a
-  // page that no longer exists in the filtered view.
-  useEffect(() => {
+  // page that no longer exists in the filtered view. Done during render so the
+  // reset lands in the same pass as the filter change, with no cascading effect.
+  const filterKey = `${filterEmployee}|${filterTool}|${filterVerdict}|${filterSince}|${filterUntil}|${filterArchive}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
     setPage(1);
-  }, [filterEmployee, filterTool, filterVerdict, filterSince, filterUntil, filterArchive]);
+  }
 
   // Poll every 5 seconds so new entries appear without a refresh — but only
   // when viewing the live log on page 1 with no date window. Browsing an

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { PageHead } from "@/components/ex/page-head";
@@ -19,6 +19,39 @@ const MODELS_STORAGE_KEY = "employee001.models.v1";
 const TODAY = new Date("2026-04-30");
 
 type ModelOverrides = Record<string, { seed: ClaudeModel; refresh: ClaudeModel }>;
+
+// ─── Persisted model overrides (client-only localStorage hydration) ──────────
+// Read as a stable snapshot via useSyncExternalStore: the parsed value is cached
+// and only recomputed when the raw string changes, so getSnapshot never returns
+// a fresh object on an unchanged store (which would loop). getServerSnapshot
+// returns the empty default so SSR + hydration match, then the client swaps in
+// the persisted value after hydration — exactly what the old mount effect did.
+const EMPTY_OVERRIDES: ModelOverrides = {};
+let cachedOverridesRaw: string | null | undefined;
+let cachedOverrides: ModelOverrides = EMPTY_OVERRIDES;
+
+function getOverridesSnapshot(): ModelOverrides {
+  try {
+    const raw = localStorage.getItem(MODELS_STORAGE_KEY);
+    if (raw !== cachedOverridesRaw) {
+      cachedOverridesRaw = raw;
+      cachedOverrides = raw ? (JSON.parse(raw) as ModelOverrides) : EMPTY_OVERRIDES;
+    }
+  } catch {
+    /* ignore — keep the last good snapshot */
+  }
+  return cachedOverrides;
+}
+
+function getServerOverrides(): ModelOverrides {
+  return EMPTY_OVERRIDES;
+}
+
+function subscribeOverrides(): () => void {
+  // Nothing in-app writes this key while the page is mounted, so a no-op
+  // subscription matches the original mount-only read.
+  return () => {};
+}
 
 function monthsActive(isoDate: string): number {
   const d = new Date(isoDate);
@@ -63,15 +96,12 @@ function formatCost(usd: number): string {
 
 export default function WorkspaceOverviewPage() {
   const roster = useRoster();
-  const [overrides, setOverrides] = useState<ModelOverrides>({});
+  const overrides = useSyncExternalStore(
+    subscribeOverrides,
+    getOverridesSnapshot,
+    getServerOverrides,
+  );
   const [execCosts, setExecCosts] = useState<ExecutionCosts | null>(null);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(MODELS_STORAGE_KEY);
-      if (raw) setOverrides(JSON.parse(raw));
-    } catch { /* ignore */ }
-  }, []);
 
   useEffect(() => {
     let cancelled = false;

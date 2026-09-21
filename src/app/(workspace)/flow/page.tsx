@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
 import {
@@ -16,22 +23,64 @@ import type { EmployeeGraph } from "@/lib/profile-graph-real";
 
 const TOUCHED_LINGER_MS = 3000;
 
+// The graph/chat split ratio is persisted in localStorage and shared as an
+// external store, so the client hydrates from it without a mount-time setState
+// (and without a hydration mismatch — the server snapshot is the default).
+const CHAT_WIDTH_KEY = "flow.chatWidthPct";
+const CHAT_WIDTH_DEFAULT = 34;
+const chatWidthListeners = new Set<() => void>();
+
+function chatWidthSubscribe(cb: () => void): () => void {
+  chatWidthListeners.add(cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    chatWidthListeners.delete(cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+function chatWidthSnapshot(): number {
+  try {
+    const saved = localStorage.getItem(CHAT_WIDTH_KEY);
+    if (saved !== null) {
+      const n = parseFloat(saved);
+      if (!Number.isNaN(n) && n >= 22 && n <= 70) return n;
+    }
+  } catch {
+    // ignore
+  }
+  return CHAT_WIDTH_DEFAULT;
+}
+
+function chatWidthServerSnapshot(): number {
+  return CHAT_WIDTH_DEFAULT;
+}
+
+function writeChatWidth(pct: number): void {
+  try {
+    localStorage.setItem(CHAT_WIDTH_KEY, String(pct));
+  } catch {
+    // ignore
+  }
+  chatWidthListeners.forEach((cb) => cb());
+}
+
 export default function FlowPage() {
   const roster = useRoster();
   const readyEmployees = useMemo(
     () => roster.filter((e) => e.twinStatus === "ready"),
     [roster],
   );
-  const [activeId, setActiveId] = useState<string>("");
-
-  // Default to first ready twin once the roster hydrates.
-  useEffect(() => {
-    if (activeId) return;
-    const next = readyEmployees[0]?.id;
-    if (next) setActiveId(next);
-  }, [activeId, readyEmployees]);
+  const [selectedId, setSelectedId] = useState<string>("");
+  // Honor an explicit user selection, otherwise default to the first ready
+  // twin once the roster hydrates. Deriving during render (instead of syncing
+  // via an effect) avoids a mount-time setState.
+  const activeId = selectedId || readyEmployees[0]?.id || "";
   const [graph, setGraph] = useState<EmployeeGraph | null>(null);
-  const [graphLoading, setGraphLoading] = useState(true);
+  // Only "loading" if there's actually a twin to fetch at mount.
+  const [graphLoading, setGraphLoading] = useState<boolean>(() =>
+    Boolean(activeId),
+  );
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [highlightState, setHighlightState] = useState<GraphHighlightState>({
     reading: new Set<string>(),
@@ -39,28 +88,35 @@ export default function FlowPage() {
     cited: new Set<string>(),
   });
 
+  // Reset the graph view when the active twin changes. Adjusting state during
+  // render (the React "reset state when a prop changes" pattern) instead of in
+  // an effect avoids a synchronous setState-in-effect cascade; the async fetch
+  // itself stays in the effect below.
+  const [prevActiveId, setPrevActiveId] = useState(activeId);
+  if (activeId !== prevActiveId) {
+    setPrevActiveId(activeId);
+    setGraph(null);
+    setGraphLoading(Boolean(activeId));
+    setHighlightState({
+      reading: new Set<string>(),
+      recentlyTouched: new Set<string>(),
+      cited: new Set<string>(),
+    });
+    setOpenFile(null);
+  }
+
   const touchedTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map()
   );
 
   // ── Resizable split between graph and chat ─────────────────────────────────
   const splitContainerRef = useRef<HTMLDivElement>(null);
-  const [chatWidthPct, setChatWidthPct] = useState<number>(34);
+  const chatWidthPct = useSyncExternalStore(
+    chatWidthSubscribe,
+    chatWidthSnapshot,
+    chatWidthServerSnapshot,
+  );
   const [isResizing, setIsResizing] = useState(false);
-
-  // Restore from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("flow.chatWidthPct");
-    if (saved) {
-      const n = parseFloat(saved);
-      if (!Number.isNaN(n) && n >= 22 && n <= 70) setChatWidthPct(n);
-    }
-  }, []);
-
-  // Persist
-  useEffect(() => {
-    localStorage.setItem("flow.chatWidthPct", String(chatWidthPct));
-  }, [chatWidthPct]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -72,7 +128,7 @@ export default function FlowPage() {
       const fromRight = rect.right - e.clientX;
       const pct = (fromRight / rect.width) * 100;
       // Clamp 22% – 70%
-      setChatWidthPct(Math.max(22, Math.min(70, pct)));
+      writeChatWidth(Math.max(22, Math.min(70, pct)));
     }
     function onUp() {
       setIsResizing(false);
@@ -95,22 +151,12 @@ export default function FlowPage() {
     [activeId]
   );
 
-  // Fetch graph when active employee changes
+  // Fetch graph when active employee changes. The view reset happens during
+  // render (above); this effect only performs the async fetch, whose setStates
+  // land in promise callbacks rather than synchronously in the effect body.
   useEffect(() => {
+    if (!activeId) return;
     let cancelled = false;
-    setGraphLoading(true);
-    setGraph(null);
-    setHighlightState({
-      reading: new Set(),
-      recentlyTouched: new Set(),
-      cited: new Set(),
-    });
-    setOpenFile(null);
-
-    if (!activeId) {
-      setGraphLoading(false);
-      return;
-    }
 
     fetch(`/api/employees/${encodeURIComponent(activeId)}/graph`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
@@ -220,7 +266,7 @@ export default function FlowPage() {
       <Topbar crumbs={["Workspace", "Memory graph"]} />
 
       {/* Employee picker bar */}
-      <EmployeePickerBar activeId={activeId} onSelect={setActiveId} />
+      <EmployeePickerBar activeId={activeId} onSelect={setSelectedId} />
 
       <div
         ref={splitContainerRef}
@@ -266,7 +312,7 @@ export default function FlowPage() {
         {/* Drag handle */}
         <div
           onMouseDown={() => setIsResizing(true)}
-          onDoubleClick={() => setChatWidthPct(34)}
+          onDoubleClick={() => writeChatWidth(CHAT_WIDTH_DEFAULT)}
           title="Drag to resize · double-click to reset"
           style={{
             flex: "0 0 5px",

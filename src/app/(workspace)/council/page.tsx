@@ -26,6 +26,12 @@ import { useRoster } from "@/components/ex/roster-context";
 import type { CouncilEvent, ClarificationQuestion } from "@/lib/council-runner";
 import { humanizeToolAction } from "@/lib/tool-humanize";
 
+// Event-time unique id for a chat thread. Lives at module scope because it is a
+// side-effecting utility invoked from event handlers, not part of render.
+function makeThreadId(): string {
+  return `t_${Date.now()}`;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ToolTrace = {
@@ -1051,7 +1057,12 @@ function FileDrawer({
   onClose: () => void;
 }) {
   const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Start in the loading state when a JSON fetch is pending on mount, so the
+  // effect doesn't need a synchronous setState to enter it. Image chips (and
+  // the no-chip case) render without a fetch, so they start not-loading.
+  const [loading, setLoading] = useState(
+    () => Boolean(chip && meetingId && chip.kind !== "image")
+  );
   const [error, setError] = useState<string | null>(null);
 
   const isImage = chip?.kind === "image";
@@ -1059,16 +1070,8 @@ function FileDrawer({
   useEffect(() => {
     if (!chip || !meetingId) return;
     // Images render via <img src> directly — no JSON fetch needed.
-    if (chip.kind === "image") {
-      setLoading(false);
-      setContent(null);
-      setError(null);
-      return;
-    }
+    if (chip.kind === "image") return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setContent(null);
     const url = `/api/council/file?meetingId=${encodeURIComponent(meetingId)}&filename=${encodeURIComponent(chip.filename)}`;
     fetch(url)
       .then(async (res) => {
@@ -1455,24 +1458,28 @@ function TypingIndicator({ emp }: { emp: EmployeeWithTwin }) {
 
 export default function CouncilPage() {
   const roster = useRoster();
-  const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
-
-  // Sync defaults once roster hydrates (initial render had an empty roster, so
-  // we can't seed activeIds via useState initializer).
-  useEffect(() => {
-    setActiveIds((prev) => {
-      if (prev.size > 0) return prev;
-      const next = new Set(
+  // `null` means "not customized yet" — the active set defaults to every ready
+  // twin, derived during render. Once the CEO toggles a participant it holds a
+  // concrete Set. This derives the default from the (asynchronously-hydrated)
+  // roster without seeding state from an effect.
+  const [activeIdsOverride, setActiveIdsOverride] = useState<Set<string> | null>(
+    null
+  );
+  const activeIds = useMemo(
+    () =>
+      activeIdsOverride ??
+      new Set(
         roster.filter((e) => e.twinStatus === "ready").map((e) => e.id)
-      );
-      return next.size > 0 ? next : prev;
-    });
-  }, [roster]);
+      ),
+    [activeIdsOverride, roster]
+  );
   const [threads, setThreads] = useState<MessageThread[]>([]);
   // Stable across CEO messages — server uses it to load the meeting transcript
   // so every twin sees prior CEO asks and prior twin turns. Resets on page
-  // reload (in-memory ref). Server-side meeting state lives in meeting-store.
-  const meetingIdRef = useRef<string | null>(null);
+  // reload (in-memory state). Server-side meeting state lives in meeting-store.
+  // Held in state (not a ref) because file chips read it during render to build
+  // their download/preview URLs.
+  const [meetingId, setMeetingId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [typingFor, setTypingFor] = useState<string[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -1510,8 +1517,9 @@ export default function CouncilPage() {
   }
 
   function toggleParticipant(id: string) {
-    setActiveIds((prev) => {
-      const next = new Set(prev);
+    setActiveIdsOverride((prev) => {
+      const base = prev ?? activeIds;
+      const next = new Set(base);
       if (next.has(id)) {
         if (next.size <= 1) return prev;
         next.delete(id);
@@ -1533,7 +1541,7 @@ export default function CouncilPage() {
   async function sendMessage(text: string) {
     if (!text.trim()) return;
     const trimmed = text.trim();
-    const threadId = `t_${Date.now()}`;
+    const threadId = makeThreadId();
 
     // If @-mentions are present, only those twins respond.
     // Otherwise, all currently selected twins respond.
@@ -1579,7 +1587,7 @@ export default function CouncilPage() {
         body: JSON.stringify({
           question: trimmed,
           employeeIds: respondingIds,
-          meetingId: meetingIdRef.current ?? undefined,
+          meetingId: meetingId ?? undefined,
         }),
       });
 
@@ -1617,7 +1625,7 @@ export default function CouncilPage() {
           // it so the next CEO ask carries the same id and the server
           // loads the same transcript.
           if (event.type === "meeting") {
-            meetingIdRef.current = event.meetingId;
+            setMeetingId(event.meetingId);
             continue;
           }
 
@@ -2295,7 +2303,7 @@ export default function CouncilPage() {
                             <FileShareChip
                               key={f.id}
                               chip={f}
-                              meetingId={meetingIdRef.current}
+                              meetingId={meetingId}
                               onOpen={() => setOpenFile(f)}
                             />
                           ))}
@@ -2498,7 +2506,7 @@ export default function CouncilPage() {
         {openFile && (
           <FileDrawer
             key={openFile.id}
-            meetingId={meetingIdRef.current}
+            meetingId={meetingId}
             chip={openFile}
             onClose={() => setOpenFile(null)}
           />

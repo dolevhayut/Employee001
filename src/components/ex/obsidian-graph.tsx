@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useSyncExternalStore,
+} from "react";
 import type { EmployeeGraph, RealNode } from "@/lib/profile-graph-real";
 
 export type GraphHighlightState = {
@@ -47,26 +54,30 @@ function isDarkTheme(): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+// Subscribe to both the `data-theme` attribute and the OS color-scheme so the
+// graph recolors live — the exact triggers the previous effect listened for.
+function subscribeTheme(onChange: () => void): () => void {
+  const obs = new MutationObserver(onChange);
+  obs.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", onChange);
+  return () => {
+    obs.disconnect();
+    mq.removeEventListener("change", onChange);
+  };
+}
+
 function useThemeIsDark(): boolean {
-  const [dark, setDark] = useState(() =>
-    typeof window !== "undefined" ? isDarkTheme() : true
+  // External store: read the live theme on the client, `true` during SSR and
+  // hydration (matching the previous initial state) — no setState-in-effect.
+  return useSyncExternalStore(
+    subscribeTheme,
+    () => isDarkTheme(),
+    () => true,
   );
-  useEffect(() => {
-    setDark(isDarkTheme());
-    const obs = new MutationObserver(() => setDark(isDarkTheme()));
-    obs.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onMq = () => setDark(isDarkTheme());
-    mq.addEventListener("change", onMq);
-    return () => {
-      obs.disconnect();
-      mq.removeEventListener("change", onMq);
-    };
-  }, []);
-  return dark;
 }
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
@@ -243,7 +254,10 @@ void main() {
 function ShaderBackground({ isDark }: { isDark: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const darkRef = useRef(isDark);
-  darkRef.current = isDark;
+  // Mirror the latest theme into a ref the animation loop reads each frame.
+  useEffect(() => {
+    darkRef.current = isDark;
+  }, [isDark]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -342,27 +356,32 @@ type Particle = { x: number; y: number; z: number };
 function AmbientNeurons({ isDark }: { isDark: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const darkRef = useRef(isDark);
-  darkRef.current = isDark;
+  // Mirror the latest theme into a ref the animation loop reads each frame.
+  useEffect(() => {
+    darkRef.current = isDark;
+  }, [isDark]);
 
-  // Stable random particles — generated once
+  // Stable random particles — generated once on mount inside the effect, since
+  // they're only consumed by the draw loop below.
   const particlesRef = useRef<Particle[]>([]);
-  if (particlesRef.current.length === 0) {
-    const N = 140;
-    const rand = mulberry32(0xa17e); // deterministic so SSR/hydration match
-    for (let i = 0; i < N; i++) {
-      particlesRef.current.push({
-        x: (rand() - 0.5) * 1200,
-        y: (rand() - 0.5) * 1200,
-        z: (rand() - 0.5) * 800,
-      });
-    }
-  }
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    if (particlesRef.current.length === 0) {
+      const N = 140;
+      const rand = mulberry32(0xa17e); // deterministic so SSR/hydration match
+      for (let i = 0; i < N; i++) {
+        particlesRef.current.push({
+          x: (rand() - 0.5) * 1200,
+          y: (rand() - 0.5) * 1200,
+          z: (rand() - 0.5) * 800,
+        });
+      }
+    }
 
     let raf = 0;
     let lastT = performance.now();
@@ -541,20 +560,24 @@ function GraphCanvas({
   const zoomRef = useRef(zoom);
   const darkRef = useRef(isDark);
 
-  stateRef.current = state;
-  layoutRef.current = layout;
-  graphRef.current = graph;
-  hoverRef.current = hoveredNode;
-  zoomRef.current = zoom;
-  darkRef.current = isDark;
-
   const nodeMap = useMemo(() => {
     const m = new Map<string, LaidOutNode>();
     for (const n of layout) m.set(n.name, n);
     return m;
   }, [layout]);
   const nodeMapRef = useRef(nodeMap);
-  nodeMapRef.current = nodeMap;
+
+  // Mirror the latest props into refs the requestAnimationFrame loop reads each
+  // frame. Runs after every render so the loop always sees current values.
+  useEffect(() => {
+    stateRef.current = state;
+    layoutRef.current = layout;
+    graphRef.current = graph;
+    hoverRef.current = hoveredNode;
+    zoomRef.current = zoom;
+    darkRef.current = isDark;
+    nodeMapRef.current = nodeMap;
+  });
 
   // Mouse position for parallax rotation (in canvas-local px)
   const mouseRef = useRef({ x: 0, y: 0, hasMoved: false });
@@ -1039,9 +1062,14 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
     setZoom((z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z * factor)));
   const zoomReset = () => setZoom(1);
 
-  useEffect(() => {
+  // Reset zoom to 1 whenever the graph changes. Adjusting state during render on
+  // a detected prop change is React's supported pattern for this — it avoids a
+  // setState-in-effect and the extra commit/paint an effect would incur.
+  const [prevGraph, setPrevGraph] = useState(graph);
+  if (graph !== prevGraph) {
+    setPrevGraph(graph);
     setZoom(1);
-  }, [graph]);
+  }
 
   if (loading) {
     return (

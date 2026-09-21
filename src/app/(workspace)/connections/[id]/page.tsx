@@ -68,31 +68,41 @@ export default function ConnectionsForEmployeePage({
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
 
-  async function refreshConnections() {
-    try {
-      const r = await fetch(`/api/connections/${id}`, { cache: "no-store" });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      setData((await r.json()) as ConnectionsResponse);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    }
+  // Written as promise chains (rather than async/await bodies) so no setState is
+  // reachable on a synchronous code path from the mount effect — the state
+  // updates only run inside the async continuations. Still returns a promise, so
+  // `await refreshConnections()` in connect/disconnect keeps waiting for it.
+  function refreshConnections() {
+    return fetch(`/api/connections/${id}`, { cache: "no-store" })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((json) => {
+        setData(json as ConnectionsResponse);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load");
+      });
   }
 
-  async function loadCatalog() {
-    try {
-      const r = await fetch(`/api/connections/toolkits`);
-      if (!r.ok) {
-        const body = (await r.json()) as { error?: string };
-        throw new Error(body.error || `HTTP ${r.status}`);
-      }
-      const data = (await r.json()) as { toolkits: ToolkitSummary[] };
-      setCatalog(data.toolkits || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load catalog");
-    } finally {
-      setCatalogLoading(false);
-    }
+  function loadCatalog() {
+    return fetch(`/api/connections/toolkits`)
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = (await r.json()) as { error?: string };
+          throw new Error(body.error || `HTTP ${r.status}`);
+        }
+        const data = (await r.json()) as { toolkits: ToolkitSummary[] };
+        setCatalog(data.toolkits || []);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load catalog");
+      })
+      .finally(() => {
+        setCatalogLoading(false);
+      });
   }
 
   useEffect(() => {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useRef, useEffect, useCallback, useMemo, type KeyboardEvent, type ReactNode } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { HalfMoon, NavArrowDown, SunLight } from "iconoir-react";
 import { Icons, type IconName } from "./icons";
@@ -86,31 +86,67 @@ const X_ONLY_COMMAND_IDS = new Set([
 
 type ThemeId = "light" | "dark" | "cool";
 const THEME_ORDER: ThemeId[] = ["light", "dark", "cool"];
+const THEME_KEY = "em001-theme";
+
+// The theme is persisted in localStorage (falling back to the OS preference)
+// and shared as an external store, so the client resolves it on hydration
+// without a mount-time setState.
+const themeListeners = new Set<() => void>();
+
+function isThemeId(v: string | null): v is ThemeId {
+  return v === "light" || v === "dark" || v === "cool";
+}
+
+function themeSubscribe(cb: () => void): () => void {
+  themeListeners.add(cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    themeListeners.delete(cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+function themeSnapshot(): ThemeId {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (isThemeId(saved)) return saved;
+    if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+  } catch {
+    // ignore
+  }
+  return "light";
+}
+
+function themeServerSnapshot(): ThemeId {
+  return "light";
+}
+
+function writeTheme(next: ThemeId): void {
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {
+    // ignore
+  }
+  themeListeners.forEach((cb) => cb());
+}
 
 function useTheme() {
-  const [theme, setTheme] = useState<ThemeId>("light");
+  const theme = useSyncExternalStore(
+    themeSubscribe,
+    themeSnapshot,
+    themeServerSnapshot,
+  );
 
+  // Mirror the resolved theme onto the document (an external-system update, not
+  // a setState) whenever it changes.
   useEffect(() => {
-    const saved = localStorage.getItem("em001-theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial: ThemeId =
-      saved === "dark" || saved === "light" || saved === "cool"
-        ? (saved as ThemeId)
-        : prefersDark
-          ? "dark"
-          : "light";
-    setTheme(initial);
-    document.documentElement.setAttribute("data-theme", initial);
-  }, []);
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   const toggle = useCallback(() => {
-    setTheme((prev) => {
-      const idx = THEME_ORDER.indexOf(prev);
-      const next = THEME_ORDER[(idx + 1) % THEME_ORDER.length];
-      document.documentElement.setAttribute("data-theme", next);
-      localStorage.setItem("em001-theme", next);
-      return next;
-    });
+    const idx = THEME_ORDER.indexOf(themeSnapshot());
+    const next = THEME_ORDER[(idx + 1) % THEME_ORDER.length];
+    writeTheme(next);
   }, []);
 
   return { theme, toggle };
@@ -631,14 +667,13 @@ function TwinSwitcher() {
   const router = useRouter();
   const roster = useRoster();
   const defaultTwin = roster.find((e) => e.twinStatus === "ready") ?? roster[0];
-  const [active, setActive] = useState<EmployeeWithTwin | undefined>(defaultTwin);
-
-  // Sync local active state when roster hydrates from /api/employees on mount.
-  useEffect(() => {
-    if (active) return;
-    const next = roster.find((e) => e.twinStatus === "ready") ?? roster[0];
-    if (next) setActive(next);
-  }, [roster, active]);
+  // Honor an explicit selection, otherwise fall back to the default twin (which
+  // resolves once the roster hydrates). Derived during render to avoid a
+  // mount-time setState.
+  const [selected, setSelected] = useState<EmployeeWithTwin | undefined>(
+    undefined,
+  );
+  const active = selected ?? defaultTwin;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -651,7 +686,7 @@ function TwinSwitcher() {
   }, []);
 
   function select(emp: EmployeeWithTwin) {
-    setActive(emp);
+    setSelected(emp);
     setOpen(false);
     if (emp.twinStatus === "ready") {
       router.push(`/flow?employee=${emp.id}`);
@@ -944,22 +979,51 @@ function ModeToggle({ collapsed }: { collapsed: boolean }) {
 
 const SIDEBAR_COLLAPSED_KEY = "em001-sidebar-collapsed";
 
+// Sidebar collapse state is persisted in localStorage and shared as an external
+// store, so the client hydrates from it without a mount-time setState.
+const sidebarListeners = new Set<() => void>();
+
+function sidebarSubscribe(cb: () => void): () => void {
+  sidebarListeners.add(cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    sidebarListeners.delete(cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+function sidebarCollapsedSnapshot(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function sidebarCollapsedServerSnapshot(): boolean {
+  return false;
+}
+
+function writeSidebarCollapsed(next: boolean): void {
+  try {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+  } catch {
+    // ignore
+  }
+  sidebarListeners.forEach((cb) => cb());
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { mode } = useWorkspaceMode();
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-    if (saved === "1") setCollapsed(true);
-  }, []);
+  const collapsed = useSyncExternalStore(
+    sidebarSubscribe,
+    sidebarCollapsedSnapshot,
+    sidebarCollapsedServerSnapshot,
+  );
 
   function toggleCollapsed() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
-      return next;
-    });
+    writeSidebarCollapsed(!collapsed);
   }
 
   const w = collapsed ? 52 : 232;

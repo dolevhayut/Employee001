@@ -29,6 +29,10 @@ type EmployeeRow = { id: string; name: string; firstName: string; initials: stri
 export function ActiveBuildsBanner() {
   const [builds, setBuilds] = useState<ActiveBuild[]>([]);
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
+  // Clock snapshot for the elapsed-time readout. Refreshed on each poll so the
+  // "Xm Ys" label advances in step with the 4 s fetch, without reading the
+  // impure Date.now() during render.
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +42,10 @@ export function ActiveBuildsBanner() {
           cache: "no-store",
         });
         const data = (await r.json()) as { builds: ActiveBuild[] };
-        if (!cancelled) setBuilds(data.builds ?? []);
+        if (!cancelled) {
+          setBuilds(data.builds ?? []);
+          setNow(Date.now());
+        }
       } catch {
         /* ignore — banner just stays as-is */
       }
@@ -80,7 +87,7 @@ export function ActiveBuildsBanner() {
       <AnimatePresence initial={false}>
         {builds.map((b) => {
           const emp = empById(b.employeeId);
-          const elapsed = Date.now() - new Date(b.startedAt).getTime();
+          const elapsed = now - new Date(b.startedAt).getTime();
           const mins = Math.floor(elapsed / 60_000);
           const secs = Math.floor((elapsed % 60_000) / 1000);
           return (

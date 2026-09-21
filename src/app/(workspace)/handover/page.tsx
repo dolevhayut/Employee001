@@ -280,6 +280,18 @@ function useHandoverStream(employeeId: string, handoverId: string | null, enable
   const cancelledRef = useRef(false);
   const finishedRef = useRef(false);
 
+  // Reset the connection-lost flag synchronously — during render — whenever the
+  // subscription target changes (which is exactly when the effect below opens a
+  // fresh EventSource). Doing it here instead of inside the effect avoids the
+  // cascading render an in-effect setState would cause, while matching the
+  // previous reset-on-(re)subscribe behavior.
+  const subKey = enabled && handoverId ? `${employeeId} ${handoverId}` : null;
+  const [prevSubKey, setPrevSubKey] = useState<string | null>(subKey);
+  if (subKey !== prevSubKey) {
+    setPrevSubKey(subKey);
+    if (subKey !== null) setConnectionLost(false);
+  }
+
   useEffect(() => {
     // Wait until we have the handoverId from the POST response before opening
     // the stream — connecting without it races the (near-instant in fixture
@@ -288,7 +300,6 @@ function useHandoverStream(employeeId: string, handoverId: string | null, enable
     if (!enabled || !handoverId) return;
     cancelledRef.current = false;
     finishedRef.current = false;
-    setConnectionLost(false);
 
     function open() {
       const qs = `?handoverId=${encodeURIComponent(handoverId!)}`;
@@ -990,19 +1001,19 @@ function HandoverPageInner() {
   const [rcp, setRcp] = useState<RoleContextPackage | null>(null);
   const [handoverId, setHandoverId] = useState<string | null>(null);
 
-  const streaming = runPhase === "running" || runPhase === "done";
+  // `runPhase` is the caller-driven phase (idle → starting → running / error).
+  // The terminal "done" phase is DERIVED from the stream rather than synced into
+  // state via an effect: once the runner emits its terminal event while we're
+  // running, the effective phase is "done". runPhase stays "running" through the
+  // done period, so `streaming` (and the live subscription) stay live exactly as
+  // before, and the RCP loads when `phase` becomes "done".
+  const streaming = runPhase === "running";
   const { state, connectionLost } = useHandoverStream(employeeId, handoverId, streaming);
-
-  // Flip to "done" once the runner emits its terminal event, then load the RCP.
-  useEffect(() => {
-    if (state.done && runPhase === "running") {
-      setRunPhase("done");
-    }
-  }, [state.done, runPhase]);
+  const phase: RunPhase = state.done && runPhase === "running" ? "done" : runPhase;
 
   // On done, fetch the persisted RCP via the GET route (the read side of the contract).
   useEffect(() => {
-    if (runPhase !== "done") return;
+    if (phase !== "done") return;
     let cancelled = false;
     (async () => {
       try {
@@ -1021,7 +1032,7 @@ function HandoverPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [runPhase, employeeId]);
+  }, [phase, employeeId]);
 
   const start = useCallback(async () => {
     if (!consentChecked) return;

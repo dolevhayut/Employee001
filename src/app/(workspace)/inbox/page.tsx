@@ -240,9 +240,10 @@ export default function InboxPage() {
   }, [hideResolved]);
 
   useEffect(() => {
-    setLoading(true);
-    load();
     const id = setInterval(load, 4000);
+    void (async () => {
+      await load();
+    })();
     return () => clearInterval(id);
   }, [load]);
 
@@ -324,7 +325,10 @@ export default function InboxPage() {
         <div style={{ flex: 1 }} />
 
         <button
-          onClick={() => setHideResolved((v) => !v)}
+          onClick={() => {
+            setLoading(true);
+            setHideResolved((v) => !v);
+          }}
           style={{
             padding: "5px 12px",
             fontSize: "var(--fs-sm)",

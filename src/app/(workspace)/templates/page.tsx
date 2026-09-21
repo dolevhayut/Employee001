@@ -44,16 +44,21 @@ export default function TemplatesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    try {
-      const res = await fetch("/api/templates");
-      const data = (await res.json()) as { templates: TemplateRecord[] };
-      setTemplates(data.templates ?? []);
-    } catch {
-      // best-effort
-    } finally {
-      setLoading(false);
-    }
+  // Promise chain (not an async body) so no setState is reachable on a
+  // synchronous path from the mount effect — the updates run only in the async
+  // continuations. Still returns a promise, so `await refresh()` in save() waits.
+  const refresh = useCallback(() => {
+    return fetch("/api/templates")
+      .then((res) => res.json())
+      .then((data) => {
+        setTemplates((data as { templates: TemplateRecord[] }).templates ?? []);
+      })
+      .catch(() => {
+        // best-effort
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {

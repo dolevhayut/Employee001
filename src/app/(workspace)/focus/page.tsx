@@ -21,17 +21,17 @@ const MONO_FONT = "ui-monospace, SFMono-Regular, Menlo, monospace";
 export default function FocusPage() {
   const roster = useRoster();
   const ready = roster.filter((e) => e.twinStatus === "ready");
-  const [employeeId, setEmployeeId] = useState<string>("");
-
-  // Default to the first ready employee once the roster hydrates.
-  useEffect(() => {
-    if (employeeId) return;
-    if (ready[0]?.id) setEmployeeId(ready[0].id);
-  }, [employeeId, ready]);
+  const [selectedId, setSelectedId] = useState<string>("");
+  // Honor an explicit selection, otherwise default to the first ready employee
+  // once the roster hydrates. Derived during render to avoid a mount-time
+  // setState.
+  const employeeId = selectedId || ready[0]?.id || "";
   const [config, setConfig] = useState<FocusConfig>({ prefetches: [] });
-  const [loading, setLoading] = useState(false);
+  // Loading is true whenever there's a twin whose config we're about to fetch.
+  const [loading, setLoading] = useState<boolean>(() => Boolean(employeeId));
   const [editing, setEditing] = useState<{ index: number | null; seed?: Partial<FocusPrefetch> } | null>(null);
 
+  // Used by the mutation flows (save/remove/upsert) to refresh after a write.
   const load = useCallback(async (id: string) => {
     if (!id) return;
     setLoading(true);
@@ -40,9 +40,25 @@ export default function FocusPage() {
     setLoading(false);
   }, []);
 
+  // Show the loading state as soon as the active twin changes (adjusting state
+  // during render instead of synchronously inside the effect below).
+  const [prevLoadId, setPrevLoadId] = useState(employeeId);
+  if (employeeId !== prevLoadId) {
+    setPrevLoadId(employeeId);
+    setLoading(Boolean(employeeId));
+  }
+
+  // Fetch the active twin's config when it changes. setStates live in the
+  // promise callback (async), so no synchronous setState in the effect body.
   useEffect(() => {
-    load(employeeId);
-  }, [employeeId, load]);
+    if (!employeeId) return;
+    fetch(`/api/twin-focus/${employeeId}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data: FocusConfig) => {
+        setConfig(data);
+        setLoading(false);
+      });
+  }, [employeeId]);
 
   async function save(prefetches: FocusPrefetch[]) {
     const r = await fetch(`/api/twin-focus/${employeeId}`, {
@@ -111,7 +127,7 @@ export default function FocusPage() {
               return (
                 <button
                   key={e.id}
-                  onClick={() => setEmployeeId(e.id)}
+                  onClick={() => setSelectedId(e.id)}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -155,7 +171,7 @@ export default function FocusPage() {
             <p style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", margin: 0, lineHeight: 1.55 }}>
               Run Composio tool calls automatically before each shift to pre-load
               {employee ? ` ${employee.firstName ?? employee.name}'s` : ""} world state.
-              Cached results feed straight into the agent's first turn.
+              Cached results feed straight into the agent&apos;s first turn.
             </p>
           </div>
 

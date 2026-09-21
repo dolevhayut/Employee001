@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, type ThreeElements } from "@react-three/fiber";
 import {
   Float,
@@ -122,17 +122,25 @@ function TwinOrb() {
   );
 
   useFrame((state) => {
-    uniforms.uTime.value = state.clock.elapsedTime;
+    // Drive the live uniforms through the material ref (Three.js owns and
+    // mutates that object) rather than the memoized `uniforms` value, which
+    // React treats as immutable after render. Same object either way — r3f
+    // assigns our `uniforms` to `material.uniforms` — so the shader is
+    // updated identically.
+    const u = mat.current?.uniforms;
+    if (u) {
+      u.uTime.value = state.clock.elapsedTime;
+      u.uLightPos.value.set(
+        2.0 + state.pointer.x * 1.5,
+        1.5 + state.pointer.y * 1.2,
+        3.0,
+      );
+    }
     if (mesh.current) {
       mesh.current.rotation.y += 0.0018;
       mesh.current.rotation.x =
         Math.sin(state.clock.elapsedTime * 0.15) * 0.05;
     }
-    uniforms.uLightPos.value.set(
-      2.0 + state.pointer.x * 1.5,
-      1.5 + state.pointer.y * 1.2,
-      3.0,
-    );
   });
 
   return (
@@ -161,7 +169,10 @@ function TwinOrb() {
 }
 
 function OrbitalArcs() {
-  const arcs = useMemo(() => {
+  // Random radii are generated once via a lazy initial state (useMemo is not
+  // allowed to call impure functions like Math.random); the arcs then stay
+  // stable across renders, exactly as before.
+  const [arcs] = useState(() => {
     const out: Array<{
       points: THREE.Vector3[];
       rotation: [number, number, number];
@@ -181,7 +192,7 @@ function OrbitalArcs() {
       out.push({ points: pts, rotation: tilt });
     }
     return out;
-  }, []);
+  });
 
   const group = useRef<THREE.Group>(null!);
   useFrame((state) => {
@@ -208,7 +219,10 @@ function OrbitalArcs() {
 }
 
 function Constellation({ count = 220 }: { count?: number }) {
-  const positions = useMemo(() => {
+  // Particle positions are generated once via a lazy initial state (useMemo
+  // may not call impure functions like Math.random) and stay stable across
+  // renders — the count prop is fixed for this component's lifetime.
+  const [positions] = useState(() => {
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
       const r = 2.4 + Math.random() * 2.5;
@@ -219,7 +233,7 @@ function Constellation({ count = 220 }: { count?: number }) {
       arr[i * 3 + 2] = (Math.random() - 0.5) * 1.5;
     }
     return arr;
-  }, [count]);
+  });
 
   const pts = useRef<THREE.Points>(null!);
   useFrame((state) => {

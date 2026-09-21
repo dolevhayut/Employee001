@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  useSyncExternalStore,
+} from "react";
 import { Star } from "iconoir-react";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
@@ -22,6 +28,55 @@ const MARKETPLACE_ID_PREFIX = "marketplace-";
 type FilterKey = "all" | TwinStatus | "favorites";
 
 const FAVORITES_KEY = "employee001.favorites.v1";
+
+// Favorites live in localStorage and are shared as an external store so the
+// client can hydrate from them without a mount-time setState. getSnapshot
+// caches by the raw string, so the returned Set keeps a stable identity until
+// the stored value actually changes (required by useSyncExternalStore).
+const favoritesListeners = new Set<() => void>();
+let favoritesCache: { raw: string; set: Set<string> } | null = null;
+const FAVORITES_SERVER_SNAPSHOT: Set<string> = new Set();
+
+function favoritesSubscribe(cb: () => void): () => void {
+  favoritesListeners.add(cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    favoritesListeners.delete(cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+function favoritesSnapshot(): Set<string> {
+  let raw = "";
+  try {
+    raw = localStorage.getItem(FAVORITES_KEY) ?? "";
+  } catch {
+    raw = "";
+  }
+  if (!favoritesCache || favoritesCache.raw !== raw) {
+    let set: Set<string>;
+    try {
+      set = new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      set = new Set();
+    }
+    favoritesCache = { raw, set };
+  }
+  return favoritesCache.set;
+}
+
+function favoritesServerSnapshot(): Set<string> {
+  return FAVORITES_SERVER_SNAPSHOT;
+}
+
+function writeFavorites(next: Set<string>): void {
+  try {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify([...next]));
+  } catch {
+    // ignore
+  }
+  favoritesListeners.forEach((cb) => cb());
+}
 
 function relativeTime(iso?: string): string {
   if (!iso) return "—";
@@ -831,6 +886,9 @@ function InvitePanel({
   }, []);
 
   const pending = invites.filter((i) => !i.completedAt);
+  // Snapshot "now" once for this panel's lifetime — expiry is measured in
+  // days, so a per-render clock read would be needless (and impure in render).
+  const [now] = useState(() => Date.now());
 
   async function createInvite() {
     setCreating(true);
@@ -1296,7 +1354,6 @@ function InvitePanel({
       {pending.length > 0 ? (
         <div className="card" style={{ padding: "var(--sp-20)" }}>
           {(() => {
-            const now = Date.now();
             const expiredCount = pending.filter(
               (i) => new Date(i.expiresAt).getTime() < now,
             ).length;
@@ -1378,7 +1435,7 @@ function InvitePanel({
               const url = inviteUrl(inv.token);
               const copied = copiedToken === inv.token;
               const started = !!inv.employeeId;
-              const expired = new Date(inv.expiresAt).getTime() < Date.now();
+              const expired = new Date(inv.expiresAt).getTime() < now;
               const status = started
                 ? { cls: "success", label: "In progress", color: "var(--success)" }
                 : expired
@@ -1576,7 +1633,11 @@ export default function EmployeesPage() {
 
   const [filter, setFilter] = useState<FilterKey>("all");
   const [query, setQuery] = useState("");
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const favorites = useSyncExternalStore(
+    favoritesSubscribe,
+    favoritesSnapshot,
+    favoritesServerSnapshot,
+  );
   const [allEmployees, setAllEmployees] = useState<EmployeeWithTwin[]>(EMPLOYEES_WITH_TWIN);
   const [tab, setTab] = useState<"people" | "org" | "invites">("people");
 
@@ -1593,31 +1654,11 @@ export default function EmployeesPage() {
       .catch(() => {/* fallback to static */});
   }, []);
 
-  // Hydrate favorites from localStorage
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(FAVORITES_KEY);
-      if (raw) {
-        const arr = JSON.parse(raw) as string[];
-        setFavorites(new Set(arr));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
   const toggleFavorite = useCallback((id: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      try {
-        localStorage.setItem(FAVORITES_KEY, JSON.stringify([...next]));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
+    const next = new Set(favoritesSnapshot());
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    writeFavorites(next);
   }, []);
 
   const stats = useMemo(() => {

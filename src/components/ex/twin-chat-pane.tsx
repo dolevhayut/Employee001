@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
@@ -120,6 +126,22 @@ type Props = {
   onOpenFile: (name: string) => void;
   employeeId?: string;
 };
+
+/**
+ * A stable callback that always invokes the latest `fn`. Because it's a hook,
+ * the compiler treats its return value as opaque — the internal ref read stays
+ * behind the hook boundary, so callers (e.g. a rendered list) can reference the
+ * returned handler without the ref access leaking into their render scope.
+ */
+function useEventCallback<A extends unknown[]>(
+  fn: (...args: A) => void,
+): (...args: A) => void {
+  const ref = useRef(fn);
+  useEffect(() => {
+    ref.current = fn;
+  });
+  return useCallback((...args: A) => ref.current(...args), []);
+}
 
 /**
  * Pulls the <attached>…</attached> scaffolding back out of a user message
@@ -637,21 +659,36 @@ function useTTS() {
 
   useEffect(() => () => { stopRef.current(); }, []);
 
-  return { playingId, loadingId, play, stopRef };
+  return { playingId, loadingId, play, stop, stopRef };
 }
 
 // ─── Voice hook ───────────────────────────────────────────────────────────────
 
 type VoiceModeState = "idle" | "listening" | "processing";
 
+// SpeechRecognition support is a client-only, constant fact. Reading it through
+// an external store lets the client resolve it on hydration without a
+// mount-time setState (the server snapshot is false to match SSR).
+function speechSupportedSubscribe(): () => void {
+  return () => {};
+}
+
+function speechSupportedSnapshot(): boolean {
+  return "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
+}
+
+function speechSupportedServerSnapshot(): boolean {
+  return false;
+}
+
 function useVoiceMode(onTranscript: (text: string) => void) {
   const [voiceState, setVoiceState] = useState<VoiceModeState>("idle");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const [supported, setSupported] = useState(false);
-
-  useEffect(() => {
-    setSupported("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
-  }, []);
+  const supported = useSyncExternalStore(
+    speechSupportedSubscribe,
+    speechSupportedSnapshot,
+    speechSupportedServerSnapshot,
+  );
 
   const start = useCallback(() => {
     if (!supported || typeof window === "undefined") return;
@@ -828,13 +865,21 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       setTimeout(() => setCopiedId((curr) => (curr === id ? null : curr)), 1400);
     }
   }, []);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  // Loading is true whenever there's a twin whose history we're about to fetch.
+  const [historyLoading, setHistoryLoading] = useState<boolean>(() =>
+    Boolean(employeeId),
+  );
   const [inputFocused, setInputFocused] = useState(false);
   const sessionIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const { playingId, loadingId, play, stopRef } = useTTS();
-  const submitRef = useRef<(q: string) => void>(() => {});
+  const { playingId, loadingId, play, stop, stopRef } = useTTS();
+  const submitRef = useRef<
+    (
+      question: string,
+      retry?: { existingComposed: string; afterUserId: string },
+    ) => void
+  >(() => {});
 
   const roster = useRoster();
   const employee = roster.find((e) => e.id === employeeId);
@@ -849,15 +894,23 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  useEffect(() => {
+  // Reset the thread when the active twin changes (adjusting state during render
+  // rather than synchronously inside the fetch effect below). The imperative
+  // teardown (abort/stop/session) stays in the effect.
+  const [prevChatEmployeeId, setPrevChatEmployeeId] = useState(employeeId);
+  if (employeeId !== prevChatEmployeeId) {
+    setPrevChatEmployeeId(employeeId);
     setMessages([]);
     setInput("");
+    setHistoryLoading(Boolean(employeeId));
+  }
+
+  useEffect(() => {
     sessionIdRef.current = null;
     abortRef.current?.abort();
     stopRef.current();
     if (!employeeId) return;
 
-    setHistoryLoading(true);
     fetch(`/api/employees/${employeeId}/chat-history`)
       .then((r) => r.json())
       .then((stored: Array<{
@@ -1095,6 +1148,15 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
   );
 
   useEffect(() => { submitRef.current = submit; }, [submit]);
+
+  // Stable handlers for the message list. useEventCallback keeps the submit
+  // access behind a hook boundary so the list JSX never touches a ref in render.
+  const handleRetry = useEventCallback((existingComposed: string, afterUserId: string) => {
+    submit("", { existingComposed, afterUserId });
+  });
+  const handleFollowup = useEventCallback((text: string) => {
+    submit(text);
+  });
 
   return (
     <div
@@ -1351,7 +1413,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       </span>
                       <button
                         type="button"
-                        onClick={() => submit("", { existingComposed: m.text, afterUserId: m.id })}
+                        onClick={() => handleRetry(m.text, m.id)}
                         title="Retry — re-run with the same message"
                         style={{
                           display: "inline-flex", alignItems: "center", gap: "var(--sp-4)",
@@ -1541,7 +1603,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                     )}
                     <button
                       onClick={() => {
-                        if (playingId === m.id) { stopRef.current(); }
+                        if (playingId === m.id) { stop(); }
                         else { play(m.id, m.text, resolveVoiceId(employeeId ?? "", roster)); }
                       }}
                       disabled={loadingId === m.id}
@@ -1626,7 +1688,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       <button
                         key={s}
                         type="button"
-                        onClick={() => submit(s)}
+                        onClick={() => handleFollowup(s)}
                         disabled={isStreaming}
                         style={{
                           padding: "7px 14px",

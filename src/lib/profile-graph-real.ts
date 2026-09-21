@@ -50,7 +50,7 @@ function parseFrontmatter(raw: string): {
     const kvMatch = line.match(/^([a-zA-Z_]+):\s*(.+)$/);
     if (!kvMatch) continue;
     const key = kvMatch[1];
-    let value = kvMatch[2].trim();
+    const value = kvMatch[2].trim();
 
     // List literal: [a, b, c]
     if (value.startsWith("[") && value.endsWith("]")) {

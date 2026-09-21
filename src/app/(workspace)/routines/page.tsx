@@ -57,7 +57,10 @@ export default function RoutinesPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    // Kick off the initial load, then poll every 4s. The first call is run
+    // inside an async wrapper so its (post-await) setState lands in an async
+    // continuation rather than synchronously in the effect body.
+    void (async () => { await load(); })();
     const id = setInterval(load, 4000);
     return () => clearInterval(id);
   }, [load]);
@@ -83,7 +86,7 @@ export default function RoutinesPage() {
   // actually completed.
   const [running, setRunning] = useState<Set<string>>(new Set());
 
-  async function runNow(id: string) {
+  const runNow = useCallback(async (id: string) => {
     if (running.has(id)) return;
     setRunning((prev) => new Set(prev).add(id));
     try {
@@ -134,7 +137,7 @@ export default function RoutinesPage() {
       }
     };
     setTimeout(tick, 2500);
-  }
+  }, [running, load]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
@@ -475,18 +478,26 @@ function RoutineDetailModal({
       .catch(() => {});
   }, [routine.kind, routine.employeeId]);
 
+  // Reset the per-run view state the moment the selected run changes. Doing
+  // this during render (instead of in an effect) clears the stale archive and
+  // activity log before the new run loads, without the extra commit + cascading
+  // render that a synchronous setState-in-effect would trigger.
+  const [viewedRunId, setViewedRunId] = useState(selectedRunId);
+  if (viewedRunId !== selectedRunId) {
+    setViewedRunId(selectedRunId);
+    setShiftData(null);
+    setEvents(null);
+    setShowLog(false);
+  }
+
   // Load the archive for the selected run.
   useEffect(() => {
     if (routine.kind !== "shift" || !selectedRunId) return;
-    setShiftData(null);
     fetch(`/api/shifts/${selectedRunId}`, { cache: "no-store" })
       .then((r) => (r.ok ? (r.json() as Promise<ShiftArchiveData>) : null))
       .then((d) => { if (d) setShiftData(d); })
       .catch(() => {});
   }, [routine.kind, selectedRunId]);
-
-  // Reset the activity log when switching runs.
-  useEffect(() => { setEvents(null); setShowLog(false); }, [selectedRunId]);
 
   async function loadEvents() {
     setShowLog(true);
@@ -1044,12 +1055,13 @@ function CreateRoutineModal({
   const ready = roster.filter((e) => e.twinStatus === "ready");
   const [employeeId, setEmployeeId] = useState<string>(ready[0]?.id ?? roster[0]?.id ?? "");
 
-  // Sync default when roster hydrates after mount (initial render had an empty roster).
-  useEffect(() => {
-    if (employeeId) return;
+  // Sync default when roster hydrates after mount (initial render had an empty
+  // roster). Done during render rather than in an effect so the default lands in
+  // the same commit the roster arrives, with no extra cascading render.
+  if (!employeeId) {
     const next = ready[0]?.id ?? roster[0]?.id;
     if (next) setEmployeeId(next);
-  }, [employeeId, ready, roster]);
+  }
   const [name, setName] = useState("");
   const [task, setTask] = useState("");
   const [scheduleType, setScheduleType] = useState<"daily" | "weekly" | "interval" | "cron">("daily");
@@ -1213,8 +1225,8 @@ function CreateRoutineModal({
                 tasks from other twins — and picks its own actions.
               </div>
               <div>
-                State <strong>accumulates across runs</strong>: today's decisions and
-                learnings are visible to tomorrow's shift. For continuous
+                State <strong>accumulates across runs</strong>: today&apos;s decisions and
+                learnings are visible to tomorrow&apos;s shift. For continuous
                 autonomy, use <em>Every N min</em> with a small interval.
               </div>
             </div>

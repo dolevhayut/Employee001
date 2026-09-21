@@ -1508,9 +1508,10 @@ function OrgBrainModal({
   const [error, setError] = useState<string | null>(null);
 
   // Auto-fill slug from label when creating.
-  useEffect(() => {
-    if (!isEdit && label && !slug) {
-      const auto = label
+  const handleLabelChange = (next: string) => {
+    setLabel(next);
+    if (!isEdit && next && !slug) {
+      const auto = next
         .toLowerCase()
         .trim()
         .replace(/[^a-z0-9_-]+/g, "-")
@@ -1518,8 +1519,7 @@ function OrgBrainModal({
         .slice(0, 80);
       if (auto) setSlug(auto);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [label]);
+  };
 
   async function save() {
     setSaving(true);
@@ -1600,7 +1600,7 @@ function OrgBrainModal({
             <Field
               label="Label"
               value={label}
-              onChange={setLabel}
+              onChange={handleLabelChange}
               placeholder="Pricing Policy — Q2 2026"
             />
             <Field

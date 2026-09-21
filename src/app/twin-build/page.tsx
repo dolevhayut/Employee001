@@ -239,118 +239,6 @@ function TwinBuildContent() {
     }
   }, []);
 
-  /**
-   * Open an SSE EventSource against the build's events.jsonl tail. The build
-   * itself runs detached on the server — closing this stream just stops the
-   * UI from listening; the runner keeps going.
-   */
-  const attachToBuild = useCallback(
-    (buildId: string, options: { reset?: boolean; resuming?: boolean } = {}) => {
-      if (!employee) return;
-      closeStream();
-
-      if (options.reset !== false) {
-        setFiles(emptyFileMap());
-        setFeed([]);
-        setNarration("");
-        setCostUsd(0);
-        setTurns(0);
-        setStoppedReason("");
-        setErrorMsg("");
-        setRecorded(null);
-        setActiveFile(null);
-        setActiveToolkits([]);
-      }
-
-      setActiveBuildId(buildId);
-      setReattached(Boolean(options.resuming));
-      startedAtRef.current = Date.now();
-      setPhase("running");
-
-      const es = new EventSource(
-        `/api/twin-builder/${employee.id}/stream?buildId=${encodeURIComponent(
-          buildId
-        )}`
-      );
-      eventSourceRef.current = es;
-
-      es.onmessage = (msg) => {
-        try {
-          const evt = JSON.parse(msg.data) as TwinBuilderEvent;
-          handleEvent(evt);
-        } catch {
-          /* skip malformed line */
-        }
-      };
-      es.onerror = () => {
-        // Browser will retry automatically. If we already saw `done`, the
-        // server closed cleanly and this fires harmlessly. If the server is
-        // still up but the runner is gone (sentinel cleared), the route will
-        // close after sending a synthetic `done` — also fine.
-      };
-    },
-    [employee, closeStream]
-  );
-
-  /** Click "Start build" — POSTs to spawn the runner, then attaches. */
-  const start = useCallback(async () => {
-    if (!employee || phase === "running") return;
-    let res: Response;
-    try {
-      res = await fetch(`/api/twin-builder/${employee.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ceoContext, lookbackDays }),
-      });
-    } catch (err) {
-      setPhase("error");
-      setErrorMsg((err as Error).message ?? "Request failed");
-      return;
-    }
-    if (!res.ok) {
-      setPhase("error");
-      setErrorMsg(`Request failed: ${res.status}`);
-      return;
-    }
-    const data = (await res.json()) as {
-      buildId: string;
-      alreadyRunning: boolean;
-    };
-    attachToBuild(data.buildId, {
-      reset: true,
-      resuming: data.alreadyRunning,
-    });
-  }, [employee, ceoContext, phase, attachToBuild]);
-
-  /**
-   * On mount: probe `/active`. If a build is already running for this
-   * employee, reattach automatically — the CEO sees the live feed picking up
-   * mid-stride instead of the empty preflight state.
-   */
-  useEffect(() => {
-    if (!employee) return;
-    let cancelled = false;
-    fetch(`/api/twin-builder/${employee.id}/active`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then(
-        (data: {
-          active: { buildId: string; startedAt: string } | null;
-        }) => {
-          if (cancelled || !data.active) return;
-          attachToBuild(data.active.buildId, { reset: true, resuming: true });
-        }
-      )
-      .catch(() => {
-        /* probe failed — show preflight as usual */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [employee, attachToBuild]);
-
-  // Tear down the EventSource on unmount.
-  useEffect(() => closeStream, [closeStream]);
-
   const handleEvent = useCallback((evt: TwinBuilderEvent) => {
     switch (evt.type) {
       case "start":
@@ -500,6 +388,118 @@ function TwinBuildContent() {
   }, []);
 
   /**
+   * Open an SSE EventSource against the build's events.jsonl tail. The build
+   * itself runs detached on the server — closing this stream just stops the
+   * UI from listening; the runner keeps going.
+   */
+  const attachToBuild = useCallback(
+    (buildId: string, options: { reset?: boolean; resuming?: boolean } = {}) => {
+      if (!employee) return;
+      closeStream();
+
+      if (options.reset !== false) {
+        setFiles(emptyFileMap());
+        setFeed([]);
+        setNarration("");
+        setCostUsd(0);
+        setTurns(0);
+        setStoppedReason("");
+        setErrorMsg("");
+        setRecorded(null);
+        setActiveFile(null);
+        setActiveToolkits([]);
+      }
+
+      setActiveBuildId(buildId);
+      setReattached(Boolean(options.resuming));
+      startedAtRef.current = Date.now();
+      setPhase("running");
+
+      const es = new EventSource(
+        `/api/twin-builder/${employee.id}/stream?buildId=${encodeURIComponent(
+          buildId
+        )}`
+      );
+      eventSourceRef.current = es;
+
+      es.onmessage = (msg) => {
+        try {
+          const evt = JSON.parse(msg.data) as TwinBuilderEvent;
+          handleEvent(evt);
+        } catch {
+          /* skip malformed line */
+        }
+      };
+      es.onerror = () => {
+        // Browser will retry automatically. If we already saw `done`, the
+        // server closed cleanly and this fires harmlessly. If the server is
+        // still up but the runner is gone (sentinel cleared), the route will
+        // close after sending a synthetic `done` — also fine.
+      };
+    },
+    [employee, closeStream, handleEvent]
+  );
+
+  /** Click "Start build" — POSTs to spawn the runner, then attaches. */
+  const start = useCallback(async () => {
+    if (!employee || phase === "running") return;
+    let res: Response;
+    try {
+      res = await fetch(`/api/twin-builder/${employee.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ceoContext, lookbackDays }),
+      });
+    } catch (err) {
+      setPhase("error");
+      setErrorMsg((err as Error).message ?? "Request failed");
+      return;
+    }
+    if (!res.ok) {
+      setPhase("error");
+      setErrorMsg(`Request failed: ${res.status}`);
+      return;
+    }
+    const data = (await res.json()) as {
+      buildId: string;
+      alreadyRunning: boolean;
+    };
+    attachToBuild(data.buildId, {
+      reset: true,
+      resuming: data.alreadyRunning,
+    });
+  }, [employee, ceoContext, phase, attachToBuild]);
+
+  /**
+   * On mount: probe `/active`. If a build is already running for this
+   * employee, reattach automatically — the CEO sees the live feed picking up
+   * mid-stride instead of the empty preflight state.
+   */
+  useEffect(() => {
+    if (!employee) return;
+    let cancelled = false;
+    fetch(`/api/twin-builder/${employee.id}/active`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then(
+        (data: {
+          active: { buildId: string; startedAt: string } | null;
+        }) => {
+          if (cancelled || !data.active) return;
+          attachToBuild(data.active.buildId, { reset: true, resuming: true });
+        }
+      )
+      .catch(() => {
+        /* probe failed — show preflight as usual */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [employee, attachToBuild]);
+
+  // Tear down the EventSource on unmount.
+  useEffect(() => closeStream, [closeStream]);
+
+  /**
    * "Stop watching" — closes the EventSource so the UI returns to idle.
    * The build itself keeps running on the server. The CEO can come back
    * any time and the on-mount probe will reattach.
@@ -569,7 +569,7 @@ function TwinBuildContent() {
             textDecoration: "none",
           }}
         >
-          ← {employee.firstName}'s profile
+          ← {employee.firstName}&apos;s profile
         </Link>
         <div style={{ flex: 1 }}>
           <div className="row" style={{ gap: "var(--sp-10)", alignItems: "center" }}>
@@ -995,34 +995,42 @@ function FilePreview({
   employeeId: string;
 }) {
   const [diskBody, setDiskBody] = useState<string>("");
-  const [loading, setLoading] = useState(false);
+  // Tracks which fetch target `diskBody` reflects; lets us derive `loading`
+  // (true while a disk fetch is in flight) without a synchronous setState in
+  // the effect below.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+
+  const shouldFetch = !state.content && state.status !== "pending";
+  const fetchKey = `${employeeId}::${filename}::${state.status}`;
+  const loading = shouldFetch && loadedKey !== fetchKey;
+
+  // When streamed content is present (or the file is still pending) we don't
+  // show disk content — clear any cached disk body during render rather than
+  // with a synchronous setState inside the effect.
+  if (!shouldFetch && diskBody !== "") {
+    setDiskBody("");
+  }
 
   // If we don't have content from a streamed file_writing event, fetch from disk.
   useEffect(() => {
-    if (state.content) {
-      setDiskBody("");
-      return;
-    }
-    if (state.status === "pending") {
-      setDiskBody("");
-      return;
-    }
+    if (!shouldFetch) return;
     let cancelled = false;
-    setLoading(true);
     fetch(`/api/employees/${employeeId}/file/${filename}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled) return;
-        const body =
+        const fetched =
           (data && (data.body || data.markdown || data.content)) ?? "";
-        setDiskBody(typeof body === "string" ? body : "");
+        setDiskBody(typeof fetched === "string" ? fetched : "");
       })
       .catch(() => {})
-      .finally(() => !cancelled && setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoadedKey(fetchKey);
+      });
     return () => {
       cancelled = true;
     };
-  }, [filename, state.status, state.content, employeeId]);
+  }, [filename, state.status, state.content, employeeId, shouldFetch, fetchKey]);
 
   const body = state.content || diskBody;
 
@@ -1135,7 +1143,7 @@ function PreFlight({
           margin: "8px 0 4px",
         }}
       >
-        Build {employee.firstName}'s twin from connected systems
+        Build {employee.firstName}&apos;s twin from connected systems
       </h1>
       <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6 }}>
         Sonnet 4.6 will plan a research path across the systems {employee.firstName}{" "}

@@ -130,7 +130,7 @@ export function spawnDetachedBuild(args: {
 
   let eventCount = 0;
   let filesWrittenCount = 0;
-  let lastCostUsd = 0;
+  const lastCostUsd = 0;
 
   const onEvent = (event: TwinBuilderEvent) => {
     eventCount += 1;

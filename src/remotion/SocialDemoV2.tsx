@@ -196,7 +196,7 @@ function HookScene() {
         >
           Your best people
           <br />
-          <span style={{ color: p.muted }}>can't clone themselves.</span>
+          <span style={{ color: p.muted }}>can&apos;t clone themselves.</span>
         </div>
 
         <div

@@ -305,6 +305,10 @@ function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
 
 function LineageCard({ employee }: { employee: EmployeeWithTwin }) {
   const lineage = employee.lineage;
+  // Snapshot "now" once for this card's life — the window is measured in months,
+  // so a per-render clock read would only be render-impure without changing what
+  // the user sees.
+  const [nowMs] = useState(() => Date.now());
 
   if (!lineage || lineage.sources.length === 0) {
     return (
@@ -326,7 +330,7 @@ function LineageCard({ employee }: { employee: EmployeeWithTwin }) {
     lineage.sources[0].fromDate
   );
   const windowMonths = Math.round(
-    (Date.now() - new Date(earliest).getTime()) / (1000 * 60 * 60 * 24 * 30)
+    (nowMs - new Date(earliest).getTime()) / (1000 * 60 * 60 * 24 * 30)
   );
 
   return (
@@ -472,11 +476,15 @@ function ProfilePageContent() {
   const [files, setFiles] = useState<FileNode[]>([]);
   const [activeToolkits, setActiveToolkits] = useState<string[]>([]);
 
-  // Reset to overview when switching employee
-  useEffect(() => {
+  // Reset to overview when switching employee. Done during render (the React
+  // "storing information from previous renders" pattern) rather than in an
+  // effect, so the new employee never paints with the previous tab/file.
+  const [prevEmployeeId, setPrevEmployeeId] = useState(employeeId);
+  if (employeeId !== prevEmployeeId) {
+    setPrevEmployeeId(employeeId);
     setTab("overview");
     setSelectedFile(null);
-  }, [employeeId]);
+  }
 
   // Fetch connections
   useEffect(() => {
@@ -982,14 +990,20 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
   const [refreshModel, setRefreshModel] = useState<ClaudeModel>(employee.refreshModel);
   const [saved, setSaved] = useState(false);
 
-  // Hydrate from localStorage on mount
-  useEffect(() => {
+  // Hydrate from localStorage whenever the employee changes (including on mount).
+  // Done during render — React's "adjust state when a prop changes" pattern —
+  // rather than in an effect, so a persisted choice never flashes the prop
+  // default first. localStorage is read client-side only (readStoredModels
+  // swallows the server-side ReferenceError and returns {}).
+  const [hydratedFor, setHydratedFor] = useState<string | null>(null);
+  if (hydratedFor !== employee.id) {
+    setHydratedFor(employee.id);
     const stored = readStoredModels();
     if (stored[employee.id]) {
       setSeedModel(stored[employee.id].seed);
       setRefreshModel(stored[employee.id].refresh);
     }
-  }, [employee.id]);
+  }
 
   function save() {
     const all = readStoredModels();
@@ -1178,10 +1192,16 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
   const [previewingId, setPreviewingId] = useState<string | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  useEffect(() => {
+  // Hydrate the selected voice from localStorage whenever the employee changes
+  // (including on mount). Done during render — React's "adjust state when a prop
+  // changes" pattern — so a persisted choice never flashes the prop default
+  // first. readStoredVoices swallows the server-side ReferenceError.
+  const [voiceHydratedFor, setVoiceHydratedFor] = useState<string | null>(null);
+  if (voiceHydratedFor !== employee.id) {
+    setVoiceHydratedFor(employee.id);
     const stored = readStoredVoices();
     if (stored[employee.id]) setVoiceId(stored[employee.id]);
-  }, [employee.id]);
+  }
 
   useEffect(() => {
     fetch("/api/tts/voices")
@@ -1775,7 +1795,9 @@ function FilesTab({
   }, [employeeId]);
 
   useEffect(() => {
-    void loadKnowledge();
+    void (async () => {
+      await loadKnowledge();
+    })();
   }, [loadKnowledge]);
 
   return (
@@ -2223,13 +2245,24 @@ function FileEditorPane({
     [employeeId]
   );
 
+  // Enter the loading state as soon as a new file is selected. Done during
+  // render — React's "adjust state when a prop changes" pattern — so the reset
+  // isn't a synchronous setState inside the fetch effect below. Matches the
+  // effect's original guard: a null selection leaves the prior state untouched.
+  const [loadingSel, setLoadingSel] = useState<SelectedFile | null>(selected);
+  if (loadingSel !== selected) {
+    setLoadingSel(selected);
+    if (selected) {
+      setLoading(true);
+      setError("");
+      setSavedAt(null);
+    }
+  }
+
   // Load the selected file's body. Both APIs return { body, ... }.
   useEffect(() => {
     if (!selected) return;
     let cancelled = false;
-    setLoading(true);
-    setError("");
-    setSavedAt(null);
     fetch(fileUrl(selected))
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -2431,8 +2464,10 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  // Callers that want the full-list loading state (the post-restore refreshes)
+  // set `loading` themselves before awaiting; on mount it is already true via
+  // the initial state, so this fetch has no synchronous setState of its own.
   const loadBuilds = useCallback(async () => {
-    setLoading(true);
     try {
       const r = await fetch(`/api/employees/${employeeId}/versions/builds`, {
         cache: "no-store",
@@ -2447,7 +2482,9 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
   }, [employeeId]);
 
   useEffect(() => {
-    loadBuilds();
+    void (async () => {
+      await loadBuilds();
+    })();
   }, [loadBuilds]);
 
   const showToast = (msg: string) => {
@@ -2492,6 +2529,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
       const data = (await r.json()) as { ok?: boolean; error?: string };
       if (!data.ok) throw new Error(data.error ?? "restore failed");
       showToast(`${filename} restored. Current state saved as a new version.`);
+      setLoading(true);
       await loadBuilds();
     } catch (err) {
       showToast(`Restore failed: ${(err as Error).message}`);
@@ -2522,6 +2560,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
       showToast(
         `Twin restored to v${version} — ${data.restored?.length ?? 0} files replaced.`
       );
+      setLoading(true);
       await loadBuilds();
     } catch (err) {
       showToast(`Restore failed: ${(err as Error).message}`);
@@ -2545,7 +2584,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
           No twin versions yet
         </h2>
         <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: "0 0 14px", lineHeight: 1.55 }}>
-          Each Twin Builder run becomes a version on this timeline. You'll be
+          Each Twin Builder run becomes a version on this timeline. You&apos;ll be
           able to compare versions, restore any past version, or cherry-pick
           individual files across builds.
         </p>

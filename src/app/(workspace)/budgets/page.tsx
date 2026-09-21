@@ -113,12 +113,15 @@ export default function BudgetsPage() {
   const [rows, setRows] = useState<BudgetRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/budgets");
-      if (res.ok) setRows(await res.json());
-    } catch { /* ignore */ }
-    setLoading(false);
+  // Promise chain (not an async body) so no setState is reachable on a
+  // synchronous path from the mount effect — the updates run only in the async
+  // continuations.
+  const load = useCallback(() => {
+    return fetch("/api/budgets")
+      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then((data) => setRows(data as BudgetRow[]))
+      .catch(() => { /* ignore */ })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { void load(); }, [load]);

@@ -70,7 +70,7 @@ function StepOrg({
         Set up your workspace.
       </h1>
       <p style={{ fontSize: "var(--fs-body)", color: "#9A9490", margin: "0 0 48px", fontWeight: 400 }}>
-        A few details and you're in.
+        A few details and you&apos;re in.
       </p>
 
       <div style={{ marginBottom: "var(--sp-36)" }}>
@@ -181,10 +181,10 @@ function StepReason({
           lineHeight: 1.2,
         }}
       >
-        What's the main goal?
+        What&apos;s the main goal?
       </h1>
       <p style={{ fontSize: "var(--fs-body)", color: "#9A9490", margin: "0 0 40px", fontWeight: 400 }}>
-        We'll tailor your workspace accordingly.
+        We&apos;ll tailor your workspace accordingly.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-12)" }}>
