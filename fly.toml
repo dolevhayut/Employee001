@@ -1,0 +1,34 @@
+# Single-tenant Employee001 on Fly.io. One app + one volume + one Machine per org.
+# See docs/DEPLOY-CLOUD.md. Copy per org and change `app`, region, and APP_URL.
+app = "employee001-example"        # change per org — must be globally unique
+primary_region = "fra"             # pick the Fly region nearest the org
+
+[build]
+
+[env]
+  PORT = "8080"
+  HOSTNAME = "0.0.0.0"
+  EMPLOYEE001_BIND = "0.0.0.0"
+  # APP_URL = "https://dolev.employee001.app"   # set once the base-URL change (Phase 4) lands
+
+[mounts]
+  source = "e001_data"
+  destination = "/app/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Single always-on writer: the app takes a data-dir lock. Do NOT autoscale.
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 50
+    soft_limit = 40
+
+# Keep exactly one Machine against the volume — two writers would corrupt state.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

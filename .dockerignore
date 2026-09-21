@@ -1,0 +1,17 @@
+# Never send secrets, org data, or build output into the image context.
+# The image builds node_modules and .next from source inside the container.
+node_modules
+.next
+data
+.env
+.env.*
+.git
+.gitignore
+*.log
+.DS_Store
+.claude
+.memory-bench
+docs/local
+docs/screenshots
+coverage
+npm-debug.log*

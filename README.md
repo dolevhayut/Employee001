@@ -248,6 +248,21 @@ Invite tokens are carve-outs — they bypass the LAN gate for `/join`, `/onboard
 > [!WARNING]
 > Use a firewall or [Tailscale](https://tailscale.com). The token gates HTTP access, but the app is not hardened for the public internet. **Don't put this on a port-forwarded box.**
 
+## Run your own cloud instance
+
+Need remote employees to reach their twins when they're off the office network? Deploy a **single-tenant** instance to an always-on host — **your** infrastructure, **your** data. Not a multi-tenant SaaS.
+
+- **Isolation by deployment** — one org = one container + one persistent volume + its own secrets + its own subdomain. The storage model doesn't change: `data/` just lives on a mounted volume, so there's no database to migrate to.
+- **Recommended stack:** [Fly.io](https://fly.io) — a single always-on Machine + persistent volume + per-app secrets + free TLS. **Not** Vercel or any serverless host: the filesystem is ephemeral there, so SQLite and the `data/` tree won't survive.
+- **Zero-loss migration** from a local install using the same `export` / `import` your backups already use.
+
+> [!WARNING]
+> The app isn't hardened for the open internet yet. For a first deploy, keep it private (Fly private networking / [Tailscale](https://tailscale.com)) or put real auth in front — don't expose a public route until the access gate is hardened.
+
+**Full runbook** — `Dockerfile`, `fly.toml`, migration steps, and a per-org security checklist: **[docs/DEPLOY-CLOUD.md](./docs/DEPLOY-CLOUD.md)**.
+
+This is the DIY version of our **Professional onboarding** — [we can deploy and manage it for your org](mailto:office@bulldog-adv.com).
+
 ## Commands
 
 | Command | What it does |
