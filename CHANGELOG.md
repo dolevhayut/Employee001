@@ -25,6 +25,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `fly.toml`, runbook in `docs/DEPLOY-CLOUD.md`.
 
 ### Changed
+- **New app typeface: Geist** everywhere, with **Geist Mono** for code, IDs
+  and numbers. Instrument Serif stays as the display serif.
 - Twin models upgraded to the Claude 5 family (Opus 5, Sonnet 5).
 - Expanded the memory tokenizer's stopword list so question scaffolding
   ("how do we", "what is our") no longer counts as topical overlap.

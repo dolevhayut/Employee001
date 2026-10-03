@@ -35,7 +35,7 @@ function SourceRow({ source, index }: { source: ProfileSource["sources"][0]; ind
           padding: "3px 9px",
           borderRadius: 100,
           marginTop: "var(--sp-1)",
-          fontFamily: '"Manrope", sans-serif',
+          fontFamily: 'var(--font-geist), sans-serif',
           textTransform: "uppercase" as const,
           border: isHuman ? "none" : "1px solid #DDD8D0",
         }}
@@ -98,7 +98,7 @@ function ProfileCard({ profile }: { profile: ProfileSource }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          fontFamily: '"Manrope", sans-serif',
+          fontFamily: 'var(--font-geist), sans-serif',
           textAlign: "left" as const,
         }}
       >
@@ -203,7 +203,7 @@ export default function SourcesPage() {
       style={{
         minHeight: "100vh",
         background: "#F5F2ED",
-        fontFamily: '"Manrope", sans-serif',
+        fontFamily: 'var(--font-geist), sans-serif',
       }}
     >
       {/* Top bar */}

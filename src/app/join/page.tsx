@@ -39,7 +39,7 @@ type CompleteSnapshot = {
 
 // Fonts loaded at the root layout (src/app/layout.tsx).
 const SANS_FONT =
-  'var(--font-manrope), "Manrope", ui-sans-serif, system-ui, sans-serif';
+  'var(--font-geist), ui-sans-serif, system-ui, sans-serif';
 const SERIF_FONT =
   'var(--font-instrument-serif), "Instrument Serif", ui-serif, Georgia, serif';
 

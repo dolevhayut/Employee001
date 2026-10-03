@@ -3,14 +3,14 @@
 import { useRouter } from "next/navigation";
 import { WelcomeHero3D } from "@/components/welcome/WelcomeHero3D";
 
-// Manrope + Instrument Serif are loaded at the root layout
+// Geist + Instrument Serif are loaded at the root layout
 // (src/app/layout.tsx) and exposed as CSS variables. These pages reference
 // them so the brand fonts apply consistently across welcome, join, and the
 // rest of the app.
 const SERIF_FONT =
   'var(--font-instrument-serif), "Instrument Serif", ui-serif, Georgia, serif';
 const SANS_FONT =
-  'var(--font-manrope), "Manrope", ui-sans-serif, system-ui, sans-serif';
+  'var(--font-geist), ui-sans-serif, system-ui, sans-serif';
 
 // Brand palette — drawn from social/main.png + campaign carousels.
 const PALETTE = {

@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 const SERIF_FONT =
   'var(--font-instrument-serif), "Instrument Serif", ui-serif, Georgia, serif';
 const SANS_FONT =
-  'var(--font-manrope), "Manrope", ui-sans-serif, system-ui, sans-serif';
+  'var(--font-geist), ui-sans-serif, system-ui, sans-serif';
 
 type Action = {
   id: "knowledge" | "invite" | "budgets";

@@ -97,7 +97,7 @@ function StepOrg({
             width: "100%",
             padding: "14px 16px",
             fontSize: "var(--fs-lg)",
-            fontFamily: '"Manrope", sans-serif',
+            fontFamily: 'var(--font-geist), sans-serif',
             fontWeight: 400,
             color: "#0A0A0A",
             background: "#FFFFFF",
@@ -136,7 +136,7 @@ function StepOrg({
                 padding: "12px 8px",
                 fontSize: "var(--fs-ui)",
                 fontWeight: 500,
-                fontFamily: '"Manrope", sans-serif',
+                fontFamily: 'var(--font-geist), sans-serif',
                 background: size === s ? "#0A0A0A" : "#FFFFFF",
                 color: size === s ? "#F5F2ED" : "#0A0A0A",
                 border: `1.5px solid ${size === s ? "#0A0A0A" : "#DDD8D0"}`,
@@ -205,7 +205,7 @@ function StepReason({
                 flexDirection: "column",
                 gap: "var(--sp-8)",
                 transition: "all .15s",
-                fontFamily: '"Manrope", sans-serif',
+                fontFamily: 'var(--font-geist), sans-serif',
               }}
             >
               <span
@@ -338,7 +338,7 @@ function StepTheme({
                 flexDirection: "column",
                 gap: 12,
                 textAlign: "left",
-                fontFamily: "Manrope, sans-serif",
+                fontFamily: "var(--font-geist), sans-serif",
                 transition: "0.15s",
               }}
             >
@@ -616,7 +616,7 @@ export default function SetupPage() {
         alignItems: "center",
         justifyContent: "center",
         padding: "40px 24px",
-        fontFamily: '"Manrope", sans-serif',
+        fontFamily: 'var(--font-geist), sans-serif',
       }}
     >
       {/* Wordmark */}
@@ -684,7 +684,7 @@ export default function SetupPage() {
               background: "none",
               border: "none",
               cursor: "pointer",
-              fontFamily: '"Manrope", sans-serif',
+              fontFamily: 'var(--font-geist), sans-serif',
               padding: "4px 0",
             }}
           >
@@ -707,7 +707,7 @@ export default function SetupPage() {
             letterSpacing: "0.08em",
             textTransform: "uppercase",
             cursor: canContinue ? "pointer" : "default",
-            fontFamily: '"Manrope", sans-serif',
+            fontFamily: 'var(--font-geist), sans-serif',
             transition: "background .2s, color .2s",
           }}
         >

@@ -1,16 +1,23 @@
 import type { Metadata } from "next";
-import { Manrope, Instrument_Serif } from "next/font/google";
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
 // Load the brand fonts once at the root so every page — welcome, join,
 // workspace — has access to them via CSS variables. Individual pages
-// reference --font-manrope / --font-instrument-serif rather than re-importing.
+// reference --font-geist / --font-geist-mono / --font-instrument-serif
+// (or the --font / --font-mono / --font-serif tokens) rather than re-importing.
+// Geist and Geist Mono are variable fonts, so every weight is available.
 
-const manrope = Manrope({
+const geist = Geist({
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-manrope",
+  variable: "--font-geist",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-geist-mono",
 });
 
 const instrumentSerif = Instrument_Serif({
@@ -36,7 +43,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${manrope.variable} ${instrumentSerif.variable}`}
+      className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`}
       style={{ height: "100%" }}
     >
       <head>
