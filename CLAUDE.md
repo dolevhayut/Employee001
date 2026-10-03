@@ -34,6 +34,22 @@ watch + verify. Repo-specific details it should honor:
   permanently retired (e.g. `0.1.0` is dead — that's why first stable shipped as
   `0.1.1`). Never reuse a number; always bump forward.
 
+## Dev workflow (gstack)
+
+[gstack](https://github.com/garrytan/gstack) is installed at `~/.claude/skills/gstack`,
+**pinned** to a commit ≥7 days old (same supply-chain rule as npm deps; never team
+mode — it auto-updates hourly). Telemetry off. Loop per change:
+
+- New feature → `/plan-ceo-review` (scope) → `/plan-eng-review` (architecture) → build.
+- Before every push to `main` → `/review`.
+- Before every release tag → `/qa` against the running app (see Node/env note below).
+- Weekly → `/retro`; monthly → `/cso`.
+- gstack's `/ship` assumes a PR flow. This repo works on `main` and releases by tag —
+  use it for its checks, then follow **Releasing** above for the actual publish.
+
+The CTO task board lives in `docs/local/BOARD.md` (gitignored). Daily and nightly
+Claude Code routines read and update it; plans and logs go to `docs/local/cto/`.
+
 ## Conventions
 
 - Work directly on `main` (solo repo) unless asked otherwise.
