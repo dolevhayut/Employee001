@@ -8,6 +8,27 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Twin memory abstains when nothing is relevant.** Recall now passes a
+  relevance gate (keyword overlap or semantic similarity ≥ 0.25) before
+  salience is applied — salience reorders what survived, it no longer
+  qualifies a card on its own. Previously every query injected a full five
+  "memories" into the twin's prompt even when none were on-topic. Escape
+  hatch: `TWIN_MEMORY_RELEVANCE_GATE=0`; floors tunable via
+  `TWIN_MEMORY_MIN_KEYWORD` / `TWIN_MEMORY_MIN_SEMANTIC`.
+- **Optional agentic rerank** (`TWIN_MEMORY_AGENTIC_RERANK=1`). One cheap
+  model call reads the shortlist and keeps only cards about the question's
+  subject (Hebrew + English). On the bench: precision over returned cards
+  0.21 → 0.91 and recall@5 0.81 → 1.0 with Haiku 4.5, at ~1.5s per query.
+  Off by default because it sits ahead of the twin's first token.
+- **One-command single-tenant cloud deploy to Fly.io** — Dockerfile,
+  `fly.toml`, runbook in `docs/DEPLOY-CLOUD.md`.
+
+### Changed
+- Twin models upgraded to the Claude 5 family (Opus 5, Sonnet 5).
+- Expanded the memory tokenizer's stopword list so question scaffolding
+  ("how do we", "what is our") no longer counts as topical overlap.
+
 ## [0.5.0] — 2026-06-27
 
 ### Added

@@ -1,48 +1,18 @@
 {
   "extraction": {
-    "overallRecall": 0.61,
-    "goldHit": 25,
+    "overallRecall": 0.854,
+    "goldHit": 35,
     "goldTotal": 41,
-    "negativePrecision": 0.917,
-    "negativesClean": "11/12",
-    "falsePositiveFactsOnNegatives": 1,
-    "spuriousTypeFactsOnPositives": 0,
+    "negativePrecision": 0.833,
+    "negativesClean": "10/12",
+    "falsePositiveFactsOnNegatives": 4,
+    "spuriousTypeFactsOnPositives": 9,
     "recallByLang": {
-      "en": "0.727 (24/33)",
-      "he": "0 (0/4)",
-      "mixed": "0.25 (1/4)"
+      "en": "0.939 (31/33)",
+      "he": "0.5 (2/4)",
+      "mixed": "0.5 (2/4)"
     },
     "sampleMisses": [
-      {
-        "id": "ex-003",
-        "type": "fact",
-        "gist": "login service uses jwt",
-        "lang": "en"
-      },
-      {
-        "id": "ex-003",
-        "type": "fact",
-        "gist": "requires refresh token rotation",
-        "lang": "en"
-      },
-      {
-        "id": "ex-004",
-        "type": "contact",
-        "gist": "sarah billing integration",
-        "lang": "en"
-      },
-      {
-        "id": "ex-015",
-        "type": "todo",
-        "gist": "book the dentist",
-        "lang": "en"
-      },
-      {
-        "id": "ex-016",
-        "type": "milestone",
-        "gist": "released v2.0 production",
-        "lang": "en"
-      },
       {
         "id": "ex-016",
         "type": "emotional",
@@ -50,35 +20,55 @@
         "lang": "en"
       },
       {
-        "id": "ex-019",
-        "type": "problem",
-        "gist": "problem attachments fail upload",
+        "id": "ex-021",
+        "type": "contact",
+        "gist": "dana soc2 audit",
         "lang": "en"
       },
       {
-        "id": "ex-020",
-        "type": "decision",
-        "gist": "went with zustand state",
-        "lang": "en"
+        "id": "ex-037",
+        "type": "milestone",
+        "gist": "שילחנו הגרסה החדשה לפרודקשן",
+        "lang": "he"
+      },
+      {
+        "id": "ex-038",
+        "type": "contact",
+        "gist": "דנה החיובים והחשבוניות",
+        "lang": "he"
+      },
+      {
+        "id": "ex-039",
+        "type": "todo",
+        "gist": "fix before launch",
+        "lang": "mixed"
+      },
+      {
+        "id": "ex-040",
+        "type": "preference",
+        "gist": "prefer figma over sketch",
+        "lang": "mixed"
       }
     ]
   },
   "retrieval": {
     "queriesScored": 16,
-    "precisionAt5": 0.163,
-    "recallAt5": 0.656,
-    "mrr": 0.404,
+    "precisionAt5": 0.213,
+    "precisionOverReturned": 0.213,
+    "avgCardsReturned": 5,
+    "recallAt5": 0.813,
+    "mrr": 0.496,
     "hard": {
       "n": 5,
-      "P5": 0.16,
-      "R5": 0.8
+      "P5": 0.2,
+      "R5": 1
     },
     "easy": {
       "n": 11,
-      "P5": 0.164,
-      "R5": 0.591
+      "P5": 0.218,
+      "R5": 0.727
     },
-    "emptyRelevant": "0/3 returned no lexically-matching top hit"
+    "emptyRelevantAbstention": "0/3 correctly returned nothing"
   },
   "salienceMath": {
     "checks": [

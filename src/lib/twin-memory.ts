@@ -20,6 +20,17 @@ const REINFORCE_GAIN = 0.5; // how hard repeated recalls boost salience
 const DEFAULT_DEDUP_THRESHOLD = 0.92;
 const DEDUP_SCAN_LIMIT = 200; // only the recent tail is checked for duplicates
 
+// ─── Relevance gate (abstention) ─────────────────────────────────────────────
+// Salience is a MODIFIER, not a qualifier. `ranksByScore` drops zero-score
+// cards, but salience is always > 0 — so before this gate every card earned a
+// salience rank, every card scored > 0, and `searchTwinMemory` always returned
+// a full `limit` of cards. A query with nothing relevant in the corpus still
+// got 5 "memories" injected into the twin's prompt, which it then reasoned
+// over as if they were context. A card must now clear at least one RELEVANCE
+// signal to be eligible; salience only reorders what already survived.
+const DEFAULT_MIN_KEYWORD = 0; // strict floor — default admits any shared non-stopword token
+const DEFAULT_MIN_SEMANTIC = 0.25; // cosine floor; unrelated embedding pairs sit well below this
+
 export type TwinMemorySurface = "chat" | "background" | "council" | "task";
 
 export type TwinMemoryCard = {
@@ -82,6 +93,22 @@ function halfLifeDays(): number {
 function dedupThreshold(): number {
   const raw = Number.parseFloat(process.env.TWIN_MEMORY_DEDUP_THRESHOLD ?? "");
   return Number.isFinite(raw) && raw > 0 && raw <= 1 ? raw : DEFAULT_DEDUP_THRESHOLD;
+}
+
+/** Escape hatch: `TWIN_MEMORY_RELEVANCE_GATE=0` restores pre-gate behaviour
+ *  (always return `limit` cards, ranked by salience when nothing matches). */
+function relevanceGateEnabled(): boolean {
+  return process.env.TWIN_MEMORY_RELEVANCE_GATE !== "0";
+}
+
+function minKeyword(): number {
+  const raw = Number.parseFloat(process.env.TWIN_MEMORY_MIN_KEYWORD ?? "");
+  return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : DEFAULT_MIN_KEYWORD;
+}
+
+function minSemantic(): number {
+  const raw = Number.parseFloat(process.env.TWIN_MEMORY_MIN_SEMANTIC ?? "");
+  return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : DEFAULT_MIN_SEMANTIC;
 }
 
 type EmbeddingResponse = {
@@ -208,13 +235,115 @@ function tokenize(text: string): string[] {
   return matches.filter((token) => !STOPWORDS.has(token));
 }
 
+// Kept deliberately in sync with the list in `org-brain-search.ts` (that module
+// is `server-only`, so it can't be imported here or by the bench harness). The
+// short list this replaced let question scaffolding — "how do we", "what is our"
+// — count as topical overlap: an unrelated query scored 0.42 keyword similarity
+// against a card purely on how/do/we/data/new, which is why recall could not
+// tell a distractor from a match.
 const STOPWORDS = new Set([
+  "about",
+  "after",
+  "again",
+  "all",
+  "also",
+  "any",
+  "because",
+  "been",
+  "before",
+  "being",
+  "between",
+  "both",
+  "but",
+  "can",
+  "cannot",
+  "could",
+  "did",
+  "does",
+  "doing",
+  "done",
+  "down",
+  "during",
+  "each",
+  "from",
+  "get",
+  "gets",
+  "had",
+  "her",
+  "here",
+  "him",
+  "his",
+  "how",
+  "into",
+  "its",
+  "just",
+  "like",
+  "make",
+  "makes",
+  "many",
+  "may",
+  "might",
+  "more",
+  "most",
+  "much",
+  "must",
+  "need",
+  "needs",
+  "new",
+  "not",
+  "now",
+  "off",
+  "one",
+  "only",
+  "onto",
+  "other",
+  "our",
+  "ours",
+  "out",
+  "over",
+  "own",
+  "same",
+  "she",
+  "should",
+  "some",
+  "such",
+  "than",
+  "their",
+  "them",
+  "then",
+  "there",
+  "these",
+  "they",
+  "those",
+  "through",
+  "too",
+  "under",
+  "until",
+  "use",
+  "used",
+  "uses",
+  "very",
+  "want",
+  "way",
+  "well",
+  "what",
+  "when",
+  "where",
+  "which",
+  "while",
+  "who",
+  "whose",
+  "why",
+  "will",
+  "with",
+  "would",
+  "your",
+  "yours",
   "the",
   "and",
   "for",
   "that",
   "this",
-  "with",
   "you",
   "are",
   "was",
@@ -352,6 +481,131 @@ export function salience(card: TwinMemoryCard, access: AccessMap, nowMs: number)
   return base * decay * reinforcement;
 }
 
+// ─── Agentic rerank ──────────────────────────────────────────────────────────
+// The gate above can only measure lexical/semantic overlap, and on our own
+// bench those two distributions do not separate: distractor cards score up to
+// 0.33 keyword similarity while genuine paraphrase matches drop to 0.15. No
+// single threshold splits them, because "how do we run a GDPR deletion" and
+// "how do we import customer data" share vocabulary but not subject. Judging
+// that needs reading, not scoring — so we optionally spend one cheap model call
+// to read the shortlist and say which cards are actually about the question.
+// Off by default: this call sits in the response path, ahead of the twin's
+// first token, so it is a latency trade the operator opts into.
+// Haiku for the same reason the Dreamer uses it: this is a cheap per-turn
+// classification, and it sits in the latency path.
+const RERANK_MODEL_DEFAULT = "claude-haiku-4-5";
+const DEFAULT_RERANK_CANDIDATES = 12;
+
+function agenticRerankEnabled(): boolean {
+  return (
+    process.env.TWIN_MEMORY_AGENTIC_RERANK === "1" && !!process.env.ANTHROPIC_API_KEY
+  );
+}
+
+function rerankCandidates(): number {
+  const raw = Number.parseInt(process.env.TWIN_MEMORY_RERANK_CANDIDATES ?? "", 10);
+  if (Number.isFinite(raw) && raw > 0) return Math.min(raw, 40);
+  return DEFAULT_RERANK_CANDIDATES;
+}
+
+// `subject` comes FIRST on purpose. Structured outputs are generated in schema
+// order, so naming the question's subject before choosing indices gives the
+// model somewhere to commit to the topic before it starts matching. Without it
+// the one-shot call almost never returns an empty list — it reaches for the
+// closest card rather than concluding nothing fits.
+const RERANK_SCHEMA = {
+  type: "object",
+  properties: {
+    subject: {
+      type: "string",
+      description: "The specific subject of the question, in under 10 words",
+    },
+    relevant: {
+      type: "array",
+      description: "1-based indices of the memories that are about that same subject",
+      items: { type: "integer" },
+    },
+  },
+  required: ["subject", "relevant"],
+  additionalProperties: false,
+} as const;
+
+const RERANK_SYSTEM = [
+  "You filter a shortlist of retrieved memories for a digital twin. You are given a QUESTION and a numbered list of MEMORIES that a keyword search returned.",
+  "First state the question's subject in a few words. Then return the 1-based indices of ONLY the memories about that same subject.",
+  "Work in ANY language — Hebrew and English are both first-class, and a memory in one language can be relevant to a question in the other.",
+  "Shared vocabulary is NOT relevance. Two items about 'customer data' are unrelated if one is about GDPR deletion and the other about CSV import.",
+  "Returning an empty list is the correct, expected answer when nothing on the shortlist is on-topic. Never pad the list to look useful — an irrelevant memory actively misleads the twin.",
+  "Do not explain, rank, or rewrite anything. Indices only.",
+].join("\n");
+
+/** Filter a lexical shortlist down to what is actually on-topic.
+ *  Returns null to mean "no judgement" (disabled, no key, or the call failed) —
+ *  distinct from `[]`, which is a real verdict that nothing is relevant. */
+async function agenticRerank(
+  query: string,
+  shortlist: TwinMemoryHit[]
+): Promise<TwinMemoryHit[] | null> {
+  if (!agenticRerankEnabled()) return null;
+  if (shortlist.length === 0) return null;
+
+  try {
+    // The Agent SDK spawns a subprocess per call — ~14s, which is fine for the
+    // Dreamer (it runs after the answer) but not here, ahead of the twin's
+    // first token. This is a one-shot classification, so it goes straight to
+    // the Messages API instead: same model, no subprocess.
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const response = await client.messages.create({
+      model: process.env.TWIN_MEMORY_RERANK_MODEL ?? RERANK_MODEL_DEFAULT,
+      // The answer is a subject line plus a few integers, but this is a ceiling
+      // rather than a spend — kept generous so TWIN_MEMORY_RERANK_MODEL can be
+      // pointed at a model that thinks (whose thinking counts against it too).
+      max_tokens: 1024,
+      system: RERANK_SYSTEM,
+      output_config: { format: { type: "json_schema", schema: RERANK_SCHEMA } },
+      messages: [
+        {
+          role: "user",
+          content: JSON.stringify({
+            question: truncate(query, 1000),
+            memories: shortlist.map((hit, index) => ({
+              n: index + 1,
+              text: truncate(hit.card.content, 400),
+            })),
+          }),
+        },
+      ],
+    });
+
+    // A refusal or a token-capped response is "no judgement", not "nothing is
+    // relevant" — fall back to the lexical ranking rather than silently
+    // dropping every card.
+    if (response.stop_reason !== "end_turn") return null;
+
+    const text = response.content.find((block) => block.type === "text")?.text;
+    if (!text) return null;
+    const picked = (JSON.parse(text) as { relevant?: unknown }).relevant;
+    if (!Array.isArray(picked)) return null;
+
+    // Keep the lexical ordering; the model only decides membership. Indices are
+    // 1-based and dedup'd, and anything out of range is dropped rather than
+    // trusted — a hallucinated index must never resurface a filtered card.
+    const keep = new Set(
+      picked
+        .filter((n): n is number => Number.isInteger(n))
+        .map((n) => n - 1)
+        .filter((i) => i >= 0 && i < shortlist.length)
+    );
+    return shortlist.filter((_, index) => keep.has(index));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.warn(`[twin-memory] agentic rerank failed: ${message}`);
+    return null;
+  }
+}
+
 export async function searchTwinMemory(
   employeeId: string,
   query: string,
@@ -378,8 +632,20 @@ export async function searchTwinMemory(
         : 0,
     ])
   );
+  // Abstention: keep only cards with real lexical or semantic overlap. When
+  // nothing qualifies we return [] and the caller injects no memory block at
+  // all — silence is a better answer than five confidently-irrelevant cards.
+  const candidates = relevanceGateEnabled()
+    ? cards.filter(
+        (card) =>
+          (keywordScores.get(card.id) ?? 0) > minKeyword() ||
+          (semanticScores.get(card.id) ?? 0) >= minSemantic()
+      )
+    : cards;
+  if (candidates.length === 0) return [];
+
   const salienceScores = new Map(
-    cards.map((card) => [card.id, salience(card, access, nowMs)])
+    candidates.map((card) => [card.id, salience(card, access, nowMs)])
   );
 
   // Relevance lanes (keyword, semantic) break ties by salience, so among
@@ -390,11 +656,11 @@ export async function searchTwinMemory(
   const byRecency = (a: TwinMemoryCard, b: TwinMemoryCard) =>
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 
-  const keywordRanks = ranksByScore(cards, (card) => keywordScores.get(card.id) ?? 0, bySalience);
-  const semanticRanks = ranksByScore(cards, (card) => semanticScores.get(card.id) ?? 0, bySalience);
-  const salienceRanks = ranksByScore(cards, (card) => salienceScores.get(card.id) ?? 0, byRecency);
+  const keywordRanks = ranksByScore(candidates, (card) => keywordScores.get(card.id) ?? 0, bySalience);
+  const semanticRanks = ranksByScore(candidates, (card) => semanticScores.get(card.id) ?? 0, bySalience);
+  const salienceRanks = ranksByScore(candidates, (card) => salienceScores.get(card.id) ?? 0, byRecency);
 
-  const hits = cards
+  const ranked = candidates
     .map((card) => {
       const score =
         rrf(keywordRanks.get(card.id), weights.keyword) +
@@ -408,8 +674,14 @@ export async function searchTwinMemory(
         salienceScore: salienceScores.get(card.id) ?? 0,
       };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
+
+  // Optional second pass: have a cheap model read the shortlist and drop what
+  // is only lexically similar. Returns null when disabled or on failure, in
+  // which case the lexical ranking stands unchanged.
+  const judged = await agenticRerank(query, ranked.slice(0, rerankCandidates()));
+  const hits = (judged ?? ranked).slice(0, limit);
+  if (hits.length === 0) return [];
 
   // Reinforce what we surfaced — recall is itself a signal of usefulness.
   reinforce(employeeId, hits.map((hit) => hit.card.id));

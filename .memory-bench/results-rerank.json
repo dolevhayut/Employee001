@@ -1,0 +1,49 @@
+{
+  "_note": "Retrieval-only A/B for TWIN_MEMORY_AGENTIC_RERANK, measured with bench-retrieval (same seeding + metrics as suiteRetrieval in harness.mjs, extraction suite skipped). Embeddings OFF (no OPENAI_API_KEY), so semanticScore is 0 throughout and the lexical gate carries the whole candidate set. results.json records the shipped default, which is this file's `gate-only` row.",
+  "configs": [
+    {
+      "name": "gate-only (shipped default)",
+      "agenticRerank": false,
+      "queriesScored": 16,
+      "precisionAt5": 0.213,
+      "precisionOverReturned": 0.213,
+      "avgCardsReturned": 5,
+      "recallAt5": 0.813,
+      "mrr": 0.496,
+      "emptyRelevantAbstention": "0/3",
+      "avgCardsOnEmptyQueries": 22,
+      "wallClockSecPerQuery": 0
+    },
+    {
+      "name": "gate + agentic rerank, claude-haiku-4-5",
+      "agenticRerank": true,
+      "queriesScored": 16,
+      "precisionAt5": 0.263,
+      "precisionOverReturned": 0.906,
+      "avgCardsReturned": 1.5,
+      "recallAt5": 1,
+      "mrr": 1,
+      "emptyRelevantAbstention": "1/3",
+      "avgCardsOnEmptyQueries": 1,
+      "wallClockSecPerQuery": 1.46
+    },
+    {
+      "name": "gate + agentic rerank, claude-sonnet-5",
+      "agenticRerank": true,
+      "queriesScored": 16,
+      "precisionAt5": 0.263,
+      "precisionOverReturned": 0.823,
+      "avgCardsReturned": 1.75,
+      "recallAt5": 1,
+      "mrr": 0.906,
+      "emptyRelevantAbstention": "3/3",
+      "avgCardsOnEmptyQueries": 0,
+      "wallClockSecPerQuery": 3.78
+    }
+  ],
+  "readings": [
+    "precisionAt5 always divides by 5, so abstention reads as a precision loss there; precisionOverReturned divides by what the twin actually saw and is the number that governs prompt noise.",
+    "Sonnet 5 is the only config that abstains reliably; Haiku ranks better on queries that do have an answer. Both are far above gate-only.",
+    "Rerank is off by default: it adds 1.5-3.8s ahead of the twin's first token."
+  ]
+}

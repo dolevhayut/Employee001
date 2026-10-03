@@ -114,7 +114,7 @@ async function suiteRetrieval() {
     return m ? Number(m[1]) : undefined;
   };
 
-  let nP = 0, sumP5 = 0, sumR5 = 0, sumMRR = 0;
+  let nP = 0, sumP5 = 0, sumR5 = 0, sumMRR = 0, sumPRet = 0, sumReturned = 0;
   let emptyTotal = 0, emptyClean = 0;
   const perHard = { hard: { n: 0, p5: 0, r5: 0 }, easy: { n: 0, p5: 0, r5: 0 } };
 
@@ -130,8 +130,8 @@ async function suiteRetrieval() {
 
     if (rel.size === 0) {
       emptyTotal++;
-      // No abstention in the API; "clean" = top hit has zero lexical signal.
-      if ((hits[0]?.keywordScore ?? 0) === 0) emptyClean++;
+      // True abstention: the relevance gate returned nothing at all.
+      if (hits.length === 0) emptyClean++;
       continue;
     }
 
@@ -139,6 +139,11 @@ async function suiteRetrieval() {
     const relInTop5 = top5.filter((i) => rel.has(i)).length;
     const p5 = relInTop5 / 5;
     const r5 = relInTop5 / rel.size;
+    // P@5 always divides by 5, so abstention looks like a precision loss when
+    // it is really a pollution win. Precision-over-returned divides by what the
+    // twin actually saw — the number that governs prompt noise.
+    sumPRet += top5.length ? relInTop5 / top5.length : 0;
+    sumReturned += top5.length;
     let mrr = 0;
     for (let r = 0; r < rankedIdx.length; r++) {
       if (rel.has(rankedIdx[r])) { mrr = 1 / (r + 1); break; }
@@ -152,11 +157,13 @@ async function suiteRetrieval() {
   return {
     queriesScored: nP,
     precisionAt5: avg(sumP5, nP),
+    precisionOverReturned: avg(sumPRet, nP),
+    avgCardsReturned: avg(sumReturned, nP),
     recallAt5: avg(sumR5, nP),
     mrr: avg(sumMRR, nP),
     hard: { n: perHard.hard.n, P5: avg(perHard.hard.p5, perHard.hard.n), R5: avg(perHard.hard.r5, perHard.hard.n) },
     easy: { n: perHard.easy.n, P5: avg(perHard.easy.p5, perHard.easy.n), R5: avg(perHard.easy.r5, perHard.easy.n) },
-    emptyRelevant: `${emptyClean}/${emptyTotal} returned no lexically-matching top hit`,
+    emptyRelevantAbstention: `${emptyClean}/${emptyTotal} correctly returned nothing`,
   };
 }
 
