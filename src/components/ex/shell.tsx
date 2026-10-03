@@ -1033,8 +1033,10 @@ export function Sidebar() {
       style={{
         width: w,
         minWidth: w,
-        background: "var(--bg-elevated)",
-        borderRight: "1px solid var(--hairline)",
+        background: "var(--bg)",
+        border: "1px solid var(--hairline)",
+        borderRadius: "var(--radius-xl)",
+        boxShadow: "var(--shadow-sm)",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -1362,17 +1364,32 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <RosterProvider>
       <WorkspaceModeProvider>
+        {/* Floating shell: sidebar and content are separate rounded panels
+            inset from the window edges on a sunken frame. */}
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "auto 1fr",
+            gap: "var(--sp-8)",
+            padding: "var(--sp-8)",
             height: "100vh",
             overflow: "hidden",
-            background: "var(--bg)",
+            background: "var(--bg-sunken)",
           }}
         >
           <Sidebar />
-          <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--bg)" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              minWidth: 0,
+              background: "var(--bg)",
+              border: "1px solid var(--hairline)",
+              borderRadius: "var(--radius-xl)",
+              boxShadow: "var(--shadow-sm)",
+            }}
+          >
             {children}
           </div>
           <GlobalApprovalOverlay />

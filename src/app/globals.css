@@ -76,25 +76,30 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Warm palette (default) */
-  --bg: #F3EEE8;
-  --bg-elevated: #FFFAF5;
-  --bg-sunken: #EDE5DC;
-  --surface: #FFFAF5;
-  --surface-soft: #F7F1EA;
-  --hairline: #DDD1C4;
-  --hairline-strong: #CDBFB0;
-  --text: #161311;
-  --text-muted: #5E544B;
-  --text-subtle: #8B8075;
-  --accent: #CDBFB0;
-  --accent-soft: #F8F2EB;
-  --accent-deep: #A89888;
-  --success: #6E8A6C;
-  --warn: #B88A47;
-  --danger: #A45E5E;
-  --twin: #7D8FA3;
-  --twin-soft: #D8CDC0;
+  /* Warm palette (default). Every color is a Radix Colors step
+     (radix-ui.com/colors, @radix-ui/colors 3.0.0): neutrals and text from
+     sand (stone), surfaces/borders/accent from brown (clay/sahara), status
+     from the earthy olive/gold/tomato, twin from slate. Step roles: 1-2 app bg, 3-5
+     component bg (normal/hover/selected), 6-8 borders, 9-10 solids,
+     11-12 text. Dark themes use the matching -dark scale at the same step. */
+  --bg: #f6eee7; /* brown-3 */
+  --bg-elevated: #fefdfc; /* brown-1 */
+  --bg-sunken: #f0e4d9; /* brown-4 */
+  --surface: #fefdfc; /* brown-1 */
+  --surface-soft: #fcf9f6; /* brown-2 */
+  --hairline: #e4cdb7; /* brown-6 */
+  --hairline-strong: #dcbc9f; /* brown-7 */
+  --text: #21201c; /* sand-12 */
+  --text-muted: #63635e; /* sand-11 */
+  --text-subtle: #82827c; /* sand-10 */
+  --accent: #ad7f58; /* brown-9 */
+  --accent-soft: #ebdaca; /* brown-5 */
+  --accent-deep: #815e46; /* brown-11 */
+  --success: #60655f; /* olive-11 */
+  --warn: #71624b; /* gold-11 */
+  --danger: #d13415; /* tomato-11 */
+  --twin: #60646c; /* slate-11 */
+  --twin-soft: #f0f0f3; /* slate-3 */
 
   /* Legacy aliases — keep existing pages working during the migration */
   --cream: var(--bg);
@@ -111,6 +116,7 @@
   --radius-sm: 3px;
   --radius: 4px;
   --radius-lg: 6px;
+  --radius-xl: 10px; /* floating shell panels (sidebar + content) */
 
   /* Type — Geist + Geist Mono loaded via next/font in src/app/layout.tsx.
      Instrument Serif stays the display serif. */
@@ -184,24 +190,24 @@
 
 /* Explicit light override — beats @media prefers-color-scheme: dark */
 [data-theme="light"] {
-  --bg: #F3EEE8;
-  --bg-elevated: #FFFAF5;
-  --bg-sunken: #EDE5DC;
-  --surface: #FFFAF5;
-  --surface-soft: #F7F1EA;
-  --hairline: #DDD1C4;
-  --hairline-strong: #CDBFB0;
-  --text: #161311;
-  --text-muted: #5E544B;
-  --text-subtle: #8B8075;
-  --accent: #CDBFB0;
-  --accent-soft: #F8F2EB;
-  --accent-deep: #A89888;
-  --success: #6E8A6C;
-  --warn: #B88A47;
-  --danger: #A45E5E;
-  --twin: #7D8FA3;
-  --twin-soft: #D8CDC0;
+  --bg: #f6eee7; /* brown-3 */
+  --bg-elevated: #fefdfc; /* brown-1 */
+  --bg-sunken: #f0e4d9; /* brown-4 */
+  --surface: #fefdfc; /* brown-1 */
+  --surface-soft: #fcf9f6; /* brown-2 */
+  --hairline: #e4cdb7; /* brown-6 */
+  --hairline-strong: #dcbc9f; /* brown-7 */
+  --text: #21201c; /* sand-12 */
+  --text-muted: #63635e; /* sand-11 */
+  --text-subtle: #82827c; /* sand-10 */
+  --accent: #ad7f58; /* brown-9 */
+  --accent-soft: #ebdaca; /* brown-5 */
+  --accent-deep: #815e46; /* brown-11 */
+  --success: #60655f; /* olive-11 */
+  --warn: #71624b; /* gold-11 */
+  --danger: #d13415; /* tomato-11 */
+  --twin: #60646c; /* slate-11 */
+  --twin-soft: #f0f0f3; /* slate-3 */
   --shadow-sm: 0 1px 0 rgba(22, 19, 17, 0.04);
   --shadow: 0 1px 2px rgba(22, 19, 17, 0.05), 0 4px 16px -8px rgba(22, 19, 17, 0.08);
   --shadow-lg: 0 4px 12px rgba(22, 19, 17, 0.06), 0 16px 48px -16px rgba(22, 19, 17, 0.12);
@@ -210,42 +216,42 @@
 }
 
 [data-theme="cool"] {
-  --bg: #F0F1F3;
-  --bg-elevated: #F7F8FA;
-  --bg-sunken: #E6E8EC;
-  --surface: #FFFFFF;
-  --surface-soft: #F4F5F8;
-  --hairline: #DDE0E5;
-  --hairline-strong: #C5C9D1;
-  --text: #161A1F;
-  --text-muted: #5C6470;
-  --text-subtle: #828A95;
-  --accent: #4A6B8A;
-  --accent-soft: #D4DEE8;
-  --accent-deep: #2D4660;
-  --twin: #4A6B7A;
-  --twin-soft: #D8E2E8;
+  --bg: #f0f0f3; /* slate-3 */
+  --bg-elevated: #fcfcfd; /* slate-1 */
+  --bg-sunken: #e8e8ec; /* slate-4 */
+  --surface: #fcfcfd; /* slate-1 */
+  --surface-soft: #f9f9fb; /* slate-2 */
+  --hairline: #d9d9e0; /* slate-6 */
+  --hairline-strong: #cdced6; /* slate-7 */
+  --text: #1c2024; /* slate-12 */
+  --text-muted: #60646c; /* slate-11 */
+  --text-subtle: #80838d; /* slate-10 */
+  --accent: #0090ff; /* blue-9 */
+  --accent-soft: #c2e5ff; /* blue-5 */
+  --accent-deep: #0d74ce; /* blue-11 */
+  --twin: #0d74ce; /* blue-11 */
+  --twin-soft: #e6f4fe; /* blue-3 */
 }
 
 [data-theme="dark"] {
-  --bg: #11100E;
-  --bg-elevated: #1D1A17;
-  --bg-sunken: #171513;
-  --surface: #1D1A17;
-  --surface-soft: #25211D;
-  --hairline: #3B342D;
-  --hairline-strong: #6C6157;
-  --text: #F3EDE6;
-  --text-muted: #CBBFB2;
-  --text-subtle: #9A8E83;
-  --accent: #6C6157;
-  --accent-soft: #2A241F;
-  --accent-deep: #A89A8B;
-  --success: #89A785;
-  --warn: #C89D5D;
-  --danger: #C57A7A;
-  --twin: #8FA7C0;
-  --twin-soft: #312B25;
+  --bg: #1c1816; /* brown-2 */
+  --bg-elevated: #322922; /* brown-4 */
+  --bg-sunken: #12110f; /* brown-1 */
+  --surface: #28211d; /* brown-3 */
+  --surface-soft: #322922; /* brown-4 */
+  --hairline: #4d3c2f; /* brown-6 */
+  --hairline-strong: #614a39; /* brown-7 */
+  --text: #eeeeec; /* sand-12 */
+  --text-muted: #b5b3ad; /* sand-11 */
+  --text-subtle: #7c7b74; /* sand-10 */
+  --accent: #ad7f58; /* brown-9 */
+  --accent-soft: #3e3128; /* brown-5 */
+  --accent-deep: #dbb594; /* brown-11 */
+  --success: #afb5ad; /* olive-11 */
+  --warn: #cbb99f; /* gold-11 */
+  --danger: #ff977d; /* tomato-11 */
+  --twin: #b0b4ba; /* slate-11 */
+  --twin-soft: #212225; /* slate-3 */
   /* Dark mode shadows use pure black at higher opacity — perceived depth on
      dark surfaces requires greater luminance contrast than on light ones */
   --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.25);
@@ -259,24 +265,24 @@
    load when the user's OS is in dark mode but no localStorage value exists) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="cool"]):not([data-theme="dark"]) {
-    --bg: #11100E;
-    --bg-elevated: #1D1A17;
-    --bg-sunken: #171513;
-    --surface: #1D1A17;
-    --surface-soft: #25211D;
-    --hairline: #3B342D;
-    --hairline-strong: #6C6157;
-    --text: #F3EDE6;
-    --text-muted: #CBBFB2;
-    --text-subtle: #9A8E83;
-    --accent: #6C6157;
-    --accent-soft: #2A241F;
-    --accent-deep: #A89A8B;
-    --success: #89A785;
-    --warn: #C89D5D;
-    --danger: #C57A7A;
-    --twin: #8FA7C0;
-    --twin-soft: #312B25;
+    --bg: #1c1816; /* brown-2 */
+    --bg-elevated: #322922; /* brown-4 */
+    --bg-sunken: #12110f; /* brown-1 */
+    --surface: #28211d; /* brown-3 */
+    --surface-soft: #322922; /* brown-4 */
+    --hairline: #4d3c2f; /* brown-6 */
+    --hairline-strong: #614a39; /* brown-7 */
+    --text: #eeeeec; /* sand-12 */
+    --text-muted: #b5b3ad; /* sand-11 */
+    --text-subtle: #7c7b74; /* sand-10 */
+    --accent: #ad7f58; /* brown-9 */
+    --accent-soft: #3e3128; /* brown-5 */
+    --accent-deep: #dbb594; /* brown-11 */
+    --success: #afb5ad; /* olive-11 */
+    --warn: #cbb99f; /* gold-11 */
+    --danger: #ff977d; /* tomato-11 */
+    --twin: #b0b4ba; /* slate-11 */
+    --twin-soft: #212225; /* slate-3 */
     --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.25);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 16px -8px rgba(0, 0, 0, 0.45);
     --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.3), 0 16px 48px -16px rgba(0, 0, 0, 0.5);

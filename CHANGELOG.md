@@ -25,6 +25,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `fly.toml`, runbook in `docs/DEPLOY-CLOUD.md`.
 
 ### Changed
+- **Calmer, clearer themes on Radix Colors.** Every theme color is now a step
+  of an established scale (sand for text, brown for surfaces and accent, and
+  olive/gold/tomato for status), so layers no longer blend together: the frame,
+  panels, cards and borders each sit on their own step. Status colors are earth
+  tones instead of neon green and red. The twin color is slate.
+- **Floating shell.** The sidebar and the content area are rounded panels
+  inset from the window edges.
 - **New app typeface: Geist** everywhere, with **Geist Mono** for code, IDs
   and numbers. Instrument Serif stays as the display serif.
 - Twin models upgraded to the Claude 5 family (Opus 5, Sonnet 5).

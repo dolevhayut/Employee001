@@ -259,21 +259,21 @@ const QUALITY_THEME: Record<
 > = {
   high: {
     label: "human-grade",
-    fg: "#15803d",
-    bgSoft: "rgba(40, 160, 90, 0.12)",
-    track: "rgba(40, 160, 90, 0.18)",
+    fg: "var(--success)",
+    bgSoft: "color-mix(in oklch, var(--success) 12%, transparent)",
+    track: "color-mix(in oklch, var(--success) 20%, transparent)",
   },
   medium: {
     label: "developing",
-    fg: "#a16207",
-    bgSoft: "rgba(180, 130, 30, 0.12)",
-    track: "rgba(180, 130, 30, 0.20)",
+    fg: "var(--warn)",
+    bgSoft: "color-mix(in oklch, var(--warn) 12%, transparent)",
+    track: "color-mix(in oklch, var(--warn) 20%, transparent)",
   },
   low: {
     label: "needs work",
-    fg: "#b45309",
-    bgSoft: "rgba(180, 90, 40, 0.12)",
-    track: "rgba(180, 90, 40, 0.22)",
+    fg: "var(--danger)",
+    bgSoft: "color-mix(in oklch, var(--danger) 12%, transparent)",
+    track: "color-mix(in oklch, var(--danger) 20%, transparent)",
   },
   empty: {
     label: "not built",
