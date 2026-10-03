@@ -37,6 +37,7 @@ function firstNameOf(name: string): string {
 type DiskSidecar = {
   id: string;
   name: string;
+  nameHe?: string;
   role?: string | null;
   createdAt?: string;
   department?: string;
@@ -137,6 +138,7 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
     results.push({
       id: sidecar.id || id,
       name: sidecar.name,
+      nameHe: sidecar.nameHe,
       firstName: firstNameOf(sidecar.name),
       role: sidecar.role || "—",
       department: sidecar.department || "General",

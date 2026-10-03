@@ -3,6 +3,9 @@ import type { AgentPlacement } from "./agent-placement";
 export type Employee = {
   id: string;
   name: string;
+  /** Optional Hebrew spelling of the name (employee.json `nameHe`), used so
+   *  Hebrew twin replies spell colleagues' names correctly. */
+  nameHe?: string;
   firstName: string;
   role: string;
   department: string;

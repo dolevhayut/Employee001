@@ -8,7 +8,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **Hebrew replies render right-to-left.** Every paragraph, list, heading,
+  quote and table in twin messages picks its own direction (`dir="auto"`), so
+  Hebrew lines run right-to-left and mixed Hebrew/English text no longer
+  scrambles punctuation. Lists and quotes use logical (start/end) spacing.
+
 ### Added
+- **Twins write natural Hebrew.** A shared language section in every twin
+  prompt (chat, Team Meeting, shifts) asks for idiomatic Israeli workplace
+  Hebrew, translated jargon, and English only where Israelis keep it (product
+  names, code, acronyms).
+- **Hebrew name spellings.** An optional `nameHe` field in `employee.json`
+  gives the twin each colleague's real Hebrew name (נועה, not נואה).
 - **Twin memory abstains when nothing is relevant.** Recall now passes a
   relevance gate (keyword overlap or semantic similarity ≥ 0.25) before
   salience is applied — salience reorders what survived, it no longer

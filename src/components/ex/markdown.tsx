@@ -23,10 +23,11 @@ export function Markdown({ children }: Props) {
           // <pre>/<table>/<ul> as children of <p> during streaming, which is
           // invalid HTML and triggers a hydration error. <div> accepts any block.
           p: ({ children }: { children?: ReactNode }) => (
-            <div style={{ margin: "0 0 8px", lineHeight: 1.65 }}>{children}</div>
+            <div dir="auto" style={{ margin: "0 0 8px", lineHeight: 1.65 }}>{children}</div>
           ),
           h1: ({ children }: { children?: ReactNode }) => (
             <h1
+              dir="auto"
               style={{
                 fontSize: "var(--fs-lg)",
                 fontWeight: 700,
@@ -39,6 +40,7 @@ export function Markdown({ children }: Props) {
           ),
           h2: ({ children }: { children?: ReactNode }) => (
             <h2
+              dir="auto"
               style={{
                 fontSize: "var(--fs-base)",
                 fontWeight: 700,
@@ -51,6 +53,7 @@ export function Markdown({ children }: Props) {
           ),
           h3: ({ children }: { children?: ReactNode }) => (
             <h3
+              dir="auto"
               style={{
                 fontSize: "var(--fs-ui)",
                 fontWeight: 600,
@@ -63,9 +66,10 @@ export function Markdown({ children }: Props) {
           ),
           ul: ({ children }: { children?: ReactNode }) => (
             <ul
+              dir="auto"
               style={{
                 margin: "0 0 8px",
-                paddingLeft: "var(--sp-18)",
+                paddingInlineStart: "var(--sp-18)",
                 lineHeight: 1.6,
               }}
             >
@@ -74,9 +78,10 @@ export function Markdown({ children }: Props) {
           ),
           ol: ({ children }: { children?: ReactNode }) => (
             <ol
+              dir="auto"
               style={{
                 margin: "0 0 8px",
-                paddingLeft: "var(--sp-22)",
+                paddingInlineStart: "var(--sp-22)",
                 lineHeight: 1.6,
               }}
             >
@@ -135,8 +140,9 @@ export function Markdown({ children }: Props) {
             ),
           blockquote: ({ children }: { children?: ReactNode }) => (
             <blockquote
+              dir="auto"
               style={{
-                borderLeft: "3px solid var(--accent-soft)",
+                borderInlineStart: "3px solid var(--accent-soft)",
                 margin: "8px 0",
                 padding: "2px 0 2px 10px",
                 color: "var(--text-muted)",
@@ -156,6 +162,7 @@ export function Markdown({ children }: Props) {
               }}
             >
               <table
+                dir="auto"
                 style={{
                   width: "100%",
                   borderCollapse: "collapse",
@@ -171,7 +178,7 @@ export function Markdown({ children }: Props) {
               style={{
                 background: "var(--bg-sunken)",
                 fontWeight: 600,
-                textAlign: "left",
+                textAlign: "start",
                 padding: "6px 10px",
                 borderBottom: "1px solid var(--hairline)",
                 fontSize: "var(--fs-sm)",

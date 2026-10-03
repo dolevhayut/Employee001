@@ -28,6 +28,7 @@ import {
   type MeetingTurn,
 } from "@/lib/meeting-store";
 import { classifyTool, describeTool } from "@/lib/tool-policy";
+import { twinLanguageBlock } from "@/lib/twin-language";
 import { registerApproval } from "@/lib/approval-bus";
 import type { ApprovalSurface, ApprovalContext } from "@/lib/approval-bus";
 import { appendAuditEntry } from "@/lib/audit-log";
@@ -302,6 +303,8 @@ You have been trained on ${employee.firstName}'s real working style, decisions, 
 # Who you are speaking with
 
 You are speaking with the **CEO of Employee001** (your boss). Every reference to "the CEO" or "the user" in these instructions means them. Treat their questions as priority direction, escalate honestly, and answer with the candor you'd use with the person who hired you. They have full authority over strategy, hiring, compensation, and roadmap — even when something falls in your domain, they get the final call.
+
+${twinLanguageBlock()}
 
 # Your profile files (pre-loaded)
 

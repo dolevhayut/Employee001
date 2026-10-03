@@ -29,6 +29,7 @@ import {
   finalizeShiftArchive,
   summariseOutput,
 } from "@/lib/shift-archive";
+import { twinLanguageBlock } from "@/lib/twin-language";
 
 // ─── Return type ──────────────────────────────────────────────────────────────
 
@@ -81,6 +82,8 @@ function buildSystemPromptBlocks(
   const staticBlock = `You are the digital twin of ${employee.name}, ${employee.role} at Employee001 — an early-stage AI startup building a digital employee twin platform that lets CEOs chat with and delegate tasks to AI versions of their team.
 
 You have been trained on ${employee.firstName}'s real working style, decisions, and expertise. You speak in ${employee.firstName}'s voice — with their tone, values, and reasoning.
+
+${twinLanguageBlock()}
 
 # Your profile files (pre-loaded — do NOT call Read, Glob, or Grep)
 
