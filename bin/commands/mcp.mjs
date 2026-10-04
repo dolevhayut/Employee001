@@ -1,0 +1,48 @@
+import { existsSync, readFileSync } from "node:fs";
+import { createInterface } from "node:readline";
+import { resolve } from "node:path";
+import { createBridge } from "../lib/mcp-bridge.mjs";
+
+function parseEnv(text) {
+  const out = {};
+  for (const line of text.split("\n")) {
+    const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!match) continue;
+    let value = match[2];
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    out[match[1]] = value;
+  }
+  return out;
+}
+
+function defaultUrl() {
+  const envPath = resolve(process.cwd(), ".env");
+  const env = existsSync(envPath) ? parseEnv(readFileSync(envPath, "utf8")) : {};
+  return `http://127.0.0.1:${env.PORT ?? "3000"}/api/mcp`;
+}
+
+export default async function mcp(argv) {
+  const urlIndex = argv.indexOf("--url");
+  if (urlIndex >= 0 && !argv[urlIndex + 1]) {
+    process.stderr.write("Missing value for --url\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  const url = urlIndex >= 0 ? argv[urlIndex + 1] : defaultUrl();
+  const bridge = createBridge({
+    url,
+    write: (line) => process.stdout.write(line),
+    log: (message) => process.stderr.write(`${message}\n`),
+  });
+  const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
+
+  for await (const line of input) {
+    await bridge.handleLine(line);
+  }
+}

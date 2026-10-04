@@ -17,6 +17,7 @@ Commands:
   doctor    Run a health check on your install
   export    Snapshot data/ to a tar.gz archive (excludes .env)
   import    Restore data/ from a tar.gz archive
+  mcp       Connect Claude Code, Cursor and other MCP clients (stdio bridge to the running app)
   help      Show this message
 
 Common flags:
@@ -26,6 +27,7 @@ Common flags:
                   (sets CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1)
   --egress        (doctor) After the health checks, list every outbound host
   --force         (import) Overwrite a non-empty data/ directory
+  --url <u>       (mcp) MCP endpoint (default http://127.0.0.1:<PORT>/api/mcp)
 
 Examples:
   employee001 export ~/Desktop/e001-backup.tar.gz
@@ -34,7 +36,7 @@ Examples:
 Docs: https://github.com/dolevhayut/Employee001
 `;
 
-const KNOWN = new Set(["setup", "start", "update", "doctor", "export", "import", "help"]);
+const KNOWN = new Set(["setup", "start", "update", "doctor", "export", "import", "mcp", "help"]);
 
 async function main() {
   const cmd = process.argv[2];
