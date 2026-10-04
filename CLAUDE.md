@@ -47,8 +47,9 @@ mode — it auto-updates hourly). Telemetry off. Loop per change:
 - gstack's `/ship` assumes a PR flow. This repo works on `main` and releases by tag —
   use it for its checks, then follow **Releasing** above for the actual publish.
 
-The CTO task board lives in `docs/local/BOARD.md` (gitignored). Daily and nightly
-Claude Code routines read and update it; plans and logs go to `docs/local/cto/`.
+The work plan lives in `docs/local/cto/PLAN.md` (gitignored): one file, updated by
+the working session after every merge or decision. No scheduled routines. Old
+boards, plans and logs are in `docs/local/cto/archive/`.
 
 ## Conventions
 

@@ -47,6 +47,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   unless you opt in and an endpoint is configured.
 
 ### Fixed
+- **Hebrew uses Open Sans**, served with the app (Hebrew subset only, loaded
+  only when the UI is in Hebrew).
 - **Team Meeting and chat work on Bedrock, Vertex, Foundry and local models.**
   They used to refuse to start without an Anthropic API key even when another
   provider was configured.
