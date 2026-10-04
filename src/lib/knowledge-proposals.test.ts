@@ -7,6 +7,7 @@ import { readKnowledgeFile, writeKnowledgeFile } from "./knowledge-files";
 import { listKnowledgeVersions } from "./knowledge-versions";
 import {
   addProposals,
+  buildProposalPrompt,
   decideProposal,
   listPendingProposals,
   parseProposalReply,
@@ -27,6 +28,15 @@ beforeEach(() => {
 afterEach(() => {
   process.chdir(previousCwd);
   fs.rmSync(tempDir, { recursive: true, force: true });
+});
+
+describe("buildProposalPrompt", () => {
+  it("pins the heading to the meeting date instead of an example date", () => {
+    const prompt = buildProposalPrompt("Noa", "transcript", [], "2026-11-12");
+    expect(prompt).toContain("The meeting took place on 2026-11-12.");
+    expect(prompt).toContain('"### 2026-11-12 — <topic>"');
+    expect(prompt).not.toContain("2026-10-04");
+  });
 });
 
 describe("validateProposal", () => {
