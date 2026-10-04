@@ -407,8 +407,8 @@ export default function RoutinesPage() {
                           lineHeight: 1.55,
                           maxHeight: 64,
                           overflow: "hidden",
-                          maskImage: "linear-gradient(to bottom, var(--text) 60%, transparent)",
-                          WebkitMaskImage: "linear-gradient(to bottom, var(--text) 60%, transparent)",
+                          maskImage: "linear-gradient(to bottom, black 60%, transparent)",
+                          WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent)",
                         }}
                       >
                         <Markdown>{r.lastRunSummary}</Markdown>
@@ -613,7 +613,7 @@ function RoutineDetailModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "color-mix(in oklch, var(--text) 45%, transparent)",
+        background: "rgba(15,18,24,0.45)",
         backdropFilter: "blur(4px)",
         zIndex: 100,
         display: "grid",
@@ -1021,7 +1021,7 @@ function RoutineDetailModal({
           {/* Artifact viewer overlay */}
           {openArtifact && (
             <div
-              style={{ position: "fixed", inset: 0, zIndex: 200, background: "color-mix(in oklch, var(--text) 70%, transparent)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: "var(--sp-24)" }}
+              style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(15,18,24,0.7)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: "var(--sp-24)" }}
               onClick={() => setOpenArtifact(null)}
             >
               <div
@@ -1218,7 +1218,7 @@ function CreateRoutineModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "color-mix(in oklch, var(--text) 45%, transparent)",
+        background: "rgba(15,18,24,0.45)",
         backdropFilter: "blur(4px)",
         zIndex: 100,
         display: "grid",
