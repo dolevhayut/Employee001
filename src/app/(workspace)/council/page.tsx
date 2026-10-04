@@ -460,7 +460,7 @@ function ApprovalCard({
         display: "flex",
         flexDirection: "column",
         gap: "var(--sp-8)",
-        boxShadow: "0 1px 3px rgba(180,140,60,0.12)",
+        boxShadow: "var(--shadow-sm)",
       }}
     >
       <div
@@ -567,7 +567,7 @@ function ApprovalCard({
           style={{
             padding: "6px 14px",
             background: "var(--success)",
-            color: "white",
+            color: "var(--bg)",
             border: "none",
             borderRadius: 6,
             fontSize: "var(--fs-sm)",
@@ -627,7 +627,7 @@ function BlockedNotice({ tool, reason }: { tool: string; reason: string }) {
       style={{
         marginBottom: "var(--sp-8)",
         padding: "8px 12px",
-        background: "rgba(180,80,60,0.06)",
+        background: "color-mix(in oklch, var(--danger) 12%, transparent)",
         border: "1px solid var(--danger)",
         borderRadius: 8,
         fontSize: "var(--fs-meta)",
@@ -678,21 +678,21 @@ type BuiltinGlyph = {
 // Lucide fallback for built-in (non-Composio) tools — Bash, Read, WebFetch, etc.
 function builtinGlyph(toolName: string): BuiltinGlyph | null {
   const t = toolName.toLowerCase();
-  if (t.startsWith("subagent:")) return { Icon: (p) => <SparksIcon {...p} />, tint: "#a64fb0" };
-  if (t === "bash" || t === "shell") return { Icon: (p) => <Terminal {...p} />, tint: "#444" };
+  if (t.startsWith("subagent:")) return { Icon: (p) => <SparksIcon {...p} />, tint: "var(--accent)" };
+  if (t === "bash" || t === "shell") return { Icon: (p) => <Terminal {...p} />, tint: "var(--text-muted)" };
   if (t === "read" || t === "write" || t === "edit" || t === "notebookedit") {
-    return { Icon: (p) => <FileTextIcon {...p} />, tint: "#5d4ec0" };
+    return { Icon: (p) => <FileTextIcon {...p} />, tint: "var(--twin)" };
   }
   if (t === "grep" || t === "glob" || t.startsWith("toolsearch")) {
-    return { Icon: (p) => <SearchIcon {...p} />, tint: "#3a8a5a" };
+    return { Icon: (p) => <SearchIcon {...p} />, tint: "var(--success)" };
   }
   if (t.startsWith("webfetch") || t.startsWith("websearch")) {
-    return { Icon: (p) => <Globe {...p} />, tint: "#1f7a8c" };
+    return { Icon: (p) => <Globe {...p} />, tint: "var(--accent-deep)" };
   }
   if (t.includes("sql") || t.includes("db") || t.includes("neon")) {
-    return { Icon: (p) => <DatabaseIcon {...p} />, tint: "#3b6ea5" };
+    return { Icon: (p) => <DatabaseIcon {...p} />, tint: "var(--twin)" };
   }
-  return { Icon: (p) => <Wrench {...p} />, tint: "#7a7a7a" };
+  return { Icon: (p) => <Wrench {...p} />, tint: "var(--text-subtle)" };
 }
 
 // Built-in tools deserve nicer line text than the generic humanizer can give.
@@ -968,30 +968,30 @@ function fileTypeBadge(filename: string, contentType: string): { glyph: string; 
   const ext = (filename.split(".").pop() || "").toLowerCase();
   const ct = contentType.toLowerCase();
 
-  if (ct.startsWith("image/")) return { glyph: "🖼", label: "IMG", bg: "#fce7f3", fg: "#9d174d" };
+  if (ct.startsWith("image/")) return { glyph: "🖼", label: "IMG", bg: "color-mix(in oklch, var(--danger) 12%, transparent)", fg: "var(--danger)" };
 
   // Spreadsheets — Excel / Google Sheets / CSV
-  if (ext === "xlsx" || ext === "xls" || ct.includes("spreadsheet")) return { glyph: "X", label: "XLS", bg: "#dcfce7", fg: "#166534" };
-  if (ext === "csv" || ct === "text/csv") return { glyph: "≡", label: "CSV", bg: "#dcfce7", fg: "#166534" };
-  if (ext === "tsv") return { glyph: "≡", label: "TSV", bg: "#dcfce7", fg: "#166534" };
+  if (ext === "xlsx" || ext === "xls" || ct.includes("spreadsheet")) return { glyph: "X", label: "XLS", bg: "color-mix(in oklch, var(--success) 12%, transparent)", fg: "var(--success)" };
+  if (ext === "csv" || ct === "text/csv") return { glyph: "≡", label: "CSV", bg: "color-mix(in oklch, var(--success) 12%, transparent)", fg: "var(--success)" };
+  if (ext === "tsv") return { glyph: "≡", label: "TSV", bg: "color-mix(in oklch, var(--success) 12%, transparent)", fg: "var(--success)" };
 
   // Word / Google Doc
-  if (ext === "docx" || ext === "doc" || ct.includes("wordprocessing")) return { glyph: "W", label: "DOC", bg: "#dbeafe", fg: "#1e40af" };
+  if (ext === "docx" || ext === "doc" || ct.includes("wordprocessing")) return { glyph: "W", label: "DOC", bg: "color-mix(in oklch, var(--twin) 12%, transparent)", fg: "var(--twin)" };
 
   // PowerPoint / Slides
-  if (ext === "pptx" || ext === "ppt" || ct.includes("presentation")) return { glyph: "P", label: "PPT", bg: "#fed7aa", fg: "#9a3412" };
+  if (ext === "pptx" || ext === "ppt" || ct.includes("presentation")) return { glyph: "P", label: "PPT", bg: "color-mix(in oklch, var(--warn) 12%, transparent)", fg: "var(--warn)" };
 
   // PDF
-  if (ext === "pdf" || ct === "application/pdf") return { glyph: "P", label: "PDF", bg: "#fee2e2", fg: "#991b1b" };
+  if (ext === "pdf" || ct === "application/pdf") return { glyph: "P", label: "PDF", bg: "color-mix(in oklch, var(--danger) 12%, transparent)", fg: "var(--danger)" };
 
   // JSON / data
-  if (ext === "json" || ct === "application/json") return { glyph: "{ }", label: "JSON", bg: "#fef3c7", fg: "#92400e" };
-  if (ext === "yaml" || ext === "yml") return { glyph: "{ }", label: "YML", bg: "#fef3c7", fg: "#92400e" };
-  if (ext === "xml" || ct === "application/xml") return { glyph: "<>", label: "XML", bg: "#fef3c7", fg: "#92400e" };
+  if (ext === "json" || ct === "application/json") return { glyph: "{ }", label: "JSON", bg: "color-mix(in oklch, var(--warn) 12%, transparent)", fg: "var(--warn)" };
+  if (ext === "yaml" || ext === "yml") return { glyph: "{ }", label: "YML", bg: "color-mix(in oklch, var(--warn) 12%, transparent)", fg: "var(--warn)" };
+  if (ext === "xml" || ct === "application/xml") return { glyph: "<>", label: "XML", bg: "color-mix(in oklch, var(--warn) 12%, transparent)", fg: "var(--warn)" };
 
   // Markdown / text
-  if (ext === "md" || ct === "text/markdown") return { glyph: "M↓", label: "MD", bg: "#e0e7ff", fg: "#3730a3" };
-  if (ext === "html" || ct === "text/html") return { glyph: "<>", label: "HTML", bg: "#fef3c7", fg: "#92400e" };
+  if (ext === "md" || ct === "text/markdown") return { glyph: "M↓", label: "MD", bg: "color-mix(in oklch, var(--accent) 12%, transparent)", fg: "var(--accent-deep)" };
+  if (ext === "html" || ct === "text/html") return { glyph: "<>", label: "HTML", bg: "color-mix(in oklch, var(--warn) 12%, transparent)", fg: "var(--warn)" };
 
   // Default — generic file
   return { glyph: "📄", label: "FILE", bg: "var(--surface)", fg: "var(--text-subtle)" };
@@ -1165,7 +1165,7 @@ function FileDrawer({
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(0,0,0,0.32)",
+          background: "color-mix(in oklch, var(--text) 32%, transparent)",
           zIndex: 100,
         }}
       />
@@ -1183,7 +1183,7 @@ function FileDrawer({
           maxWidth: "90vw",
           background: "var(--bg-elevated)",
           borderInlineStart: "1px solid var(--hairline-strong)",
-          boxShadow: rtl ? "12px 0 40px rgba(0,0,0,0.18)" : "-12px 0 40px rgba(0,0,0,0.18)",
+          boxShadow: "var(--shadow-lg)",
           zIndex: 101,
           display: "flex",
           flexDirection: "column",
@@ -1273,7 +1273,7 @@ function FileDrawer({
                 <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>{t("settings.status.loading")}</div>
               )}
               {error && (
-                <div style={{ fontSize: "var(--fs-sm)", color: "var(--danger, #c33)" }}>
+                <div style={{ fontSize: "var(--fs-sm)", color: "var(--danger)" }}>
                   {t("meeting.file.loadFailed")}{" "}
                   <bdi>{error === "fetch_failed" ? t("meeting.file.fetchFailed") : error}</bdi>
                 </div>
@@ -2428,7 +2428,7 @@ export default function CouncilPage() {
               background: "var(--surface)",
               border: "1px solid var(--hairline-strong)",
               borderRadius: 10,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+              boxShadow: "var(--shadow-dropdown)",
               overflow: "hidden",
               maxWidth: 320,
               zIndex: 20,
