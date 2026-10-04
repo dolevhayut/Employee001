@@ -62,7 +62,7 @@ function Avatar({ initials, color, size = 44 }: { initials: string; color: strin
         justifyContent: "center",
         fontSize: size * 0.33,
         fontWeight: 600,
-        color: "var(--bg-elevated)",
+        color: "#fff",
         flexShrink: 0,
         letterSpacing: "0.02em",
       }}
@@ -1054,7 +1054,7 @@ export default function MarketplacePage() {
             insetInlineEnd: 24,
             zIndex: 9999,
             background: toast.kind === "success" ? "var(--text)" : "var(--danger)",
-            color: toast.kind === "success" ? "var(--bg)" : "var(--bg-elevated)",
+            color: toast.kind === "success" ? "var(--bg)" : "#fff",
             padding: "10px 16px",
             borderRadius: 10,
             fontSize: "var(--fs-ui)",
