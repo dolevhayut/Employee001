@@ -567,7 +567,7 @@ function CockpitCard({ run }: { run: ActiveRun }) {
           style={{
             padding: "6px 10px",
             borderInlineStart: "2px dashed var(--hairline-strong)",
-            background: "color-mix(in oklch, var(--text) 12%, transparent)",
+            background: "color-mix(in oklch, var(--text) 3%, transparent)",
             color: "var(--text-subtle)",
             fontSize: "var(--fs-meta)",
             fontStyle: "italic",
