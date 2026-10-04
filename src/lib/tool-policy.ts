@@ -120,10 +120,15 @@ export function classifyTool(
     };
   }
 
-  // A read action is safe even when its object happens to be named
-  // "transfer" or "user". This must happen before the hard-block scan.
+  // A read verb before a blocked term usually means the term is the object
+  // ("LIST_PAYMENT_METHODS"), but names like "LIST_AND_DELETE_CHARGES" also
+  // match. Never auto-allow these: ask, so a human decides. Runs before the
+  // hard-block scan so a genuine read isn't refused outright.
   if (readActionPrecedesBlockedTerm(name)) {
-    return { kind: "allow" };
+    return {
+      kind: "ask",
+      reason: `${name} reads data whose name looks destructive; confirm it is read-only.`,
+    };
   }
 
   // Hard-block on destructive patterns regardless of approval.

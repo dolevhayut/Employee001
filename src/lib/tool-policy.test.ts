@@ -52,8 +52,17 @@ describe("classifyTool", () => {
     }
   });
 
-  it("keeps harmless transfer and user look-alikes read-only", () => {
-    expect(classifyTool("BANK_GET_TRANSFER_FUNDS", {})).toEqual({ kind: "allow" });
+  it("asks (never auto-allows, never refuses) when a read verb precedes a destructive term", () => {
+    expect(classifyTool("BANK_GET_TRANSFER_FUNDS", {}).kind).toBe("ask");
+    expect(classifyTool("STRIPE_LIST_PAYMENT_METHODS", {}).kind).toBe("ask");
+  });
+
+  it("never auto-allows a combined read-and-destroy action", () => {
+    expect(classifyTool("STRIPE_LIST_AND_DELETE_CHARGES", {}).kind).not.toBe("allow");
+    expect(classifyTool("GMAIL_FIND_AND_DELETE_EMAIL", {}).kind).not.toBe("allow");
+  });
+
+  it("still allows plain reads that carry no destructive term", () => {
     expect(classifyTool("IDENTITY_LIST_USERS", {})).toEqual({ kind: "allow" });
   });
 
