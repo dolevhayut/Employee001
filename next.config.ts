@@ -30,6 +30,9 @@ const nextConfig: NextConfig = {
     "*": [
       "data/**",
       "**/data/**",
+      // The CLI (incl. the demo fixture in bin/demo/data) runs from the
+      // package's own bin/, never from inside the standalone server.
+      "bin/**",
       ".env*",
       "**/.env*",
       "**/node_modules/@img/**",

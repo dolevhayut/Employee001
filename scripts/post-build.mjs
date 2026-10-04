@@ -45,6 +45,9 @@ const FORBIDDEN = [
   // internal docs/local/ — KICKOFF, ROADMAP, SESSION logs, SHOW-HN drafts).
   // outputFileTracingExcludes handles it; this is the belt-and-suspenders.
   join(STANDALONE, "docs"),
+  // bin/ (the CLI + the demo fixture under bin/demo/data) ships at the package
+  // root; a copy inside standalone is dead weight and trips the data/ scan.
+  join(STANDALONE, "bin"),
 ];
 for (const p of FORBIDDEN) {
   if (existsSync(p)) {
