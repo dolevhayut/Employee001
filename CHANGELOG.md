@@ -28,6 +28,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
+- **PDF and Word files become readable knowledge.** Uploading a `.pdf` or
+  `.docx` to a twin's `knowledge/` keeps the original and writes
+  `NAME.pdf.md` / `NAME.docx.md` with the extracted text (capped at 2 MB), so
+  the twin can read it. If extraction fails, the upload still succeeds and
+  shows a warning. Deleting the original also removes its generated text.
 - **Twins write natural Hebrew.** A shared language section in every twin
   prompt (chat, Team Meeting, shifts) asks for idiomatic Israeli workplace
   Hebrew, translated jargon, and English only where Israelis keep it (product
