@@ -8,6 +8,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Anonymous usage counts, off unless you turn them on.** Settings shows
+  exactly what would be sent (counts only: twins, meetings, approvals,
+  version, OS) and `setup` asks once, defaulting to No. Nothing is ever sent
+  unless you opt in and an endpoint is configured.
+
 ### Fixed
 - **`doctor` and `start` warn about unsupported Node versions.** Node 26 breaks
   a native module; you now get a clear "use Node 24 LTS" message instead of a
@@ -27,8 +33,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   themed color at all.
   Status badges, file chips, tool tints and dialogs now follow the theme
   instead of fixed light-mode colors.
-- **The knowledge graph, the Activity log and chat dialogs follow the
-  theme too.** The graph recolors live when you switch themes.
+- **The knowledge graph, the Activity log, chat dialogs and the remaining
+  workspace pages follow the theme too.** The graph recolors live when you switch themes.
 - **Approval gate hardened.** Bash and the other never-allowed built-in
   tools are refused by the policy layer too, destructive tool names
   (delete, refund, payment, fund transfer, user removal) are caught
