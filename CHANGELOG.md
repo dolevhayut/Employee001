@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- Cockpit, Spend and Approvals show "Couldn't load …" with Try again when
+  their data fails to load, instead of pretending the page is empty. A view
+  that already loaded stays on screen with a quiet "Couldn't refresh".
 - **Twins say they work at your company, not "Employee001".** The company
   name and a one-line description are saved from Setup and
   Settings → Workspace (they weren't saved before), and Team Meetings and
