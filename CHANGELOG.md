@@ -8,6 +8,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-10-05
+
+
 ### Security
 - **Encrypted backups:** `employee001 export --encrypt` protects the archive
   with a passphrase (AES-256-GCM); `import` detects it and asks for the
@@ -45,97 +48,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   exactly what would be sent (counts only: twins, meetings, approvals,
   version, OS) and `setup` asks once, defaulting to No. Nothing is ever sent
   unless you opt in and an endpoint is configured.
-
-### Fixed
-- **Hebrew uses Open Sans**, served with the app (Hebrew subset only, loaded
-  only when the UI is in Hebrew).
-- **Team Meeting and chat work on Bedrock, Vertex, Foundry and local models.**
-  They used to refuse to start without an Anthropic API key even when another
-  provider was configured.
-- **Smaller download.** The npm package no longer carries a copy of the
-  source tree, tests and tooling inside the server bundle (57 MB → 48 MB).
-- **Your twins now live in your folder and survive upgrades.** With
-  `npx employee001`, the app stored everything inside the installed package
-  (the npx cache), so a new version started empty and `export` found nothing.
-  Data now lives in the `data/` folder next to your `.env`, as `setup` always
-  intended. On first start, twins from an earlier install are copied over
-  automatically (the old copy is left untouched), and `doctor` shows where
-  your data is.
-- **`doctor` and `start` warn about unsupported Node versions.** Node 26 breaks
-  a native module; you now get a clear "use Node 24 LTS" message instead of a
-  build error, and Node older than 22 stops before starting.
-- **Unattended work starts with the server.** Schedules, catch-up of missed
-  runs and recovery of approvals lost in a restart used to wait until someone
-  opened Schedules or Tasks.
-- **The Autonomy switch looks on when it is on** (it was grey in every theme).
-- **"Run routine again" is reachable.** The review popup now offers it
-  (instead of Approve/Reject) when a routine run was skipped or lost in a
-  restart; before, the popup covered the button in Approvals.
-- **Suggested knowledge updates carry the meeting's real date.**
-- **Schedules no longer shows an empty box on shift routines.**
-- **Dark and cool themes on Settings, Team Meeting, Cockpit, Schedules,
-  Tasks, Approvals, twin training, Live interview, Hire and the org chart.**
-  Hire also used theme names that did not exist, so some of its text had no
-  themed color at all.
-  Status badges, file chips, tool tints and dialogs now follow the theme
-  instead of fixed light-mode colors.
-- **The knowledge graph, the Activity log, chat dialogs and the remaining
-  workspace pages follow the theme too.** The graph recolors live when you switch themes.
-- **Approval gate hardened.** Bash and the other never-allowed built-in
-  tools are refused by the policy layer too, destructive tool names
-  (delete, refund, payment, fund transfer, user removal) are caught
-  regardless of naming style, and look-alikes that read data ask first
-  instead of running automatically. Schedules reject malformed cron
-  expressions.
-- **No silently skipped work.** When an unattended run's approval request
-  waits too long (6 hours), Approvals now shows what was skipped and why.
-  For scheduled routines, that item and the "lost in restart" ones get a
-  one-click "Run routine again".
-- PDF and Word extraction can't take the server down: Word files that
-  expand suspiciously (zip bombs) are refused before they are opened, and
-  extraction runs in a separate worker with a memory cap and a 30-second
-  limit. The upload itself always succeeds.
-- Cockpit, Spend and Approvals show "Couldn't load …" with Try again when
-  their data fails to load, instead of pretending the page is empty. A view
-  that already loaded stays on screen with a quiet "Couldn't refresh".
-- **Twins say they work at your company, not "Employee001".** The company
-  name and a one-line description are saved from Setup and
-  Settings → Workspace (they weren't saved before), and Team Meetings and
-  shifts use them.
-- Setup, Sources and Join pages follow the light, dark and cool themes
-  (they used hard-coded colors). The setup wizard's theme previews each
-  show their own theme.
-- The sidebar version label reads `package.json` at build time instead of a
-  hard-coded "v0.4".
-- **Hebrew replies render right-to-left.** Every paragraph, list, heading,
-  quote and table in twin messages picks its own direction (`dir="auto"`), so
-  Hebrew lines run right-to-left and mixed Hebrew/English text no longer
-  scrambles punctuation. Lists and quotes use logical (start/end) spacing.
-
-### Changed
-- **Twins recall the right memory first more often.** Keyword recall now
-  weighs rare, decisive words (like "GDPR" or "CSV") above common ones, so
-  without embeddings the top memory is the relevant one in 11 of 11
-  benchmark questions, up from 8.
-- **Operator pages explain themselves when Autonomy is off.** Cockpit, Spend,
-  Activity log, Schedules and Approvals show what will appear there once twins
-  work unattended, with a one-click "Turn on Autonomy" (no reload). Pages with
-  real data are unchanged. Schedules gets a Focus tab, and Spend links to
-  Workspace costs.
-- **Handover has tabs** (Handover / Live interview). Page titles use the new
-  sidebar names, and Templates and org-wide MCP servers are one click away
-  from Tasks, Settings and Tools & MCP.
-- **New sidebar.** One navigation for both modes: Work (Approvals with a
-  pending-count badge, Tasks, Team Meeting), Twins (Twins, Chat, Hire),
-  Operations (Cockpit, Schedules, Activity log), Control (Spend, Tools & MCP)
-  and Labs (Handover). Operator pages no longer disappear when Autonomy is
-  off; Autonomy now only arms or disarms unattended work. The command palette
-  uses the same names and still finds the old ones (Employees, Routines,
-  Audit, Budgets, Inbox, Marketplace).
-- **Twins default to Claude Sonnet 5.5** (`claude-sonnet-5-5`), with Sonnet 5
-  as the fallback. Existing twins keep the model they were built with.
-
-### Added
 - **Brain Cosmos.** The memory graph in Chat is now a living 3D brain:
   the twin's knowledge files are neurons inside a particle brain, and you
   watch it think — impulses travel along synapses to the file being read,
@@ -217,6 +129,27 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `fly.toml`, runbook in `docs/DEPLOY-CLOUD.md`.
 
 ### Changed
+- **Twins recall the right memory first more often.** Keyword recall now
+  weighs rare, decisive words (like "GDPR" or "CSV") above common ones, so
+  without embeddings the top memory is the relevant one in 11 of 11
+  benchmark questions, up from 8.
+- **Operator pages explain themselves when Autonomy is off.** Cockpit, Spend,
+  Activity log, Schedules and Approvals show what will appear there once twins
+  work unattended, with a one-click "Turn on Autonomy" (no reload). Pages with
+  real data are unchanged. Schedules gets a Focus tab, and Spend links to
+  Workspace costs.
+- **Handover has tabs** (Handover / Live interview). Page titles use the new
+  sidebar names, and Templates and org-wide MCP servers are one click away
+  from Tasks, Settings and Tools & MCP.
+- **New sidebar.** One navigation for both modes: Work (Approvals with a
+  pending-count badge, Tasks, Team Meeting), Twins (Twins, Chat, Hire),
+  Operations (Cockpit, Schedules, Activity log), Control (Spend, Tools & MCP)
+  and Labs (Handover). Operator pages no longer disappear when Autonomy is
+  off; Autonomy now only arms or disarms unattended work. The command palette
+  uses the same names and still finds the old ones (Employees, Routines,
+  Audit, Budgets, Inbox, Marketplace).
+- **Twins default to Claude Sonnet 5.5** (`claude-sonnet-5-5`), with Sonnet 5
+  as the fallback. Existing twins keep the model they were built with.
 - **Calmer, clearer themes on Radix Colors.** Every theme color is now a step
   of an established scale (sand for text, brown for surfaces and accent, and
   olive/gold/tomato for status), so layers no longer blend together: the frame,
@@ -229,6 +162,72 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Twin models upgraded to the Claude 5 family (Opus 5, Sonnet 5).
 - Expanded the memory tokenizer's stopword list so question scaffolding
   ("how do we", "what is our") no longer counts as topical overlap.
+
+### Fixed
+- **Hebrew uses Open Sans**, served with the app (Hebrew subset only, loaded
+  only when the UI is in Hebrew).
+- **Team Meeting and chat work on Bedrock, Vertex, Foundry and local models.**
+  They used to refuse to start without an Anthropic API key even when another
+  provider was configured.
+- **Smaller download.** The npm package no longer carries a copy of the
+  source tree, tests and tooling inside the server bundle (57 MB → 48 MB).
+- **Your twins now live in your folder and survive upgrades.** With
+  `npx employee001`, the app stored everything inside the installed package
+  (the npx cache), so a new version started empty and `export` found nothing.
+  Data now lives in the `data/` folder next to your `.env`, as `setup` always
+  intended. On first start, twins from an earlier install are copied over
+  automatically (the old copy is left untouched), and `doctor` shows where
+  your data is.
+- **`doctor` and `start` warn about unsupported Node versions.** Node 26 breaks
+  a native module; you now get a clear "use Node 24 LTS" message instead of a
+  build error, and Node older than 22 stops before starting.
+- **Unattended work starts with the server.** Schedules, catch-up of missed
+  runs and recovery of approvals lost in a restart used to wait until someone
+  opened Schedules or Tasks.
+- **The Autonomy switch looks on when it is on** (it was grey in every theme).
+- **"Run routine again" is reachable.** The review popup now offers it
+  (instead of Approve/Reject) when a routine run was skipped or lost in a
+  restart; before, the popup covered the button in Approvals.
+- **Suggested knowledge updates carry the meeting's real date.**
+- **Schedules no longer shows an empty box on shift routines.**
+- **Dark and cool themes on Settings, Team Meeting, Cockpit, Schedules,
+  Tasks, Approvals, twin training, Live interview, Hire and the org chart.**
+  Hire also used theme names that did not exist, so some of its text had no
+  themed color at all.
+  Status badges, file chips, tool tints and dialogs now follow the theme
+  instead of fixed light-mode colors.
+- **The knowledge graph, the Activity log, chat dialogs and the remaining
+  workspace pages follow the theme too.** The graph recolors live when you switch themes.
+- **Approval gate hardened.** Bash and the other never-allowed built-in
+  tools are refused by the policy layer too, destructive tool names
+  (delete, refund, payment, fund transfer, user removal) are caught
+  regardless of naming style, and look-alikes that read data ask first
+  instead of running automatically. Schedules reject malformed cron
+  expressions.
+- **No silently skipped work.** When an unattended run's approval request
+  waits too long (6 hours), Approvals now shows what was skipped and why.
+  For scheduled routines, that item and the "lost in restart" ones get a
+  one-click "Run routine again".
+- PDF and Word extraction can't take the server down: Word files that
+  expand suspiciously (zip bombs) are refused before they are opened, and
+  extraction runs in a separate worker with a memory cap and a 30-second
+  limit. The upload itself always succeeds.
+- Cockpit, Spend and Approvals show "Couldn't load …" with Try again when
+  their data fails to load, instead of pretending the page is empty. A view
+  that already loaded stays on screen with a quiet "Couldn't refresh".
+- **Twins say they work at your company, not "Employee001".** The company
+  name and a one-line description are saved from Setup and
+  Settings → Workspace (they weren't saved before), and Team Meetings and
+  shifts use them.
+- Setup, Sources and Join pages follow the light, dark and cool themes
+  (they used hard-coded colors). The setup wizard's theme previews each
+  show their own theme.
+- The sidebar version label reads `package.json` at build time instead of a
+  hard-coded "v0.4".
+- **Hebrew replies render right-to-left.** Every paragraph, list, heading,
+  quote and table in twin messages picks its own direction (`dir="auto"`), so
+  Hebrew lines run right-to-left and mixed Hebrew/English text no longer
+  scrambles punctuation. Lists and quotes use logical (start/end) spacing.
 
 ## [0.5.1] — 2026-09-21
 
@@ -600,7 +599,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CLI commands: `setup`, `start`, `update`, `doctor`, `help`
 - Human-controlled autonomy — approval gate before any sensitive tool call executes
 
-[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/dolevhayut/Employee001/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/dolevhayut/Employee001/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/dolevhayut/Employee001/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dolevhayut/Employee001/compare/v0.3.1...v0.4.0
