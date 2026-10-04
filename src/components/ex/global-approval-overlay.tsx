@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
 import { useRoster } from "@/components/ex/roster-context";
+import { useT } from "@/components/ex/i18n-context";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -554,11 +555,18 @@ export function usePendingApprovalCount(): number {
 }
 
 export function NotificationBell({ count }: { count: number }) {
+  const { t } = useT();
+  const title =
+    count === 0
+      ? t("shell.bell.notifications")
+      : count === 1
+        ? t("shell.bell.pendingOne", { count })
+        : t("shell.bell.pendingMany", { count });
   return (
     <button
       className="btn ghost"
       style={{ height: 22, width: 22, padding: 0, justifyContent: "center", position: "relative" }}
-      title={count > 0 ? `${count} pending approval${count === 1 ? "" : "s"}` : "Notifications"}
+      title={title}
     >
       <Icons.Bell size={13} />
       {count > 0 && (
@@ -566,7 +574,7 @@ export function NotificationBell({ count }: { count: number }) {
           style={{
             position: "absolute",
             top: -3,
-            right: -3,
+            insetInlineEnd: -3,
             minWidth: 14,
             height: 14,
             padding: "0 3px",

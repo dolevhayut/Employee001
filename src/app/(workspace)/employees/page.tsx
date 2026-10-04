@@ -12,6 +12,7 @@ import { Star } from "iconoir-react";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
 import { Topbar } from "@/components/ex/shell";
+import { useT } from "@/components/ex/i18n-context";
 import { INTEGRATIONS as INTEGRATION_META } from "@/lib/demo";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { OrgChart } from "@/components/ex/org-chart";
@@ -168,7 +169,7 @@ function Stat({
     <div
       style={{
         padding: "16px 18px",
-        borderLeft: border ? "1px solid var(--hairline)" : "none",
+        borderInlineStart: border ? "1px solid var(--hairline)" : "none",
       }}
     >
       <div className="row" style={{ gap: "var(--sp-8)", marginBottom: "var(--sp-4)" }}>
@@ -1622,6 +1623,7 @@ function InvitePanel({
 }
 
 export default function EmployeesPage() {
+  const { t } = useT();
   const [invites, setInvites] = useState<Invite[]>([]);
   const refreshInvites = useCallback(() => {
     fetch("/api/invites")
@@ -1699,7 +1701,7 @@ export default function EmployeesPage() {
   return (
     <>
       <Topbar
-        crumbs={["Twins"]}
+        crumbs={[t("nav.twins")]}
         actions={
           <div style={{ display: "flex", gap: "var(--sp-8)" }}>
             <Link href="/marketplace" className="btn ghost" style={{ textDecoration: "none" }}>
@@ -1927,7 +1929,7 @@ export default function EmployeesPage() {
                       className="mono"
                       style={{
                         fontSize: "var(--fs-xs)",
-                        marginLeft: "var(--sp-4)",
+                        marginInlineStart: "var(--sp-4)",
                         opacity: 0.7,
                       }}
                     >

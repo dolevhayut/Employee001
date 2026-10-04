@@ -9,6 +9,7 @@ import { useRoster } from "@/components/ex/roster-context";
 import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
 import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 import { LoadErrorPanel, RefreshMiss } from "@/components/ex/load-error";
+import { useT } from "@/components/ex/i18n-context";
 
 type RunSurface = "shift" | "routine" | "task" | "council" | "builder";
 type RunStatus = "running" | "complete" | "error" | "aborted";
@@ -515,7 +516,7 @@ function CockpitCard({ run }: { run: ActiveRun }) {
         <div
           style={{
             padding: "6px 10px",
-            borderLeft: "2px dashed var(--hairline-strong)",
+            borderInlineStart: "2px dashed var(--hairline-strong)",
             background: "rgba(0,0,0,0.02)",
             color: "var(--text-subtle)",
             fontSize: "var(--fs-meta)",
@@ -561,6 +562,7 @@ function CockpitCard({ run }: { run: ActiveRun }) {
 }
 
 export default function CockpitPage() {
+  const { t } = useT();
   const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [runs, setRuns] = useState<ActiveRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -654,7 +656,7 @@ export default function CockpitPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <Topbar
-        crumbs={["Cockpit"]}
+        crumbs={[t("nav.cockpit")]}
         actions={
           <span
             style={{
@@ -753,12 +755,12 @@ export default function CockpitPage() {
         />
         {loadError && hasLoaded && <RefreshMiss />}
         {loadError && !hasLoaded ? (
-          <LoadErrorPanel message={loadError} onRetry={() => void load()} />
+          <LoadErrorPanel message={t("load.runs")} onRetry={() => void load()} />
         ) : isEmpty ? (
           showAutonomyEmpty ? (
             <AutonomyEmptyState
-              title="Cockpit is quiet"
-              description="Live runs land here once twins act on their own — who is working, the tool they are using, and what each run costs."
+              title={t("empty.cockpit.title")}
+              description={t("empty.cockpit.description")}
             />
           ) : (
           <div

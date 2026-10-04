@@ -6,6 +6,7 @@ import { Icons } from "@/components/ex/icons";
 import { useRoster } from "@/components/ex/roster-context";
 import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
 import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
+import { useT } from "@/components/ex/i18n-context";
 import type { AuditEntry, AuditVerdict } from "@/lib/audit-log";
 
 // ─── Verdict helpers ──────────────────────────────────────────────────────────
@@ -124,6 +125,8 @@ function EmpAvatar({ employeeId, employeeName }: { employeeId: string; employeeN
 // ─── Args cell ────────────────────────────────────────────────────────────────
 
 function ArgsCell({ input }: { input: Record<string, unknown> }) {
+  const { locale } = useT();
+  const rtl = locale === "he";
   const [open, setOpen] = useState(false);
   const keys = Object.keys(input);
   if (keys.length === 0) return <span style={{ color: "var(--text-subtle)", fontSize: "var(--fs-meta)" }}>—</span>;
@@ -148,7 +151,7 @@ function ArgsCell({ input }: { input: Record<string, unknown> }) {
           fontFamily: "var(--font-mono, monospace)",
           fontSize: 10.5,
           color: "var(--text-muted)",
-          textAlign: "left",
+          textAlign: "start",
           padding: 0,
           display: "flex",
           alignItems: "center",
@@ -159,7 +162,7 @@ function ArgsCell({ input }: { input: Record<string, unknown> }) {
           size={10}
           style={{
             flexShrink: 0,
-            transform: open ? "rotate(90deg)" : "none",
+            transform: open ? "rotate(90deg)" : rtl ? "rotate(180deg)" : "none",
             transition: "transform .12s",
           }}
         />
@@ -196,6 +199,7 @@ function ArgsCell({ input }: { input: Record<string, unknown> }) {
 const PAGE_SIZE = 100;
 
 export default function AuditPage() {
+  const { t } = useT();
   const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -285,7 +289,7 @@ export default function AuditPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <Topbar
-        crumbs={["Activity log"]}
+        crumbs={[t("nav.activityLog")]}
         actions={
           <button
             className="btn ghost sm"
@@ -339,7 +343,7 @@ export default function AuditPage() {
             size={12}
             style={{
               position: "absolute",
-              left: 8,
+              insetInlineStart: 8,
               top: "50%",
               transform: "translateY(-50%)",
               color: "var(--text-subtle)",
@@ -352,8 +356,8 @@ export default function AuditPage() {
             placeholder="Filter by tool…"
             style={{
               height: 30,
-              paddingLeft: 26,
-              paddingRight: "var(--sp-8)",
+              paddingInlineStart: 26,
+              paddingInlineEnd: "var(--sp-8)",
               fontSize: "var(--fs-sm)",
               border: "1px solid var(--hairline)",
               borderRadius: 5,
@@ -443,7 +447,7 @@ export default function AuditPage() {
           </select>
         )}
 
-        <div style={{ marginLeft: "auto", fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}>
+        <div style={{ marginInlineStart: "auto", fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}>
           {loading
             ? "Loading…"
             : `${totalCount} entr${totalCount === 1 ? "y" : "ies"}${
@@ -457,8 +461,8 @@ export default function AuditPage() {
         {isEmpty ? (
           showAutonomyEmpty ? (
             <AutonomyEmptyState
-              title="The activity log is empty"
-              description="Tool calls twins make on their own are written here, with whether each one was allowed, blocked, or sent to Approvals."
+              title={t("empty.audit.title")}
+              description={t("empty.audit.description")}
             />
           ) : (
           <div
@@ -503,7 +507,7 @@ export default function AuditPage() {
                     key={h}
                     style={{
                       padding: "8px 16px",
-                      textAlign: "left",
+                      textAlign: "start",
                       fontWeight: 600,
                       fontSize: "var(--fs-meta)",
                       color: "var(--text-muted)",

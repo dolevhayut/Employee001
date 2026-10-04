@@ -9,6 +9,7 @@ import { useRoster } from "@/components/ex/roster-context";
 import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
 import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 import { LoadErrorPanel, RefreshMiss } from "@/components/ex/load-error";
+import { useT } from "@/components/ex/i18n-context";
 
 type FeedSource =
   | { kind: "shift"; employeeId: string; runId: string }
@@ -220,6 +221,7 @@ function ResolutionChip({ resolution, resolvedAt }: { resolution: string; resolv
 }
 
 export default function InboxPage() {
+  const { t } = useT();
   const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -288,7 +290,7 @@ export default function InboxPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <Topbar
-        crumbs={["Approvals"]}
+        crumbs={[t("nav.approvals")]}
         actions={
           <button className="btn ghost sm" onClick={load} title="Refresh" style={{ height: 28 }}>
             <Icons.Refresh
@@ -382,12 +384,12 @@ export default function InboxPage() {
         />
         {loadError && hasLoaded && <RefreshMiss />}
         {loadError && !hasLoaded ? (
-          <LoadErrorPanel message={loadError} onRetry={() => void load()} />
+          <LoadErrorPanel message={t("load.approvals")} onRetry={() => void load()} />
         ) : isEmpty ? (
           showAutonomyEmpty ? (
             <AutonomyEmptyState
-              title="Approvals is clear"
-              description="When twins act unattended, decisions that need you, along with the updates they post, collect here."
+              title={t("empty.approvals.title")}
+              description={t("empty.approvals.description")}
             />
           ) : (
           <div
@@ -474,7 +476,7 @@ export default function InboxPage() {
                           color: "var(--text-muted)",
                           margin: "0 0 8px",
                           lineHeight: 1.5,
-                          paddingLeft: "var(--sp-2)",
+                          paddingInlineStart: "var(--sp-2)",
                         }}
                       >
                         {item.detail}

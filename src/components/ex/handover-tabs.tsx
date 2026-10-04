@@ -2,19 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useT } from "@/components/ex/i18n-context";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 // Handover (Labs) is one sidebar entry with two tabs: the scripted export and
 // the live interview. Same pill look as the Schedules / Focus tabs.
-const TABS = [
-  { href: "/handover", label: "Handover" },
-  { href: "/handover/live", label: "Live interview" },
+const TABS: { href: string; labelKey: MessageKey }[] = [
+  { href: "/handover", labelKey: "nav.handover" },
+  { href: "/handover/live", labelKey: "handover.live" },
 ];
 
 export function HandoverTabs() {
   const pathname = usePathname();
+  const { t } = useT();
 
   return (
-    <nav aria-label="Handover" style={{ display: "flex", gap: "var(--sp-6)" }}>
+    <nav aria-label={t("nav.handover")} style={{ display: "flex", gap: "var(--sp-6)" }}>
       {TABS.map((tab) => {
         const active = pathname === tab.href;
         return (
@@ -33,7 +36,7 @@ export function HandoverTabs() {
               textDecoration: "none",
             }}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </Link>
         );
       })}

@@ -8,6 +8,7 @@ import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { PageHead } from "@/components/ex/page-head";
 import { Topbar } from "@/components/ex/shell";
+import { useT } from "@/components/ex/i18n-context";
 import type { AgentPlacement } from "@/lib/agent-placement";
 import { CATEGORY_LABELS, type MarketplaceCategory } from "@/lib/marketplace";
 
@@ -567,6 +568,8 @@ function TrialChatDrawer({
   onClose: () => void;
   onHire: (id: string) => void;
 }) {
+  const { locale } = useT();
+  const rtl = locale === "he";
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -680,19 +683,19 @@ function TrialChatDrawer({
       <motion.aside
         role="dialog"
         aria-label={`Trial chat with ${agent.name}`}
-        initial={{ x: "100%" }}
+        initial={{ x: rtl ? "-100%" : "100%" }}
         animate={{ x: 0 }}
-        exit={{ x: "100%" }}
+        exit={{ x: rtl ? "-100%" : "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 280 }}
         style={{
           position: "fixed",
           top: 0,
-          right: 0,
+          insetInlineEnd: 0,
           bottom: 0,
           width: "min(480px, 100%)",
           background: "var(--surface-raised, var(--surface))",
-          borderLeft: "1px solid var(--hairline)",
-          boxShadow: "-12px 0 40px rgba(0,0,0,0.25)",
+          borderInlineStart: "1px solid var(--hairline)",
+          boxShadow: rtl ? "12px 0 40px rgba(0,0,0,0.25)" : "-12px 0 40px rgba(0,0,0,0.25)",
           zIndex: 9991,
           display: "flex",
           flexDirection: "column",
@@ -769,7 +772,7 @@ function TrialChatDrawer({
                     key={s}
                     onClick={() => setInput(s)}
                     style={{
-                      textAlign: "left",
+                      textAlign: "start",
                       padding: "7px 10px",
                       borderRadius: 8,
                       border: "1px solid var(--hairline)",
@@ -904,6 +907,7 @@ function TrialChatDrawer({
 }
 
 export default function MarketplacePage() {
+  const { t } = useT();
   const router = useRouter();
   const [agents, setAgents] = useState<AgentCard[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -1031,7 +1035,7 @@ export default function MarketplacePage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Topbar
-        crumbs={["Hire"]}
+        crumbs={[t("nav.hire")]}
         actions={
           <span style={{ fontSize: "var(--fs-sm)", color: "var(--muted)" }}>
             {agents.length} agents · {hiredCount} hired
@@ -1044,7 +1048,7 @@ export default function MarketplacePage() {
           style={{
             position: "fixed",
             bottom: 24,
-            right: 24,
+            insetInlineEnd: 24,
             zIndex: 9999,
             background: toast.kind === "success" ? "var(--text)" : "var(--danger)",
             color: toast.kind === "success" ? "var(--bg)" : "#fff",

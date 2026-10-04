@@ -11,6 +11,7 @@ import { useRoster } from "@/components/ex/roster-context";
 import { EmployeePicker } from "@/components/ex/employee-picker";
 import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
 import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
+import { useT } from "@/components/ex/i18n-context";
 import type { Routine, Schedule, RoutineRunStatus } from "@/lib/routines";
 import { isValidCron } from "@/lib/cron";
 
@@ -47,6 +48,8 @@ const STATUS_META: Record<RoutineRunStatus, { label: string; color: string; bg: 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function RoutinesPage() {
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const roster = useRoster();
   const [routines, setRoutines] = useState<Routine[]>([]);
@@ -146,7 +149,7 @@ export default function RoutinesPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <Topbar
-        crumbs={["Schedules"]}
+        crumbs={[t("nav.schedules")]}
         actions={
           <button
             className="btn primary sm"
@@ -207,8 +210,8 @@ export default function RoutinesPage() {
         {!loading && routines.length === 0 && (
           modeLoaded && mode === "base" ? (
             <AutonomyEmptyState
-              title="No schedules yet"
-              description="Schedules keep twins working when you are not in the chat. Their recurring runs and latest results appear here once Autonomy is on."
+              title={t("empty.schedules.title")}
+              description={t("empty.schedules.description")}
             />
           ) : (
           <div
@@ -349,23 +352,23 @@ export default function RoutinesPage() {
                       style={{
                         display: "block",
                         width: "100%",
-                        textAlign: "left",
+                        textAlign: "start",
                         background: "transparent",
                         border: "none",
                         padding: "6px 10px",
                         marginBottom: "var(--sp-10)",
-                        borderLeft: "2px solid var(--hairline)",
+                        borderInlineStart: "2px solid var(--hairline)",
                         cursor: "pointer",
                         position: "relative",
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderLeftColor = "var(--accent)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderLeftColor = "var(--hairline)"; }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderInlineStartColor = "var(--accent)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderInlineStartColor = "var(--hairline)"; }}
                     >
                       <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", marginBottom: "var(--sp-3)", display: "flex", alignItems: "center", gap: "var(--sp-6)" }}>
                         <strong style={{ color: "var(--text)" }}>Last run {relTime(r.lastRunAt)}</strong>
                         <span style={{ flex: 1 }} />
                         <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-3)", color: "var(--accent)" }}>
-                          View details <Icons.Chevron size={9} />
+                          View details <Icons.Chevron size={9} style={{ transform: rtl ? "rotate(180deg)" : undefined }} />
                         </span>
                       </div>
                       <div
@@ -504,6 +507,8 @@ function RoutineDetailModal({
   onClose: () => void;
   onRunNow: () => Promise<void>;
 }) {
+  const { locale } = useT();
+  const rtl = locale === "he";
   const employee = useRoster().find((e) => e.id === routine.employeeId);
   const status = routine.lastRunStatus ? STATUS_META[routine.lastRunStatus] : null;
 
@@ -723,8 +728,8 @@ function RoutineDetailModal({
                 }}
               >
                 Shift history
-                <span style={{ fontWeight: 400, textTransform: "none", marginLeft: 6, opacity: 0.6 }}>
-                  ({history.length})
+                <span style={{ fontWeight: 400, textTransform: "none", marginInlineStart: 6, opacity: 0.6 }}>
+                  <bdi>({history.length})</bdi>
                 </span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)", maxHeight: 200, overflowY: "auto" }} className="scrollbar">
@@ -747,7 +752,7 @@ function RoutineDetailModal({
                         border: `1px solid ${sel ? "var(--hairline)" : "transparent"}`,
                         borderRadius: 6,
                         cursor: "pointer",
-                        textAlign: "left",
+                        textAlign: "start",
                         fontFamily: "inherit",
                         width: "100%",
                         transition: "background 0.12s",
@@ -830,8 +835,8 @@ function RoutineDetailModal({
                 }}
               >
                 Deliverables
-                <span style={{ fontWeight: 400, textTransform: "none", marginLeft: 6, opacity: 0.6 }}>
-                  ({shiftData.outputs.length + shiftData.artifacts.length})
+                <span style={{ fontWeight: 400, textTransform: "none", marginInlineStart: 6, opacity: 0.6 }}>
+                  <bdi>({shiftData.outputs.length + shiftData.artifacts.length})</bdi>
                 </span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-6)" }}>
@@ -850,7 +855,7 @@ function RoutineDetailModal({
                       border: "1px solid var(--hairline)",
                       borderRadius: 8,
                       cursor: "pointer",
-                      textAlign: "left",
+                      textAlign: "start",
                       fontFamily: "inherit",
                       width: "100%",
                       transition: "background 0.12s",
@@ -942,7 +947,7 @@ function RoutineDetailModal({
                   fontFamily: "inherit",
                 }}
               >
-                <Icons.Chevron size={10} style={{ transform: showLog ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
+                <Icons.Chevron size={10} style={{ transform: showLog ? "rotate(90deg)" : rtl ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
                 Activity log
                 <span style={{ fontWeight: 400, textTransform: "none", opacity: 0.6 }}>
                   — thinking, tools &amp; results
@@ -956,8 +961,8 @@ function RoutineDetailModal({
                     marginTop: "var(--sp-10)",
                     maxHeight: 360,
                     overflowY: "auto",
-                    borderLeft: "2px solid var(--hairline)",
-                    paddingLeft: "var(--sp-12)",
+                    borderInlineStart: "2px solid var(--hairline)",
+                    paddingInlineStart: "var(--sp-12)",
                     display: "flex",
                     flexDirection: "column",
                     gap: "var(--sp-8)",

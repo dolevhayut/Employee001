@@ -10,6 +10,7 @@ import {
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
+import { useT } from "@/components/ex/i18n-context";
 import {
   ObsidianGraph,
   type GraphHighlightState,
@@ -66,6 +67,7 @@ function writeChatWidth(pct: number): void {
 }
 
 export default function FlowPage() {
+  const { t } = useT();
   const roster = useRoster();
   const readyEmployees = useMemo(
     () => roster.filter((e) => e.twinStatus === "ready"),
@@ -263,7 +265,12 @@ export default function FlowPage() {
 
   return (
     <>
-      <Topbar crumbs={["Workspace", "Chat"]} />
+      <Topbar
+        crumbs={[
+          { label: t("crumb.workspace"), href: "/employees" },
+          t("nav.chat"),
+        ]}
+      />
 
       {/* Employee picker bar */}
       <EmployeePickerBar activeId={activeId} onSelect={setSelectedId} />
@@ -408,7 +415,7 @@ function EmployeePickerBar({
           letterSpacing: "0.06em",
           textTransform: "uppercase",
           color: "var(--text-subtle)",
-          marginRight: "var(--sp-4)",
+          marginInlineEnd: "var(--sp-4)",
         }}
       >
         Twin brain
@@ -425,7 +432,10 @@ function EmployeePickerBar({
               display: "flex",
               alignItems: "center",
               gap: "var(--sp-8)",
-              padding: "5px 12px 5px 5px",
+              paddingTop: 5,
+              paddingBottom: 5,
+              paddingInlineStart: 5,
+              paddingInlineEnd: 12,
               background: isActive ? "var(--surface)" : "transparent",
               border: `1px solid ${isActive ? "var(--accent-soft)" : "transparent"}`,
               borderRadius: 22,
@@ -451,7 +461,7 @@ function EmployeePickerBar({
               {emp.initials}
             </div>
             <div
-              style={{ display: "flex", flexDirection: "column", textAlign: "left" }}
+              style={{ display: "flex", flexDirection: "column", textAlign: "start" }}
             >
               <span
                 style={{

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
+import { useT } from "@/components/ex/i18n-context";
 
 type Props = {
   title: string;
@@ -10,6 +11,7 @@ type Props = {
 
 export function AutonomyEmptyState({ title, description }: Props) {
   const { setMode } = useWorkspaceMode();
+  const { t } = useT();
 
   return (
     <motion.div
@@ -48,7 +50,7 @@ export function AutonomyEmptyState({ title, description }: Props) {
         {description}
       </p>
       <button type="button" className="btn primary" onClick={() => setMode("x")}>
-        Turn on Autonomy
+        {t("autonomy.turnOn")}
       </button>
     </motion.div>
   );

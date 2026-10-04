@@ -7,6 +7,7 @@ import { PageHead } from "@/components/ex/page-head";
 import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
 import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 import { LoadErrorPanel, RefreshMiss } from "@/components/ex/load-error";
+import { useT } from "@/components/ex/i18n-context";
 
 type BudgetRow = {
   employeeId: string;
@@ -108,12 +109,13 @@ function EditableLimit({
         textDecoration: "underline dotted var(--text-muted)",
       }}
     >
-      ${row.dailyBudgetUsd.toFixed(2)}
+      <bdi>${row.dailyBudgetUsd.toFixed(2)}</bdi>
     </button>
   );
 }
 
 export default function BudgetsPage() {
+  const { t } = useT();
   const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [rows, setRows] = useState<BudgetRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,7 +161,7 @@ export default function BudgetsPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Topbar
-        crumbs={["Spend"]}
+        crumbs={[t("nav.spend")]}
         actions={
           <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-12)" }}>
             <Link
@@ -190,11 +192,11 @@ export default function BudgetsPage() {
         />
         {loadError && hasLoaded && <RefreshMiss />}
         {loadError && !hasLoaded ? (
-          <LoadErrorPanel message={loadError} onRetry={() => void load()} />
+          <LoadErrorPanel message={t("load.budgets")} onRetry={() => void load()} />
         ) : showAutonomyEmpty ? (
           <AutonomyEmptyState
-            title="Spend has nothing to track yet"
-            description="Daily caps and the money twins use while working unattended show up here after Autonomy is on."
+            title={t("empty.spend.title")}
+            description={t("empty.spend.description")}
           />
         ) : (
         <>
@@ -214,8 +216,8 @@ export default function BudgetsPage() {
           <div>
             <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", marginBottom: "var(--sp-4)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Org spend today</div>
             <div style={{ fontSize: "var(--fs-h3)", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "var(--text)" }}>
-              ${totalSpent.toFixed(4)}
-              <span style={{ fontSize: "var(--fs-ui)", fontWeight: 400, color: "var(--text-muted)", marginLeft: "var(--sp-6)" }}>/ ${totalLimit.toFixed(2)} limit</span>
+              <bdi>${totalSpent.toFixed(4)}</bdi>
+              <span style={{ fontSize: "var(--fs-ui)", fontWeight: 400, color: "var(--text-muted)", marginInlineStart: "var(--sp-6)" }}><bdi>/ ${totalLimit.toFixed(2)}</bdi> limit</span>
             </div>
           </div>
           <div style={{ flex: 1, height: 8, background: "var(--bg-sunken)", borderRadius: 99, overflow: "hidden" }}>
@@ -229,7 +231,7 @@ export default function BudgetsPage() {
               }}
             />
           </div>
-          <div style={{ fontSize: "var(--fs-ui)", color: "var(--text-muted)", minWidth: 40, textAlign: "right" }}>
+          <div style={{ fontSize: "var(--fs-ui)", color: "var(--text-muted)", minWidth: 40, textAlign: "end" }}>
             {pct(totalSpent, totalLimit)}%
           </div>
         </div>
@@ -256,7 +258,7 @@ export default function BudgetsPage() {
                       key={h}
                       style={{
                         padding: "10px 16px",
-                        textAlign: "left",
+                        textAlign: "start",
                         fontSize: "var(--fs-meta)",
                         fontWeight: 600,
                         color: "var(--text-muted)",
@@ -287,7 +289,7 @@ export default function BudgetsPage() {
                         {overBudget && (
                           <span
                             style={{
-                              marginLeft: "var(--sp-8)",
+                              marginInlineStart: "var(--sp-8)",
                               fontSize: "var(--fs-xs)",
                               fontWeight: 600,
                               background: "var(--danger)",
@@ -309,7 +311,7 @@ export default function BudgetsPage() {
                         <EditableLimit row={row} onSaved={onSaved} />
                       </td>
                       <td style={{ padding: "12px 16px", fontSize: "var(--fs-ui)", fontFamily: "var(--font-mono, monospace)", color: "var(--text)" }}>
-                        ${row.spentTodayUsd.toFixed(4)}
+                        <bdi>${row.spentTodayUsd.toFixed(4)}</bdi>
                       </td>
                       <td style={{ padding: "12px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)" }}>
@@ -324,7 +326,7 @@ export default function BudgetsPage() {
                             />
                           </div>
                           <span style={{ fontSize: "var(--fs-sm)", fontFamily: "var(--font-mono, monospace)", color: overBudget ? "var(--danger)" : "var(--text-muted)" }}>
-                            ${remaining.toFixed(2)}
+                            <bdi>${remaining.toFixed(2)}</bdi>
                           </span>
                         </div>
                       </td>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "iconoir-react";
 import { Topbar } from "@/components/ex/shell";
+import { useT } from "@/components/ex/i18n-context";
 import { useRoster } from "@/components/ex/roster-context";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 
@@ -54,6 +55,7 @@ export default function ConnectionsForEmployeePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { t } = useT();
   const roster = useRoster();
   const employee = useMemo(
     () => roster.find((e) => e.id === id),
@@ -189,7 +191,12 @@ export default function ConnectionsForEmployeePage({
   if (!employee) {
     return (
       <>
-        <Topbar crumbs={["Workspace", "Tools & MCP"]} />
+        <Topbar
+          crumbs={[
+            { label: t("crumb.workspace"), href: "/employees" },
+            t("nav.tools"),
+          ]}
+        />
         <div style={{ padding: "var(--sp-32)", color: "var(--text-muted)" }}>
           Employee not found.
         </div>
@@ -208,7 +215,11 @@ export default function ConnectionsForEmployeePage({
   return (
     <>
       <Topbar
-        crumbs={["Workspace", "Tools & MCP", employee.name]}
+        crumbs={[
+          { label: t("crumb.workspace"), href: "/employees" },
+          t("nav.tools"),
+          employee.name,
+        ]}
         actions={
           <Link
             href="/settings#custom-mcp"
@@ -446,7 +457,7 @@ export default function ConnectionsForEmployeePage({
             <button
               onClick={() => setShowAll((v) => !v)}
               style={{
-                marginLeft: "auto",
+                marginInlineStart: "auto",
                 padding: "5px 10px",
                 fontSize: "var(--fs-meta)",
                 fontWeight: 600,
@@ -694,7 +705,7 @@ function ToolkitCard({
           style={{
             position: "absolute",
             top: 8,
-            right: 8,
+            insetInlineEnd: 8,
             fontSize: "var(--fs-xs)",
             fontWeight: 600,
             color: "var(--accent-deep)",
@@ -960,7 +971,7 @@ function EmployeePickerBar({ activeId }: { activeId: string }) {
           letterSpacing: "0.06em",
           textTransform: "uppercase",
           color: "var(--text-subtle)",
-          marginRight: "var(--sp-4)",
+          marginInlineEnd: "var(--sp-4)",
         }}
       >
         Configure connections for
@@ -975,7 +986,10 @@ function EmployeePickerBar({ activeId }: { activeId: string }) {
               display: "flex",
               alignItems: "center",
               gap: "var(--sp-8)",
-              padding: "5px 12px 5px 5px",
+              paddingTop: 5,
+              paddingBottom: 5,
+              paddingInlineStart: 5,
+              paddingInlineEnd: 12,
               background: isActive ? "var(--surface)" : "transparent",
               border: `1px solid ${
                 isActive ? "var(--accent-soft)" : "transparent"
@@ -1006,7 +1020,7 @@ function EmployeePickerBar({ activeId }: { activeId: string }) {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                textAlign: "left",
+                textAlign: "start",
               }}
             >
               <span

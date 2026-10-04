@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { useT } from "@/components/ex/i18n-context";
-import type { Locale } from "@/lib/i18n/messages";
+import type { Locale, MessageKey } from "@/lib/i18n/messages";
 import { setOrgName } from "@/components/ex/use-org-name";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
@@ -22,6 +22,7 @@ import { ObsidianGraph } from "@/components/ex/obsidian-graph";
 import { BrainGraph3D } from "@/components/ex/brain-graph-3d";
 
 export default function SettingsPage() {
+  const { t } = useT();
   // App Router doesn't auto-scroll to hash on client navigations. When the
   // launchpad sends the CEO to /settings#company-brain we have to scroll
   // manually once the section is mounted.
@@ -33,20 +34,23 @@ export default function SettingsPage() {
       const el = document.getElementById(hash);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     };
-    const t = setTimeout(tick, 60);
-    return () => clearTimeout(t);
+    const timer = setTimeout(tick, 60);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
     <>
       <Topbar
-        crumbs={["Workspace", "Settings"]}
+        crumbs={[
+          { label: t("crumb.workspace"), href: "/employees" },
+          t("nav.settings"),
+        ]}
         actions={
           <Link
             href="/templates"
             style={{ fontSize: "var(--fs-sm)", fontWeight: 500, color: "var(--text-muted)", textDecoration: "underline", textUnderlineOffset: 3 }}
           >
-            Task templates
+            {t("settings.link.templates")}
           </Link>
         }
       />
@@ -61,8 +65,8 @@ export default function SettingsPage() {
         <div style={{ maxWidth: 760 }}>
           <PageHead
             icon="Settings"
-            title="Settings"
-            subtitle="Configure workspace identity, internal playbooks (org skills), and custom MCP servers. This is where you wire new capabilities into the company."
+            title={t("nav.settings")}
+            subtitle={t("settings.page.subtitle")}
             style={{ marginBottom: "var(--sp-20)" }}
           />
 
@@ -79,6 +83,7 @@ export default function SettingsPage() {
 }
 
 function ApiKeysSection() {
+  const { t } = useT();
   const [anthropic, setAnthropic] = useState("");
   const [composio, setComposio] = useState("");
   const [elevenLabs, setElevenLabs] = useState("");
@@ -124,18 +129,18 @@ function ApiKeysSection() {
   return (
     <section style={{ marginBottom: "var(--sp-32)" }}>
       <SectionHeader
-        title="API Keys"
-        desc="Keys are written to .env on your machine. Values are never sent anywhere except the respective APIs. Restart the server after saving to apply changes."
+        title={t("settings.api.title")}
+        desc={t("settings.api.desc")}
       />
       <div className="card" style={{ padding: "var(--sp-20)", display: "flex", flexDirection: "column", gap: "var(--sp-16)" }}>
         {keyRows.map(({ key, label, statusKey, value, setValue, required }) => (
           <div key={key}>
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", marginBottom: "var(--sp-6)" }}>
               <span className="section-title" style={{ fontSize: "var(--fs-xs)" }}>{label}</span>
-              {required && <span style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase" }}>required</span>}
+              {required && <span style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase" }}>{t("settings.api.required")}</span>}
               {status[statusKey] && (
                 <span style={{ fontSize: 10, color: "var(--green, #4caf7d)", textTransform: "uppercase" }}>
-                  {saved === key ? "saved ✓" : "configured"}
+                  {saved === key ? t("settings.api.saved") : t("settings.api.configured")}
                 </span>
               )}
             </div>
@@ -144,7 +149,7 @@ function ApiKeysSection() {
                 type="password"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder={status[statusKey] ? "Enter new key to replace…" : "Paste key here…"}
+                placeholder={status[statusKey] ? t("settings.api.placeholderReplace") : t("settings.api.placeholderPaste")}
                 style={{
                   flex: 1,
                   padding: "8px 10px",
@@ -171,13 +176,13 @@ function ApiKeysSection() {
                   whiteSpace: "nowrap",
                 }}
               >
-                {saving === key ? "Saving…" : "Save"}
+                {saving === key ? t("settings.action.saving") : t("settings.action.save")}
               </button>
             </div>
           </div>
         ))}
         <p style={{ fontSize: "var(--fs-xs)", color: "var(--text-3)", margin: 0 }}>
-          After saving, restart the server with <code style={{ fontFamily: "var(--font-mono)" }}>npx employee001 start</code> to apply the new keys.
+          {t("settings.api.restartBefore")} <code dir="ltr" style={{ fontFamily: "var(--font-mono)" }}>npx employee001 start</code> {t("settings.api.restartAfter")}
         </p>
       </div>
     </section>
@@ -185,6 +190,7 @@ function ApiKeysSection() {
 }
 
 function WorkspaceSection() {
+  const { t } = useT();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saved, setSaved] = useState<{ name: string; description: string } | null>(null);
@@ -236,8 +242,8 @@ function WorkspaceSection() {
   return (
     <section style={{ marginBottom: "var(--sp-32)" }}>
       <SectionHeader
-        title="Workspace"
-        desc="The organization this workspace represents."
+        title={t("crumb.workspace")}
+        desc={t("settings.workspace.desc")}
       />
       <div className="card" style={{ padding: "var(--sp-20)" }}>
         <div className="row" style={{ gap: "var(--sp-16)", alignItems: "center", marginBottom: "var(--sp-20)" }}>
@@ -258,33 +264,33 @@ function WorkspaceSection() {
             {(name || "?").slice(0, 1).toUpperCase()}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>Workspace logo</div>
+            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>{t("settings.workspace.logo")}</div>
             <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
-              PNG or SVG, square, ≥ 256×256
+              {t("settings.workspace.logoHint")} <bdi>≥ 256×256</bdi>
             </div>
           </div>
-          <button className="btn sm">Upload</button>
+          <button className="btn sm">{t("settings.workspace.upload")}</button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "var(--sp-16)" }}>
-          <Field label="Organization name" value={name} onChange={setName} placeholder="Acme" />
+          <Field label={t("settings.workspace.orgName")} value={name} onChange={setName} placeholder="Acme" />
           <Field
-            label="What the company does (one line)"
+            label={t("settings.workspace.what")}
             value={description}
             onChange={setDescription}
-            placeholder="A two-sided marketplace for local contractors"
+            placeholder={t("settings.workspace.whatPlaceholder")}
           />
         </div>
         <div className="row" style={{ alignItems: "center", gap: "var(--sp-12)", marginTop: "var(--sp-16)" }}>
           <button className="btn primary sm" onClick={save} disabled={!dirty || status === "saving"}>
-            {status === "saving" ? "Saving…" : "Save"}
+            {status === "saving" ? t("settings.action.saving") : t("settings.action.save")}
           </button>
           <span className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
             {status === "saved" && !dirty
-              ? "Saved. Twins use this from their next run."
+              ? t("settings.workspace.saved")
               : status === "error"
-                ? "Couldn't load or save. Try again."
-                : "Twins introduce themselves as working here."}
+                ? t("settings.workspace.error")
+                : t("settings.workspace.idle")}
           </span>
         </div>
         <LanguageControl />
@@ -355,6 +361,7 @@ function LanguageControl() {
 // ─── Org Skills ──────────────────────────────────────────────────────────────
 
 function OrgSkillsSection() {
+  const { t } = useT();
   const [skills, setSkills] = useState<OrgSkillPlaybook[] | null>(null);
   const [editing, setEditing] = useState<OrgSkillPlaybook | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -369,10 +376,10 @@ function OrgSkillsSection() {
       setSkills(data.skills ?? []);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      setError(err instanceof Error ? err.message : t("settings.status.failedToLoad"));
       setSkills([]);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -398,7 +405,7 @@ function OrgSkillsSection() {
       );
 
       if (payload.length === 0) {
-        throw new Error("Choose one or more .md files");
+        throw new Error(t("settings.skills.chooseMd"));
       }
 
       const res = await fetch("/api/org/skills/import", {
@@ -411,18 +418,18 @@ function OrgSkillsSection() {
         errors?: Array<{ filename: string; error: string }>;
         error?: string;
       };
-      if (!res.ok) throw new Error(data.error ?? "Import failed");
+      if (!res.ok) throw new Error(data.error ?? t("settings.skills.importFailed"));
 
       const importedCount = data.imported?.length ?? 0;
       const errorCount = data.errors?.length ?? 0;
       setImportMessage(
         errorCount > 0
-          ? `Imported ${importedCount}; ${errorCount} file${errorCount === 1 ? "" : "s"} failed`
-          : `Imported ${importedCount} skill${importedCount === 1 ? "" : "s"}`
+          ? t(errorCount === 1 ? "settings.skills.importedPartialOne" : "settings.skills.importedPartialMany", { imported: importedCount, failed: errorCount })
+          : t(importedCount === 1 ? "settings.skills.importedOne" : "settings.skills.importedMany", { count: importedCount })
       );
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
+      setError(err instanceof Error ? err.message : t("settings.skills.importFailed"));
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -432,15 +439,15 @@ function OrgSkillsSection() {
   return (
     <section style={{ marginBottom: "var(--sp-32)" }}>
       <SectionHeader
-        title="Organization skills"
-        desc="Reusable operating playbooks. Assign them to twins from each twin profile."
+        title={t("settings.skills.title")}
+        desc={t("settings.skills.desc")}
       />
       <div className="card" style={{ padding: "var(--sp-20)" }}>
         <div className="row" style={{ alignItems: "center", marginBottom: "var(--sp-16)" }}>
           <div style={{ flex: 1, fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>
             {skills === null
-              ? "Loading…"
-              : `${skills.length} org skill${skills.length === 1 ? "" : "s"} available`}
+              ? t("settings.status.loading")
+              : t(skills.length === 1 ? "settings.skills.countOne" : "settings.skills.countMany", { count: skills.length })}
           </div>
           <input
             ref={fileInputRef}
@@ -454,10 +461,10 @@ function OrgSkillsSection() {
             className="btn sm"
             disabled={importing}
             onClick={() => fileInputRef.current?.click()}
-            title="Import one or more SKILL.md files"
+            title={t("settings.skills.importTitle")}
           >
             <Icons.Doc size={12} />
-            {importing ? "Importing…" : "Import SKILL.md"}
+            {importing ? t("settings.skills.importing") : t("settings.skills.importButton")}
           </button>
         </div>
 
@@ -525,6 +532,7 @@ function OrgSkillRow({
   skill: OrgSkillPlaybook;
   onEdit: () => void;
 }) {
+  const { t } = useT();
   return (
     <div
       className="card"
@@ -560,7 +568,7 @@ function OrgSkillRow({
             lineHeight: 1.4,
           }}
         >
-          {skill.description || "No description yet"}
+          {skill.description || t("settings.skills.noDescription")}
         </div>
         <div style={{ display: "flex", gap: "var(--sp-4)", flexWrap: "wrap", marginTop: "var(--sp-6)" }}>
           {skill.triggers.slice(0, 6).map((trigger) => (
@@ -582,7 +590,7 @@ function OrgSkillRow({
         </div>
       </div>
       <button className="btn ghost sm" onClick={onEdit}>
-        Edit
+        {t("settings.action.edit")}
       </button>
     </div>
   );
@@ -597,6 +605,7 @@ function OrgSkillModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useT();
   const [label, setLabel] = useState(skill.label);
   const [description, setDescription] = useState(skill.description);
   const [triggers, setTriggers] = useState(skill.triggers.join(", "));
@@ -620,11 +629,11 @@ function OrgSkillModal({
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? "Save failed");
+        throw new Error(data.error ?? t("settings.status.saveFailed"));
       }
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("settings.status.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -659,29 +668,29 @@ function OrgSkillModal({
       >
         <div style={{ marginBottom: "var(--sp-20)" }}>
           <h2 style={{ fontSize: "var(--fs-lg)", fontWeight: 600, margin: 0 }}>
-            Edit {skill.label}
+            {t("settings.editNamed", { name: skill.label })}
           </h2>
           <p className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-4)" }}>
-            Changes affect the next twin run that selects this organization skill.
+            {t("settings.skills.editDesc")}
           </p>
         </div>
 
         <div style={{ display: "grid", gap: "var(--sp-14)" }}>
-          <Field label="Label" value={label} onChange={setLabel} />
+          <Field label={t("settings.field.label")} value={label} onChange={setLabel} />
           <Field
-            label="Description"
+            label={t("settings.field.description")}
             value={description}
             onChange={setDescription}
           />
           <Field
-            label="Triggers"
+            label={t("settings.skills.triggers")}
             value={triggers}
             onChange={setTriggers}
-            placeholder="roadmap, priority, launch"
+            placeholder={t("settings.skills.triggersPlaceholder")}
           />
           <div>
             <div className="section-title" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-4)" }}>
-              Playbook
+              {t("settings.field.playbook")}
             </div>
             <textarea
               value={body}
@@ -713,7 +722,7 @@ function OrgSkillModal({
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--sp-8)", marginTop: "var(--sp-24)" }}>
           <button className="btn sm" onClick={onClose} disabled={saving}>
-            Cancel
+            {t("settings.action.cancel")}
           </button>
           <button
             className="btn sm"
@@ -725,7 +734,7 @@ function OrgSkillModal({
               borderColor: "var(--text)",
             }}
           >
-            {saving ? "Saving…" : "Save skill"}
+            {saving ? t("settings.action.saving") : t("settings.skills.save")}
           </button>
         </div>
       </div>
@@ -734,6 +743,17 @@ function OrgSkillModal({
 }
 
 // ─── Org Brain (Company-wide knowledge graph) ───────────────────────────────
+
+const BRAIN_TYPE_LABEL: Record<OrgBrainNodeType, MessageKey> = {
+  document: "settings.brain.type.document",
+  decision: "settings.brain.type.decision",
+  incident: "settings.brain.type.incident",
+  policy: "settings.brain.type.policy",
+  customer: "settings.brain.type.customer",
+  product: "settings.brain.type.product",
+  process: "settings.brain.type.process",
+  note: "settings.brain.type.note",
+};
 
 const BRAIN_TYPES: OrgBrainNodeType[] = [
   "document",
@@ -763,6 +783,7 @@ type BrainEditState =
   | null;
 
 function OrgBrainSection() {
+  const { t } = useT();
   const [nodes, setNodes] = useState<OrgBrainNode[] | null>(null);
   const [editing, setEditing] = useState<BrainEditState>(null);
   const [building, setBuilding] = useState(false);
@@ -776,10 +797,10 @@ function OrgBrainSection() {
       setNodes(data.nodes ?? []);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      setError(err instanceof Error ? err.message : t("settings.status.failedToLoad"));
       setNodes([]);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -791,7 +812,7 @@ function OrgBrainSection() {
   async function remove(node: OrgBrainNode) {
     if (
       !confirm(
-        `Delete the "${node.label}" knowledge node? Every twin loses access immediately.`
+        t("settings.brain.deleteConfirm", { label: node.label })
       )
     )
       return;
@@ -801,11 +822,11 @@ function OrgBrainSection() {
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? "Delete failed");
+        throw new Error(data.error ?? t("settings.status.deleteFailed"));
       }
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      setError(err instanceof Error ? err.message : t("settings.status.deleteFailed"));
     }
   }
 
@@ -815,38 +836,38 @@ function OrgBrainSection() {
       style={{ marginBottom: "var(--sp-32)", scrollMarginTop: 80 }}
     >
       <SectionHeader
-        title="Company brain"
-        desc="Organization-wide knowledge nodes — facts every twin reads at run time. Pricing policies, customer segments, incident postmortems, product decisions."
+        title={t("settings.brain.title")}
+        desc={t("settings.brain.desc")}
       />
       <div className="card" style={{ padding: "var(--sp-20)" }}>
         <div className="row" style={{ alignItems: "center", marginBottom: "var(--sp-16)" }}>
           <div style={{ flex: 1, fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>
             {nodes === null
-              ? "Loading…"
+              ? t("settings.status.loading")
               : nodes.length === 0
-              ? "No nodes yet — every twin has nothing organizational to lean on."
-              : `${nodes.length} brain node${nodes.length === 1 ? "" : "s"} · shared across every twin`}
+              ? t("settings.brain.none")
+              : t(nodes.length === 1 ? "settings.brain.countOne" : "settings.brain.countMany", { count: nodes.length })}
           </div>
           <button
             className="btn sm"
             onClick={() => setGraphOpen(true)}
-            title="View Obsidian-style graph of all brain nodes and their cross-references"
+            title={t("settings.brain.graphTitle")}
             disabled={nodes !== null && nodes.length === 0}
           >
-            <Icons.Sparkle2 size={12} /> Graph
+            <Icons.Sparkle2 size={12} /> {t("settings.brain.graph")}
           </button>
           <button
             className="btn sm"
             onClick={() => setBuilding(true)}
-            title="Paste raw text — Claude extracts structured knowledge nodes"
+            title={t("settings.brain.buildTitle")}
           >
-            <Icons.Sparkle2 size={12} /> Build from text
+            <Icons.Sparkle2 size={12} /> {t("settings.brain.build")}
           </button>
           <button
             className="btn sm"
             onClick={() => setEditing({ mode: "create" })}
           >
-            <Icons.Plus size={12} /> New node
+            <Icons.Plus size={12} /> {t("settings.brain.newNode")}
           </button>
         </div>
 
@@ -889,9 +910,7 @@ function OrgBrainSection() {
               borderRadius: 6,
             }}
           >
-            Click <strong>New node</strong> to create the first piece of company
-            knowledge — a pricing rule, an ICP definition, an incident postmortem,
-            anything every twin should know.
+            {t("settings.emptyLead")} <strong>{t("settings.brain.newNode")}</strong> {t("settings.brain.emptyTail")}
           </div>
         )}
       </div>
@@ -925,6 +944,7 @@ function OrgBrainSection() {
 }
 
 function BrainGraphModal({ onClose }: { onClose: () => void }) {
+  const { t } = useT();
   const [graph, setGraph] = useState<EmployeeGraph | null>(null);
   const [stats, setStats] = useState<{
     brainNodeCount: number;
@@ -960,12 +980,12 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
           error?: string;
         };
         if (cancelled) return;
-        if (!res.ok) throw new Error(data.error ?? "Graph load failed");
+        if (!res.ok) throw new Error(data.error ?? t("settings.brain.graphFailed"));
         setGraph(data.graph ?? null);
         setStats(data.stats ?? null);
       } catch (err) {
         if (!cancelled)
-          setError(err instanceof Error ? err.message : "Graph load failed");
+          setError(err instanceof Error ? err.message : t("settings.brain.graphFailed"));
       }
     })();
     return () => {
@@ -1026,7 +1046,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
                 color: view === "3d" ? "#f5edd9" : undefined,
               }}
             >
-              Company Brain — Knowledge Graph
+              {t("settings.brain.graphHeading")}
             </h2>
             <p
               style={{
@@ -1037,8 +1057,21 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
               }}
             >
               {stats
-                ? `${stats.brainNodeCount} node${stats.brainNodeCount === 1 ? "" : "s"} · ${stats.edgeCount} edge${stats.edgeCount === 1 ? "" : "s"} · ${stats.employeesLinkedIn} employee${stats.employeesLinkedIn === 1 ? "" : "s"} cross-linked · ${stats.orphanBrainNodes} unlinked`
-                : "Loading…"}
+                ? <>
+                    <bdi>{stats.brainNodeCount}</bdi>{" "}
+                    {t(stats.brainNodeCount === 1 ? "settings.brain.nodeOne" : "settings.brain.nodeMany")}
+                    {" · "}
+                    <bdi>{stats.edgeCount}</bdi>{" "}
+                    {t(stats.edgeCount === 1 ? "settings.brain.edgeOne" : "settings.brain.edgeMany")}
+                    {" · "}
+                    <bdi>{stats.employeesLinkedIn}</bdi>{" "}
+                    {t(stats.employeesLinkedIn === 1 ? "settings.brain.employeeOne" : "settings.brain.employeeMany")}{" "}
+                    {t("settings.brain.crossLinked")}
+                    {" · "}
+                    <bdi>{stats.orphanBrainNodes}</bdi>{" "}
+                    {t("settings.brain.unlinked")}
+                  </>
+                : t("settings.status.loading")}
             </p>
           </div>
           <div
@@ -1092,7 +1125,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
                 view === "3d" ? "rgba(245,237,217,0.18)" : undefined,
             }}
           >
-            Close
+            {t("settings.action.close")}
           </button>
         </div>
         <div
@@ -1147,6 +1180,7 @@ function BrainBuilderModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useT();
   const [text, setText] = useState("");
   const [sourceLabel, setSourceLabel] = useState("");
   const [running, setRunning] = useState(false);
@@ -1174,12 +1208,12 @@ function BrainBuilderModal({
         notes?: string;
         error?: string;
       };
-      if (!res.ok) throw new Error(data.error ?? "Extraction failed");
+      if (!res.ok) throw new Error(data.error ?? t("settings.brain.extractionFailed"));
       setProposed(data.proposed ?? []);
       setNotes(data.notes ?? null);
       setSelected(new Set((data.proposed ?? []).map((_, i) => i)));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Extraction failed");
+      setError(err instanceof Error ? err.message : t("settings.brain.extractionFailed"));
     } finally {
       setRunning(false);
     }
@@ -1202,16 +1236,20 @@ function BrainBuilderModal({
         });
         if (!res.ok) {
           const data = (await res.json()) as { error?: string };
-          failures.push(`${node.slug}: ${data.error ?? "save failed"}`);
+          failures.push(`${node.slug}: ${data.error ?? t("settings.status.saveFailedInline")}`);
         }
       }
       if (failures.length > 0) {
-        setError(`Saved ${items.length - failures.length}/${items.length}. Errors: ${failures.join("; ")}`);
+        setError(t("settings.brain.savePartial", {
+          saved: items.length - failures.length,
+          total: items.length,
+          errors: failures.join("; "),
+        }));
         return;
       }
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("settings.status.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -1255,32 +1293,30 @@ function BrainBuilderModal({
       >
         <div style={{ marginBottom: "var(--sp-20)" }}>
           <h2 style={{ fontSize: "var(--fs-lg)", fontWeight: 600, margin: 0 }}>
-            Build brain from text
+            {t("settings.brain.buildHeading")}
           </h2>
           <p className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-4)" }}>
-            Paste a Notion page, Slack thread, postmortem, meeting notes, or
-            email. Claude extracts structured knowledge nodes — you pick which
-            to save.
+            {t("settings.brain.buildDesc")}
           </p>
         </div>
 
         {!proposed && (
           <div style={{ display: "grid", gap: "var(--sp-14)" }}>
             <Field
-              label="Source label (optional)"
+              label={t("settings.brain.sourceLabel")}
               value={sourceLabel}
               onChange={setSourceLabel}
               placeholder="notion-export-q2-roadmap, slack-thread-incident-2026-04-22"
             />
             <div>
               <div className="section-title" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-4)" }}>
-                Raw text
+                {t("settings.brain.rawText")}
               </div>
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 rows={16}
-                placeholder="Paste the source material here..."
+                placeholder={t("settings.brain.rawPlaceholder")}
                 style={{
                   ...inputStyle,
                   fontFamily: "var(--font-mono, monospace)",
@@ -1292,7 +1328,7 @@ function BrainBuilderModal({
                 className="subtle"
                 style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-4)" }}
               >
-                {text.length.toLocaleString()} chars · max 60,000
+                <bdi>{text.length.toLocaleString()}</bdi> {t("settings.brain.charsLabel")} <bdi>60,000</bdi>
               </div>
             </div>
 
@@ -1324,7 +1360,7 @@ function BrainBuilderModal({
                   color: "var(--text-muted)",
                 }}
               >
-                <strong>Builder note:</strong> {notes}
+                <strong>{t("settings.brain.builderNote")}</strong> {notes}
               </div>
             )}
 
@@ -1339,8 +1375,7 @@ function BrainBuilderModal({
                   borderRadius: 6,
                 }}
               >
-                Nothing extractable from this text. Try pasting more substantive
-                org material.
+                {t("settings.brain.nothing")}
               </div>
             ) : (
               <>
@@ -1348,8 +1383,10 @@ function BrainBuilderModal({
                   className="subtle"
                   style={{ fontSize: "var(--fs-sm)" }}
                 >
-                  {proposed.length} node{proposed.length === 1 ? "" : "s"} extracted ·
-                  {" "}{selected.size} selected
+                  <bdi>{proposed.length}</bdi>{" "}
+                  {t(proposed.length === 1 ? "settings.brain.extractedOne" : "settings.brain.extractedMany")}
+                  {" · "}
+                  <bdi>{selected.size}</bdi> {t("settings.brain.selected")}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-8)", maxHeight: 360, overflowY: "auto" }}>
                   {proposed.map((node, i) => (
@@ -1387,7 +1424,7 @@ function BrainBuilderModal({
                               textTransform: "uppercase",
                             }}
                           >
-                            {node.type ?? "note"}
+                            {t(BRAIN_TYPE_LABEL[node.type ?? "note"])}
                           </span>
                           <span style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>
                             {node.label}
@@ -1470,11 +1507,11 @@ function BrainBuilderModal({
               }}
               disabled={saving}
             >
-              Back to text
+              {t("settings.brain.back")}
             </button>
           )}
           <button className="btn sm" onClick={onClose} disabled={running || saving}>
-            Cancel
+            {t("settings.action.cancel")}
           </button>
           {!proposed && (
             <button
@@ -1487,7 +1524,7 @@ function BrainBuilderModal({
                 borderColor: "var(--text)",
               }}
             >
-              {running ? "Extracting…" : "Extract nodes"}
+              {running ? t("settings.brain.extracting") : t("settings.brain.extract")}
             </button>
           )}
           {proposed && proposed.length > 0 && (
@@ -1502,8 +1539,8 @@ function BrainBuilderModal({
               }}
             >
               {saving
-                ? "Saving…"
-                : `Save ${selected.size} node${selected.size === 1 ? "" : "s"}`}
+                ? t("settings.action.saving")
+                : t(selected.size === 1 ? "settings.brain.saveOne" : "settings.brain.saveMany", { count: selected.size })}
             </button>
           )}
         </div>
@@ -1521,6 +1558,7 @@ function OrgBrainRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useT();
   return (
     <div
       className="card"
@@ -1546,7 +1584,7 @@ function OrgBrainRow({
           flexShrink: 0,
         }}
       >
-        {node.type}
+        {t(BRAIN_TYPE_LABEL[node.type])}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>{node.label}</div>
@@ -1563,7 +1601,7 @@ function OrgBrainRow({
             WebkitBoxOrient: "vertical",
           }}
         >
-          {node.description || "No description"}
+          {node.description || t("settings.brain.noDescription")}
         </div>
         <div style={{ display: "flex", gap: "var(--sp-4)", flexWrap: "wrap", marginTop: "var(--sp-6)" }}>
           {node.triggers.slice(0, 6).map((trigger) => (
@@ -1594,22 +1632,21 @@ function OrgBrainRow({
               }}
               title={node.linkedNodes.join(", ")}
             >
-              ↗ {node.linkedNodes.length} link
-              {node.linkedNodes.length === 1 ? "" : "s"}
+              ↗ {t(node.linkedNodes.length === 1 ? "settings.brain.linkOne" : "settings.brain.linkMany", { count: node.linkedNodes.length })}
             </span>
           )}
         </div>
       </div>
       <div style={{ display: "flex", gap: "var(--sp-6)" }}>
         <button className="btn ghost sm" onClick={onEdit}>
-          Edit
+          {t("settings.action.edit")}
         </button>
         <button
           className="btn ghost sm"
           onClick={onDelete}
           style={{ color: "var(--danger)" }}
         >
-          Delete
+          {t("settings.action.delete")}
         </button>
       </div>
     </div>
@@ -1625,6 +1662,7 @@ function OrgBrainModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useT();
   const isEdit = state.mode === "edit";
   const existing = isEdit ? state.node : null;
 
@@ -1684,11 +1722,11 @@ function OrgBrainModal({
       );
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? "Save failed");
+        throw new Error(data.error ?? t("settings.status.saveFailed"));
       }
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("settings.status.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -1723,21 +1761,20 @@ function OrgBrainModal({
       >
         <div style={{ marginBottom: "var(--sp-20)" }}>
           <h2 style={{ fontSize: "var(--fs-lg)", fontWeight: 600, margin: 0 }}>
-            {isEdit ? `Edit ${existing!.label}` : "New brain node"}
+            {isEdit ? t("settings.editNamed", { name: existing!.label }) : t("settings.brain.newHeading")}
           </h2>
           <p className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-4)" }}>
-            Every twin in this workspace will see this content the next time
-            its triggers match a question.
+            {t("settings.brain.modalDesc")}
           </p>
         </div>
 
         <div style={{ display: "grid", gap: "var(--sp-14)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-14)" }}>
             <Field
-              label="Label"
+              label={t("settings.field.label")}
               value={label}
               onChange={handleLabelChange}
-              placeholder="Pricing Policy — Q2 2026"
+              placeholder={t("settings.brain.labelPlaceholder")}
             />
             <Field
               label="Slug"
@@ -1749,54 +1786,54 @@ function OrgBrainModal({
 
           <div>
             <div className="section-title" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-4)" }}>
-              Type
+              {t("settings.field.type")}
             </div>
             <div style={{ display: "flex", gap: "var(--sp-6)", flexWrap: "wrap" }}>
-              {BRAIN_TYPES.map((t) => (
+              {BRAIN_TYPES.map((kind) => (
                 <button
-                  key={t}
+                  key={kind}
                   type="button"
-                  onClick={() => setType(t)}
+                  onClick={() => setType(kind)}
                   className="btn sm"
                   style={{
                     padding: "4px 10px",
                     fontSize: "var(--fs-meta)",
                     background:
-                      type === t ? "var(--text)" : "var(--bg-elevated)",
-                    color: type === t ? "var(--bg)" : "var(--text)",
+                      type === kind ? "var(--text)" : "var(--bg-elevated)",
+                    color: type === kind ? "var(--bg)" : "var(--text)",
                     borderColor:
-                      type === t ? "var(--text)" : "var(--hairline)",
+                      type === kind ? "var(--text)" : "var(--hairline)",
                     textTransform: "capitalize",
                   }}
                 >
-                  {t}
+                  {t(BRAIN_TYPE_LABEL[kind])}
                 </button>
               ))}
             </div>
           </div>
 
           <Field
-            label="Description"
+            label={t("settings.field.description")}
             value={description}
             onChange={setDescription}
-            placeholder="One-line summary — what this node is and when it matters"
+            placeholder={t("settings.brain.descPlaceholder")}
           />
           <Field
-            label="Triggers (comma-separated)"
+            label={t("settings.brain.triggers")}
             value={triggers}
             onChange={setTriggers}
-            placeholder="pricing, discount, exception, deal"
+            placeholder={t("settings.brain.triggersPlaceholder")}
           />
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-14)" }}>
             <Field
-              label="Sources (comma-separated)"
+              label={t("settings.brain.sources")}
               value={sources}
               onChange={setSources}
               placeholder="manual, confluence, slack-thread"
             />
             <Field
-              label="Linked nodes (slugs)"
+              label={t("settings.brain.linked")}
               value={linkedNodes}
               onChange={setLinkedNodes}
               placeholder="enterprise-segment-smb-vs-mid-market"
@@ -1805,7 +1842,7 @@ function OrgBrainModal({
 
           <div>
             <div className="section-title" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-4)" }}>
-              Body (markdown — supports [[wikilinks]])
+              {t("settings.brain.bodyLabel")}
             </div>
             <textarea
               value={body}
@@ -1851,7 +1888,7 @@ function OrgBrainModal({
           }}
         >
           <button className="btn sm" onClick={onClose} disabled={saving}>
-            Cancel
+            {t("settings.action.cancel")}
           </button>
           <button
             className="btn sm"
@@ -1863,7 +1900,7 @@ function OrgBrainModal({
               borderColor: "var(--text)",
             }}
           >
-            {saving ? "Saving…" : isEdit ? "Save changes" : "Create node"}
+            {saving ? t("settings.action.saving") : isEdit ? t("settings.action.saveChanges") : t("settings.brain.create")}
           </button>
         </div>
       </div>
@@ -1874,6 +1911,7 @@ function OrgBrainModal({
 // ─── Custom MCP ──────────────────────────────────────────────────────────────
 
 function CustomMcpSection() {
+  const { t } = useT();
   const [servers, setServers] = useState<CustomMcpServer[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<CustomMcpServer | null>(null);
@@ -1892,10 +1930,10 @@ function CustomMcpSection() {
       setServers(data.servers ?? []);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      setError(err instanceof Error ? err.message : t("settings.status.failedToLoad"));
       setServers([]);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -1916,12 +1954,12 @@ function CustomMcpSection() {
         setOauthError(null);
         void load();
       } else {
-        setOauthError(data.message ?? "OAuth flow failed.");
+        setOauthError(data.message ?? t("settings.mcp.oauthFlowFailed"));
       }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [load]);
+  }, [load, t]);
 
   /**
    * Kick off an OAuth flow for a preset. POSTs to /api/org/mcp/oauth/start,
@@ -1945,17 +1983,17 @@ function CustomMcpSection() {
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `Start failed (${res.status})`);
+        throw new Error(data.error ?? t("settings.mcp.startFailed", { status: res.status }));
       }
       const { authUrl } = (await res.json()) as { authUrl?: string };
-      if (!authUrl) throw new Error("No authUrl returned from /start.");
+      if (!authUrl) throw new Error(t("settings.mcp.noAuthUrl"));
       const popup = window.open(authUrl, "mcpOAuth", "width=620,height=720,menubar=no,toolbar=no");
       if (!popup) {
-        throw new Error("Popup blocked. Allow popups for this site and try again.");
+        throw new Error(t("settings.mcp.popupBlocked"));
       }
     } catch (err) {
       setOauthConnecting(null);
-      setOauthError(err instanceof Error ? err.message : "OAuth start failed.");
+      setOauthError(err instanceof Error ? err.message : t("settings.mcp.oauthStartFailed"));
     }
   }
 
@@ -1977,7 +2015,7 @@ function CustomMcpSection() {
   }
 
   async function remove(s: CustomMcpServer) {
-    if (!confirm(`Delete the "${s.name}" MCP server? Twins lose access immediately.`)) return;
+    if (!confirm(t("settings.mcp.deleteConfirm", { name: s.name }))) return;
     await fetch(`/api/org/mcp/${s.id}`, { method: "DELETE" });
     load();
   }
@@ -1985,20 +2023,20 @@ function CustomMcpSection() {
   return (
     <section id="custom-mcp" style={{ marginBottom: "var(--sp-32)", scrollMarginTop: 80 }}>
       <SectionHeader
-        title="Custom MCP servers"
-        desc="Org-wide tools every twin can use. Add Supabase, your internal API, or any MCP-compatible server."
+        title={t("settings.mcp.title")}
+        desc={t("settings.mcp.desc")}
       />
       <div className="card" style={{ padding: "var(--sp-20)" }}>
         <div className="row" style={{ alignItems: "center", marginBottom: "var(--sp-16)" }}>
           <div style={{ flex: 1, fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>
             {servers === null
-              ? "Loading…"
+              ? t("settings.status.loading")
               : servers.length === 0
-              ? "No custom MCP servers yet."
-              : `${servers.length} server${servers.length === 1 ? "" : "s"} configured`}
+              ? t("settings.mcp.none")
+              : t(servers.length === 1 ? "settings.mcp.countOne" : "settings.mcp.countMany", { count: servers.length })}
           </div>
           <button className="btn sm" onClick={() => setCreating(true)}>
-            <Icons.Plus size={12} /> Add MCP server
+            <Icons.Plus size={12} /> {t("settings.mcp.add")}
           </button>
         </div>
 
@@ -2017,7 +2055,7 @@ function CustomMcpSection() {
               className="section-title"
               style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}
             >
-              Quick add
+              {t("settings.mcp.quickAdd")}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-8)" }}>
               {MCP_PRESETS.map((p) => {
@@ -2036,9 +2074,9 @@ function CustomMcpSection() {
                     }}
                     title={
                       alreadyAdded
-                        ? `${p.name} is already added`
+                        ? t("settings.mcp.already", { name: p.name })
                         : busy
-                        ? `Waiting for ${p.name} OAuth window…`
+                        ? t("settings.mcp.waiting", { name: p.name })
                         : p.description
                     }
                     style={{
@@ -2086,13 +2124,13 @@ function CustomMcpSection() {
                     )}
                     {p.name}
                     {alreadyAdded && (
-                      <span style={{ fontSize: "var(--fs-meta)", marginLeft: 2 }}>
-                        · added
+                      <span style={{ fontSize: "var(--fs-meta)", marginInlineStart: 2 }}>
+                        · {t("settings.mcp.added")}
                       </span>
                     )}
                     {busy && (
-                      <span style={{ fontSize: "var(--fs-meta)", marginLeft: 2 }}>
-                        · connecting…
+                      <span style={{ fontSize: "var(--fs-meta)", marginInlineStart: 2 }}>
+                        · {t("settings.mcp.connecting")}
                       </span>
                     )}
                   </button>
@@ -2157,8 +2195,7 @@ function CustomMcpSection() {
               borderRadius: 6,
             }}
           >
-            Click <strong>Add MCP server</strong> to give every twin in the org
-            access to a custom tool layer.
+            {t("settings.emptyLead")} <strong>{t("settings.mcp.add")}</strong> {t("settings.mcp.emptyTail")}
           </div>
         )}
       </div>
@@ -2195,6 +2232,7 @@ function McpServerRow({
   onToggle: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useT();
   const host = (() => {
     try {
       return new URL(server.url).host;
@@ -2253,7 +2291,7 @@ function McpServerRow({
             }}
           />
           <span style={{ fontSize: "var(--fs-meta)", fontWeight: 500, color: "var(--text-subtle)" }}>
-            {server.enabled ? "Enabled" : "Disabled"}
+            {server.enabled ? t("settings.mcp.enabled") : t("settings.mcp.disabled")}
           </span>
         </div>
         <div
@@ -2270,8 +2308,8 @@ function McpServerRow({
         >
           {host}
           {server.headers.length > 0 && (
-            <span style={{ marginLeft: "var(--sp-8)", color: "var(--text-subtle)" }}>
-              · {server.headers.length} header{server.headers.length === 1 ? "" : "s"}
+            <span style={{ marginInlineStart: "var(--sp-8)", color: "var(--text-subtle)" }}>
+              · {t(server.headers.length === 1 ? "settings.mcp.headerOne" : "settings.mcp.headerMany", { count: server.headers.length })}
             </span>
           )}
         </div>
@@ -2289,17 +2327,17 @@ function McpServerRow({
       </div>
       <div style={{ display: "flex", gap: "var(--sp-6)" }}>
         <button className="btn ghost sm" onClick={onToggle}>
-          {server.enabled ? "Disable" : "Enable"}
+          {server.enabled ? t("settings.mcp.disable") : t("settings.mcp.enable")}
         </button>
         <button className="btn ghost sm" onClick={onEdit}>
-          Edit
+          {t("settings.action.edit")}
         </button>
         <button
           className="btn ghost sm"
           onClick={onDelete}
           style={{ color: "var(--danger)" }}
         >
-          Delete
+          {t("settings.action.delete")}
         </button>
       </div>
     </div>
@@ -2317,6 +2355,7 @@ function McpModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useT();
   const isEdit = server !== null;
   const [name, setName] = useState(server?.name ?? preset?.name ?? "");
   const [description, setDescription] = useState(
@@ -2359,11 +2398,11 @@ function McpModal({
       );
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? "Save failed");
+        throw new Error(data.error ?? t("settings.status.saveFailed"));
       }
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("settings.status.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -2399,17 +2438,16 @@ function McpModal({
         <div style={{ marginBottom: "var(--sp-20)" }}>
           <h2 style={{ fontSize: "var(--fs-lg)", fontWeight: 600, margin: 0 }}>
             {isEdit
-              ? `Edit ${server.name}`
+              ? t("settings.editNamed", { name: server.name })
               : preset
-              ? `Add ${preset.name}`
-              : "Add custom MCP server"}
+              ? t("settings.addNamed", { name: preset.name })
+              : t("settings.mcp.addCustom")}
           </h2>
           <p
             className="subtle"
             style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-4)" }}
           >
-            Available to every twin in this workspace. Tools route through
-            the same approval + audit log as Composio actions.
+            {t("settings.mcp.modalDesc")}
           </p>
         </div>
 
@@ -2436,7 +2474,7 @@ function McpModal({
                   rel="noopener noreferrer"
                   style={{ color: "var(--accent-deep)", fontWeight: 600 }}
                 >
-                  Open {preset.name} →
+                  {t("settings.mcp.openPreset", { name: preset.name })}
                 </a>
               </>
             )}
@@ -2445,21 +2483,21 @@ function McpModal({
 
         <div style={{ display: "grid", gap: "var(--sp-14)" }}>
           <Field
-            label="Name"
+            label={t("settings.field.name")}
             value={name}
             onChange={setName}
-            placeholder="e.g. Supabase"
+            placeholder={t("settings.mcp.namePlaceholder")}
           />
           <Field
-            label="Description (optional)"
+            label={t("settings.mcp.descOptional")}
             value={description}
             onChange={setDescription}
-            placeholder="What this gives the twins access to"
+            placeholder={t("settings.mcp.descPlaceholder")}
           />
 
           <div>
             <div className="section-title" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-4)" }}>
-              Transport
+              {t("settings.mcp.transport")}
             </div>
             <div style={{ display: "flex", gap: "var(--sp-8)" }}>
               {(["http", "sse"] as const).map((t) => (
@@ -2487,8 +2525,8 @@ function McpModal({
               style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-4)" }}
             >
               {transport === "http"
-                ? "Streamable HTTP transport — most modern MCP servers."
-                : "Server-Sent Events — for legacy MCP servers."}
+                ? t("settings.mcp.transportHttp")
+                : t("settings.mcp.transportSse")}
             </div>
           </div>
 
@@ -2508,7 +2546,7 @@ function McpModal({
                 className="section-title"
                 style={{ fontSize: "var(--fs-xs)", flex: 1, marginBottom: 0 }}
               >
-                Headers (auth, tokens)
+                {t("settings.mcp.headers")}
               </div>
               <button
                 type="button"
@@ -2517,7 +2555,7 @@ function McpModal({
                   setHeaders((h) => [...h, { key: "", value: "" }])
                 }
               >
-                + Add header
+                {t("settings.mcp.addHeader")}
               </button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-6)" }}>
@@ -2560,7 +2598,7 @@ function McpModal({
                     onClick={() =>
                       setHeaders((arr) => arr.filter((_, j) => j !== i))
                     }
-                    aria-label="Remove header"
+                    aria-label={t("settings.mcp.removeHeader")}
                     style={{ padding: "0 8px" }}
                   >
                     ×
@@ -2584,7 +2622,7 @@ function McpModal({
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
             />
-            <span>Enable for all twins immediately</span>
+            <span>{t("settings.mcp.enableNow")}</span>
           </label>
 
           {error && (
@@ -2611,7 +2649,7 @@ function McpModal({
           }}
         >
           <button className="btn sm" onClick={onClose} disabled={saving}>
-            Cancel
+            {t("settings.action.cancel")}
           </button>
           <button
             className="btn sm"
@@ -2623,7 +2661,7 @@ function McpModal({
               borderColor: "var(--text)",
             }}
           >
-            {saving ? "Saving…" : isEdit ? "Save changes" : "Add server"}
+            {saving ? t("settings.action.saving") : isEdit ? t("settings.action.saveChanges") : t("settings.mcp.addServer")}
           </button>
         </div>
       </div>
@@ -2645,16 +2683,17 @@ const inputStyle: React.CSSProperties = {
 // ─── Account ─────────────────────────────────────────────────────────────────
 
 function AccountSection() {
+  const { t } = useT();
   const [fullName, setFullName] = useState("Admin");
   const [email, setEmail] = useState("admin@employee001.io");
 
   return (
     <section style={{ marginBottom: "var(--sp-32)" }}>
-      <SectionHeader title="Account" desc="The signed-in user." />
+      <SectionHeader title={t("settings.account.title")} desc={t("settings.account.desc")} />
       <div className="card" style={{ padding: "var(--sp-20)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-16)", marginBottom: "var(--sp-16)" }}>
-          <Field label="Full name" value={fullName} onChange={setFullName} />
-          <Field label="Email" value={email} onChange={setEmail} type="email" />
+          <Field label={t("settings.account.fullName")} value={fullName} onChange={setFullName} />
+          <Field label={t("settings.account.email")} value={email} onChange={setEmail} type="email" />
         </div>
 
         <div
@@ -2666,12 +2705,12 @@ function AccountSection() {
           }}
         >
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>Password</div>
+            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>{t("settings.account.password")}</div>
             <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
-              Last changed never · we&apos;ll email a reset link
+              {t("settings.account.passwordHint")}
             </div>
           </div>
-          <button className="btn sm">Change password</button>
+          <button className="btn sm">{t("settings.account.changePassword")}</button>
         </div>
       </div>
 
@@ -2686,17 +2725,17 @@ function AccountSection() {
         <div className="row" style={{ alignItems: "center" }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600, color: "var(--danger)" }}>
-              Sign out
+              {t("settings.account.signOut")}
             </div>
             <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
-              End the current session on this device.
+              {t("settings.account.signOutDesc")}
             </div>
           </div>
           <button
             className="btn sm"
             style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
           >
-            Sign out
+            {t("settings.account.signOut")}
           </button>
         </div>
       </div>

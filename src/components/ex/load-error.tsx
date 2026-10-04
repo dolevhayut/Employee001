@@ -3,6 +3,8 @@
 // Shown when an operator page's data fetch fails: a panel with Try again
 // before anything has loaded, a quiet line once a stale view is on screen.
 
+import { useT } from "@/components/ex/i18n-context";
+
 export function LoadErrorPanel({
   message,
   onRetry,
@@ -10,6 +12,7 @@ export function LoadErrorPanel({
   message: string;
   onRetry: () => void;
 }) {
+  const { t } = useT();
   return (
     <div
       role="alert"
@@ -37,13 +40,14 @@ export function LoadErrorPanel({
         {message}
       </p>
       <button type="button" className="btn sm" onClick={onRetry}>
-        Try again
+        {t("load.tryAgain")}
       </button>
     </div>
   );
 }
 
 export function RefreshMiss() {
+  const { t } = useT();
   return (
     <p
       style={{
@@ -52,7 +56,7 @@ export function RefreshMiss() {
         color: "var(--text-muted)",
       }}
     >
-      {"Couldn't refresh"}
+      {t("load.refreshMiss")}
     </p>
   );
 }

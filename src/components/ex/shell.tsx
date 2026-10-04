@@ -14,7 +14,7 @@ import { ActiveBuildsBanner } from "./active-builds-banner";
 import { RosterProvider, useRoster } from "./roster-context";
 import { WorkspaceModeProvider, useWorkspaceMode } from "./workspace-mode-context";
 import { useT } from "./i18n-context";
-import type { MessageKey } from "@/lib/i18n/messages";
+import { t as translate, type MessageKey } from "@/lib/i18n/messages";
 
 type NavItem = {
   href: string;
@@ -28,14 +28,34 @@ type NavSection = {
   items: NavItem[];
 };
 
+type CommandGroup = "popular" | "navigate" | "twins";
+
+type StaticCommand = {
+  id: string;
+  labelKey: MessageKey;
+  hintKey: MessageKey;
+  href: string;
+  icon: IconName;
+  group: CommandGroup;
+  keywords: string;
+};
+
 type CommandItem = {
   id: string;
   label: string;
   href: string;
   icon: IconName;
-  group: "Popular" | "Navigate" | "Twins";
+  group: CommandGroup;
   hint: string;
   keywords: string;
+};
+
+const COMMAND_GROUPS: CommandGroup[] = ["popular", "navigate", "twins"];
+
+const GROUP_LABEL: Record<CommandGroup, MessageKey> = {
+  popular: "shell.palette.group.popular",
+  navigate: "shell.palette.navigate",
+  twins: "nav.twins",
 };
 
 // One nav for both modes. Autonomy (formerly "EmployeeX" — that name now
@@ -151,13 +171,15 @@ function useTheme() {
 
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
+  const { t } = useT();
+  const label = theme === "dark" ? t("shell.theme.toLight") : t("shell.theme.toDark");
   return (
     <button
       type="button"
       className="btn ghost sm"
       onClick={toggle}
-      title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      title={label}
+      aria-label={label}
     >
       {theme === "dark" ? <SunLight width={13} height={13} /> : <HalfMoon width={13} height={13} />}
     </button>
@@ -169,24 +191,24 @@ function ThemeToggle() {
 // need to change when that lands — only this constant moves into a setting.
 const COMPANY_MONTHLY_BUDGET_USD = 50;
 
-const STATIC_COMMANDS: CommandItem[] = [
-  { id: "home", label: "Twins", href: "/employees", icon: "Home", group: "Popular", hint: "Open the twin roster", keywords: "employees people team admin roster clone status" },
-  { id: "inbox", label: "Approvals", href: "/inbox", icon: "Bell", group: "Popular", hint: "Pending approvals, alerts, and the org-wide twin feed", keywords: "inbox feed activity alerts review approval flagged updates" },
-  { id: "cockpit", label: "Cockpit", href: "/cockpit", icon: "Activity", group: "Popular", hint: "Live grid of every running agent — what they're doing right now", keywords: "live agents running cockpit monitor real-time" },
-  { id: "tasks", label: "Tasks", href: "/tasks", icon: "Zap", group: "Popular", hint: "Run or review twin tasks", keywords: "agent execution work runs retry" },
-  { id: "twins", label: "Chat", href: "/flow", icon: "Bot", group: "Popular", hint: "Chat with a twin next to its memory graph", keywords: "chat with twin memory graph ask clone flow" },
-  { id: "connections", label: "Tools & MCP", href: "/connections", icon: "Plug", group: "Navigate", hint: "Manage connected tools and MCP servers", keywords: "connections integrations composio slack github gmail tools mcp" },
-  { id: "marketplace", label: "Hire", href: "/marketplace", icon: "Store", group: "Navigate", hint: "Hire specialized agents", keywords: "marketplace agents hire catalog" },
-  { id: "council", label: "Team Meeting", href: "/council", icon: "Team", group: "Navigate", hint: "Open the council room", keywords: "council meeting team debate room" },
-  { id: "handover", label: "Handover", href: "/handover", icon: "Send", group: "Navigate", hint: "Run a Relay role-context handover interview", keywords: "relay handover offboarding rcp role context successor coverage" },
-  { id: "handover-live", label: "Live Interview", href: "/handover/live", icon: "Bot", group: "Navigate", hint: "Run a real interactive handover interview (tune the interviewer prompt)", keywords: "relay live interview handover chat answer real opus synthesize tune prompt" },
-  { id: "templates", label: "Templates", href: "/templates", icon: "Doc", group: "Navigate", hint: "Browse task templates", keywords: "slash commands prompts snippets" },
-  { id: "routines", label: "Schedules", href: "/routines", icon: "Refresh", group: "Navigate", hint: "Schedule recurring work", keywords: "routines automation schedule recurring cron" },
-  { id: "focus", label: "Focus", href: "/focus", icon: "Eye", group: "Navigate", hint: "Configure per-twin world prefetch (PRs, Linear, Gmail) before each shift", keywords: "focus prefetch composio github linear gmail world state" },
-  { id: "audit", label: "Activity log", href: "/audit", icon: "Logs", group: "Navigate", hint: "Review approvals and actions", keywords: "audit log compliance approvals trace history" },
-  { id: "workspace-costs", label: "Workspace costs", href: "/workspace", icon: "Zap", group: "Navigate", hint: "Review training, refresh, and execution spend", keywords: "workspace costs budget spend usage billing models" },
-  { id: "budgets", label: "Spend", href: "/budgets", icon: "DollarSign", group: "Navigate", hint: "Set daily spend caps per twin", keywords: "budgets limits caps spend cost per twin daily" },
-  { id: "settings", label: "Settings", href: "/settings", icon: "Settings", group: "Navigate", hint: "Workspace configuration", keywords: "workspace org skills mcp account" },
+const STATIC_COMMANDS: StaticCommand[] = [
+  { id: "home", labelKey: "nav.twins", href: "/employees", icon: "Home", group: "popular", hintKey: "shell.cmd.twins.hint", keywords: "employees people team admin roster clone status תאומים עובדים אנשים צוות" },
+  { id: "inbox", labelKey: "nav.approvals", href: "/inbox", icon: "Bell", group: "popular", hintKey: "shell.cmd.approvals.hint", keywords: "inbox feed activity alerts review approval flagged updates אישורים תיבה התראות עדכונים" },
+  { id: "cockpit", labelKey: "nav.cockpit", href: "/cockpit", icon: "Activity", group: "popular", hintKey: "shell.cmd.cockpit.hint", keywords: "live agents running cockpit monitor real-time קוקפיט הרצות סוכנים חי" },
+  { id: "tasks", labelKey: "nav.tasks", href: "/tasks", icon: "Zap", group: "popular", hintKey: "shell.cmd.tasks.hint", keywords: "agent execution work runs retry משימות הרצה עבודה" },
+  { id: "twins", labelKey: "nav.chat", href: "/flow", icon: "Bot", group: "popular", hintKey: "shell.cmd.chat.hint", keywords: "chat with twin memory graph ask clone flow צ'אט תאום זיכרון גרף" },
+  { id: "connections", labelKey: "nav.tools", href: "/connections", icon: "Plug", group: "navigate", hintKey: "shell.cmd.tools.hint", keywords: "connections integrations composio slack github gmail tools mcp כלים חיבורים" },
+  { id: "marketplace", labelKey: "nav.hire", href: "/marketplace", icon: "Store", group: "navigate", hintKey: "shell.cmd.hire.hint", keywords: "marketplace agents hire catalog גיוס סוכנים" },
+  { id: "council", labelKey: "nav.teamMeeting", href: "/council", icon: "Team", group: "navigate", hintKey: "shell.cmd.meeting.hint", keywords: "council meeting team debate room ישיבת צוות מועצה" },
+  { id: "handover", labelKey: "nav.handover", href: "/handover", icon: "Send", group: "navigate", hintKey: "shell.cmd.handover.hint", keywords: "relay handover offboarding rcp role context successor coverage חפיפה" },
+  { id: "handover-live", labelKey: "shell.cmd.liveInterview", href: "/handover/live", icon: "Bot", group: "navigate", hintKey: "shell.cmd.liveInterview.hint", keywords: "relay live interview handover chat answer real opus synthesize tune prompt ראיון חי חפיפה" },
+  { id: "templates", labelKey: "shell.cmd.templates", href: "/templates", icon: "Doc", group: "navigate", hintKey: "shell.cmd.templates.hint", keywords: "slash commands prompts snippets תבניות" },
+  { id: "routines", labelKey: "nav.schedules", href: "/routines", icon: "Refresh", group: "navigate", hintKey: "shell.cmd.schedules.hint", keywords: "routines automation schedule recurring cron תזמונים שגרות" },
+  { id: "focus", labelKey: "shell.cmd.focus", href: "/focus", icon: "Eye", group: "navigate", hintKey: "shell.cmd.focus.hint", keywords: "focus prefetch composio github linear gmail world state מיקוד פוקוס" },
+  { id: "audit", labelKey: "nav.activityLog", href: "/audit", icon: "Logs", group: "navigate", hintKey: "shell.cmd.activity.hint", keywords: "audit log compliance approvals trace history יומן פעילות" },
+  { id: "workspace-costs", labelKey: "shell.cmd.workspaceCosts", href: "/workspace", icon: "Zap", group: "navigate", hintKey: "shell.cmd.workspaceCosts.hint", keywords: "workspace costs budget spend usage billing models עלויות הוצאות סביבת עבודה" },
+  { id: "budgets", labelKey: "nav.spend", href: "/budgets", icon: "DollarSign", group: "navigate", hintKey: "shell.cmd.spend.hint", keywords: "budgets limits caps spend cost per twin daily הוצאות תקציב תקרה" },
+  { id: "settings", labelKey: "nav.settings", href: "/settings", icon: "Settings", group: "navigate", hintKey: "shell.cmd.settings.hint", keywords: "workspace org skills mcp account הגדרות סביבת עבודה" },
 ];
 
 function formatBudgetCost(usd: number): string {
@@ -198,6 +220,7 @@ function formatBudgetCost(usd: number): string {
 }
 
 function BudgetMeter() {
+  const { t } = useT();
   const [spend, setSpend] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
@@ -247,7 +270,7 @@ function BudgetMeter() {
   return (
     <Link
       href="/workspace"
-      title="Click to view per-employee execution costs"
+      title={t("shell.budget.title")}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -283,7 +306,7 @@ function BudgetMeter() {
             letterSpacing: ".06em",
           }}
         >
-          Twin spend · MTD
+          {t("shell.budget.label")}
         </span>
         <div style={{ flex: 1 }} />
         <span
@@ -294,7 +317,7 @@ function BudgetMeter() {
             fontWeight: 600,
           }}
         >
-          {Math.round(pct * 100)}%
+          <bdi>{Math.round(pct * 100)}%</bdi>
         </span>
       </div>
 
@@ -314,13 +337,13 @@ function BudgetMeter() {
             color: overBudget ? "var(--danger)" : "var(--text)",
           }}
         >
-          {loaded ? formatBudgetCost(spend) : "—"}
+          <bdi>{loaded ? formatBudgetCost(spend) : "—"}</bdi>
         </span>
         <span
           className="mono subtle"
           style={{ fontSize: "var(--fs-meta)" }}
         >
-          / {formatBudgetCost(budget)}
+          <bdi>/ {formatBudgetCost(budget)}</bdi>
         </span>
       </div>
 
@@ -358,32 +381,57 @@ function statusLabel(emp: EmployeeWithTwin) {
   return "Not started";
 }
 
-function buildTwinCommands(roster: EmployeeWithTwin[]): CommandItem[] {
+function buildTwinCommands(
+  roster: EmployeeWithTwin[],
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string,
+): CommandItem[] {
   return roster.flatMap((emp) => {
     const flowHref = emp.twinStatus === "ready" ? `/flow?employee=${emp.id}` : "/clone";
     const statusKeyword = emp.twinStatus === "ready" ? "ready live chat memory" : "onboarding setup clone";
+    const bothLang = "twin profile chat onboarding תאום פרופיל צ'אט קליטה";
 
     return [
       {
         id: `twin-${emp.id}`,
-        label: `${emp.name} twin`,
+        label: t("shell.cmd.twinLabel", { name: emp.name }),
         href: flowHref,
         icon: "Bot",
-        group: "Twins",
-        hint: emp.twinStatus === "ready" ? "Open live twin chat" : "Start onboarding",
-        keywords: `${emp.name} ${emp.firstName} ${emp.role} ${statusKeyword}`,
+        group: "twins",
+        hint: emp.twinStatus === "ready" ? t("shell.cmd.twinHintReady") : t("shell.cmd.twinHintOnboarding"),
+        keywords: `${emp.name} ${emp.firstName} ${emp.role} ${statusKeyword} ${bothLang} ${emp.name} twin`,
       },
       {
         id: `profile-${emp.id}`,
-        label: `${emp.name} profile`,
+        label: t("shell.cmd.profileLabel", { name: emp.name }),
         href: `/profile?employee=${emp.id}`,
         icon: "Doc",
-        group: "Twins",
-        hint: "View profile, consent, lineage",
-        keywords: `${emp.name} ${emp.firstName} profile sources voice skills consent`,
+        group: "twins",
+        hint: t("shell.cmd.profileHint"),
+        keywords: `${emp.name} ${emp.firstName} profile sources voice skills consent ${bothLang} ${emp.name} profile`,
       },
     ];
   });
+}
+
+function resolveStaticCommand(
+  command: StaticCommand,
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string,
+): CommandItem {
+  return {
+    id: command.id,
+    label: t(command.labelKey),
+    hint: t(command.hintKey),
+    href: command.href,
+    icon: command.icon,
+    group: command.group,
+    keywords: [
+      command.keywords,
+      translate("en", command.labelKey),
+      translate("he", command.labelKey),
+      translate("en", command.hintKey),
+      translate("he", command.hintKey),
+    ].join(" "),
+  };
 }
 
 function CommandPalette({
@@ -399,9 +447,13 @@ function CommandPalette({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const roster = useRoster();
+  const { t } = useT();
   const commands = useMemo(
-    () => [...STATIC_COMMANDS, ...buildTwinCommands(roster)],
-    [roster]
+    () => [
+      ...STATIC_COMMANDS.map((command) => resolveStaticCommand(command, t)),
+      ...buildTwinCommands(roster, t),
+    ],
+    [roster, t],
   );
   const filteredCommands = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -413,7 +465,7 @@ function CommandPalette({
   }, [commands, query]);
 
   const groupedCommands = useMemo(() => {
-    const groups: CommandItem["group"][] = ["Popular", "Navigate", "Twins"];
+    const groups: CommandItem["group"][] = COMMAND_GROUPS;
     return groups
       .map((group) => ({
         group,
@@ -513,7 +565,7 @@ function CommandPalette({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Command palette"
+        aria-label={t("shell.palette.aria")}
         onMouseDown={(event) => event.stopPropagation()}
         style={{
           width: "min(680px, 100%)",
@@ -543,8 +595,8 @@ function CommandPalette({
               setActiveIndex(0);
             }}
             onKeyDown={onInputKeyDown}
-            placeholder="Search pages, twins, tasks..."
-            aria-label="Search commands"
+            placeholder={t("shell.palette.placeholder")}
+            aria-label={t("shell.palette.searchAria")}
             style={{
               flex: 1,
               minWidth: 0,
@@ -562,16 +614,16 @@ function CommandPalette({
         <div className="scrollbar" style={{ maxHeight: "min(520px, 62vh)", overflow: "auto", padding: "var(--sp-8)" }}>
           {groupedCommands.length === 0 ? (
             <div style={{ padding: "34px 18px", textAlign: "center" }}>
-              <div style={{ fontSize: "var(--fs-base)", fontWeight: 650 }}>No commands found</div>
+              <div style={{ fontSize: "var(--fs-base)", fontWeight: 650 }}>{t("shell.palette.emptyTitle")}</div>
               <div className="subtle" style={{ marginTop: "var(--sp-6)", fontSize: "var(--fs-sm)" }}>
-                Try searching for a page, employee, or workflow.
+                {t("shell.palette.emptyHint")}
               </div>
             </div>
           ) : (
             groupedCommands.map((section) => (
               <div key={section.group} style={{ padding: "7px 0" }}>
                 <div className="nav-label" style={{ padding: "4px 8px 6px" }}>
-                  {section.group}
+                  {t(GROUP_LABEL[section.group])}
                 </div>
                 {section.items.map((command) => {
                   const index = filteredCommands.indexOf(command);
@@ -595,7 +647,7 @@ function CommandPalette({
                         borderRadius: 6,
                         background: active ? "var(--surface-soft)" : "transparent",
                         color: "var(--text)",
-                        textAlign: "left",
+                        textAlign: "start",
                         cursor: "pointer",
                       }}
                     >
@@ -645,10 +697,10 @@ function CommandPalette({
             fontSize: "var(--fs-meta)",
           }}
         >
-          <span><span className="kbd">↑</span> <span className="kbd">↓</span> Navigate</span>
-          <span><span className="kbd">Enter</span> Open</span>
+          <span><span className="kbd">↑</span> <span className="kbd">↓</span> {t("shell.palette.navigate")}</span>
+          <span><span className="kbd">Enter</span> {t("shell.palette.open")}</span>
           <div className="spacer" />
-          <span className="mono">{filteredCommands.length} commands</span>
+          <span className="mono"><bdi>{filteredCommands.length}</bdi> {t("shell.palette.commands")}</span>
         </div>
       </div>
     </div>,
@@ -715,7 +767,7 @@ function TwinSwitcher() {
             border: "1px solid var(--hairline)",
             borderRadius: open ? "6px 6px 0 0" : 6,
             cursor: "pointer",
-            textAlign: "left",
+            textAlign: "start",
             fontFamily: "inherit",
             transition: "background .12s",
           }}
@@ -759,8 +811,8 @@ function TwinSwitcher() {
             style={{
               position: "absolute",
               top: "100%",
-              left: 0,
-              right: 0,
+              insetInlineStart: 0,
+              insetInlineEnd: 0,
               background: "var(--surface)",
               border: "1px solid var(--hairline)",
               borderTop: "none",
@@ -785,7 +837,7 @@ function TwinSwitcher() {
                     background: isCurrent ? "var(--bg-sunken)" : "transparent",
                     border: "none",
                     cursor: "pointer",
-                    textAlign: "left",
+                    textAlign: "start",
                     fontFamily: "inherit",
                     transition: "background .1s",
                   }}
@@ -1237,8 +1289,10 @@ export function Sidebar() {
               A
             </div>
             <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-              <div style={{ fontSize: "var(--fs-sm)", fontWeight: 500, color: "var(--text)" }}>Admin</div>
-              <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>{orgName || "Workspace"}</div>
+              <div style={{ fontSize: "var(--fs-sm)", fontWeight: 500, color: "var(--text)" }}>{t("shell.admin")}</div>
+              <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>
+                {orgName ? <bdi>{orgName}</bdi> : t("crumb.workspace")}
+              </div>
             </div>
           </div>
         )}
@@ -1247,7 +1301,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={toggleCollapsed}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? t("shell.expandSidebar") : t("shell.collapseSidebar")}
           style={{
             display: "flex",
             alignItems: "center",
@@ -1281,7 +1335,7 @@ export function Sidebar() {
                   : "none",
             }}
           />
-          {!collapsed && <span>Collapse</span>}
+          {!collapsed && <span>{t("shell.collapse")}</span>}
         </button>
       </div>
     </aside>
@@ -1323,6 +1377,7 @@ function crumbHref(c: Crumb): string | undefined {
 }
 
 export function Topbar({ crumbs = [], actions }: { crumbs?: Crumb[]; actions?: ReactNode }) {
+  const { t } = useT();
   const [commandOpen, setCommandOpen] = useState(false);
 
   return (
@@ -1351,7 +1406,7 @@ export function Topbar({ crumbs = [], actions }: { crumbs?: Crumb[]; actions?: R
                   fontWeight: isLast ? 600 : 500,
                 }}
               >
-                {label}
+                <bdi>{label}</bdi>
               </span>
             );
             return (
@@ -1388,7 +1443,7 @@ export function Topbar({ crumbs = [], actions }: { crumbs?: Crumb[]; actions?: R
           <button
             type="button"
             className="btn ghost sm"
-            title="Open command palette"
+            title={t("shell.palette.openTitle")}
             aria-haspopup="dialog"
             aria-expanded={commandOpen}
             onClick={() => setCommandOpen(true)}
