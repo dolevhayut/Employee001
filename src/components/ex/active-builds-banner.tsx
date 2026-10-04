@@ -112,7 +112,7 @@ export function ActiveBuildsBanner() {
                   fontSize: "var(--fs-sm)",
                   textDecoration: "none",
                   color: "var(--text)",
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                  boxShadow: "var(--shadow-lg)",
                   minWidth: 240,
                 }}
               >
@@ -149,8 +149,8 @@ export function ActiveBuildsBanner() {
                     width: 8,
                     height: 8,
                     borderRadius: "50%",
-                    background: "var(--success, #2c8b54)",
-                    boxShadow: "0 0 0 0 var(--success, #2c8b54)",
+                    background: "var(--success)",
+                    boxShadow: "0 0 0 0 var(--success)",
                     animation: "abp-pulse 1.4s infinite",
                     flexShrink: 0,
                   }}
@@ -185,13 +185,13 @@ export function ActiveBuildsBanner() {
       <style jsx>{`
         @keyframes abp-pulse {
           0% {
-            box-shadow: 0 0 0 0 rgba(44, 139, 84, 0.5);
+            box-shadow: 0 0 0 0 color-mix(in oklch, var(--success) 50%, transparent);
           }
           70% {
-            box-shadow: 0 0 0 7px rgba(44, 139, 84, 0);
+            box-shadow: 0 0 0 7px transparent;
           }
           100% {
-            box-shadow: 0 0 0 0 rgba(44, 139, 84, 0);
+            box-shadow: 0 0 0 0 transparent;
           }
         }
       `}</style>

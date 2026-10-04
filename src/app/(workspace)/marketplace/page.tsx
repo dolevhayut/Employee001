@@ -62,7 +62,7 @@ function Avatar({ initials, color, size = 44 }: { initials: string; color: strin
         justifyContent: "center",
         fontSize: size * 0.33,
         fontWeight: 600,
-        color: "#fff",
+        color: "var(--bg-elevated)",
         flexShrink: 0,
         letterSpacing: "0.02em",
       }}
@@ -82,7 +82,7 @@ function SkillPill({ label }: { label: string }) {
         background: "var(--surface)",
         border: "1px solid var(--hairline)",
         fontSize: "var(--fs-meta)",
-        color: "var(--muted)",
+        color: "var(--text-muted)",
         fontWeight: 500,
         whiteSpace: "nowrap",
       }}
@@ -109,7 +109,7 @@ function AgentCardComponent({
   return (
     <div
       style={{
-        background: "var(--surface-raised, var(--surface))",
+        background: "var(--surface)",
         border: `1px solid ${agent.hired ? "var(--accent)" : "var(--hairline)"}`,
         borderRadius: 12,
         padding: "var(--sp-20)",
@@ -117,22 +117,24 @@ function AgentCardComponent({
         flexDirection: "column",
         gap: "var(--sp-14)",
         transition: "border-color 0.15s, box-shadow 0.15s",
-        boxShadow: agent.hired ? "0 0 0 1px var(--accent)20" : "var(--shadow-sm)",
+        boxShadow: agent.hired
+          ? "0 0 0 1px color-mix(in oklch, var(--accent) 12%, transparent)"
+          : "var(--shadow-sm)",
       }}
     >
       <div style={{ display: "flex", gap: "var(--sp-12)", alignItems: "flex-start" }}>
         <Avatar initials={agent.initials} color={agent.avatarColor} size={44} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)" }}>
-            <span style={{ fontWeight: 600, fontSize: "var(--fs-base)", color: "var(--fg)" }}>
+            <span style={{ fontWeight: 600, fontSize: "var(--fs-base)", color: "var(--text)" }}>
               {agent.name}
             </span>
             {agent.hired && (
               <span
                 style={{
-                  background: "var(--accent)20",
+                  background: "color-mix(in oklch, var(--accent) 12%, transparent)",
                   color: "var(--accent)",
-                  border: "1px solid var(--accent)40",
+                  border: "1px solid color-mix(in oklch, var(--accent) 12%, transparent)",
                   fontSize: "var(--fs-xs)",
                   fontWeight: 600,
                   padding: "1px 7px",
@@ -145,14 +147,14 @@ function AgentCardComponent({
               </span>
             )}
           </div>
-          <div style={{ fontSize: "var(--fs-sm)", color: "var(--muted)", marginTop: "var(--sp-1)" }}>
+          <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", marginTop: "var(--sp-1)" }}>
             {agent.role} · {agent.department}
           </div>
         </div>
         <span
           style={{
             fontSize: "var(--fs-xs)",
-            color: "var(--muted)",
+            color: "var(--text-muted)",
             background: "var(--surface)",
             border: "1px solid var(--hairline)",
             padding: "2px 7px",
@@ -165,7 +167,7 @@ function AgentCardComponent({
         </span>
       </div>
 
-      <p style={{ fontSize: "var(--fs-ui)", color: "var(--fg-sub)", margin: 0, lineHeight: 1.5 }}>
+      <p style={{ fontSize: "var(--fs-ui)", color: "var(--text-muted)", margin: 0, lineHeight: 1.5 }}>
         {agent.tagline}
       </p>
 
@@ -192,7 +194,7 @@ function AgentCardComponent({
                 border: "1px solid var(--hairline)",
                 fontSize: "var(--fs-ui)",
                 fontWeight: 500,
-                color: "var(--fg)",
+                color: "var(--text)",
                 textDecoration: "none",
                 cursor: "pointer",
               }}
@@ -213,7 +215,7 @@ function AgentCardComponent({
                 background: "transparent",
                 border: "1px solid var(--hairline)",
                 fontSize: "var(--fs-ui)",
-                color: "var(--muted)",
+                color: "var(--text-muted)",
                 cursor: loading ? "not-allowed" : "pointer",
                 opacity: loading ? 0.5 : 1,
               }}
@@ -238,7 +240,7 @@ function AgentCardComponent({
                 border: "1px solid var(--hairline)",
                 fontSize: "var(--fs-ui)",
                 fontWeight: 500,
-                color: "var(--fg)",
+                color: "var(--text)",
                 cursor: loading ? "not-allowed" : "pointer",
                 opacity: loading ? 0.6 : 1,
               }}
@@ -327,10 +329,10 @@ function HirePlacementModal({
           width: "min(560px, 100%)",
           maxHeight: "90vh",
           overflowY: "auto",
-          background: "var(--surface-raised, var(--surface))",
+          background: "var(--surface)",
           border: "1px solid var(--hairline)",
           borderRadius: 16,
-          boxShadow: "var(--shadow-lg, 0 20px 60px rgba(0,0,0,0.2))",
+          boxShadow: "var(--shadow-lg)",
           padding: "var(--sp-22)",
         }}
       >
@@ -338,11 +340,11 @@ function HirePlacementModal({
           <div>
             <div
               id="hire-placement-title"
-              style={{ fontSize: "var(--fs-h4)", fontWeight: 650, color: "var(--fg)" }}
+              style={{ fontSize: "var(--fs-h4)", fontWeight: 650, color: "var(--text)" }}
             >
               Place {agent.firstName} on the team
             </div>
-            <p style={{ margin: "6px 0 0", fontSize: "var(--fs-ui)", color: "var(--muted)", lineHeight: 1.5 }}>
+            <p style={{ margin: "6px 0 0", fontSize: "var(--fs-ui)", color: "var(--text-muted)", lineHeight: 1.5 }}>
               Choose who owns this agent, where they work, and whether this is a team member
               or an external consultant.
             </p>
@@ -357,7 +359,7 @@ function HirePlacementModal({
               borderRadius: 8,
               border: "1px solid var(--hairline)",
               background: "transparent",
-              color: "var(--muted)",
+              color: "var(--text-muted)",
               cursor: loading ? "not-allowed" : "pointer",
             }}
           >
@@ -366,7 +368,7 @@ function HirePlacementModal({
         </div>
 
         <div style={{ display: "grid", gap: "var(--sp-14)", marginTop: "var(--sp-20)" }}>
-          <label style={{ display: "grid", gap: "var(--sp-6)", fontSize: "var(--fs-sm)", color: "var(--muted)", fontWeight: 600 }}>
+          <label style={{ display: "grid", gap: "var(--sp-6)", fontSize: "var(--fs-sm)", color: "var(--text-muted)", fontWeight: 600 }}>
             Employment kind
             <select
               value={placement.employmentKind}
@@ -383,7 +385,7 @@ function HirePlacementModal({
             </select>
           </label>
 
-          <label style={{ display: "grid", gap: "var(--sp-6)", fontSize: "var(--fs-sm)", color: "var(--muted)", fontWeight: 600 }}>
+          <label style={{ display: "grid", gap: "var(--sp-6)", fontSize: "var(--fs-sm)", color: "var(--text-muted)", fontWeight: 600 }}>
             Responsible owner
             <select
               value={placement.responsibleEmployeeId}
@@ -410,7 +412,7 @@ function HirePlacementModal({
             </select>
           </label>
 
-          <label style={{ display: "grid", gap: "var(--sp-6)", fontSize: "var(--fs-sm)", color: "var(--muted)", fontWeight: 600 }}>
+          <label style={{ display: "grid", gap: "var(--sp-6)", fontSize: "var(--fs-sm)", color: "var(--text-muted)", fontWeight: 600 }}>
             Team
             <input
               value={placement.teamName}
@@ -421,7 +423,7 @@ function HirePlacementModal({
           </label>
 
           <div style={{ display: "grid", gap: "var(--sp-8)" }}>
-            <div style={{ fontSize: "var(--fs-sm)", color: "var(--muted)", fontWeight: 600 }}>
+            <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", fontWeight: 600 }}>
               Teammates
             </div>
             <div style={{ display: "grid", gap: "var(--sp-6)" }}>
@@ -438,7 +440,7 @@ function HirePlacementModal({
                       border: "1px solid var(--hairline)",
                       borderRadius: 8,
                       fontSize: "var(--fs-ui)",
-                      color: "var(--fg)",
+                      color: "var(--text)",
                       cursor: "pointer",
                     }}
                   >
@@ -454,7 +456,7 @@ function HirePlacementModal({
                     />
                     <span>
                       {employee.name}
-                      <span style={{ color: "var(--muted)" }}> · {employee.department}</span>
+                      <span style={{ color: "var(--text-muted)" }}> · {employee.department}</span>
                     </span>
                   </label>
                 );
@@ -462,7 +464,7 @@ function HirePlacementModal({
             </div>
           </div>
 
-          <label style={{ display: "grid", gap: "var(--sp-6)", fontSize: "var(--fs-sm)", color: "var(--muted)", fontWeight: 600 }}>
+          <label style={{ display: "grid", gap: "var(--sp-6)", fontSize: "var(--fs-sm)", color: "var(--text-muted)", fontWeight: 600 }}>
             Engagement note
             <textarea
               value={placement.engagementNote ?? ""}
@@ -485,7 +487,7 @@ function HirePlacementModal({
               borderRadius: 8,
               border: "1px solid var(--hairline)",
               background: "transparent",
-              color: "var(--fg)",
+              color: "var(--text)",
               cursor: loading ? "not-allowed" : "pointer",
             }}
           >
@@ -506,7 +508,7 @@ function HirePlacementModal({
               fontWeight: 650,
               cursor: loading ? "not-allowed" : "pointer",
               opacity: loading || !placement.responsibleEmployeeId || !placement.teamName.trim() ? 0.5 : 1,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+              boxShadow: "var(--shadow-sm)",
             }}
           >
             {loading ? <Icons.Loader size={13} /> : <Icons.UserPlus size={13} />}
@@ -523,7 +525,7 @@ const fieldStyle: CSSProperties = {
   border: "1px solid var(--hairline)",
   borderRadius: 8,
   background: "var(--surface)",
-  color: "var(--fg)",
+  color: "var(--text)",
   fontSize: "var(--fs-ui)",
   padding: "9px 10px",
   outline: "none",
@@ -551,7 +553,7 @@ function TypingDots() {
             width: 6,
             height: 6,
             borderRadius: "50%",
-            background: "var(--muted)",
+            background: "var(--text-muted)",
             display: "inline-block",
           }}
         />
@@ -694,9 +696,9 @@ function TrialChatDrawer({
           insetInlineEnd: 0,
           bottom: 0,
           width: "min(480px, 100%)",
-          background: "var(--surface-raised, var(--surface))",
+          background: "var(--surface)",
           borderInlineStart: "1px solid var(--hairline)",
-          boxShadow: rtl ? "12px 0 40px rgba(0,0,0,0.25)" : "-12px 0 40px rgba(0,0,0,0.25)",
+          boxShadow: "var(--shadow-lg)",
           zIndex: 9991,
           display: "flex",
           flexDirection: "column",
@@ -713,10 +715,10 @@ function TrialChatDrawer({
         >
           <Avatar initials={agent.initials} color={agent.avatarColor} size={40} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 650, color: "var(--fg)", fontSize: "var(--fs-base)" }}>
+            <div style={{ fontWeight: 650, color: "var(--text)", fontSize: "var(--fs-base)" }}>
               {agent.name}
             </div>
-            <div style={{ fontSize: "var(--fs-sm)", color: "var(--muted)" }}>
+            <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
               Trial chat · {agent.role}
             </div>
           </div>
@@ -729,7 +731,7 @@ function TrialChatDrawer({
               borderRadius: 8,
               border: "1px solid var(--hairline)",
               background: "transparent",
-              color: "var(--muted)",
+              color: "var(--text-muted)",
               cursor: "pointer",
             }}
           >
@@ -751,7 +753,7 @@ function TrialChatDrawer({
           {messages.length === 0 ? (
             <div
               style={{
-                color: "var(--muted)",
+                color: "var(--text-muted)",
                 fontSize: "var(--fs-ui)",
                 lineHeight: 1.6,
                 padding: "var(--sp-12)",
@@ -778,7 +780,7 @@ function TrialChatDrawer({
                       borderRadius: 8,
                       border: "1px solid var(--hairline)",
                       background: "transparent",
-                      color: "var(--fg-sub)",
+                      color: "var(--text-muted)",
                       fontSize: "var(--fs-sm)",
                       cursor: "pointer",
                     }}
@@ -805,7 +807,7 @@ function TrialChatDrawer({
                       padding: empty && !isUser ? "10px 14px" : "9px 13px",
                       borderRadius: 12,
                       background: isUser ? "var(--text)" : "var(--surface)",
-                      color: isUser ? "var(--bg)" : "var(--fg)",
+                      color: isUser ? "var(--bg)" : "var(--text)",
                       border: isUser ? "none" : "1px solid var(--hairline)",
                       fontSize: "var(--fs-ui)",
                       lineHeight: 1.55,
@@ -853,7 +855,7 @@ function TrialChatDrawer({
                 borderRadius: 10,
                 border: "1px solid var(--hairline)",
                 background: "var(--surface)",
-                color: "var(--fg)",
+                color: "var(--text)",
                 fontSize: "var(--fs-ui)",
                 outline: "none",
               }}
@@ -895,7 +897,7 @@ function TrialChatDrawer({
               alignItems: "center",
               justifyContent: "center",
               gap: "var(--sp-7)",
-              boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+              boxShadow: "var(--shadow-sm)",
             }}
           >
             <Icons.UserPlus size={13} />
@@ -1038,7 +1040,7 @@ export default function MarketplacePage() {
       <Topbar
         crumbs={[t("nav.hire")]}
         actions={
-          <span style={{ fontSize: "var(--fs-sm)", color: "var(--muted)" }}>
+          <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
             {t("hire.agents", { count: agents.length })} · {t("hire.hired", { count: hiredCount })}
           </span>
         }
@@ -1052,12 +1054,12 @@ export default function MarketplacePage() {
             insetInlineEnd: 24,
             zIndex: 9999,
             background: toast.kind === "success" ? "var(--text)" : "var(--danger)",
-            color: toast.kind === "success" ? "var(--bg)" : "#fff",
+            color: toast.kind === "success" ? "var(--bg)" : "var(--bg-elevated)",
             padding: "10px 16px",
             borderRadius: 10,
             fontSize: "var(--fs-ui)",
             fontWeight: 500,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+            boxShadow: "var(--shadow-lg)",
             display: "flex",
             alignItems: "center",
             gap: "var(--sp-8)",
@@ -1128,7 +1130,7 @@ export default function MarketplacePage() {
               maxWidth: 300,
             }}
           >
-            <Icons.Search size={13} style={{ color: "var(--muted)", flexShrink: 0 }} />
+            <Icons.Search size={13} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -1138,14 +1140,14 @@ export default function MarketplacePage() {
                 border: "none",
                 outline: "none",
                 fontSize: "var(--fs-ui)",
-                color: "var(--fg)",
+                color: "var(--text)",
                 width: "100%",
               }}
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--muted)" }}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--text-muted)" }}
               >
                 <Icons.X size={12} />
               </button>
@@ -1162,8 +1164,10 @@ export default function MarketplacePage() {
                   borderRadius: 20,
                   border: "1px solid",
                   borderColor: category === cat.id ? "var(--accent)" : "var(--hairline)",
-                  background: category === cat.id ? "var(--accent)15" : "transparent",
-                  color: category === cat.id ? "var(--accent)" : "var(--muted)",
+                  background: category === cat.id
+                    ? "color-mix(in oklch, var(--accent) 12%, transparent)"
+                    : "transparent",
+                  color: category === cat.id ? "var(--accent)" : "var(--text-muted)",
                   fontSize: "var(--fs-sm)",
                   fontWeight: category === cat.id ? 600 : 400,
                   cursor: "pointer",
@@ -1178,14 +1182,14 @@ export default function MarketplacePage() {
 
         {loading ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 60 }}>
-            <Icons.Loader size={20} style={{ color: "var(--muted)", animation: "spin 1s linear infinite" }} />
+            <Icons.Loader size={20} style={{ color: "var(--text-muted)", animation: "spin 1s linear infinite" }} />
           </div>
         ) : filtered.length === 0 ? (
           <div
             style={{
               textAlign: "center",
               padding: "60px 20px",
-              color: "var(--muted)",
+              color: "var(--text-muted)",
               fontSize: "var(--fs-base)",
             }}
           >

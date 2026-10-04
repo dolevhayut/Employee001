@@ -37,15 +37,15 @@ function PersonNode({ data }: NodeProps<NodeData>) {
   const isCEO = data.kind === "ceo";
   const ring =
     data.status === "ready"
-      ? "var(--success, #4ade80)"
+      ? "var(--success)"
       : data.status === "building"
-        ? "var(--warn, #f59e0b)"
+        ? "var(--warn)"
         : "var(--hairline)";
 
   return (
     <div
       style={{
-        background: "var(--surface-raised, var(--surface))",
+        background: "var(--surface)",
         border: `1px solid ${isCEO ? "var(--text)" : "var(--hairline)"}`,
         borderRadius: 12,
         padding: "10px 14px",
@@ -53,9 +53,7 @@ function PersonNode({ data }: NodeProps<NodeData>) {
         display: "flex",
         alignItems: "center",
         gap: 10,
-        boxShadow: isCEO
-          ? "0 2px 12px rgba(0,0,0,0.10)"
-          : "0 1px 3px rgba(0,0,0,0.06)",
+        boxShadow: isCEO ? "var(--shadow)" : "var(--shadow-sm)",
         fontFamily: "inherit",
       }}
     >
@@ -70,7 +68,7 @@ function PersonNode({ data }: NodeProps<NodeData>) {
           height: 36,
           borderRadius: "50%",
           background: data.color,
-          color: "#fff",
+          color: "var(--bg-elevated)",
           display: "grid",
           placeItems: "center",
           fontWeight: 650,
@@ -87,7 +85,7 @@ function PersonNode({ data }: NodeProps<NodeData>) {
           style={{
             fontWeight: 600,
             fontSize: 13,
-            color: "var(--fg)",
+            color: "var(--text)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -100,7 +98,7 @@ function PersonNode({ data }: NodeProps<NodeData>) {
           <div
             style={{
               fontSize: 11,
-              color: "var(--muted)",
+              color: "var(--text-muted)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -149,10 +147,10 @@ function EmployeePopover({
         style={popoverShell(x, y)}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontWeight: 650, color: "var(--fg)", fontSize: 14 }}>
+        <div style={{ fontWeight: 650, color: "var(--text)", fontSize: 14 }}>
           {t("twins.org.you")}
         </div>
-        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
           {orgName ? (
             <>
               {t("twins.org.founder")} · <bdi>{orgName}</bdi>
@@ -164,7 +162,7 @@ function EmployeePopover({
         <div
           style={{
             fontSize: 12,
-            color: "var(--muted)",
+            color: "var(--text-muted)",
             marginTop: 10,
             lineHeight: 1.5,
           }}
@@ -184,10 +182,10 @@ function EmployeePopover({
         : t("twins.filter.pending");
   const statusColor =
     employee.twinStatus === "ready"
-      ? "var(--success, #4ade80)"
+      ? "var(--success)"
       : employee.twinStatus === "building"
-        ? "var(--warn, #f59e0b)"
-        : "var(--muted)";
+        ? "var(--warn)"
+        : "var(--text-muted)";
   const isAgent = employee.id.startsWith("marketplace-");
 
   return (
@@ -206,7 +204,7 @@ function EmployeePopover({
             height: 36,
             borderRadius: "50%",
             background: employee.avatarColor,
-            color: "#fff",
+            color: "var(--bg-elevated)",
             display: "grid",
             placeItems: "center",
             fontSize: 13,
@@ -220,7 +218,7 @@ function EmployeePopover({
           <div
             style={{
               fontWeight: 650,
-              color: "var(--fg)",
+              color: "var(--text)",
               fontSize: 14,
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -232,7 +230,7 @@ function EmployeePopover({
           <div
             style={{
               fontSize: 12,
-              color: "var(--muted)",
+              color: "var(--text-muted)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -250,7 +248,7 @@ function EmployeePopover({
               borderRadius: 10,
               background: "var(--surface)",
               border: "1px solid var(--hairline)",
-              color: "var(--muted)",
+              color: "var(--text-muted)",
               textTransform: "uppercase",
               letterSpacing: "0.04em",
             }}
@@ -269,11 +267,11 @@ function EmployeePopover({
           fontSize: 12,
         }}
       >
-        <span style={{ color: "var(--muted)" }}>{t("twins.org.department")}</span>
-        <span style={{ color: "var(--fg)" }}><bdi>{employee.department}</bdi></span>
+        <span style={{ color: "var(--text-muted)" }}>{t("twins.org.department")}</span>
+        <span style={{ color: "var(--text)" }}><bdi>{employee.department}</bdi></span>
 
-        <span style={{ color: "var(--muted)" }}>{t("twins.org.status")}</span>
-        <span style={{ color: "var(--fg)", display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "var(--text-muted)" }}>{t("twins.org.status")}</span>
+        <span style={{ color: "var(--text)", display: "flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
               width: 7,
@@ -285,28 +283,28 @@ function EmployeePopover({
           />
           {statusLabel}
           {employee.twinStatus === "ready" && (
-            <span style={{ color: "var(--muted)" }}>
+            <span style={{ color: "var(--text-muted)" }}>
               · <bdi>{(employee.twinConfidence * 100).toFixed(0)}%</bdi> {t("twins.org.conf")}
             </span>
           )}
         </span>
 
-        <span style={{ color: "var(--muted)" }}>{t("twins.org.profile")}</span>
-        <span style={{ color: "var(--fg)" }}>
+        <span style={{ color: "var(--text-muted)" }}>{t("twins.org.profile")}</span>
+        <span style={{ color: "var(--text)" }}>
           <bdi>{employee.profileFilesComplete}/9</bdi> {t("twins.profile.files")}
         </span>
 
         {employee.placement?.responsibleEmployeeName && (
           <>
-            <span style={{ color: "var(--muted)" }}>{t("twins.org.reportsTo")}</span>
-            <span style={{ color: "var(--fg)" }}>
+            <span style={{ color: "var(--text-muted)" }}>{t("twins.org.reportsTo")}</span>
+            <span style={{ color: "var(--text)" }}>
               <bdi>{employee.placement.responsibleEmployeeName}</bdi>
             </span>
           </>
         )}
 
-        <span style={{ color: "var(--muted)" }}>{t("twins.org.questions")}</span>
-        <span style={{ color: "var(--fg)" }}><bdi>{employee.questionsThisWeek}</bdi></span>
+        <span style={{ color: "var(--text-muted)" }}>{t("twins.org.questions")}</span>
+        <span style={{ color: "var(--text)" }}><bdi>{employee.questionsThisWeek}</bdi></span>
       </div>
 
       {employee.skills.length > 0 && (
@@ -327,7 +325,7 @@ function EmployeePopover({
                 borderRadius: 10,
                 background: "var(--surface)",
                 border: "1px solid var(--hairline)",
-                color: "var(--muted)",
+                color: "var(--text-muted)",
               }}
             >
               <bdi>{s.label}</bdi>
@@ -361,7 +359,7 @@ function EmployeePopover({
             borderRadius: 8,
             border: "1px solid var(--hairline)",
             background: "transparent",
-            color: "var(--muted)",
+            color: "var(--text-muted)",
             cursor: "pointer",
             fontSize: 14,
           }}
@@ -380,10 +378,10 @@ function popoverShell(x: number, y: number) {
     top: y,
     transform: "translate(-50%, 12px)",
     width: 280,
-    background: "var(--surface-raised, var(--surface))",
+    background: "var(--surface)",
     border: "1px solid var(--hairline)",
     borderRadius: 12,
-    boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
+    boxShadow: "var(--shadow-lg)",
     padding: 14,
     zIndex: 20,
     pointerEvents: "auto" as const,
@@ -438,7 +436,7 @@ export function OrgChart({ employees, ceoName }: Props) {
         label: rootLabel,
         sub: t("twins.org.founder"),
         initials: "CEO",
-        color: "#111",
+        color: "var(--text)",
         kind: "ceo",
       },
     });
@@ -464,7 +462,7 @@ export function OrgChart({ employees, ceoName }: Props) {
         target: emp.id,
         type: "smoothstep",
         animated: false,
-        style: { stroke: "var(--hairline-strong, var(--hairline))", strokeWidth: 1.5 },
+        style: { stroke: "var(--hairline-strong)", strokeWidth: 1.5 },
       });
 
       // Level 2 — agents managed by this employee
@@ -492,7 +490,7 @@ export function OrgChart({ employees, ceoName }: Props) {
             target: rep.id,
             type: "smoothstep",
             style: {
-              stroke: "var(--hairline-strong, var(--hairline))",
+              stroke: "var(--hairline-strong)",
               strokeWidth: 1.5,
               strokeDasharray: "4 4",
             },
@@ -533,7 +531,7 @@ export function OrgChart({ employees, ceoName }: Props) {
         style={{
           padding: 40,
           textAlign: "center",
-          color: "var(--muted)",
+          color: "var(--text-muted)",
           fontSize: "var(--fs-ui)",
         }}
       >

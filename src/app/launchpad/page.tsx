@@ -85,13 +85,13 @@ const ACTIONS: Action[] = [
 ];
 
 const PALETTE = {
-  surface: "#F2EBE0",
-  surfaceCard: "#FFFFFF",
-  border: "#DDD1C4",
-  ink: "#1A1612",
-  inkMuted: "#5E544B",
-  inkDim: "#8A7F73",
-  copper: "#9E6B47",
+  surface: "var(--bg)",
+  surfaceCard: "var(--surface)",
+  border: "var(--hairline)",
+  ink: "var(--text)",
+  inkMuted: "var(--text-muted)",
+  inkDim: "var(--text-subtle)",
+  copper: "var(--accent)",
 };
 
 export default function LaunchpadPage() {
@@ -207,8 +207,7 @@ export default function LaunchpadPage() {
               transition={{ duration: 0.4, delay: 0.1 + i * 0.08, ease: "easeOut" }}
               whileHover={{
                 y: -3,
-                boxShadow:
-                  "0 24px 60px -20px rgba(158, 107, 71, 0.30), 0 0 0 1px rgba(26,22,18,0.06)",
+                boxShadow: "var(--shadow-lg)",
               }}
               whileTap={{ scale: 0.98 }}
               style={{
