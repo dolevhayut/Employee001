@@ -15,7 +15,7 @@ import { dataDir } from "./app-home";
 //   - attempts are bounded; an item that keeps failing parks as "failed"
 //     with its last error, it never retries forever.
 
-export type WorkItemType = "email" | "task";
+export type WorkItemType = "email" | "slack" | "task";
 
 export type WorkItemStatus =
   | "queued" // waiting for a worker
@@ -34,13 +34,26 @@ export type EmailPayload = {
   body?: string;
 };
 
+export type SlackPayload = {
+  channel: string;
+  ts: string;
+  threadTs?: string;
+  text: string;
+  userId: string;
+  workspaceId?: string;
+  externalWorkspace?: boolean;
+  isDm: boolean;
+  mentionedTwinUserId?: string;
+  threadMessages?: Array<{ userId?: string; text: string; ts?: string }>;
+};
+
 export type WorkItem = {
   id: string;
   type: WorkItemType;
   assigneeEmployeeId: string;
   title: string;
-  /** Email envelope for type "email"; free-form task text for type "task". */
-  payload: EmailPayload | { task: string };
+  /** Inbound provider envelope, or free-form task text. */
+  payload: EmailPayload | SlackPayload | { task: string };
   idempotencyKey: string;
   status: WorkItemStatus;
   attemptCount: number;

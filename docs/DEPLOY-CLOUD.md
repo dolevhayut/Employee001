@@ -196,6 +196,12 @@ In the Composio project, set that same public endpoint as the project's webhook
 subscription. The installed Composio SDK version registers Gmail trigger instances;
 the project-level subscription determines where those instances deliver events.
 
+### Twins in Slack (optional)
+
+Slack uses the same signed Composio webhook and reconciliation pattern as Gmail. Set a public HTTPS `APP_URL` (or `EMPLOYEE001_PUBLIC_URL`) and `COMPOSIO_WEBHOOK_SECRET`; Composio may then deliver to `/api/slack/composio`. Configure that endpoint as the project webhook subscription. Each active employee Slack connection arms its own message trigger when Composio exposes one; without a public URL, signing secret, or available trigger, the autonomy scheduler polls every five minutes (and polls every 30 minutes as reconciliation after push is armed).
+
+The Slack connection must expose the connected Slack user and workspace IDs. Employee001 never maps a display name to a twin. Mentions and DMs are drafted with the twin's normal profile/Org Brain grounding, then go to **Approvals** by default. The per-twin “Answer Slack questions without asking” setting only permits direct, in-thread answers for internal questions; external shared channels and action requests remain approval-gated.
+
 ---
 
 ## Data migration — zero loss

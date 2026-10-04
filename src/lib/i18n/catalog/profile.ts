@@ -23,6 +23,9 @@ export const profileEn = {
   "profile.file.expertise": "Domains the twin can answer authoritatively", "profile.file.tone": "Voice, communication style, characteristic phrases", "profile.file.context": "Role, org chart, current priorities", "profile.file.decisions": "Decision-making patterns and past calls", "profile.file.preferences": "How they like to work, tools, communication", "profile.file.people": "Relationships and who they defer to", "profile.file.projects": "Currently active projects", "profile.file.boundaries": "Topics the twin should never answer alone", "profile.file.employment": "Formal HR record, manager, reports, certifications",
   "profile.provider.label": "Claude runs on:", "profile.provider.note": "To change this provider, re-run employee001 setup.",
   "profile.provider.anthropic": "Anthropic API", "profile.provider.bedrock": "AWS Bedrock", "profile.provider.vertex": "Google Vertex AI", "profile.provider.foundry": "Azure AI Foundry", "profile.provider.local": "Local model (offline)",
+  "profile.slack.title": "Slack replies",
+  "profile.slack.answerWithoutAsking": "Answer Slack questions without asking",
+  "profile.slack.answerHint": "Off by default. Action requests and external shared channels still require approval.",
 } as const;
 
 export const profileHe: Partial<Record<keyof typeof profileEn, string>> = {
@@ -32,4 +35,7 @@ export const profileHe: Partial<Record<keyof typeof profileEn, string>> = {
   "profile.file.expertise":"תחומים שבהם התאום יכול לענות בסמכות", "profile.file.tone":"קול, סגנון תקשורת וביטויים אופייניים", "profile.file.context":"תפקיד, תרשים ארגוני וסדרי עדיפויות", "profile.file.decisions":"דפוסי קבלת החלטות והחלטות קודמות", "profile.file.preferences":"איך נוח לו לעבוד, כלים ותקשורת", "profile.file.people":"קשרים ולמי הוא מפנה שאלות", "profile.file.projects":"פרויקטים פעילים", "profile.file.boundaries":"נושאים שהתאום לא אמור לענות עליהם לבד", "profile.file.employment":"רשומת HR, מנהל, כפיפים והסמכות",
   "profile.provider.label": "Claude רץ על:", "profile.provider.note": "כדי לשנות את הספק, הריצו שוב employee001 setup.",
   "profile.provider.anthropic": "Anthropic API", "profile.provider.bedrock": "AWS Bedrock", "profile.provider.vertex": "Google Vertex AI", "profile.provider.foundry": "Azure AI Foundry", "profile.provider.local": "מודל מקומי (לא מקוון)",
+  "profile.slack.title":"תשובות ב־Slack",
+  "profile.slack.answerWithoutAsking":"לענות על שאלות ב־Slack ללא אישור",
+  "profile.slack.answerHint":"כבוי כברירת מחדל. בקשות לפעולה וערוצים משותפים חיצוניים עדיין דורשים אישור.",
 };

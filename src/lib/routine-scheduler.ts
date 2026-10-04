@@ -16,6 +16,7 @@ import { appendRunLog, logPathFor } from "@/lib/run-logs";
 import { isAutonomyArmed } from "@/lib/workspace-mode";
 import { dispatchWorkTick, recoverOrphanedApprovals } from "@/lib/work-dispatcher";
 import { pollEmailInboxes } from "@/lib/email-poller";
+import { pollSlackMessages } from "@/lib/slack-poller";
 
 const TICK_MS = 30_000; // check every 30s
 
@@ -53,6 +54,7 @@ function tick(): void {
   // Autonomy work plane: pull new inbound email into the queue, then run
   // at most one queued work item. Both are self-throttled and fire-and-forget.
   void pollEmailInboxes().catch(() => {});
+  void pollSlackMessages().catch(() => {});
   void dispatchWorkTick().catch(() => {});
   const now = Date.now();
   const routines = listRoutines();

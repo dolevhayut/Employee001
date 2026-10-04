@@ -11,6 +11,7 @@ import { dataDir } from "./app-home";
 import { toolkitAllowed } from "./consent-policy";
 import { loadConsentStatus } from "./consent-status";
 import { disableEmailTrigger, ensureEmailTrigger } from "@/lib/email-intake-trigger";
+import { ensureSlackTrigger, disableSlackTrigger } from "@/lib/slack-intake-trigger";
 
 // ─── Toolkit allow-list per role ─────────────────────────────────────────────
 // Curated so each twin can't act outside its functional area.
@@ -59,6 +60,9 @@ export type ConnectionRecord = {
   redirectUrl?: string;
   initiatedAt: string;
   activatedAt?: string;
+  /** Provider identity returned by the connected Slack account, never inferred from a display name. */
+  slackUserId?: string;
+  slackWorkspaceId?: string;
 };
 
 /** Coarse status buckets used by the UI. */
@@ -207,6 +211,7 @@ export async function refreshConnections(
       id: string;
       status: string;
       toolkit?: { slug?: string } | string;
+      metadata?: Record<string, unknown>;
       authConfig?: { id?: string };
     }> }).items ?? [];
 
@@ -244,6 +249,10 @@ export async function refreshConnections(
         itemStatus === "ACTIVE" && !prev?.activatedAt
           ? new Date().toISOString()
           : prev?.activatedAt,
+      ...(toolkit === "slack" ? {
+        slackUserId: typeof item.metadata?.user_id === "string" ? item.metadata.user_id : prev?.slackUserId,
+        slackWorkspaceId: typeof item.metadata?.team_id === "string" ? item.metadata.team_id : prev?.slackWorkspaceId,
+      } : {}),
     };
   }
 
@@ -251,6 +260,7 @@ export async function refreshConnections(
   // OAuth status refresh is the first reliable point at which Gmail is ACTIVE.
   // This is intentionally best-effort: the poller stays the safety net.
   if (state.connections.gmail?.status === "ACTIVE") void ensureEmailTrigger(employeeId);
+  if (state.connections.slack?.status === "ACTIVE") void ensureSlackTrigger(employeeId);
   return state;
 }
 
@@ -276,6 +286,7 @@ export async function disconnectToolkit(
   delete state.connections[toolkit];
   await writeState(employeeId, state);
   if (toolkit === "gmail") await disableEmailTrigger(employeeId);
+  if (toolkit === "slack") await disableSlackTrigger(employeeId);
 }
 
 /**

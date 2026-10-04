@@ -54,6 +54,7 @@ type DiskSidecar = {
   model?: ClaudeModel;
   seedModel?: ClaudeModel;
   refreshModel?: ClaudeModel;
+  answerSlackWithoutAsking?: boolean;
   /**
    * Set when materialised from an invite before the employee finished the
    * consent wizard. Such records have placeholder markdown that would
@@ -166,6 +167,7 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
       refreshModel: sidecar.refreshModel ?? sidecar.model ?? TWIN_MODEL_PRIMARY,
       ttsVoiceId: "EXAVITQu4vr4xnSDxMaL",
       ...(sidecar.consent ? { consent: sidecar.consent } : {}),
+      answerSlackWithoutAsking: sidecar.answerSlackWithoutAsking === true,
     });
   }
 

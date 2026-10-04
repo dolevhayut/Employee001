@@ -214,6 +214,8 @@ export const ELEVENLABS_VOICE_STORAGE_KEY = "twin.ttsVoices";
 // ─── Employee twin type ───────────────────────────────────────────────────────
 
 export type EmployeeWithTwin = Employee & {
+  /** Per-twin unattended Slack policy. Off unless the CEO explicitly enables it. */
+  answerSlackWithoutAsking?: boolean;
   twinStatus: TwinStatus;
   /** 0–1 — only meaningful when status==="ready" */
   twinConfidence: number;

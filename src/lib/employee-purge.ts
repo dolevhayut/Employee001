@@ -147,6 +147,22 @@ function dropFromAssignments(id: string) {
   };
 }
 
+/** slack-reply-rate.json is keyed "<employeeId>:<channel>". */
+function dropKeysWithPrefix(prefix: string) {
+  return (data: unknown): number => {
+    if (!data || typeof data !== "object" || Array.isArray(data)) return 0;
+    const record = data as Record<string, unknown>;
+    let count = 0;
+    for (const key of Object.keys(record)) {
+      if (key.startsWith(prefix)) {
+        delete record[key];
+        count++;
+      }
+    }
+    return count;
+  };
+}
+
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -222,6 +238,10 @@ export function purgeLocalData(id: string): PurgeStep[] {
     editJson("active-runs.json", dataDir("active-runs.json"), dropFromRecord(id)),
     editJson("email-poll.json", dataDir("email-poll.json"), dropFromRecord(id)),
     editJson("active-builds.json", dataDir("active-builds.json"), dropFromRecord(id)),
+    editJson("org/email-triggers.json", dataDir("org", "email-triggers.json"), dropFromRecord(id)),
+    editJson("org/slack-triggers.json", dataDir("org", "slack-triggers.json"), dropFromRecord(id)),
+    editJson("slack-poll.json", dataDir("slack-poll.json"), dropFromRecord(id)),
+    editJson("slack-reply-rate.json", dataDir("slack-reply-rate.json"), dropKeysWithPrefix(`${id}:`)),
     editJson("org/skill-assignments.json", dataDir("org", "skill-assignments.json"), dropFromAssignments(id)),
     // Legacy meeting debug log (CEO questions + names, no retention). The app
     // no longer writes it; remove it rather than edit free text.

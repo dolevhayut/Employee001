@@ -124,12 +124,15 @@ export async function PATCH(
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
-  const nameHeRaw = (body as { nameHe?: unknown }).nameHe;
-  if (typeof nameHeRaw !== "string") {
+  const input = body as { nameHe?: unknown; answerSlackWithoutAsking?: unknown };
+  const nameHeRaw = input.nameHe;
+  const slackSetting = input.answerSlackWithoutAsking;
+  if (nameHeRaw !== undefined && typeof nameHeRaw !== "string") {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
+  if (slackSetting !== undefined && typeof slackSetting !== "boolean") return NextResponse.json({ error: "invalid_body" }, { status: 400 });
 
-  const nameHe = normalizeNameHe(nameHeRaw);
+  const nameHe = nameHeRaw === undefined ? undefined : normalizeNameHe(nameHeRaw);
   if (nameHe === null) {
     return NextResponse.json({ error: "not_hebrew" }, { status: 400 });
   }
@@ -157,8 +160,11 @@ export async function PATCH(
       return NextResponse.json({ error: "invalid_sidecar" }, { status: 500 });
     }
 
-    if (nameHe === "") delete sidecar.nameHe;
-    else sidecar.nameHe = nameHe;
+    if (nameHe !== undefined) {
+      if (nameHe === "") delete sidecar.nameHe;
+      else sidecar.nameHe = nameHe;
+    }
+    if (slackSetting !== undefined) sidecar.answerSlackWithoutAsking = slackSetting;
 
     const tmp = path.join(dir, `.employee.json.${randomUUID()}.tmp`);
     try {
@@ -181,9 +187,9 @@ export async function PATCH(
     employeeName,
     toolName: "employee.update_name_he",
     bareName: "employee.update_name_he",
-    input: { id, nameHe },
+    input: { id, ...(nameHe !== undefined ? { nameHe } : {}), ...(slackSetting !== undefined ? { answerSlackWithoutAsking: slackSetting } : {}) },
     verdict: "executed",
   });
 
-  return NextResponse.json({ ok: true, nameHe });
+  return NextResponse.json({ ok: true, ...(nameHe !== undefined ? { nameHe } : {}), ...(slackSetting !== undefined ? { answerSlackWithoutAsking: slackSetting } : {}) });
 }

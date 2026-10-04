@@ -1,8 +1,9 @@
 import fs from "fs";
+import { dataDir } from "@/lib/app-home";
 import path from "path";
 import { getComposio, composioUserIdFor, readState } from "@/lib/composio-client";
 
-const FILE = () => path.join(process.cwd(), "data", "org", "email-triggers.json");
+const FILE = () => dataDir("org", "email-triggers.json");
 const FALLBACK_TRIGGER_SLUG = "GMAIL_NEW_GMAIL_MESSAGE";
 const LIMIT = 200;
 const RETRY_AFTER_MS = 5 * 60 * 1000;
@@ -15,10 +16,10 @@ export function emailTriggerFor(employeeId: string): EmailTrigger | undefined { 
 function remember(employeeId: string, trigger: EmailTrigger): void { const state = load(); state[employeeId] = trigger; save(state); }
 export function forgetEmailTrigger(employeeId: string): void { const state = load(); delete state[employeeId]; save(state); }
 
-export function publicWebhookUrl(env: Record<string, string | undefined> = process.env): string | null {
+export function publicWebhookUrl(env: Record<string, string | undefined> = process.env, route = "/api/email/composio"): string | null {
   const configured = (env.EMPLOYEE001_PUBLIC_URL ?? env.APP_URL ?? "").trim().replace(/\/$/, "");
   if (!configured) return null;
-  try { const url = new URL(configured); return url.protocol === "https:" && !["localhost", "127.0.0.1", "::1"].includes(url.hostname) ? `${url.toString().replace(/\/$/, "")}/api/email/composio` : null; } catch { return null; }
+  try { const url = new URL(configured); return url.protocol === "https:" && !["localhost", "127.0.0.1", "::1"].includes(url.hostname) ? `${url.toString().replace(/\/$/, "")}${route}` : null; } catch { return null; }
 }
 export function emailPollIntervalMs(pushArmed: boolean): number { return pushArmed ? 30 * 60 * 1000 : 5 * 60 * 1000; }
 function rows(value: unknown): Record<string, unknown>[] { const list = Array.isArray(value) ? value : value && typeof value === "object" ? (value as Record<string, unknown>).items : undefined; return Array.isArray(list) ? list.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row)) : []; }

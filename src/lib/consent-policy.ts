@@ -70,6 +70,11 @@ export function toolkitAllowed(status: ConsentStatus, toolkit: string): boolean 
   return true;
 }
 
+/** May the twin act (send, post, change) through the employee's accounts? */
+export function actionsAllowed(status: ConsentStatus): boolean {
+  return has(status, "third-party-actions");
+}
+
 /** The employee's own accounts: their personal Composio server. Org-wide MCP
  *  servers and web fetches aren't the employee acting, so the normal
  *  approval gate covers them. */

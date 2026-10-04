@@ -46,6 +46,10 @@ beforeEach(() => {
   write("active-runs.json", JSON.stringify({ run1: { employeeId: ME }, run2: { employeeId: PEER } }));
   write("email-poll.json", JSON.stringify({ [ME]: { lastPollAt: "x" }, [PEER]: { lastPollAt: "y" } }));
   write("goals.json", JSON.stringify([{ id: "g1", ownerEmployeeId: ME }, { id: "g2", ownerEmployeeId: PEER }]));
+  write("org/email-triggers.json", JSON.stringify({ [ME]: { id: "t1" }, [PEER]: { id: "t2" } }));
+  write("org/slack-triggers.json", JSON.stringify({ [ME]: { id: "t3" } }));
+  write("slack-poll.json", JSON.stringify({ [ME]: { lastPollAt: "x" } }));
+  write("slack-reply-rate.json", JSON.stringify({ [`${ME}:C1`]: [1], [`${PEER}:C1`]: [2] }));
 });
 
 afterEach(() => {
@@ -83,6 +87,10 @@ describe("purgeEmployee", () => {
     expect(read("invites.json")).not.toContain(ME);
     expect(read("active-runs.json")).not.toContain(ME);
     expect(read("email-poll.json")).not.toContain(ME);
+    for (const f of ["org/email-triggers.json", "org/slack-triggers.json", "slack-poll.json", "slack-reply-rate.json"]) {
+      expect(read(f), f).not.toContain(ME);
+    }
+    expect(read("slack-reply-rate.json")).toContain(PEER);
     expect(JSON.parse(read("goals.json"))).toEqual([
       { id: "g1", ownerEmployeeId: null },
       { id: "g2", ownerEmployeeId: PEER },

@@ -1961,9 +1961,30 @@ function OverviewTab({
           <SectionTitle>{t("profile.overview.model")}</SectionTitle>
           <ModelPicker employee={employee} />
         </div>
+        <SlackAnswerSetting employee={employee} />
       </SectionGroup>
     </div>
   );
+}
+
+function SlackAnswerSetting({ employee }: { employee: EmployeeWithTwin }) {
+  const { t } = useT();
+  const [enabled, setEnabled] = useState(employee.answerSlackWithoutAsking === true);
+  const [saving, setSaving] = useState(false);
+  async function change(value: boolean) {
+    setEnabled(value); setSaving(true);
+    try {
+      const res = await fetch(`/api/employees/${employee.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answerSlackWithoutAsking: value }) });
+      if (!res.ok) setEnabled(!value);
+    } catch { setEnabled(!value); } finally { setSaving(false); }
+  }
+  return <div>
+    <SectionTitle>{t("profile.slack.title")}</SectionTitle>
+    <label className="card" style={{ display: "flex", alignItems: "center", gap: "var(--sp-12)", padding: "var(--sp-16)", cursor: saving ? "wait" : "pointer" }}>
+      <input aria-label={t("profile.slack.answerWithoutAsking")} type="checkbox" checked={enabled} disabled={saving} onChange={(e) => void change(e.target.checked)} style={{ accentColor: "var(--accent)", width: 18, height: 18 }} />
+      <span><span style={{ display: "block", fontSize: "var(--fs-ui)", fontWeight: 600 }}>{t("profile.slack.answerWithoutAsking")}</span><span className="subtle" style={{ display: "block", fontSize: "var(--fs-sm)", marginTop: "var(--sp-4)" }}>{t("profile.slack.answerHint")}</span></span>
+    </label>
+  </div>;
 }
 
 // ─── Files Tab (split-pane editor) ────────────────────────────────────────────

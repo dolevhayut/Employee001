@@ -201,7 +201,7 @@ export function proxy(request: NextRequest) {
   // everything when COMPOSIO_WEBHOOK_SECRET is unset.
   if (
     request.method === "POST" &&
-    request.nextUrl.pathname === "/api/email/composio" &&
+    (request.nextUrl.pathname === "/api/email/composio" || request.nextUrl.pathname === "/api/slack/composio") &&
     request.headers.has("webhook-signature")
   ) {
     return NextResponse.next();

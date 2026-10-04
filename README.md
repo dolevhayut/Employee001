@@ -46,6 +46,7 @@ npx employee001 start     # opens http://localhost:3000
 - **Twins of real people, not role templates.** Each employee connects their own tools (Slack, Gmail, Linear, GitHub ...) and a training agent writes their twin from their actual history: expertise, decisions, tone.
 - **Team Meeting.** Ask one question and the right twins argue it out, challenge each other and land on a verdict you can act on.
 - **Nothing changes unapproved by default.** Every write action (an email, a Slack post, a ticket) and every web fetch stops at an approval gate; read-only tool calls run on their own. Every tool call is written to an audit log, and each employee authorizes their own twin's tools with their own OAuth.
+- **Twins in Slack.** A connected twin drafts answers to its @mentions and DMs. Replies go through Approvals by default; a CEO can opt a specific twin into direct answers, while action requests and external shared channels still require approval.
 - **Local-first.** Your profiles, memory, audit log and org knowledge live in `./data/` on your hardware. Prefer a server? Run your own single-tenant cloud instance.
 - **Speaks Hebrew.** Twins converse, write and remember in natural Hebrew, with right-to-left rendering, no extra service needed.
 
