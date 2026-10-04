@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
+import { setOrgName } from "@/components/ex/use-org-name";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
 import type {
@@ -223,6 +224,7 @@ function WorkspaceSection() {
       setName((current) => (current === submitted.name ? data.identity.name : current));
       setDescription((current) => (current === submitted.description ? data.identity.description : current));
       setSaved(data.identity);
+      setOrgName(data.identity.name);
       setStatus("saved");
     } catch {
       setStatus("error");
