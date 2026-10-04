@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:net";
 import { checkNodeVersion } from "../lib/node-version.mjs";
+import { countTwins } from "../lib/adopt-data.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(HERE, "..", "..");
@@ -365,6 +366,16 @@ export default async function doctor(argv = []) {
       fail("data/", "exists but not writable");
       issues++;
     }
+  }
+
+  const twinCount = countTwins(dataDir);
+  ok("Twins", `${twinCount} in ${dataDir}`);
+  const packagedTwins = countTwins(resolve(PKG_ROOT, ".next", "standalone", "data"));
+  if (twinCount === 0 && packagedTwins > 0) {
+    warn(
+      "Twins found inside the installed package (from an older version).",
+      "`employee001 start` will copy them into ./data.",
+    );
   }
 
   // Port

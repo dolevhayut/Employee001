@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkNodeVersion } from "../lib/node-version.mjs";
+import { adoptData } from "../lib/adopt-data.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // bin/commands/start.mjs → ../../  is the package root
@@ -36,36 +37,21 @@ function openInBrowser(url) {
   }
 }
 
-export default async function start(argv) {
-  const nodeVersion = checkNodeVersion();
-  if (nodeVersion.level === "error") {
-    process.stderr.write(`${nodeVersion.message}\n`);
-    process.exitCode = 1;
-    return;
-  }
-  if (nodeVersion.level === "warn") process.stderr.write(`${nodeVersion.message}\n`);
+export function buildChildEnv({ home, port, bind, env = {}, strict = false }) {
+  const childEnv = {
+    ...process.env,
+    ...env,
+    EMPLOYEE001_HOME: resolve(home),
+    HOSTNAME: bind,
+    PORT: String(port),
+    NODE_ENV: "production",
+  };
+  if (strict) childEnv.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
+  return childEnv;
+}
 
-  const cwd = process.cwd();
-  const envPath = resolve(cwd, ".env");
-
-  if (!existsSync(envPath)) {
-    process.stderr.write(
-      "No .env found. Run `employee001 setup` first.\n",
-    );
-    process.exitCode = 1;
-    return;
-  }
-
-  const fileEnv = parseEnv(readFileSync(envPath, "utf8"));
-
-  const noOpen = argv.includes("--no-open");
-  const strict = argv.includes("--strict");
-  const portFlagIdx = argv.indexOf("--port");
-  const portArg = portFlagIdx >= 0 ? argv[portFlagIdx + 1] : undefined;
-
-  const port = portArg ?? fileEnv.PORT ?? process.env.PORT ?? "3000";
-  const bind = fileEnv.EMPLOYEE001_BIND ?? process.env.EMPLOYEE001_BIND ?? "127.0.0.1";
-
+export function launchServer({ home, port, bind, env = {}, open = "/", noOpen = false, strict = false }) {
+  const absoluteHome = resolve(home);
   const serverScript = join(PKG_ROOT, ".next", "standalone", "server.js");
   if (!existsSync(serverScript)) {
     process.stderr.write(
@@ -73,23 +59,23 @@ export default async function start(argv) {
         "Build artifact is missing. If you're developing locally, run `npm run build` first.\n",
     );
     process.exitCode = 1;
-    return;
+    return null;
   }
 
-  const childEnv = {
-    ...process.env,
-    ...fileEnv,
-    HOSTNAME: bind,
-    PORT: String(port),
-    NODE_ENV: "production",
-  };
-  if (strict) {
-    childEnv.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
+  const childEnv = buildChildEnv({ home: absoluteHome, port, bind, env, strict });
+  const adoption = adoptData({ home: absoluteHome, pkgRoot: PKG_ROOT, env: childEnv });
+  if (adoption.warning) {
+    process.stderr.write(`Warning: could not check earlier install data: ${adoption.warning.message ?? adoption.warning}\n`);
+  }
+  if (adoption.adopted) {
+    process.stdout.write(
+      `Found your twins from an earlier install at ${adoption.source} and copied them to ${adoption.target} (the old copy is untouched).\n`,
+    );
   }
 
   const isLoopback =
     !bind || bind === "127.0.0.1" || bind === "::1" || bind === "localhost";
-  const token = fileEnv.EMPLOYEE001_TOKEN ?? process.env.EMPLOYEE001_TOKEN;
+  const token = env.EMPLOYEE001_TOKEN ?? process.env.EMPLOYEE001_TOKEN;
 
   const banner = ["", "  Employee001", `  → http://localhost:${port}`];
   if (isLoopback) {
@@ -124,7 +110,7 @@ export default async function start(argv) {
   let opened = false;
   setTimeout(() => {
     if (!noOpen && !opened) {
-      openInBrowser(`http://localhost:${port}`);
+      openInBrowser(`http://localhost:${port}${open}`);
       opened = true;
     }
   }, 1500);
@@ -136,4 +122,38 @@ export default async function start(argv) {
   child.on("exit", (code) => {
     process.exitCode = code ?? 0;
   });
+  return child;
+}
+
+export default async function start(argv) {
+  const nodeVersion = checkNodeVersion();
+  if (nodeVersion.level === "error") {
+    process.stderr.write(`${nodeVersion.message}\n`);
+    process.exitCode = 1;
+    return;
+  }
+  if (nodeVersion.level === "warn") process.stderr.write(`${nodeVersion.message}\n`);
+
+  const cwd = process.cwd();
+  const envPath = resolve(cwd, ".env");
+
+  if (!existsSync(envPath)) {
+    process.stderr.write(
+      "No .env found. Run `employee001 setup` first.\n",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const fileEnv = parseEnv(readFileSync(envPath, "utf8"));
+
+  const noOpen = argv.includes("--no-open");
+  const strict = argv.includes("--strict");
+  const portFlagIdx = argv.indexOf("--port");
+  const portArg = portFlagIdx >= 0 ? argv[portFlagIdx + 1] : undefined;
+
+  const port = portArg ?? fileEnv.PORT ?? process.env.PORT ?? "3000";
+  const bind = fileEnv.EMPLOYEE001_BIND ?? process.env.EMPLOYEE001_BIND ?? "127.0.0.1";
+
+  launchServer({ home: cwd, port, bind, env: fileEnv, noOpen, strict });
 }
