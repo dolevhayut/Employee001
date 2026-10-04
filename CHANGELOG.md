@@ -17,6 +17,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   similar proxy, list the public name in `EMPLOYEE001_ALLOWED_HOSTS`.
 
 ### Added
+- **Health check on Cockpit.** One card answers "is my org running?":
+  approvals waiting more than a day, schedules that didn't run, twins over
+  budget, failed tasks, and twins whose knowledge hasn't changed in 60 days.
+  No AI calls.
+- **Use the MCP server on a LAN or hosted instance** with your access token
+  (`employee001 mcp --url … --token …`, or the token from `.env`).
 - **`npx employee001 demo`: try it in one command, no keys, no setup.** Opens
   a workspace with 5 invented twins at a fictional startup and replays a real
   Team Meeting about a launch decision, with zero AI calls. Nothing touches
