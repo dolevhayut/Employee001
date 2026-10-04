@@ -146,7 +146,7 @@ export default function RoutinesPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <Topbar
-        crumbs={["Routines"]}
+        crumbs={["Schedules"]}
         actions={
           <button
             className="btn primary sm"

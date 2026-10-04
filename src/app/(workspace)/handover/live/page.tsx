@@ -14,6 +14,8 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Topbar } from "@/components/ex/shell";
+import { HandoverTabs } from "@/components/ex/handover-tabs";
 
 const DEMO_EMPLOYEE_ID = "itai-cohen";
 const BRAND = "#9E6B47";
@@ -150,7 +152,7 @@ function LivePageInner() {
   return (
     <div className="scrollbar" style={{ flex: 1, overflowY: "auto", padding: 24 }}>
       <div style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontSize: 13, color: "var(--text-dim, #888)" }}>Workspace / Handover / Live interview</div>
+        <HandoverTabs />
 
         {/* DEMO banner */}
         <div style={{ background: "rgba(158,107,71,.12)", border: `1px solid ${BRAND}`, borderRadius: 10, padding: "10px 14px", fontSize: 13 }}>
@@ -369,8 +371,11 @@ function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
 
 export default function LiveHandoverPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 24 }}>Loading…</div>}>
-      <LivePageInner />
-    </Suspense>
+    <>
+      <Topbar crumbs={["Workspace", "Handover", "Live interview"]} />
+      <Suspense fallback={<div style={{ padding: 24 }}>Loading…</div>}>
+        <LivePageInner />
+      </Suspense>
+    </>
   );
 }

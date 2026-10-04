@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Topbar } from "@/components/ex/shell";
+import { HandoverTabs } from "@/components/ex/handover-tabs";
 
 // ─── Relay Handover workspace page ────────────────────────────────────────────
 //
@@ -1066,6 +1067,7 @@ function HandoverPageInner() {
       <Topbar crumbs={["Workspace", "Handover"]} />
       <div className="scrollbar" style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
         <div style={{ maxWidth: 960, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+          <HandoverTabs />
           {/* DEMO banner — PRD 13.5 */}
           <div
             style={{

@@ -263,7 +263,7 @@ export default function FlowPage() {
 
   return (
     <>
-      <Topbar crumbs={["Workspace", "Memory graph"]} />
+      <Topbar crumbs={["Workspace", "Chat"]} />
 
       {/* Employee picker bar */}
       <EmployeePickerBar activeId={activeId} onSelect={setSelectedId} />

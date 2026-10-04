@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
@@ -35,7 +36,17 @@ export default function SettingsPage() {
 
   return (
     <>
-      <Topbar crumbs={["Workspace", "Settings"]} />
+      <Topbar
+        crumbs={["Workspace", "Settings"]}
+        actions={
+          <Link
+            href="/templates"
+            style={{ fontSize: "var(--fs-sm)", fontWeight: 500, color: "var(--text-muted)", textDecoration: "underline", textUnderlineOffset: 3 }}
+          >
+            Task templates
+          </Link>
+        }
+      />
       <div
         className="scrollbar"
         style={{
@@ -1847,7 +1858,7 @@ function CustomMcpSection() {
   }
 
   return (
-    <section style={{ marginBottom: "var(--sp-32)" }}>
+    <section id="custom-mcp" style={{ marginBottom: "var(--sp-32)", scrollMarginTop: 80 }}>
       <SectionHeader
         title="Custom MCP servers"
         desc="Org-wide tools every twin can use. Add Supabase, your internal API, or any MCP-compatible server."

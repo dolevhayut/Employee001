@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, type CSSProperties } from "react";
 import { Icons } from "@/components/ex/icons";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
+import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { Markdown } from "@/components/ex/markdown";
 import { PageHead } from "@/components/ex/page-head";
@@ -720,7 +721,17 @@ export default function TasksPage() {
 
   return (
     <>
-      <Topbar crumbs={["Workspace", "Tasks"]} />
+      <Topbar
+        crumbs={["Workspace", "Tasks"]}
+        actions={
+          <Link
+            href="/templates"
+            style={{ fontSize: "var(--fs-sm)", fontWeight: 500, color: "var(--text-muted)", textDecoration: "underline", textUnderlineOffset: 3 }}
+          >
+            Templates
+          </Link>
+        }
+      />
       <div
         className="scrollbar"
         style={{ overflow: "auto", padding: "32px 40px 60px" }}

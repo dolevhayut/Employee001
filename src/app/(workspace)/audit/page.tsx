@@ -285,7 +285,7 @@ export default function AuditPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <Topbar
-        crumbs={["Audit log"]}
+        crumbs={["Activity log"]}
         actions={
           <button
             className="btn ghost sm"

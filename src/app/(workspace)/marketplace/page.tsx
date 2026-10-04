@@ -1031,7 +1031,7 @@ export default function MarketplacePage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Topbar
-        crumbs={["Marketplace"]}
+        crumbs={["Hire"]}
         actions={
           <span style={{ fontSize: "var(--fs-sm)", color: "var(--muted)" }}>
             {agents.length} agents · {hiredCount} hired

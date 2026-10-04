@@ -189,7 +189,7 @@ export default function ConnectionsForEmployeePage({
   if (!employee) {
     return (
       <>
-        <Topbar crumbs={["Workspace", "Connections"]} />
+        <Topbar crumbs={["Workspace", "Tools & MCP"]} />
         <div style={{ padding: "var(--sp-32)", color: "var(--text-muted)" }}>
           Employee not found.
         </div>
@@ -207,7 +207,17 @@ export default function ConnectionsForEmployeePage({
 
   return (
     <>
-      <Topbar crumbs={["Workspace", "Connections", employee.name]} />
+      <Topbar
+        crumbs={["Workspace", "Tools & MCP", employee.name]}
+        actions={
+          <Link
+            href="/settings#custom-mcp"
+            style={{ fontSize: "var(--fs-sm)", fontWeight: 500, color: "var(--text-muted)", textDecoration: "underline", textUnderlineOffset: 3 }}
+          >
+            Org-wide MCP servers
+          </Link>
+        }
+      />
 
       <EmployeePickerBar activeId={id} />
 

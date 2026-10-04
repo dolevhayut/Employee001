@@ -276,7 +276,7 @@ export default function InboxPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <Topbar
-        crumbs={["Inbox"]}
+        crumbs={["Approvals"]}
         actions={
           <button className="btn ghost sm" onClick={load} title="Refresh" style={{ height: 28 }}>
             <Icons.Refresh

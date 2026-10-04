@@ -143,7 +143,7 @@ export default function BudgetsPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Topbar
-        crumbs={["Budgets"]}
+        crumbs={["Spend"]}
         actions={
           <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-12)" }}>
             <Link
