@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { createGzip } from "node:zlib";
 import { pipeline } from "node:stream/promises";
 import * as tar from "tar";
+import * as p from "@clack/prompts";
+import { encryptArchive } from "../lib/encrypted-archive.mjs";
 
 const COLOR = process.stdout.isTTY
   ? { red: "\x1b[31m", green: "\x1b[32m", yellow: "\x1b[33m", reset: "\x1b[0m", dim: "\x1b[2m" }
@@ -45,18 +47,55 @@ function readPkgVersion() {
 
 export default async function exportCmd(args) {
   const cwd = process.cwd();
-  const dataDir = resolve(cwd, "data");
+  const home = process.env.EMPLOYEE001_HOME ? resolve(process.env.EMPLOYEE001_HOME) : cwd;
+  const dataDir = resolve(home, "data");
 
   if (!existsSync(dataDir)) {
-    process.stderr.write(`${COLOR.red}error:${COLOR.reset} no data/ directory found in ${cwd}\n`);
+    process.stderr.write(`${COLOR.red}error:${COLOR.reset} no data/ directory found in ${home}\n`);
     process.exitCode = 1;
     return;
   }
 
   const positional = args.filter((a) => !a.startsWith("-"));
-  const target = positional[0]
+  const encrypt = args.includes("--encrypt");
+  const archiveTarget = positional[0]
     ? resolve(cwd, positional[0])
     : resolve(cwd, `e001-backup-${ts()}.tar.gz`);
+  const target = !encrypt
+    ? archiveTarget
+    : archiveTarget.endsWith(".tar.gz.enc")
+      ? archiveTarget
+      : archiveTarget.endsWith(".tar.gz")
+        ? `${archiveTarget}.enc`
+        : `${archiveTarget}.tar.gz.enc`;
+
+  let passphrase = process.env.EMPLOYEE001_EXPORT_PASSPHRASE;
+  if (encrypt && !passphrase) {
+    passphrase = await p.password({
+      message: "Archive passphrase (at least 12 characters)",
+      mask: "•",
+      validate: (value) => value.length >= 12 ? undefined : "Passphrase must be at least 12 characters",
+    });
+    if (p.isCancel(passphrase)) {
+      p.cancel("Export cancelled");
+      return;
+    }
+    const confirmation = await p.password({ message: "Confirm archive passphrase", mask: "•" });
+    if (p.isCancel(confirmation)) {
+      p.cancel("Export cancelled");
+      return;
+    }
+    if (passphrase !== confirmation) {
+      process.stderr.write(`${COLOR.red}error:${COLOR.reset} passphrases do not match\n`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+  if (encrypt && (!passphrase || passphrase.length < 12)) {
+    process.stderr.write(`${COLOR.red}error:${COLOR.reset} export passphrase must be at least 12 characters\n`);
+    process.exitCode = 1;
+    return;
+  }
 
   const manifest = {
     version: 1,
@@ -80,11 +119,11 @@ export default async function exportCmd(args) {
   const tmpTar = resolve(tmpdir(), `e001-export-${Date.now()}.tar`);
 
   try {
-    // Pack data/ relative to cwd.
+    // Pack data/ relative to the configured Employee001 home.
     await tar.create(
       {
         file: tmpTar,
-        cwd,
+        cwd: home,
         portable: true,
         filter: (path) => {
           const base = path.split("/").pop() || "";
@@ -105,7 +144,17 @@ export default async function exportCmd(args) {
     );
 
     // Gzip the tar into the final target.
-    await pipeline(createReadStream(tmpTar), createGzip(), createWriteStream(target));
+    if (encrypt) {
+      const compressedArchive = resolve(tmpdir(), `e001-export-${Date.now()}-${process.pid}.tar.gz`);
+      try {
+        await pipeline(createReadStream(tmpTar), createGzip(), createWriteStream(compressedArchive));
+        await encryptArchive(compressedArchive, target, passphrase);
+      } finally {
+        rmSync(compressedArchive, { force: true });
+      }
+    } else {
+      await pipeline(createReadStream(tmpTar), createGzip(), createWriteStream(target));
+    }
   } catch (err) {
     process.stderr.write(`${COLOR.red}error:${COLOR.reset} failed to create archive: ${err.message}\n`);
     process.exitCode = 1;

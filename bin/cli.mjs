@@ -30,6 +30,7 @@ Common flags:
                   (sets CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1)
   --egress        (doctor) After the health checks, list every outbound host
   --force         (import) Overwrite a non-empty data/ directory
+  --encrypt       (export) Encrypt the archive with a passphrase
   --url <u>       (mcp) MCP endpoint (default http://127.0.0.1:<PORT>/api/mcp)
 
 Examples:
