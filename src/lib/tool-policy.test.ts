@@ -14,33 +14,27 @@ describe("classifyTool", () => {
     }
   });
 
-  it.fails("guarantees fund transfers are hard-blocked without a trailing tool-name segment", () => {
-    // Bug: the transfer regex requires an underscore after FUNDS.
+  it("guarantees fund transfers are hard-blocked without a trailing tool-name segment", () => {
     expect(classifyTool("BANK_TRANSFER_FUNDS", {})).toMatchObject({ kind: "block" });
   });
 
-  it.fails("guarantees user removals are hard-blocked without a trailing tool-name segment", () => {
-    // Bug: the user-removal regex requires an underscore after USER.
+  it("guarantees user removals are hard-blocked without a trailing tool-name segment", () => {
     expect(classifyTool("IDENTITY_REMOVE_USER", {})).toMatchObject({ kind: "block" });
   });
 
-  it.fails("guarantees Bash is always hard-blocked", () => {
-    // Bug: SDK-denied tools are omitted in sdk-defaults.ts but are not blocked here.
+  it("guarantees Bash is always hard-blocked", () => {
     expect(classifyTool("Bash", {})).toMatchObject({ kind: "block" });
   });
 
-  it.fails("guarantees NotebookEdit is always hard-blocked", () => {
-    // Bug: SDK-denied tools are omitted in sdk-defaults.ts but are not blocked here.
+  it("guarantees NotebookEdit is always hard-blocked", () => {
     expect(classifyTool("NotebookEdit", {})).toMatchObject({ kind: "block" });
   });
 
-  it.fails("guarantees EnterWorktree is always hard-blocked", () => {
-    // Bug: SDK-denied tools are omitted in sdk-defaults.ts but are not blocked here.
+  it("guarantees EnterWorktree is always hard-blocked", () => {
     expect(classifyTool("EnterWorktree", {})).toMatchObject({ kind: "block" });
   });
 
-  it.fails("guarantees ExitWorktree is always hard-blocked", () => {
-    // Bug: SDK-denied tools are omitted in sdk-defaults.ts but are not blocked here.
+  it("guarantees ExitWorktree is always hard-blocked", () => {
     expect(classifyTool("ExitWorktree", {})).toMatchObject({ kind: "block" });
   });
 
@@ -56,6 +50,11 @@ describe("classifyTool", () => {
     ]) {
       expect(classifyTool(name, {})).toEqual({ kind: "allow" });
     }
+  });
+
+  it("keeps harmless transfer and user look-alikes read-only", () => {
+    expect(classifyTool("BANK_GET_TRANSFER_FUNDS", {})).toEqual({ kind: "allow" });
+    expect(classifyTool("IDENTITY_LIST_USERS", {})).toEqual({ kind: "allow" });
   });
 
   it("guarantees MCP-prefixed read-only actions are allowed", () => {
@@ -144,8 +143,7 @@ describe("describeTool", () => {
     expect(describeTool("Read")).toBe("Read");
   });
 
-  it.fails("guarantees MCP prefix stripping is case-insensitive", () => {
-    // Bug: describeTool only recognizes lower-case MCP server names.
+  it("guarantees MCP prefix stripping is case-insensitive", () => {
     expect(describeTool("mcp__COMPOSIO__GITHUB_CREATE_ISSUE")).toBe("Github: create issue");
   });
 });

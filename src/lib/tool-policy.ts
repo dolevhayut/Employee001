@@ -11,13 +11,9 @@ export type ToolDecision =
  * approval until trust is established. Keep this short and conservative.
  */
 const HARD_BLOCK_PATTERNS: RegExp[] = [
-  /_DELETE_/i,
-  /_DESTROY_/i,
-  /_REMOVE_USER_/i,
-  /_TRANSFER_FUNDS_/i,
-  /_REFUND_/i,
-  /_PAYMENT_/i,
-  /_CHARGE_/i,
+  /(?:^|_)(?:DELETE|DESTROY|REFUND|PAYMENT|CHARGE)(?:_|$)/i,
+  /(?:^|_)REMOVE_USER(?:_|$)/i,
+  /(?:^|_)TRANSFER_FUNDS(?:_|$)/i,
 ];
 
 /**
@@ -60,6 +56,14 @@ const LOCAL_SAFE_TOOLS = new Set([
   "request_approval",
 ]);
 
+/** SDK tools that are never available to an employee twin. */
+const ALWAYS_BLOCKED_TOOLS = new Set([
+  "bash",
+  "notebookedit",
+  "enterworktree",
+  "exitworktree",
+]);
+
 /**
  * Strip the `mcp__<server>__` prefix that the Agent SDK adds to MCP tool
  * names so the classifier sees the bare Composio action name.
@@ -68,6 +72,28 @@ const LOCAL_SAFE_TOOLS = new Set([
  */
 function bareName(toolName: string): string {
   return (toolName || "").replace(/^mcp__[a-z0-9_]+__/i, "");
+}
+
+/**
+ * A read action may legitimately operate on an object called a transfer or a
+ * user. In a conventional TOOLKIT_VERB_OBJECT tool name, a read verb before
+ * a blocked term means that term is the object being read, not an action.
+ */
+function readActionPrecedesBlockedTerm(name: string): boolean {
+  const parts = name.split("_");
+  const readIndex = parts.findIndex((part) =>
+    ["GET", "LIST", "SEARCH", "FETCH", "RETRIEVE", "READ", "FIND"].includes(
+      part.toUpperCase(),
+    ),
+  );
+  const blockedIndex = parts.findIndex(
+    (part, index) =>
+      ["DELETE", "DESTROY", "REFUND", "PAYMENT", "CHARGE"].includes(part.toUpperCase()) ||
+      (part.toUpperCase() === "REMOVE" && parts[index + 1]?.toUpperCase() === "USER") ||
+      (part.toUpperCase() === "TRANSFER" && parts[index + 1]?.toUpperCase() === "FUNDS"),
+  );
+
+  return readIndex !== -1 && blockedIndex !== -1 && readIndex < blockedIndex;
 }
 
 /**
@@ -84,6 +110,19 @@ export function classifyTool(
 
   // Local sandbox + SDK built-in tools never need approval.
   if (LOCAL_SAFE_TOOLS.has(original) || LOCAL_SAFE_TOOLS.has(name)) {
+    return { kind: "allow" };
+  }
+
+  if (ALWAYS_BLOCKED_TOOLS.has(name.toLowerCase())) {
+    return {
+      kind: "block",
+      reason: `${name} is unavailable to employee twins.`,
+    };
+  }
+
+  // A read action is safe even when its object happens to be named
+  // "transfer" or "user". This must happen before the hard-block scan.
+  if (readActionPrecedesBlockedTerm(name)) {
     return { kind: "allow" };
   }
 
@@ -170,7 +209,7 @@ export function classifyTool(
 /** Short human-readable description for the approval card heading. */
 export function describeTool(toolName: string): string {
   // Strip mcp__composio__ prefix if present
-  const stripped = toolName.replace(/^mcp__[a-z_]+__/, "");
+  const stripped = toolName.replace(/^mcp__[a-z0-9_]+__/i, "");
   // SLACK_SEND_MESSAGE → "Slack: Send message"
   const parts = stripped.split("_");
   if (parts.length >= 2) {

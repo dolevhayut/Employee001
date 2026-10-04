@@ -22,13 +22,11 @@ describe("isValidCron", () => {
     }
   });
 
-  it.fails("guarantees malformed numeric tokens are rejected instead of being partially parsed", () => {
-    // Bug: parseInt accepts the leading integer in malformed fields such as "1x".
+  it("guarantees malformed numeric tokens are rejected instead of being partially parsed", () => {
     expect(isValidCron("1x * * * *")).toBe(false);
   });
 
-  it.fails("guarantees fields with more than one slash are rejected", () => {
-    // Bug: parseField ignores segments after the first slash.
+  it("guarantees fields with more than one slash are rejected", () => {
     expect(isValidCron("*/2/3 * * * *")).toBe(false);
   });
 });

@@ -27,10 +27,17 @@ function parseField(field: string, [min, max]: readonly [number, number]): numbe
     let step = 1;
     let range = part;
     if (part.includes("/")) {
-      const [r, s] = part.split("/");
+      const slashParts = part.split("/");
+      if (slashParts.length !== 2) {
+        throw new Error(`Invalid step in '${part}'`);
+      }
+      const [r, s] = slashParts;
       range = r;
-      step = parseInt(s, 10);
-      if (!Number.isFinite(step) || step < 1) {
+      if (!/^\d+$/.test(s)) {
+        throw new Error(`Invalid step in '${part}'`);
+      }
+      step = Number(s);
+      if (!Number.isSafeInteger(step) || step < 1) {
         throw new Error(`Invalid step in '${part}'`);
       }
     }
@@ -40,16 +47,22 @@ function parseField(field: string, [min, max]: readonly [number, number]): numbe
       lo = min;
       hi = max;
     } else if (range.includes("-")) {
-      const [a, b] = range.split("-").map((s) => parseInt(s, 10));
-      lo = a;
-      hi = b;
+      const rangeParts = range.split("-");
+      if (rangeParts.length !== 2 || !rangeParts.every((value) => /^\d+$/.test(value))) {
+        throw new Error(`Invalid range '${range}' for [${min},${max}]`);
+      }
+      lo = Number(rangeParts[0]);
+      hi = Number(rangeParts[1]);
     } else {
-      lo = parseInt(range, 10);
+      if (!/^\d+$/.test(range)) {
+        throw new Error(`Invalid range '${range}' for [${min},${max}]`);
+      }
+      lo = Number(range);
       hi = lo;
     }
     if (
-      !Number.isFinite(lo) ||
-      !Number.isFinite(hi) ||
+      !Number.isSafeInteger(lo) ||
+      !Number.isSafeInteger(hi) ||
       lo < min ||
       hi > max ||
       lo > hi
