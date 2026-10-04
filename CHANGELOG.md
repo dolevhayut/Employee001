@@ -46,6 +46,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
+- **Hebrew name per twin.** Set a twin's Hebrew spelling from its profile
+  ("Add Hebrew name"); twins use it when they write in Hebrew. The sidebar,
+  profile and org chart show your company's name instead of "Employee001".
 - **PDF and Word files become readable knowledge.** Uploading a `.pdf` or
   `.docx` to a twin's `knowledge/` keeps the original and writes
   `NAME.pdf.md` / `NAME.docx.md` with the extracted text (capped at 2 MB), so
