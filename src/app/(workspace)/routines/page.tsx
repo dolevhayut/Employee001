@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
@@ -8,6 +9,8 @@ import { Markdown } from "@/components/ex/markdown";
 import { PageHead } from "@/components/ex/page-head";
 import { useRoster } from "@/components/ex/roster-context";
 import { EmployeePicker } from "@/components/ex/employee-picker";
+import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
+import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 import type { Routine, Schedule, RoutineRunStatus } from "@/lib/routines";
 import { isValidCron } from "@/lib/cron";
 
@@ -44,6 +47,7 @@ const STATUS_META: Record<RoutineRunStatus, { label: string; color: string; bg: 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function RoutinesPage() {
+  const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const roster = useRoster();
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -161,8 +165,52 @@ export default function RoutinesPage() {
           subtitle="Schedule background work for a twin (tasks or autonomous shifts). Review last runs, statuses, and trigger a run now."
           style={{ marginBottom: "var(--sp-16)", maxWidth: 880 }}
         />
+        <div
+          style={{
+            display: "flex",
+            gap: "var(--sp-6)",
+            marginBottom: "var(--sp-16)",
+            maxWidth: 880,
+          }}
+        >
+          <span
+            aria-current="page"
+            style={{
+              padding: "5px 12px",
+              fontSize: "var(--fs-sm)",
+              fontWeight: 600,
+              borderRadius: 999,
+              border: "1px solid var(--hairline)",
+              background: "var(--text)",
+              color: "var(--bg)",
+            }}
+          >
+            Schedules
+          </span>
+          <Link
+            href="/focus"
+            style={{
+              padding: "5px 12px",
+              fontSize: "var(--fs-sm)",
+              fontWeight: 500,
+              borderRadius: 999,
+              border: "1px solid var(--hairline)",
+              background: "var(--surface)",
+              color: "var(--text-muted)",
+              textDecoration: "none",
+            }}
+          >
+            Focus
+          </Link>
+        </div>
         {/* Empty / loading */}
         {!loading && routines.length === 0 && (
+          modeLoaded && mode === "base" ? (
+            <AutonomyEmptyState
+              title="No schedules yet"
+              description="Schedules keep twins working when you are not in the chat. Their recurring runs and latest results appear here once Autonomy is on."
+            />
+          ) : (
           <div
             style={{
               maxWidth: 560,
@@ -183,6 +231,7 @@ export default function RoutinesPage() {
               <Icons.Plus size={13} /> Create your first routine
             </button>
           </div>
+          )
         )}
 
         {/* Routines list */}

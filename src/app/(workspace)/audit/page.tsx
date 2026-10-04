@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { useRoster } from "@/components/ex/roster-context";
+import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
+import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 import type { AuditEntry, AuditVerdict } from "@/lib/audit-log";
 
 // ─── Verdict helpers ──────────────────────────────────────────────────────────
@@ -194,6 +196,7 @@ function ArgsCell({ input }: { input: Record<string, unknown> }) {
 const PAGE_SIZE = 100;
 
 export default function AuditPage() {
+  const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [archives, setArchives] = useState<string[]>([]);
@@ -272,6 +275,11 @@ export default function AuditPage() {
   }, [load, filterArchive, page, filterSince, filterUntil]);
 
   const isEmpty = !loading && entries.length === 0;
+  const hasFilters = Boolean(
+    filterEmployee || filterTool || filterVerdict || filterSince || filterUntil || filterArchive,
+  );
+  const showAutonomyEmpty =
+    modeLoaded && mode === "base" && isEmpty && totalCount === 0 && !hasFilters;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
@@ -447,6 +455,12 @@ export default function AuditPage() {
       {/* Table */}
       <div style={{ flex: 1, overflow: "auto" }}>
         {isEmpty ? (
+          showAutonomyEmpty ? (
+            <AutonomyEmptyState
+              title="The activity log is empty"
+              description="Tool calls twins make on their own are written here, with whether each one was allowed, blocked, or sent to Approvals."
+            />
+          ) : (
           <div
             style={{
               display: "flex",
@@ -465,6 +479,7 @@ export default function AuditPage() {
                 : "No tool calls recorded yet. Run a Team Meeting with Composio connected."}
             </div>
           </div>
+          )
         ) : (
           <table
             style={{

@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { PageHead } from "@/components/ex/page-head";
+import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
+import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 
 type BudgetRow = {
   employeeId: string;
@@ -110,6 +113,7 @@ function EditableLimit({
 }
 
 export default function BudgetsPage() {
+  const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [rows, setRows] = useState<BudgetRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -134,14 +138,29 @@ export default function BudgetsPage() {
 
   const totalLimit = rows.reduce((s, r) => s + r.dailyBudgetUsd, 0);
   const totalSpent = rows.reduce((s, r) => s + r.spentTodayUsd, 0);
+  const showAutonomyEmpty = modeLoaded && mode === "base" && !loading && rows.length === 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Topbar
         crumbs={["Budgets"]}
         actions={
-          <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
-            Daily spend caps per twin — resets at midnight Israel time
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-12)" }}>
+            <Link
+              href="/workspace"
+              style={{
+                fontSize: "var(--fs-sm)",
+                fontWeight: 600,
+                color: "var(--text)",
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+              }}
+            >
+              Workspace costs
+            </Link>
+            <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
+              Daily spend caps per twin — resets at midnight Israel time
+            </span>
           </span>
         }
       />
@@ -153,6 +172,13 @@ export default function BudgetsPage() {
           subtitle="Set daily spend caps per twin and monitor today’s usage against limits."
           style={{ marginBottom: "var(--sp-16)", maxWidth: 1100 }}
         />
+        {showAutonomyEmpty ? (
+          <AutonomyEmptyState
+            title="Spend has nothing to track yet"
+            description="Daily caps and the money twins use while working unattended show up here after Autonomy is on."
+          />
+        ) : (
+        <>
         {/* Org summary bar */}
         <div
           style={{
@@ -292,6 +318,8 @@ export default function BudgetsPage() {
               </tbody>
             </table>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

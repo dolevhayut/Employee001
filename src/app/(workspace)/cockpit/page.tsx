@@ -6,6 +6,8 @@ import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
 import { useRoster } from "@/components/ex/roster-context";
+import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
+import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 
 type RunSurface = "shift" | "routine" | "task" | "council" | "builder";
 type RunStatus = "running" | "complete" | "error" | "aborted";
@@ -558,6 +560,7 @@ function CockpitCard({ run }: { run: ActiveRun }) {
 }
 
 export default function CockpitPage() {
+  const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [runs, setRuns] = useState<ActiveRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<SurfaceFilter>("all");
@@ -630,6 +633,8 @@ export default function CockpitPage() {
   );
 
   const isEmpty = !loading && filtered.length === 0;
+  const showAutonomyEmpty =
+    modeLoaded && mode === "base" && !loading && runs.length === 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
@@ -732,6 +737,12 @@ export default function CockpitPage() {
           style={{ marginBottom: "var(--sp-16)", maxWidth: 1100 }}
         />
         {isEmpty ? (
+          showAutonomyEmpty ? (
+            <AutonomyEmptyState
+              title="Cockpit is quiet"
+              description="Live runs land here once twins act on their own — who is working, the tool they are using, and what each run costs."
+            />
+          ) : (
           <div
             style={{
               maxWidth: 480,
@@ -751,6 +762,7 @@ export default function CockpitPage() {
               Cards appear here when shifts, routines, or tasks fire.
             </p>
           </div>
+          )
         ) : (
           <div
             style={{

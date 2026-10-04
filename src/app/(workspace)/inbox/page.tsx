@@ -6,6 +6,8 @@ import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
 import { useRoster } from "@/components/ex/roster-context";
+import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
+import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 
 type FeedSource =
   | { kind: "shift"; employeeId: string; runId: string }
@@ -217,6 +219,7 @@ function ResolutionChip({ resolution, resolvedAt }: { resolution: string; resolv
 }
 
 export default function InboxPage() {
+  const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -267,6 +270,8 @@ export default function InboxPage() {
   }
 
   const isEmpty = !loading && filteredItems.length === 0;
+  const showAutonomyEmpty =
+    modeLoaded && mode === "base" && !loading && items.length === 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
@@ -364,6 +369,12 @@ export default function InboxPage() {
           style={{ marginBottom: "var(--sp-16)", maxWidth: 880 }}
         />
         {isEmpty && (
+          showAutonomyEmpty ? (
+            <AutonomyEmptyState
+              title="Approvals is clear"
+              description="When twins act unattended, decisions that need you, along with the updates they post, collect here."
+            />
+          ) : (
           <div
             style={{
               maxWidth: 520,
@@ -389,6 +400,7 @@ export default function InboxPage() {
               Twins post updates and flags here when they run shifts.
             </p>
           </div>
+          )
         )}
 
         {!isEmpty && (
