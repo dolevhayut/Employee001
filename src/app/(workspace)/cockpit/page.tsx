@@ -45,6 +45,27 @@ type RunLogEvent =
 
 type SurfaceFilter = "all" | RunSurface;
 
+type OpsHealthCheck = {
+  id: "stuck_approvals" | "missed_routines" | "over_budget" | "failed_work" | "stale_knowledge";
+  status: "ok" | "warn";
+  count: number;
+  items: { label: string; href?: string }[];
+};
+
+type OpsHealth = {
+  generatedAt: string;
+  status: "ok" | "attention";
+  checks: OpsHealthCheck[];
+};
+
+const OPS_HEALTH_LABELS: Record<OpsHealthCheck["id"], MessageKey> = {
+  stuck_approvals: "opsHealth.check.stuck_approvals",
+  missed_routines: "opsHealth.check.missed_routines",
+  over_budget: "opsHealth.check.over_budget",
+  failed_work: "opsHealth.check.failed_work",
+  stale_knowledge: "opsHealth.check.stale_knowledge",
+};
+
 const FILTERS: { key: SurfaceFilter; labelKey: MessageKey }[] = [
   { key: "all", labelKey: "cockpit.filter.all" },
   { key: "shift", labelKey: "cockpit.filter.shift" },
@@ -170,6 +191,110 @@ function SurfaceChip({ surface }: { surface: RunSurface }) {
     >
       {t(SURFACE_KEY[surface])}
     </span>
+  );
+}
+
+function HealthCheckCard() {
+  const { t, locale } = useT();
+  const [health, setHealth] = useState<OpsHealth | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  const loadHealth = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/ops-health", { cache: "no-store" });
+      if (!res.ok) throw new Error("Health check request failed");
+      const next = await res.json() as OpsHealth;
+      if (!Array.isArray(next.checks)) throw new Error("Invalid health check response");
+      setHealth(next);
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => void loadHealth(), 0);
+    return () => window.clearTimeout(id);
+  }, [loadHealth]);
+
+  const updatedAt = health
+    ? new Intl.DateTimeFormat(locale === "he" ? "he-IL" : "en", {
+      hour: "numeric", minute: "2-digit", second: "2-digit",
+    }).format(new Date(health.generatedAt))
+    : null;
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      style={{
+        maxWidth: 1100,
+        padding: "var(--sp-16)",
+        border: "1px solid var(--hairline)",
+        borderRadius: 10,
+        background: "var(--surface)",
+        marginBottom: "var(--sp-16)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-10)", marginBottom: "var(--sp-12)" }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h2 style={{ color: "var(--text)", fontSize: "var(--fs-base)", fontWeight: 650, margin: 0 }}>
+            {t("opsHealth.title")}
+          </h2>
+          {updatedAt && (
+            <div style={{ color: "var(--text-muted)", fontSize: "var(--fs-meta)", marginTop: "var(--sp-3)" }}>
+              {t("opsHealth.updated", { time: updatedAt })}
+            </div>
+          )}
+        </div>
+        {health?.status === "ok" && (
+          <span style={{ background: "var(--success)", color: "#fff", borderRadius: 999, padding: "3px 8px", fontSize: "var(--fs-meta)", fontWeight: 700 }}>
+            {t("opsHealth.allClear")}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => void loadHealth()}
+          disabled={loading}
+          className="btn ghost sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-5)", minHeight: 28, fontSize: "var(--fs-meta)" }}
+        >
+          <Icons.Refresh size={13} style={loading ? { animation: "spin 1s linear infinite" } : undefined} />
+          {loading ? t("opsHealth.refreshing") : t("opsHealth.refresh")}
+        </button>
+      </div>
+
+      {failed && !health ? (
+        <div style={{ color: "var(--warn)", fontSize: "var(--fs-sm)" }}>{t("opsHealth.unavailable")}</div>
+      ) : health ? (
+        <div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--hairline)" }}>
+          {health.checks.map((check) => (
+            <div key={check.id} style={{ display: "flex", gap: "var(--sp-10)", padding: "var(--sp-10) 0", borderBottom: "1px solid var(--hairline)", alignItems: "flex-start" }}>
+              <span
+                aria-label={check.status}
+                style={{ width: 8, height: 8, borderRadius: "50%", background: check.status === "ok" ? "var(--success)" : "var(--warn)", marginTop: 5, flexShrink: 0 }}
+              />
+              <span style={{ minWidth: 140, color: "var(--text)", fontSize: "var(--fs-sm)", fontWeight: 600 }}>{t(OPS_HEALTH_LABELS[check.id])}</span>
+              <span style={{ color: check.status === "ok" ? "var(--text-muted)" : "var(--warn)", fontSize: "var(--fs-sm)", fontWeight: 700 }}><bdi>{check.count}</bdi></span>
+              <div style={{ minWidth: 0, flex: 1, display: "flex", flexWrap: "wrap", gap: "var(--sp-6)" }}>
+                {check.items.slice(0, 5).map((item, index) => item.href ? (
+                  <a key={`${item.label}-${index}`} href={item.href} style={{ color: "var(--accent)", fontSize: "var(--fs-meta)", textDecoration: "none" }}>{item.label}</a>
+                ) : (
+                  <span key={`${item.label}-${index}`} style={{ color: "var(--text-muted)", fontSize: "var(--fs-meta)" }}>{item.label}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ color: "var(--text-muted)", fontSize: "var(--fs-sm)" }}>{t("opsHealth.refreshing")}</div>
+      )}
+    </motion.section>
   );
 }
 
@@ -804,6 +929,7 @@ export default function CockpitPage() {
           subtitle={t("cockpit.subtitle")}
           style={{ marginBottom: "var(--sp-16)", maxWidth: 1100 }}
         />
+        <HealthCheckCard />
         {loadError && hasLoaded && <RefreshMiss />}
         {loadError && !hasLoaded ? (
           <LoadErrorPanel message={t("load.runs")} onRetry={() => void load()} />
