@@ -54,6 +54,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
+- **Knowledge files keep their history.** Editing or deleting a twin's
+  knowledge file saves the previous version (last 50 per file). In the Files
+  tab, History shows each version with "Show changes" and "Restore", and
+  "Recently deleted" brings back files you removed.
 - **See what changed between profile versions.** In a twin's Versions tab,
   "Show changes" highlights added and removed lines against the current
   file, so you can check before restoring.
