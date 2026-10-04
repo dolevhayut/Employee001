@@ -5,6 +5,7 @@ import { profileEn, profileHe } from "./catalog/profile";
 import { chatMeetingEn, chatMeetingHe } from "./catalog/chat-meeting";
 import { operationsEn, operationsHe } from "./catalog/operations";
 import { workEn, workHe } from "./catalog/work";
+import { onboardingEn, onboardingHe } from "./catalog/onboarding";
 
 export const LOCALES = ["en", "he"] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -456,7 +457,7 @@ const coreEn = {
 
 // Area catalogs live in ./catalog/*.ts so parallel work on different
 // screens never edits the same file.
-const en = { ...coreEn, ...profileEn, ...chatMeetingEn, ...operationsEn, ...workEn } as const;
+const en = { ...coreEn, ...profileEn, ...chatMeetingEn, ...operationsEn, ...workEn, ...onboardingEn } as const;
 
 export type MessageKey = keyof typeof en;
 
@@ -901,7 +902,7 @@ const coreHe: Record<keyof typeof coreEn, string> = {
   "inbox.overlay.badJson": "JSON לא תקין",
 };
 
-const he: Record<MessageKey, string> = { ...coreHe, ...profileHe, ...chatMeetingHe, ...operationsHe, ...workHe };
+const he: Record<MessageKey, string> = { ...coreHe, ...profileHe, ...chatMeetingHe, ...operationsHe, ...workHe, ...onboardingHe };
 
 export const messages: Record<Locale, Record<MessageKey, string>> = { en, he };
 
