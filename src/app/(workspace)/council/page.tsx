@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo, type KeyboardEvent } from "react";
+import { Suspense, useState, useRef, useEffect, useMemo, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import {
@@ -1528,7 +1528,17 @@ function TypingIndicator({ emp }: { emp: EmployeeWithTwin }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+// useSearchParams (the demo's `?q=` prefill) needs a Suspense boundary, or
+// Next can't prerender this route.
 export default function CouncilPage() {
+  return (
+    <Suspense fallback={null}>
+      <CouncilPageInner />
+    </Suspense>
+  );
+}
+
+function CouncilPageInner() {
   const { t, locale } = useT();
   const searchParams = useSearchParams();
   const rtl = locale === "he";
