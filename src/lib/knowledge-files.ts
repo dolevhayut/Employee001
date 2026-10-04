@@ -2,7 +2,8 @@ import "server-only";
 import fs from "fs";
 import path from "path";
 import mammoth from "mammoth";
-import { extractText, getDocumentProxy } from "unpdf";
+import { extractTextItems, getDocumentProxy } from "unpdf";
+import { textFromPositionedPdfItems } from "@/lib/rtl-text";
 
 const EMPLOYEES_DATA_DIR = path.join(process.cwd(), "data", "employees");
 
@@ -278,8 +279,8 @@ async function extractUploadedText(ext: string, data: Buffer): Promise<string> {
   if (ext === ".pdf") {
     const pdf = await getDocumentProxy(new Uint8Array(data));
     try {
-      const { text } = await extractText(pdf, { mergePages: true });
-      return text;
+      const { items } = await extractTextItems(pdf);
+      return items.map(textFromPositionedPdfItems).join("\n");
     } finally {
       await pdf.loadingTask.destroy();
     }
