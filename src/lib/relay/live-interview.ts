@@ -117,7 +117,9 @@ export async function streamInterviewerTurn(
   let full = "";
   const stream = client.messages.stream({
     model: CAPTURE_MODEL,
-    max_tokens: 1024,
+    // Ceiling, not spend: Claude 5.5 models think by default and thinking
+    // counts against max_tokens, so 1024 cut interviewer questions off.
+    max_tokens: 4096,
     system,
     messages: msgs.map((m) => ({ role: m.role, content: m.content })),
   });
@@ -240,7 +242,8 @@ export async function synthesizeFromConversation(
 
   const res = await client.messages.create({
     model: SYNTHESIS_MODEL,
-    max_tokens: 8000,
+    // Room for thinking plus the full RCP JSON (thinking counts against it).
+    max_tokens: 16000,
     messages: [{ role: "user", content: buildLiveSynthesisPrompt(profile, conversation) }],
   });
 
