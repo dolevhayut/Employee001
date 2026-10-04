@@ -50,6 +50,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
+- **See what changed between profile versions.** In a twin's Versions tab,
+  "Show changes" highlights added and removed lines against the current
+  file, so you can check before restoring.
 - **`npx employee001 doctor --egress`** lists every outside host your
   current configuration talks to (Anthropic or your cloud provider,
   Composio, OpenAI embeddings, ElevenLabs, each custom MCP server, web
