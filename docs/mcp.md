@@ -21,13 +21,13 @@ http://127.0.0.1:3000/api/mcp
 Run this in the project where you use Claude Code:
 
 ```bash
-claude mcp add employee001 -- npx employee001 mcp
+claude mcp add employee001 -- npx -y employee001 mcp
 ```
 
 The `employee001 mcp` command is a stdio bridge. It forwards MCP requests to the running local app. To use another local port or endpoint, add `--url`:
 
 ```bash
-npx employee001 mcp --url http://127.0.0.1:3001/api/mcp
+npx -y employee001 mcp --url http://127.0.0.1:3001/api/mcp
 ```
 
 ### Cursor
@@ -39,7 +39,7 @@ Create or update `.cursor/mcp.json` in your project:
   "mcpServers": {
     "employee001": {
       "command": "npx",
-      "args": ["employee001", "mcp"]
+      "args": ["-y", "employee001", "mcp"]
     }
   }
 }
@@ -56,7 +56,7 @@ Open Claude Desktop's MCP configuration file and add Employee001 under `mcpServe
   "mcpServers": {
     "employee001": {
       "command": "npx",
-      "args": ["employee001", "mcp"]
+      "args": ["-y", "employee001", "mcp"]
     }
   }
 }
@@ -339,7 +339,7 @@ npx employee001 start
 The bridge expects `http://127.0.0.1:3000/api/mcp` by default. If your app runs on another port, use the matching URL:
 
 ```bash
-npx employee001 mcp --url http://127.0.0.1:3001/api/mcp
+npx -y employee001 mcp --url http://127.0.0.1:3001/api/mcp
 ```
 
 ### The client cannot see `ask_twin`

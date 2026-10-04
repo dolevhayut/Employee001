@@ -309,7 +309,7 @@ npx employee001 start
 Then add it to Claude Code:
 
 ```bash
-claude mcp add employee001 -- npx employee001 mcp
+claude mcp add employee001 -- npx -y employee001 mcp
 ```
 
 The default connection is your local app at `http://127.0.0.1:3000/api/mcp`. No cloud account or separate service is required. Read the complete setup, tool reference, limits, and security model in [docs/mcp.md](./docs/mcp.md).
