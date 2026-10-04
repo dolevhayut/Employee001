@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- Setup, Sources and Join pages follow the light, dark and cool themes
+  (they used hard-coded colors). The setup wizard's theme previews each
+  show their own theme.
 - The sidebar version label reads `package.json` at build time instead of a
   hard-coded "v0.4".
 - **Hebrew replies render right-to-left.** Every paragraph, list, heading,
