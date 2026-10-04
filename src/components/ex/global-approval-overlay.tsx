@@ -522,7 +522,9 @@ export function GlobalApprovalOverlay() {
 
 // ─── Bell with badge ──────────────────────────────────────────────────────────
 
-export function NotificationBell() {
+// Pending approvals = live tool-call approvals + open needs-review feed items.
+// Shared by the bell and the sidebar's Approvals badge (one poller per caller).
+export function usePendingApprovalCount(): number {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -548,6 +550,10 @@ export function NotificationBell() {
     };
   }, []);
 
+  return count;
+}
+
+export function NotificationBell({ count }: { count: number }) {
   return (
     <button
       className="btn ghost"

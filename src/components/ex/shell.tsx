@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { HalfMoon, NavArrowDown, SunLight } from "iconoir-react";
 import { Icons, type IconName } from "./icons";
 import { type EmployeeWithTwin } from "@/lib/employees";
-import { GlobalApprovalOverlay, NotificationBell } from "./global-approval-overlay";
+import { GlobalApprovalOverlay, NotificationBell, usePendingApprovalCount } from "./global-approval-overlay";
 import { ActiveBuildsBanner } from "./active-builds-banner";
 import { RosterProvider, useRoster } from "./roster-context";
 import { WorkspaceModeProvider, useWorkspaceMode } from "./workspace-mode-context";
@@ -17,6 +17,7 @@ type NavItem = {
   href: string;
   label: string;
   icon: IconName;
+  badge?: "approvals";
 };
 
 type NavSection = {
@@ -34,55 +35,48 @@ type CommandItem = {
   keywords: string;
 };
 
-// Two operation modes, one nav. Base = a twin you talk to (you initiate,
-// you're present). Autonomy mode (formerly "EmployeeX" — that name now
-// belongs to the separate product) = a worker that accepts work and acts
-// unattended — it unlocks the operator surfaces: the feed of what happened
-// without you (Inbox), live runs (Cockpit), schedules (Routines), world
-// prefetch (Focus), spend caps (Budgets), and the trail (Audit).
-function navForMode(mode: "base" | "x"): NavSection[] {
-  const operate: NavItem[] = [
-    { href: "/employees", label: "Employees", icon: "Home" },
-    ...(mode === "x" ? [{ href: "/inbox", label: "Inbox", icon: "Bell" } as NavItem] : []),
-    { href: "/tasks", label: "Tasks", icon: "Zap" },
-    { href: "/flow", label: "Chat With Twin", icon: "Bot" },
-    { href: "/council", label: "Team Meeting", icon: "Team" },
-    { href: "/handover", label: "Handover", icon: "Send" },
-    { href: "/handover/live", label: "Live Interview", icon: "Bot" },
-  ];
-  const sections: NavSection[] = [{ label: "Operate", items: operate }];
-  if (mode === "x") {
-    sections.push({
-      label: "Autonomy",
-      items: [
-        { href: "/cockpit", label: "Cockpit", icon: "Activity" },
-        { href: "/routines", label: "Routines", icon: "Refresh" },
-        { href: "/focus", label: "Focus", icon: "Eye" },
-        { href: "/budgets", label: "Budgets", icon: "DollarSign" },
-        { href: "/audit", label: "Audit log", icon: "Logs" },
-      ],
-    });
-  }
-  sections.push({
-    label: "Manage",
+// One nav for both modes. Autonomy (formerly "EmployeeX" — that name now
+// belongs to the separate product) is a kill switch for unattended execution
+// only; it no longer hides the operator surfaces (Approvals, Cockpit,
+// Schedules, Activity log, Spend). Those pages explain themselves when
+// Autonomy is off. Settings lives in the pinned footer.
+const NAV_SECTIONS: NavSection[] = [
+  {
+    label: "Work",
     items: [
-      { href: "/connections", label: "Connections", icon: "Plug" },
-      { href: "/templates", label: "Templates", icon: "Doc" },
+      { href: "/inbox", label: "Approvals", icon: "Bell", badge: "approvals" },
+      { href: "/tasks", label: "Tasks", icon: "Zap" },
+      { href: "/council", label: "Team Meeting", icon: "Team" },
     ],
-  });
-  return sections;
-}
-
-// Command-palette entries that only make sense with Autonomy mode armed.
-const X_ONLY_COMMAND_IDS = new Set([
-  "inbox",
-  "cockpit",
-  "routines",
-  "focus",
-  "audit",
-  "budgets",
-  "workspace-costs",
-]);
+  },
+  {
+    label: "Twins",
+    items: [
+      { href: "/employees", label: "Twins", icon: "Home" },
+      { href: "/flow", label: "Chat", icon: "Bot" },
+      { href: "/marketplace", label: "Hire", icon: "Store" },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { href: "/cockpit", label: "Cockpit", icon: "Activity" },
+      { href: "/routines", label: "Schedules", icon: "Refresh" },
+      { href: "/audit", label: "Activity log", icon: "Logs" },
+    ],
+  },
+  {
+    label: "Control",
+    items: [
+      { href: "/budgets", label: "Spend", icon: "DollarSign" },
+      { href: "/connections", label: "Tools & MCP", icon: "Plug" },
+    ],
+  },
+  {
+    label: "Labs",
+    items: [{ href: "/handover", label: "Handover", icon: "Send" }],
+  },
+];
 
 type ThemeId = "light" | "dark" | "cool";
 const THEME_ORDER: ThemeId[] = ["light", "dark", "cool"];
@@ -173,22 +167,22 @@ function ThemeToggle() {
 const COMPANY_MONTHLY_BUDGET_USD = 50;
 
 const STATIC_COMMANDS: CommandItem[] = [
-  { id: "home", label: "Employees", href: "/employees", icon: "Home", group: "Popular", hint: "Open CEO admin roster", keywords: "people team admin roster clone status" },
-  { id: "inbox", label: "Inbox", href: "/inbox", icon: "Bell", group: "Popular", hint: "Org-wide feed of twin activity, alerts, and approvals", keywords: "feed activity alerts review approval flagged updates" },
+  { id: "home", label: "Twins", href: "/employees", icon: "Home", group: "Popular", hint: "Open the twin roster", keywords: "employees people team admin roster clone status" },
+  { id: "inbox", label: "Approvals", href: "/inbox", icon: "Bell", group: "Popular", hint: "Pending approvals, alerts, and the org-wide twin feed", keywords: "inbox feed activity alerts review approval flagged updates" },
   { id: "cockpit", label: "Cockpit", href: "/cockpit", icon: "Activity", group: "Popular", hint: "Live grid of every running agent — what they're doing right now", keywords: "live agents running cockpit monitor real-time" },
   { id: "tasks", label: "Tasks", href: "/tasks", icon: "Zap", group: "Popular", hint: "Run or review twin tasks", keywords: "agent execution work runs retry" },
-  { id: "twins", label: "Twins", href: "/flow", icon: "Bot", group: "Popular", hint: "Open memory graph and chat", keywords: "memory graph chat ask clone" },
-  { id: "connections", label: "Connections", href: "/connections", icon: "Plug", group: "Navigate", hint: "Manage connected tools", keywords: "integrations composio slack github gmail tools" },
-  { id: "marketplace", label: "Marketplace", href: "/marketplace", icon: "Store", group: "Navigate", hint: "Hire specialized agents", keywords: "agents hire catalog" },
-  { id: "council", label: "Team Meeting", href: "/council", icon: "Team", group: "Navigate", hint: "Open the council room", keywords: "meeting team debate room" },
+  { id: "twins", label: "Chat", href: "/flow", icon: "Bot", group: "Popular", hint: "Chat with a twin next to its memory graph", keywords: "chat with twin memory graph ask clone flow" },
+  { id: "connections", label: "Tools & MCP", href: "/connections", icon: "Plug", group: "Navigate", hint: "Manage connected tools and MCP servers", keywords: "connections integrations composio slack github gmail tools mcp" },
+  { id: "marketplace", label: "Hire", href: "/marketplace", icon: "Store", group: "Navigate", hint: "Hire specialized agents", keywords: "marketplace agents hire catalog" },
+  { id: "council", label: "Team Meeting", href: "/council", icon: "Team", group: "Navigate", hint: "Open the council room", keywords: "council meeting team debate room" },
   { id: "handover", label: "Handover", href: "/handover", icon: "Send", group: "Navigate", hint: "Run a Relay role-context handover interview", keywords: "relay handover offboarding rcp role context successor coverage" },
   { id: "handover-live", label: "Live Interview", href: "/handover/live", icon: "Bot", group: "Navigate", hint: "Run a real interactive handover interview (tune the interviewer prompt)", keywords: "relay live interview handover chat answer real opus synthesize tune prompt" },
   { id: "templates", label: "Templates", href: "/templates", icon: "Doc", group: "Navigate", hint: "Browse task templates", keywords: "slash commands prompts snippets" },
-  { id: "routines", label: "Routines", href: "/routines", icon: "Refresh", group: "Navigate", hint: "Schedule recurring work", keywords: "automation schedule recurring cron" },
+  { id: "routines", label: "Schedules", href: "/routines", icon: "Refresh", group: "Navigate", hint: "Schedule recurring work", keywords: "routines automation schedule recurring cron" },
   { id: "focus", label: "Focus", href: "/focus", icon: "Eye", group: "Navigate", hint: "Configure per-twin world prefetch (PRs, Linear, Gmail) before each shift", keywords: "focus prefetch composio github linear gmail world state" },
-  { id: "audit", label: "Audit log", href: "/audit", icon: "Logs", group: "Navigate", hint: "Review approvals and actions", keywords: "compliance approvals trace history" },
+  { id: "audit", label: "Activity log", href: "/audit", icon: "Logs", group: "Navigate", hint: "Review approvals and actions", keywords: "audit log compliance approvals trace history" },
   { id: "workspace-costs", label: "Workspace costs", href: "/workspace", icon: "Zap", group: "Navigate", hint: "Review training, refresh, and execution spend", keywords: "workspace costs budget spend usage billing models" },
-  { id: "budgets", label: "Budgets", href: "/budgets", icon: "DollarSign", group: "Navigate", hint: "Set daily spend caps per twin", keywords: "budgets limits caps spend cost per twin daily" },
+  { id: "budgets", label: "Spend", href: "/budgets", icon: "DollarSign", group: "Navigate", hint: "Set daily spend caps per twin", keywords: "budgets limits caps spend cost per twin daily" },
   { id: "settings", label: "Settings", href: "/settings", icon: "Settings", group: "Navigate", hint: "Workspace configuration", keywords: "workspace org skills mcp account" },
 ];
 
@@ -402,13 +396,9 @@ function CommandPalette({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const roster = useRoster();
-  const { mode } = useWorkspaceMode();
   const commands = useMemo(
-    () =>
-      [...STATIC_COMMANDS, ...buildTwinCommands(roster)].filter(
-        (c) => mode === "x" || !X_ONLY_COMMAND_IDS.has(c.id)
-      ),
-    [roster, mode]
+    () => [...STATIC_COMMANDS, ...buildTwinCommands(roster)],
+    [roster]
   );
   const filteredCommands = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -1015,7 +1005,7 @@ function writeSidebarCollapsed(next: boolean): void {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { mode } = useWorkspaceMode();
+  const pendingApprovals = usePendingApprovalCount();
   const collapsed = useSyncExternalStore(
     sidebarSubscribe,
     sidebarCollapsedSnapshot,
@@ -1073,7 +1063,7 @@ export function Sidebar() {
               </em>
             </div>
             <div className="spacer" />
-            <NotificationBell />
+            <NotificationBell count={pendingApprovals} />
           </>
         )}
       </div>
@@ -1094,18 +1084,21 @@ export function Sidebar() {
       >
         {/* Workspace nav */}
         <div style={{ display: "flex", flexDirection: "column", gap: collapsed ? 2 : 9 }}>
-          {navForMode(mode).map((section) => (
+          {NAV_SECTIONS.map((section) => (
             <div key={section.label} style={{ display: "flex", flexDirection: "column", gap: "var(--sp-1)" }}>
               {!collapsed && <div className="nav-label">{section.label}</div>}
               {collapsed && <div style={{ height: 6 }} />}
               {section.items.map((item) => {
                 const Icon = Icons[item.icon];
                 const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                const badge = item.badge === "approvals" ? pendingApprovals : 0;
+                const label = badge > 0 ? `${item.label} (${badge} pending)` : item.label;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    title={collapsed ? item.label : undefined}
+                    title={collapsed ? label : undefined}
+                    aria-label={label}
                     className={"nav-item " + (isActive ? "active" : "")}
                     style={{
                       display: "flex",
@@ -1121,10 +1114,44 @@ export function Sidebar() {
                       letterSpacing: "-0.005em",
                       textDecoration: "none",
                       boxShadow: isActive ? "var(--shadow-sm)" : "none",
+                      position: "relative",
                     }}
                   >
                     <Icon size={14} style={{ opacity: isActive ? 1 : 0.7, flexShrink: 0 }} />
                     {!collapsed && <span>{item.label}</span>}
+                    {badge > 0 && (
+                      <span
+                        aria-hidden
+                        style={
+                          collapsed
+                            ? {
+                                position: "absolute",
+                                top: 4,
+                                right: 8,
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                background: "var(--warn)",
+                              }
+                            : {
+                                marginLeft: "auto",
+                                minWidth: 18,
+                                height: 18,
+                                padding: "0 5px",
+                                borderRadius: 9,
+                                background: "color-mix(in oklch, var(--warn) 16%, transparent)",
+                                color: "var(--warn)",
+                                fontSize: "var(--fs-xs)",
+                                fontWeight: 600,
+                                display: "grid",
+                                placeItems: "center",
+                                fontVariantNumeric: "tabular-nums",
+                              }
+                        }
+                      >
+                        {collapsed ? null : badge > 99 ? "99+" : badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
