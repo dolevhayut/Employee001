@@ -26,3 +26,6 @@ Thumbs.db
 # Local-only docs — session summaries, build notes, scratch
 # Anything under docs/local/ stays on disk only.
 docs/local/
+
+# Local Claude Code MCP config (e.g. the companysim dev server). Per-machine, not shipped.
+.mcp.json
