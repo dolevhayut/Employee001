@@ -287,7 +287,7 @@ export const operationsHe: Record<keyof typeof operationsEn, string> = {
   "cockpit.filter.routine": "שגרות",
   "cockpit.filter.task": "משימות",
   "cockpit.filter.council": "ישיבת צוות",
-  "cockpit.filter.builder": "Builder",
+  "cockpit.filter.builder": "בניית תאומים",
   "cockpit.surface.shift": "משמרת",
   "cockpit.surface.routine": "שגרה",
   "cockpit.surface.task": "משימה",
