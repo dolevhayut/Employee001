@@ -24,8 +24,6 @@ export type TwinStatus = "ready" | "building" | "pending";
 export type ClaudeModel =
   | "claude-sonnet-5-5"
   | "claude-haiku-4-5"
-  // Valid ids, not yet in the picker: the bundled Agent SDK 0.2.x runtime
-  // rejects them (needs Claude Code >= 2.1.280). E-010 adds them to CLAUDE_MODELS.
   | "claude-opus-5-5"
   | "claude-fable-5-1"
   // Legacy ids — kept valid so employee JSON created before the Claude 5.5
@@ -57,6 +55,20 @@ export const CLAUDE_MODELS: {
     sub: "Fastest & cheapest — good for high-volume or junior roles",
     seedCostMultiplier: 0.12,
     refreshCostMultiplier: 0.12,
+  },
+  {
+    id: "claude-opus-5-5",
+    label: "Opus 5.5",
+    sub: "Highest quality — best for complex reasoning & nuanced profiles",
+    seedCostMultiplier: 0.8,
+    refreshCostMultiplier: 0.8,
+  },
+  {
+    id: "claude-fable-5-1",
+    label: "Fable 5.1",
+    sub: "Most capable, priced above Opus. For the hardest profiles",
+    seedCostMultiplier: 2.0,
+    refreshCostMultiplier: 2.0,
   },
   // Legacy ids remain selectable so existing employee settings still render.
   {
