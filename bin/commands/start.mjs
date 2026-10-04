@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkNodeVersion } from "../lib/node-version.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // bin/commands/start.mjs → ../../  is the package root
@@ -36,6 +37,14 @@ function openInBrowser(url) {
 }
 
 export default async function start(argv) {
+  const nodeVersion = checkNodeVersion();
+  if (nodeVersion.level === "error") {
+    process.stderr.write(`${nodeVersion.message}\n`);
+    process.exitCode = 1;
+    return;
+  }
+  if (nodeVersion.level === "warn") process.stderr.write(`${nodeVersion.message}\n`);
+
   const cwd = process.cwd();
   const envPath = resolve(cwd, ".env");
 

@@ -2,7 +2,7 @@ import { accessSync, constants, existsSync, mkdirSync, readFileSync, statSync } 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:net";
-import semver from "semver";
+import { checkNodeVersion } from "../lib/node-version.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(HERE, "..", "..");
@@ -271,11 +271,11 @@ export default async function doctor(argv = []) {
   process.stdout.write("\nEmployee001 — doctor\n\n");
 
   // Node version
-  const need = ">=22.0.0";
-  if (semver.satisfies(process.version, need)) {
-    ok(`Node ${process.version}`, `(need ${need})`);
-  } else {
-    fail(`Node ${process.version}`, `need ${need}`);
+  const nodeVersion = checkNodeVersion();
+  if (nodeVersion.level === "ok") ok(`Node ${process.version}`, nodeVersion.message);
+  else if (nodeVersion.level === "warn") warn(`Node ${process.version}`, nodeVersion.message);
+  else {
+    fail(`Node ${process.version}`, nodeVersion.message);
     issues++;
   }
 
