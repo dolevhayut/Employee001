@@ -54,9 +54,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
-- **Hebrew interface, first step.** Settings → Workspace has an
+- **Hebrew interface, first steps.** Settings → Workspace has an
   English / עברית switch. In Hebrew the app runs right-to-left in
-  Niv Sans, and the sidebar is translated; more screens follow. English
+  Niv Sans; the sidebar, command palette (search works in both languages),
+  page titles, empty states and Settings are translated. More screens
+  follow. English
   stays the default and doesn't load the Hebrew font.
 - **Knowledge files keep their history.** Editing or deleting a twin's
   knowledge file saves the previous version (last 50 per file). In the Files
