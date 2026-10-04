@@ -1,5 +1,8 @@
+import "server-only";
 import fs from "fs";
 import path from "path";
+import mammoth from "mammoth";
+import { extractText, getDocumentProxy } from "unpdf";
 
 const EMPLOYEES_DATA_DIR = path.join(process.cwd(), "data", "employees");
 
@@ -22,6 +25,9 @@ export const KNOWLEDGE_TEXT_EXTS: readonly string[] = [
 
 /** Max upload size: 25 MB. */
 export const KNOWLEDGE_MAX_BYTES: number = 25 * 1024 * 1024;
+
+/** Max extracted text written beside a PDF or DOCX upload: 2 MB. */
+export const KNOWLEDGE_EXTRACTED_TEXT_MAX_BYTES: number = 2 * 1024 * 1024;
 
 /**
  * Executable / script extensions that must never be written to the knowledge
@@ -239,6 +245,88 @@ export function saveUploadedKnowledgeFile(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown disk error";
     return { error: message };
+  }
+}
+
+type ExtractedKnowledgeFile = {
+  file: KnowledgeFile;
+  truncated: boolean;
+};
+
+type ExtractedKnowledgeFileResult =
+  | ExtractedKnowledgeFile
+  | { warning: string };
+
+function cappedExtractedText(text: string): { body: string; truncated: boolean } {
+  const bytes = Buffer.from(text, "utf-8");
+  if (bytes.length <= KNOWLEDGE_EXTRACTED_TEXT_MAX_BYTES) {
+    return { body: text, truncated: false };
+  }
+
+  return {
+    body: bytes
+      .subarray(0, KNOWLEDGE_EXTRACTED_TEXT_MAX_BYTES)
+      .toString("utf-8"),
+    truncated: true,
+  };
+}
+
+async function extractUploadedText(ext: string, data: Buffer): Promise<string> {
+  if (ext === ".pdf") {
+    const pdf = await getDocumentProxy(new Uint8Array(data));
+    try {
+      const { text } = await extractText(pdf, { mergePages: true });
+      return text;
+    } finally {
+      await pdf.loadingTask.destroy();
+    }
+  }
+
+  if (ext === ".docx") {
+    const { value } = await mammoth.extractRawText({ buffer: data });
+    return value;
+  }
+
+  throw new Error(`Unsupported extraction type: ${ext}`);
+}
+
+/**
+ * Best-effort PDF/DOCX extraction. The original upload is retained even if
+ * conversion or writing its `${name}.md` companion fails.
+ */
+export async function extractUploadedKnowledgeFile(
+  employeeId: string,
+  savedName: string,
+  data: Buffer
+): Promise<ExtractedKnowledgeFileResult> {
+  const ext = extOf(savedName);
+  if (ext !== ".pdf" && ext !== ".docx") {
+    return { warning: "This file type does not support text extraction." };
+  }
+
+  try {
+    const extracted = await extractUploadedText(ext, data);
+    const { body, truncated } = cappedExtractedText(extracted);
+    const markdown = truncated
+      ? "> **Note:** Extracted text was truncated to 2 MB.\n\n" + body
+      : body;
+    const dir = knowledgeDir(employeeId);
+    const companionName = `${savedName}.md`;
+    fs.writeFileSync(path.join(dir, companionName), markdown, {
+      encoding: "utf-8",
+      flag: "wx",
+    });
+    const file = statToKnowledgeFile(dir, companionName);
+    if (!file) {
+      return { warning: "Text was extracted but the Markdown companion could not be read." };
+    }
+    return { file, truncated };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown extraction error";
+    console.warn(`[knowledge-extract] ${employeeId}/${savedName}: ${message}`);
+    return {
+      warning: `The original file was uploaded, but text extraction failed: ${message}`,
+    };
   }
 }
 

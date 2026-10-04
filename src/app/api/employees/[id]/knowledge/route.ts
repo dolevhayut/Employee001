@@ -1,11 +1,14 @@
 import { NextRequest } from "next/server";
 import { hasEmployeeFiles } from "@/lib/employees-files";
 import {
+  extractUploadedKnowledgeFile,
   listKnowledgeFiles,
   saveUploadedKnowledgeFile,
   writeKnowledgeFile,
   type KnowledgeFile,
 } from "@/lib/knowledge-files";
+
+export const runtime = "nodejs";
 
 function jsonResponse(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -79,6 +82,19 @@ export async function POST(
         return diskErrorResponse(`upload ${id}/${file.name}`, result.error);
       }
       return jsonResponse({ error: result.error }, 400);
+    }
+    if (result.ext === ".pdf" || result.ext === ".docx") {
+      const extraction = await extractUploadedKnowledgeFile(id, result.name, buffer);
+      if ("warning" in extraction) {
+        return jsonResponse({ file: result, warning: extraction.warning });
+      }
+      return jsonResponse({
+        file: result,
+        extractedFile: extraction.file,
+        ...(extraction.truncated
+          ? { warning: "Extracted text was truncated to 2 MB." }
+          : {}),
+      });
     }
     return jsonResponse({ file: result });
   }
