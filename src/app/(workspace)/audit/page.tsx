@@ -49,9 +49,9 @@ const VERDICT_META: Record<
   },
   deferred_to_flow: {
     labelKey: "audit.verdict.deferred",
-    color: "var(--warn)",
-    bg: "color-mix(in oklch, var(--warn) 14%, transparent)",
-    dot: "var(--warn)",
+    color: "var(--accent-deep)",
+    bg: "var(--accent-soft)",
+    dot: "var(--accent)",
   },
 };
 
