@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import pkg from "./package.json";
 
 const nextConfig: NextConfig = {
   // Produces .next/standalone — a self-contained server bundle.
@@ -49,6 +50,8 @@ const nextConfig: NextConfig = {
   // workspace. Allow both loopback names so dev works regardless of which
   // the user types.
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  // Inlined at build time so the sidebar label always matches the release.
+  env: { NEXT_PUBLIC_APP_VERSION: pkg.version },
   images: {
     // This is a local-first desktop-style app — no need for server-side image
     // resizing/format conversion. Disabling it lets us drop `sharp` entirely

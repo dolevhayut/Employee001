@@ -1069,7 +1069,7 @@ export function Sidebar() {
             <div style={{ fontWeight: 600, fontSize: "var(--fs-base)", letterSpacing: "-0.015em", whiteSpace: "nowrap" }}>
               Employee001{" "}
               <em style={{ fontStyle: "normal", color: "var(--text-muted)", fontWeight: 400, marginLeft: "var(--sp-4)", fontSize: "var(--fs-meta)" }}>
-                v0.4
+                v{process.env.NEXT_PUBLIC_APP_VERSION}
               </em>
             </div>
             <div className="spacer" />
