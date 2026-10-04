@@ -36,7 +36,8 @@ describe("model provider", () => {
     expect(providerEnvForAgentSdk({ EMPLOYEE001_MODEL_PROVIDER: "bedrock", AWS_REGION: "eu-west-1" })).toMatchObject({ CLAUDE_CODE_USE_BEDROCK: "1", AWS_REGION: "eu-west-1" });
     expect(providerEnvForAgentSdk({ EMPLOYEE001_MODEL_PROVIDER: "vertex", CLOUD_ML_REGION: "europe-west1", ANTHROPIC_VERTEX_PROJECT_ID: "acme" })).toMatchObject({ CLAUDE_CODE_USE_VERTEX: "1", CLOUD_ML_REGION: "europe-west1", ANTHROPIC_VERTEX_PROJECT_ID: "acme" });
     expect(providerEnvForAgentSdk({ EMPLOYEE001_MODEL_PROVIDER: "foundry", ANTHROPIC_FOUNDRY_RESOURCE: "acme-ai" })).toMatchObject({ CLAUDE_CODE_USE_FOUNDRY: "1", ANTHROPIC_FOUNDRY_RESOURCE: "acme-ai" });
-    expect(providerEnvForAgentSdk({ EMPLOYEE001_MODEL_PROVIDER: "local", ANTHROPIC_BASE_URL: "http://127.0.0.1:11434", ANTHROPIC_AUTH_TOKEN: "local-token" })).toMatchObject({ ANTHROPIC_BASE_URL: "http://127.0.0.1:11434", ANTHROPIC_AUTH_TOKEN: "local-token" });
+    const pins = { ANTHROPIC_DEFAULT_OPUS_MODEL: "o", ANTHROPIC_DEFAULT_SONNET_MODEL: "s", ANTHROPIC_DEFAULT_HAIKU_MODEL: "h" };
+    expect(providerEnvForAgentSdk({ EMPLOYEE001_MODEL_PROVIDER: "local", ANTHROPIC_BASE_URL: "http://127.0.0.1:11434", ANTHROPIC_AUTH_TOKEN: "local-token", ANTHROPIC_API_KEY: "sk-real", ...pins })).toMatchObject({ ANTHROPIC_BASE_URL: "http://127.0.0.1:11434", ANTHROPIC_AUTH_TOKEN: "local-token", ANTHROPIC_API_KEY: "" });
   });
 
   it("buildBaseOptions forwards the selected provider environment to query", () => {
@@ -50,6 +51,9 @@ describe("model provider", () => {
     process.env.EMPLOYEE001_MODEL_PROVIDER = "local";
     process.env.ANTHROPIC_BASE_URL = "http://localhost:11434";
     process.env.ANTHROPIC_AUTH_TOKEN = "local-token";
+    process.env.ANTHROPIC_DEFAULT_OPUS_MODEL = "o";
+    process.env.ANTHROPIC_DEFAULT_SONNET_MODEL = "s";
+    process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL = "h";
     const options = buildBaseOptions({ surface: "chat", runId: "r", employeeId: "e" });
     expect(options.env).toMatchObject({ ANTHROPIC_BASE_URL: "http://localhost:11434", ANTHROPIC_AUTH_TOKEN: "local-token" });
   });
@@ -66,6 +70,10 @@ describe("model provider", () => {
     expect(modelForProvider(TWIN_MODEL_PRIMARY, cloud)).toBe("anthropic.claude-sonnet-provider-id");
     expect(modelForProvider(TWIN_MODEL_PRIMARY, { ...cloud, EMPLOYEE001_MODEL_PROVIDER: "anthropic" })).toBe(TWIN_MODEL_PRIMARY);
     expect(modelForProvider(TWIN_MODEL_PRIMARY, { EMPLOYEE001_MODEL_PROVIDER: "vertex" })).toBe(TWIN_MODEL_PRIMARY);
+  });
+
+  it("fails closed when the local provider is misconfigured", () => {
+    expect(() => providerEnvForAgentSdk({ EMPLOYEE001_MODEL_PROVIDER: "local", ANTHROPIC_API_KEY: "sk-real" })).toThrow(/misconfigured/);
   });
 
   it("requires an http(s) endpoint and explicit local model pins", () => {

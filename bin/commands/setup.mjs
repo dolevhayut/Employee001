@@ -173,7 +173,7 @@ export default async function setup() {
         } catch { return "Enter an http(s) URL"; }
       },
     });
-    if (!p.isCancel(localBaseUrl)) localAuthToken = await p.password({ message: "Endpoint auth token (optional — leave blank if not needed)", mask: "•" });
+    if (!p.isCancel(localBaseUrl)) localAuthToken = await p.password({ message: existing.ANTHROPIC_AUTH_TOKEN ? "Endpoint auth token (optional — leave blank to keep the current one)" : "Endpoint auth token (optional — leave blank if not needed)", mask: "•" });
     if (!p.isCancel(localAuthToken)) localOpusModel = await p.text({ message: "Local Opus-equivalent model ID (required)", initialValue: existing.ANTHROPIC_DEFAULT_OPUS_MODEL ?? "", validate: (v) => v.trim() ? undefined : "A local model ID is required; Employee001 never guesses it" });
     if (!p.isCancel(localOpusModel)) localSonnetModel = await p.text({ message: "Local Sonnet-equivalent model ID (required)", initialValue: existing.ANTHROPIC_DEFAULT_SONNET_MODEL ?? "", validate: (v) => v.trim() ? undefined : "A local model ID is required; Employee001 never guesses it" });
     if (!p.isCancel(localSonnetModel)) localHaikuModel = await p.text({ message: "Local Haiku-equivalent model ID (required)", initialValue: existing.ANTHROPIC_DEFAULT_HAIKU_MODEL ?? "", validate: (v) => v.trim() ? undefined : "A local model ID is required; Employee001 never guesses it" });
@@ -267,6 +267,28 @@ export default async function setup() {
   // 0.0.0.0, with no second setup step required.
   const token = existing.EMPLOYEE001_TOKEN || generateToken();
 
+  // Local endpoint settings are written only for the local provider: an
+  // empty or stale ANTHROPIC_BASE_URL must never redirect Anthropic/cloud runs.
+  // Cloud users' hand-set model pins survive a re-run (unless they were local pins).
+  const keepPins = provider !== "anthropic" && provider !== "local" && existing.EMPLOYEE001_MODEL_PROVIDER !== "local";
+  const pins = provider === "local"
+    ? { OPUS: localOpusModel, SONNET: localSonnetModel, HAIKU: localHaikuModel }
+    : keepPins
+      ? { OPUS: existing.ANTHROPIC_DEFAULT_OPUS_MODEL, SONNET: existing.ANTHROPIC_DEFAULT_SONNET_MODEL, HAIKU: existing.ANTHROPIC_DEFAULT_HAIKU_MODEL }
+      : {};
+  const localLines = [
+    ...(provider === "local"
+      ? [
+          "# Local Anthropic-compatible endpoint. Use only with operator-supplied model IDs.",
+          `ANTHROPIC_BASE_URL=${String(localBaseUrl).trim()}`,
+          `ANTHROPIC_AUTH_TOKEN=${localAuthToken || existing.ANTHROPIC_AUTH_TOKEN || ""}`,
+        ]
+      : []),
+    ...Object.entries(pins)
+      .filter(([, v]) => v && String(v).trim())
+      .map(([family, v]) => `ANTHROPIC_DEFAULT_${family}_MODEL=${String(v).trim()}`),
+  ];
+
   const lines = [
     "# Employee001 — local configuration",
     "# This file is read at startup. Edits take effect on the next `employee001 start`.",
@@ -283,12 +305,7 @@ export default async function setup() {
     `ANTHROPIC_VERTEX_PROJECT_ID=${vertexProject}`,
     "# Azure AI Foundry: configure Azure credentials outside this file.",
     `ANTHROPIC_FOUNDRY_RESOURCE=${foundryResource}`,
-    "# Local Anthropic-compatible endpoint. Use only with operator-supplied model IDs.",
-    `ANTHROPIC_BASE_URL=${localBaseUrl}`,
-    `ANTHROPIC_AUTH_TOKEN=${localAuthToken}`,
-    `ANTHROPIC_DEFAULT_OPUS_MODEL=${localOpusModel}`,
-    `ANTHROPIC_DEFAULT_SONNET_MODEL=${localSonnetModel}`,
-    `ANTHROPIC_DEFAULT_HAIKU_MODEL=${localHaikuModel}`,
+    ...localLines,
     "",
     "# Optional. Composio MCP powers the autonomous training loop for",
     "# inviting real employees: a Claude agent studies the CEO-chosen",

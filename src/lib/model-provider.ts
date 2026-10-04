@@ -26,7 +26,19 @@ export function providerEnvForAgentSdk(env: Env = process.env): Env {
     case "bedrock": return { ...clear, CLAUDE_CODE_USE_BEDROCK: "1", AWS_REGION: env.AWS_REGION };
     case "vertex": return { ...clear, CLAUDE_CODE_USE_VERTEX: "1", CLOUD_ML_REGION: env.CLOUD_ML_REGION, ANTHROPIC_VERTEX_PROJECT_ID: env.ANTHROPIC_VERTEX_PROJECT_ID };
     case "foundry": return { ...clear, CLAUDE_CODE_USE_FOUNDRY: "1", ANTHROPIC_FOUNDRY_RESOURCE: env.ANTHROPIC_FOUNDRY_RESOURCE };
-    case "local": return { ...clear, ANTHROPIC_BASE_URL: env.ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN: env.ANTHROPIC_AUTH_TOKEN };
+    case "local": {
+      // Fail closed: without a valid endpoint the child would fall back to
+      // api.anthropic.com. The real Anthropic key is blanked so it is never
+      // sent to the local endpoint; Ollama-style servers accept any token.
+      const error = localProviderConfigurationError(env);
+      if (error) throw new Error(`Local model provider is misconfigured: ${error}. Run \`employee001 setup\`.`);
+      return {
+        ...clear,
+        ANTHROPIC_BASE_URL: env.ANTHROPIC_BASE_URL?.trim(),
+        ANTHROPIC_AUTH_TOKEN: env.ANTHROPIC_AUTH_TOKEN?.trim() || "local",
+        ANTHROPIC_API_KEY: "",
+      };
+    }
     default: return clear;
   }
 }
