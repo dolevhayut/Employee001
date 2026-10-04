@@ -40,7 +40,7 @@ type FeedItem = {
 type FilterKey = "all" | FeedType;
 
 const TYPE_META: Record<FeedType, { label: MessageKey; color: string; bg: string }> = {
-  "update":        { label: "inbox.type.update", color: "var(--twin)", bg: "color-mix(in oklch, var(--twin) 12%, transparent)" },
+  "update":        { label: "inbox.type.update", color: "var(--text-subtle)", bg: "color-mix(in oklch, var(--text-subtle) 12%, transparent)" },
   "alert":         { label: "inbox.type.alert",  color: "var(--danger)", bg: "color-mix(in oklch, var(--danger) 12%, transparent)" },
   "needs-review":  { label: "inbox.type.review", color: "var(--warn)", bg: "color-mix(in oklch, var(--warn) 12%, transparent)" },
   "task-handoff":  { label: "inbox.type.handoff", color: "var(--twin)", bg: "color-mix(in oklch, var(--twin) 12%, transparent)" },
