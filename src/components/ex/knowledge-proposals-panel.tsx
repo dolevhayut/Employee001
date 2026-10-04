@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useT } from "@/components/ex/i18n-context";
 
 type Proposal = {
   id: string;
@@ -23,6 +24,7 @@ export function KnowledgeProposalsPanel({
   employeeId: string;
   onAccepted: () => void;
 }) {
+  const { t } = useT();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function KnowledgeProposalsPanel({
       setProposals((list) => list.filter((p) => p.id !== id));
       if (action === "accept") onAccepted();
     } catch {
-      setError("Couldn't save that. Try again.");
+      setError(t("profile.proposals.error"));
     } finally {
       setBusyId(null);
     }
@@ -78,10 +80,10 @@ export function KnowledgeProposalsPanel({
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: "var(--sp-8)", marginBottom: "var(--sp-4)" }}>
         <h3 style={{ margin: 0, fontSize: "var(--fs-ui)", fontWeight: 600, color: "var(--text)" }}>
-          Suggested updates ({proposals.length})
+          {t("profile.proposals.title", { count: proposals.length })}
         </h3>
         <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
-          From Team Meetings. Nothing is saved until you accept.
+          {t("profile.proposals.desc")}
         </span>
       </div>
       {error && (
@@ -106,7 +108,7 @@ export function KnowledgeProposalsPanel({
             >
               <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", marginBottom: "var(--sp-6)" }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--fs-sm)", color: "var(--text)" }}>
-                  knowledge/{p.file}
+                  knowledge/<bdi>{p.file}</bdi>
                 </span>
                 {p.reason && (
                   <span dir="auto" style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
@@ -138,7 +140,7 @@ export function KnowledgeProposalsPanel({
                   disabled={busyId !== null}
                   onClick={() => void decide(p.id, "accept")}
                 >
-                  {busyId === p.id ? "Saving…" : `Add to ${p.file}`}
+                  {busyId === p.id ? t("profile.proposals.saving") : t("profile.proposals.add", { file: p.file })}
                 </button>
                 <button
                   type="button"
@@ -146,7 +148,7 @@ export function KnowledgeProposalsPanel({
                   disabled={busyId !== null}
                   onClick={() => void decide(p.id, "dismiss")}
                 >
-                  Dismiss
+                  {t("profile.proposals.dismiss")}
                 </button>
               </div>
             </motion.div>

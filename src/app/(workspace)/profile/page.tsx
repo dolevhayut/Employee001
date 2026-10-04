@@ -11,6 +11,7 @@ import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { Topbar } from "@/components/ex/shell";
 import { Markdown } from "@/components/ex/markdown";
 import { PageHead } from "@/components/ex/page-head";
+import { useT } from "@/components/ex/i18n-context";
 import { TwinEditor } from "@/components/editor/TwinEditor";
 import {
   EMPLOYEES_WITH_TWIN,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/employees";
 import type { OrgSkillPlaybook } from "@/lib/org-skills";
 import { DIFF_TOO_LARGE_TEXT, diffLines, isCollapsedUnchanged } from "@/lib/text-diff";
+import { formatDateTime, formatRelativeTime } from "@/lib/i18n/format";
 
 const MODELS_STORAGE_KEY = "employee001.models.v1";
 
@@ -122,17 +124,12 @@ function isKnowledgeTextName(name: string): boolean {
   return KNOWLEDGE_TEXT_EXT_LIST.includes(ext);
 }
 
-function formatSnapshotTime(ts: string): string {
+function formatSnapshotTime(ts: string, locale: "en" | "he"): string {
   const match = /^(\d{4}-\d{2}-\d{2}T)(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/.exec(ts);
   if (!match) return ts;
   const date = new Date(`${match[1]}${match[2]}:${match[3]}:${match[4]}.${match[5]}Z`);
   if (Number.isNaN(date.getTime())) return ts;
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(date, locale);
 }
 
 function formatSnapshotSize(bytes: number): string {
@@ -232,6 +229,7 @@ function SectionGroup({
 }
 
 function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
+  const { t, locale } = useT();
   const consent = employee.consent;
   const firstName = employee.name.split(" ")[0];
 
@@ -266,11 +264,10 @@ function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
           </span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600, color: "var(--text)" }}>
-              Consent not on file
+              {t("profile.consent.missing")}
             </div>
             <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-3)", lineHeight: 1.5 }}>
-              {firstName} has not yet consented to having a digital twin trained on
-              their work data. The twin cannot ingest data until consent is granted.
+              {t("profile.consent.missingDesc", { name: firstName })}
             </div>
           </div>
           <Link
@@ -278,7 +275,7 @@ function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
             className="btn sm"
             style={{ textDecoration: "none", whiteSpace: "nowrap" }}
           >
-            Request consent
+            {t("profile.consent.request")}
           </Link>
         </div>
       </div>
@@ -286,36 +283,32 @@ function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
   }
 
   const grantedDate = new Date(consent.grantedAt);
-  const dateLabel = grantedDate.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const dateLabel = formatDateTime(grantedDate, locale);
 
   return (
     <div className="card" style={{ padding: "var(--sp-16)" }}>
       <div className="row" style={{ gap: "var(--sp-10)", alignItems: "center", marginBottom: "var(--sp-12)" }}>
         <Icons.Check size={14} style={{ color: "var(--success)" }} />
         <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>
-          Consented on {dateLabel}
+          {t("profile.consent.granted", { date: dateLabel })}
         </div>
         <span className="badge mono" style={{ fontSize: "var(--fs-xs)" }}>
-          v{consent.version}
+          <bdi>v{consent.version}</bdi>
         </span>
         <div className="spacer" />
         <button
           className="btn sm ghost"
           style={{ color: "var(--danger)" }}
-          title="Revoke consent — pauses the twin and queues data deletion within 30 days"
+          title={t("profile.consent.revokeTitle")}
         >
-          Revoke
+          {t("profile.consent.revoke")}
         </button>
       </div>
       <div
         className="subtle"
         style={{ fontSize: "var(--fs-meta)", lineHeight: 1.5, marginBottom: "var(--sp-8)" }}
       >
-        Scopes granted by {firstName}:
+        {t("profile.consent.scopes", { name: firstName })}
       </div>
       <div className="row" style={{ flexWrap: "wrap", gap: "var(--sp-6)" }}>
         {consent.scopes.map((s) => (
@@ -338,6 +331,7 @@ function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
 }
 
 function LineageCard({ employee }: { employee: EmployeeWithTwin }) {
+  const { t, locale } = useT();
   const lineage = employee.lineage;
   // Snapshot "now" once for this card's life — the window is measured in months,
   // so a per-render clock read would only be render-impure without changing what
@@ -348,8 +342,7 @@ function LineageCard({ employee }: { employee: EmployeeWithTwin }) {
     return (
       <div className="card" style={{ padding: "var(--sp-16)" }}>
         <div className="subtle" style={{ fontSize: "var(--fs-sm)", lineHeight: 1.5 }}>
-          No data ingested yet. Once {employee.name.split(" ")[0]} connects sources,
-          this section will show exactly what fed the twin.
+          {t("profile.lineage.none", { name: employee.name.split(" ")[0] })}
         </div>
       </div>
     );
@@ -358,7 +351,7 @@ function LineageCard({ employee }: { employee: EmployeeWithTwin }) {
   const totalItems = lineage.sources.reduce((sum, s) => sum + s.count, 0);
   const tokensM = (lineage.totalTokens / 1_000_000).toFixed(2);
   const lastSync = new Date(lineage.lastSyncAt);
-  const lastSyncRel = relTime(lastSync);
+  const lastSyncRel = formatRelativeTime(lastSync, locale);
   const earliest = lineage.sources.reduce(
     (min, s) => (s.fromDate < min ? s.fromDate : min),
     lineage.sources[0].fromDate
@@ -380,17 +373,17 @@ function LineageCard({ employee }: { employee: EmployeeWithTwin }) {
           flexWrap: "wrap",
         }}
       >
-        <Stat label="Items indexed" value={totalItems.toLocaleString()} />
-        <Stat label="Tokens" value={`${tokensM}M`} />
-        <Stat label="Window" value={`${windowMonths} months`} />
-        <Stat label="Last sync" value={lastSyncRel} />
+        <Stat label={t("profile.lineage.items")} value={totalItems.toLocaleString(locale === "he" ? "he-IL" : "en-US")} />
+        <Stat label={t("profile.lineage.tokens")} value={`${tokensM}M`} />
+        <Stat label={t("profile.lineage.window")} value={t("profile.lineage.months", { count: windowMonths })} />
+        <Stat label={t("profile.lineage.lastSync")} value={lastSyncRel} />
         <div className="spacer" />
         <button
           className="btn sm ghost"
-          title="Re-index all sources now"
+          title={t("profile.lineage.resyncTitle")}
           style={{ alignSelf: "center" }}
         >
-          <Icons.Refresh size={11} /> Re-sync
+          <Icons.Refresh size={11} /> {t("profile.lineage.resync")}
         </button>
       </div>
 
@@ -398,14 +391,8 @@ function LineageCard({ employee }: { employee: EmployeeWithTwin }) {
       <div>
         {lineage.sources.map((s, i) => {
           const pct = Math.round((s.tokens / lineage.totalTokens) * 100);
-          const from = new Date(s.fromDate).toLocaleDateString(undefined, {
-            month: "short",
-            year: "2-digit",
-          });
-          const to = new Date(s.toDate).toLocaleDateString(undefined, {
-            month: "short",
-            year: "2-digit",
-          });
+          const from = formatDateTime(new Date(s.fromDate), locale);
+          const to = formatDateTime(new Date(s.toDate), locale);
           return (
             <div
               key={s.toolkit + s.itemType}
@@ -436,15 +423,15 @@ function LineageCard({ employee }: { employee: EmployeeWithTwin }) {
                   </div>
                 </div>
                 <div className="subtle mono" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>
-                  {from} → {to} · synced {relTime(new Date(s.lastSyncAt))}
+                  <bdi>{from} → {to}</bdi> · {t("profile.lineage.synced", { time: formatRelativeTime(new Date(s.lastSyncAt), locale) })}
                 </div>
               </div>
-              <div style={{ textAlign: "right", minWidth: 110 }}>
+              <div style={{ textAlign: "end", minWidth: 110 }}>
                 <div className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>
-                  {s.count.toLocaleString()}
+                  <bdi>{s.count.toLocaleString(locale === "he" ? "he-IL" : "en-US")}</bdi>
                 </div>
                 <div className="subtle" style={{ fontSize: "var(--fs-xs)" }}>
-                  {(s.tokens / 1000).toFixed(0)}K tokens · {pct}%
+                  {t("profile.lineage.tokenCount", { count: (s.tokens / 1000).toFixed(0), percent: pct })}
                 </div>
               </div>
             </div>
@@ -474,17 +461,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function relTime(d: Date) {
-  const sec = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (sec < 60) return "just now";
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
-  return `${Math.floor(sec / 86400)}d ago`;
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function ProfilePageContent() {
+  const { t } = useT();
   const sp = useSearchParams();
   const empId = sp.get("employee");
 
@@ -560,7 +540,7 @@ function ProfilePageContent() {
   if (!employee) {
     return (
       <>
-        <Topbar crumbs={["Workspace", "Profile"]} />
+        <Topbar crumbs={["Workspace", t("profile.title")]} />
         <div
           className="scrollbar"
           style={{ overflow: "auto", padding: "32px 40px 60px" }}
@@ -580,7 +560,7 @@ function ProfilePageContent() {
                 letterSpacing: "-0.02em",
               }}
             >
-              No twin to show here.
+              {t("profile.empty.title")}
             </h1>
             <p
               style={{
@@ -591,15 +571,15 @@ function ProfilePageContent() {
               }}
             >
               {empId
-                ? "This profile doesn't exist anymore — it may have been revoked or deleted."
-                : "You haven't created a twin yet. Start by inviting your first employee."}
+                ? t("profile.empty.missing")
+                : t("profile.empty.new")}
             </p>
             <a
               href="/employees"
               className="btn primary"
               style={{ display: "inline-block", padding: "10px 18px" }}
             >
-              Go to Employees →
+              {t("profile.empty.goEmployees")} ←
             </a>
           </div>
         </div>
@@ -609,12 +589,12 @@ function ProfilePageContent() {
 
   return (
     <>
-      <Topbar crumbs={["Workspace", "Profile", employee.name]} />
+      <Topbar crumbs={["Workspace", t("profile.title"), employee.name]} />
       <div className="scrollbar" style={{ overflow: "auto", padding: "32px 40px 60px" }}>
         <PageHead
           icon="User"
-          title="Profile"
-          subtitle="A twin’s operating manual: expertise, tone, boundaries, preferences, and project context. Use it to review or adjust how the twin should behave."
+          title={t("profile.title")}
+          subtitle={t("profile.subtitle")}
           style={{ marginBottom: "var(--sp-16)", maxWidth: 880 }}
         />
         {/* Hero (always shown) */}
@@ -630,18 +610,18 @@ function ProfilePageContent() {
             borderBottom: "1px solid var(--hairline)",
           }}
         >
-          {(["overview", "files", "versions", "danger"] as const).map((t) => (
+          {(["overview", "files", "versions", "danger"] as const).map((tabName) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={tabName}
+              onClick={() => setTab(tabName)}
               style={{
                 padding: "8px 18px",
                 fontSize: "var(--fs-ui)",
-                fontWeight: tab === t ? 600 : 500,
-                color: tab === t ? "var(--text)" : "var(--text-muted)",
+                fontWeight: tab === tabName ? 600 : 500,
+                color: tab === tabName ? "var(--text)" : "var(--text-muted)",
                 background: "transparent",
                 border: "none",
-                borderBottom: `2px solid ${tab === t ? "var(--text)" : "transparent"}`,
+                borderBottom: `2px solid ${tab === tabName ? "var(--text)" : "transparent"}`,
                 cursor: "pointer",
                 fontFamily: "inherit",
                 marginBottom: -1,
@@ -650,7 +630,7 @@ function ProfilePageContent() {
                 transition: "all .15s",
               }}
             >
-              {t}
+              {t(`profile.tab.${tabName}`)}
             </button>
           ))}
         </div>
@@ -726,6 +706,7 @@ function ProfilePageContent() {
 // twin's exact name before the button enables.
 
 function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
+  const { t } = useT();
   const router = useRouter();
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -748,7 +729,7 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
       // Twin gone — back to the roster.
       router.push("/employees");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed.");
+      setError(err instanceof Error ? err.message : t("profile.danger.error"));
       setDeleting(false);
     }
   }
@@ -765,14 +746,13 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
             color: "var(--text)",
           }}
         >
-          Danger zone
+          {t("profile.danger.title")}
         </h2>
         <p
           className="muted"
           style={{ fontSize: "var(--fs-base)", lineHeight: 1.55, margin: 0 }}
         >
-          Use this when a twin was created by mistake or is no longer needed.
-          Everything below is permanent — there&apos;s no undo button.
+          {t("profile.danger.desc")}
         </p>
       </div>
 
@@ -787,7 +767,7 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
         <div className="row" style={{ gap: "var(--sp-10)", marginBottom: "var(--sp-12)" }}>
           <Icons.Trash size={16} style={{ color: "var(--danger)" }} />
           <span style={{ fontSize: "var(--fs-base)", fontWeight: 600, color: "var(--danger)" }}>
-            Delete this twin
+            {t("profile.danger.delete")}
           </span>
         </div>
 
@@ -799,21 +779,21 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
             color: "var(--text-muted)",
           }}
         >
-          This will remove:
+          {t("profile.danger.remove")}
         </p>
         <ul
           style={{
             margin: "0 0 var(--sp-16)",
-            paddingLeft: "var(--sp-20)",
+            paddingInlineStart: "var(--sp-20)",
             fontSize: "var(--fs-sm)",
             lineHeight: 1.7,
             color: "var(--text-muted)",
           }}
         >
-          <li>The 9 profile files (<span className="mono">EXPERTISE.md</span>, <span className="mono">DECISIONS.md</span>, etc.) and all version snapshots.</li>
-          <li>The Composio connections this twin owns — the underlying SaaS tokens stay with the employee&apos;s own accounts.</li>
-          <li>Any scratch notes the twin wrote under <span className="mono">data/scratch/{employee.id}/</span>.</li>
-          <li>Routines, scheduled work, and pending approvals scoped to this twin.</li>
+          <li>{t("profile.danger.files", { files: "EXPERTISE.md, DECISIONS.md, etc." })}</li>
+          <li>{t("profile.danger.connections")}</li>
+          <li>{t("profile.danger.notes", { path: `data/scratch/${employee.id}/` })}</li>
+          <li>{t("profile.danger.routines")}</li>
         </ul>
         <p
           style={{
@@ -823,8 +803,7 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
             color: "var(--text-muted)",
           }}
         >
-          The audit log entry for this twin is preserved — the deletion itself is
-          recorded with the timestamp and the operator id.
+          {t("profile.danger.audit")}
         </p>
 
         <div
@@ -843,7 +822,7 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
               color: "var(--text)",
             }}
           >
-            Type <span className="mono" style={{ color: "var(--danger)" }}>{employee.name}</span> to confirm:
+            {t("profile.danger.confirm", { name: employee.name })}
           </label>
           <input
             id="confirm-twin-name"
@@ -883,7 +862,7 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
             transition: "all .15s",
           }}
         >
-          {deleting ? "Deleting…" : `Delete ${employee.name} permanently`}
+          {deleting ? t("profile.danger.deleting") : t("profile.danger.deleteNamed", { name: employee.name })}
         </button>
 
         {error && (
@@ -917,6 +896,7 @@ export default function ProfilePage() {
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
 function Hero({ employee }: { employee: EmployeeWithTwin }) {
+  const { t } = useT();
   const orgName = useOrgName();
   const [boundId, setBoundId] = useState(employee.id);
   const [nameHe, setNameHe] = useState(employee.nameHe ?? "");
@@ -961,8 +941,8 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
       if (!res.ok) {
         setError(
           data?.error === "not_hebrew"
-            ? "Enter a Hebrew name, or leave it blank to clear."
-            : "Could not save the Hebrew name.",
+            ? t("profile.name.invalid")
+            : t("profile.name.error"),
         );
         return;
       }
@@ -971,7 +951,7 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
       setDraft(next);
       setEditing(false);
     } catch {
-      setError("Could not save the Hebrew name.");
+      setError(t("profile.name.error"));
     } finally {
       setSaving(false);
     }
@@ -1007,14 +987,14 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
           <div className="row" style={{ gap: "var(--sp-10)", marginBottom: "var(--sp-6)" }}>
             {employee.twinStatus === "ready" && (
               <span className="badge twin">
-                <span className="dot success pulse" /> Twin is live
+                <span className="dot success pulse" /> {t("profile.status.live")}
               </span>
             )}
             {employee.twinStatus === "building" && (
-              <span className="badge warn">Building</span>
+              <span className="badge warn">{t("profile.status.building")}</span>
             )}
             {employee.twinStatus === "pending" && (
-              <span className="badge">Not started</span>
+              <span className="badge">{t("profile.status.notStarted")}</span>
             )}
           </div>
           <h1
@@ -1031,7 +1011,7 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
                 dir="rtl"
                 style={{
                   display: "inline-block",
-                  marginLeft: "var(--sp-10)",
+                  marginInlineStart: "var(--sp-10)",
                   whiteSpace: "nowrap",
                   unicodeBidi: "isolate",
                   color: "var(--text-muted)",
@@ -1057,12 +1037,12 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
                 }}
               >
                 <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
-                  Hebrew name
+                  {t("profile.name.label")}
                 </span>
                 <input
                   dir="rtl"
                   value={draft}
-                  aria-label="Hebrew name"
+                  aria-label={t("profile.name.label")}
                   disabled={saving}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {
@@ -1091,7 +1071,7 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
                   disabled={saving}
                   onClick={() => void saveNameHe()}
                 >
-                  {saving ? "Saving…" : "Save"}
+                  {saving ? t("profile.name.saving") : t("profile.name.save")}
                 </button>
                 <button
                   type="button"
@@ -1099,7 +1079,7 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
                   disabled={saving}
                   onClick={cancelEdit}
                 >
-                  Cancel
+                  {t("profile.name.cancel")}
                 </button>
               </div>
             ) : (
@@ -1116,7 +1096,7 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
                   cursor: "pointer",
                 }}
               >
-                {nameHe ? "Edit Hebrew name" : "Add Hebrew name"}
+                {nameHe ? t("profile.name.edit") : t("profile.name.add")}
               </button>
             )}
             {error ? (
@@ -1137,7 +1117,7 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
           style={{
             gap: "var(--sp-8)",
             flexShrink: 0,
-            marginLeft: "auto",
+            marginInlineStart: "auto",
           }}
         >
           <Link
@@ -1146,19 +1126,19 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
             style={{ textDecoration: "none" }}
             title={
               employee.profileFilesComplete >= 9
-                ? "Re-run the autonomous Twin Builder agent. Will overwrite existing profile files."
-                : "Run the autonomous Twin Builder agent to generate profile files from connected systems."
+                ? t("profile.hero.rebuildTitle")
+                : t("profile.hero.buildTitle")
             }
           >
             <Icons.Spark size={12} />{" "}
-            {employee.profileFilesComplete >= 9 ? "Rebuild twin" : "Build twin"}
+            {employee.profileFilesComplete >= 9 ? t("profile.hero.rebuild") : t("profile.hero.build")}
           </Link>
           <Link
             href={`/flow?employee=${employee.id}`}
             className="btn primary"
             style={{ textDecoration: "none" }}
           >
-            <Icons.Bot size={12} /> Chat with twin
+            <Icons.Bot size={12} /> {t("profile.hero.chat")}
           </Link>
         </div>
       </div>
@@ -1181,6 +1161,7 @@ function readStoredModels(): Record<string, { seed: ClaudeModel; refresh: Claude
 }
 
 function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
+  const { t } = useT();
   const [seedModel, setSeedModel] = useState<ClaudeModel>(employee.seedModel);
   const [refreshModel, setRefreshModel] = useState<ClaudeModel>(employee.refreshModel);
   const [saved, setSaved] = useState(false);
@@ -1219,9 +1200,9 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
       <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--hairline)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-10)", marginBottom: "var(--sp-14)" }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>Seed model</div>
+            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>{t("profile.model.seed")}</div>
             <div className="subtle" style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-2)" }}>
-              Used once for the 180-day initial data pull · est. <span className="mono">${estSeed}</span>
+              {t("profile.model.seedDesc", { cost: `$${estSeed}` })}
             </div>
           </div>
         </div>
@@ -1242,7 +1223,7 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
                   border: `1px solid ${active ? "var(--accent)" : "var(--hairline)"}`,
                   background: active ? "var(--accent-soft)" : "var(--bg-elevated)",
                   cursor: "pointer",
-                  textAlign: "left",
+                  textAlign: "start",
                   fontFamily: "inherit",
                   transition: "all .12s",
                 }}
@@ -1282,9 +1263,9 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
       <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--hairline)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-10)", marginBottom: "var(--sp-14)" }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>Refresh model</div>
+            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>{t("profile.model.refresh")}</div>
             <div className="subtle" style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-2)" }}>
-              Used every week to keep the twin current · est. <span className="mono">${estRefresh}/mo</span>
+              {t("profile.model.refreshDesc", { cost: `$${estRefresh}` })}
             </div>
           </div>
         </div>
@@ -1305,7 +1286,7 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
                   border: `1px solid ${active ? "var(--accent)" : "var(--hairline)"}`,
                   background: active ? "var(--accent-soft)" : "var(--bg-elevated)",
                   cursor: "pointer",
-                  textAlign: "left",
+                  textAlign: "start",
                   fontFamily: "inherit",
                   transition: "all .12s",
                 }}
@@ -1344,13 +1325,13 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
       {/* Footer */}
       <div style={{ padding: "12px 18px", display: "flex", alignItems: "center", gap: "var(--sp-12)" }}>
         <div className="subtle" style={{ fontSize: "var(--fs-meta)", flex: 1 }}>
-          Changes apply to the next seed or refresh run. Prompt caching reduces input costs by ~70%.
+          {t("profile.model.footer")}
         </div>
         {saved && (
-          <span style={{ fontSize: "var(--fs-sm)", color: "var(--success)", fontWeight: 500 }}>Saved ✓</span>
+          <span style={{ fontSize: "var(--fs-sm)", color: "var(--success)", fontWeight: 500 }}>{t("profile.common.saved")}</span>
         )}
         <button className="btn primary sm" onClick={save}>
-          Save changes
+          {t("profile.common.saveChanges")}
         </button>
       </div>
     </div>
@@ -1379,6 +1360,7 @@ function readStoredVoices(): Record<string, string> {
 }
 
 function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
+  const { t } = useT();
   const [voiceId, setVoiceId] = useState<string>(employee.ttsVoiceId);
   const [saved, setSaved] = useState(false);
   const [voices, setVoices] = useState<ELVoice[]>([]);
@@ -1434,19 +1416,19 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
   });
 
   const GENDER_TABS: { key: GenderFilter; label: string }[] = [
-    { key: "all",     label: "All" },
-    { key: "male",    label: "♂ Male" },
-    { key: "female",  label: "♀ Female" },
-    { key: "neutral", label: "⊙ Neutral" },
+    { key: "all",     label: t("profile.voice.all") },
+    { key: "male",    label: t("profile.voice.male") },
+    { key: "female",  label: t("profile.voice.female") },
+    { key: "neutral", label: t("profile.voice.neutral") },
   ];
 
   return (
     <div className="card" style={{ overflow: "hidden" }}>
       {/* Header + gender filter */}
       <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--hairline)" }}>
-        <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600, marginBottom: "var(--sp-2)" }}>Twin voice</div>
+        <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600, marginBottom: "var(--sp-2)" }}>{t("profile.voice.title")}</div>
         <div className="subtle" style={{ fontSize: "var(--fs-meta)", marginBottom: "var(--sp-12)" }}>
-          Powered by ElevenLabs · used when clicking &quot;listen&quot; in chat
+          {t("profile.voice.desc")}
         </div>
         {/* Gender tabs */}
         <div style={{ display: "flex", gap: "var(--sp-4)" }}>
@@ -1470,11 +1452,11 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
       <div style={{ maxHeight: 340, overflowY: "auto" }} className="scrollbar">
         {loading ? (
           <div style={{ padding: "24px 18px", color: "var(--text-subtle)", fontSize: "var(--fs-sm)", textAlign: "center" }}>
-            Loading voices…
+            {t("profile.voice.loading")}
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: "24px 18px", color: "var(--text-subtle)", fontSize: "var(--fs-sm)", textAlign: "center" }}>
-            No voices in this category
+            {t("profile.voice.none")}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1537,7 +1519,7 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
                   {v.preview_url && (
                     <button
                       onClick={() => playPreview(v)}
-                      title={isPreviewing ? "Stop preview" : "Play preview"}
+                      title={isPreviewing ? t("profile.voice.stop") : t("profile.voice.play")}
                       style={{
                         width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
                         border: `1px solid ${isPreviewing ? "var(--accent)" : "var(--hairline)"}`,
@@ -1562,10 +1544,10 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
       {/* Footer */}
       <div style={{ padding: "12px 18px", display: "flex", alignItems: "center", gap: "var(--sp-12)", borderTop: "1px solid var(--hairline)" }}>
         <div className="subtle" style={{ fontSize: "var(--fs-meta)", flex: 1 }}>
-          {voices.length > 0 ? `${voices.length} voices available` : ""}  · Changes take effect immediately in chat.
+          {voices.length > 0 ? t("profile.voice.available", { count: voices.length }) : ""} · {t("profile.voice.footer")}
         </div>
-        {saved && <span style={{ fontSize: "var(--fs-sm)", color: "var(--success)", fontWeight: 500 }}>Saved ✓</span>}
-        <button className="btn primary sm" onClick={save}>Save changes</button>
+        {saved && <span style={{ fontSize: "var(--fs-sm)", color: "var(--success)", fontWeight: 500 }}>{t("profile.common.saved")}</span>}
+        <button className="btn primary sm" onClick={save}>{t("profile.common.saveChanges")}</button>
       </div>
     </div>
   );
@@ -1574,6 +1556,7 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
 // ─── Org Skill Assignment ────────────────────────────────────────────────────
 
 function OrgSkillAssignmentCard({ employee }: { employee: EmployeeWithTwin }) {
+  const { t } = useT();
   const [skills, setSkills] = useState<OrgSkillPlaybook[]>([]);
   const [assigned, setAssigned] = useState<Set<string>>(new Set(employee.orgSkillIds));
   const [loading, setLoading] = useState(true);
@@ -1591,11 +1574,11 @@ function OrgSkillAssignmentCard({ employee }: { employee: EmployeeWithTwin }) {
       setSkills(data.skills ?? []);
       setAssigned(new Set(data.assignedSkillIds ?? []));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load skills");
+      setError(err instanceof Error ? err.message : t("profile.skills.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [employee.id]);
+  }, [employee.id, t]);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -1621,10 +1604,10 @@ function OrgSkillAssignmentCard({ employee }: { employee: EmployeeWithTwin }) {
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? "Save failed");
+        throw new Error(data.error ?? t("profile.skills.saveError"));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("profile.skills.saveError"));
       setAssigned(new Set(assigned));
     } finally {
       setSavingId(null);
@@ -1636,17 +1619,13 @@ function OrgSkillAssignmentCard({ employee }: { employee: EmployeeWithTwin }) {
       <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--hairline)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)" }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>Assigned org skills</div>
+            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>{t("profile.skills.title")}</div>
             <div className="subtle" style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-2)" }}>
-              Playbooks this twin can use at runtime. Manage the library in{" "}
-              <Link href="/settings" style={{ color: "var(--accent-deep)" }}>
-                Settings
-              </Link>
-              .
+              {t("profile.skills.desc", { settings: t("profile.skills.settings") })}
             </div>
           </div>
           <span className="badge twin" style={{ fontSize: "var(--fs-xs)" }}>
-            {assigned.size} assigned
+            {t("profile.skills.assigned", { count: assigned.size })}
           </span>
         </div>
       </div>
@@ -1668,7 +1647,7 @@ function OrgSkillAssignmentCard({ employee }: { employee: EmployeeWithTwin }) {
 
       {loading ? (
         <div style={{ padding: "22px 18px", fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>
-          Loading skills…
+          {t("profile.skills.loading")}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1688,7 +1667,7 @@ function OrgSkillAssignmentCard({ employee }: { employee: EmployeeWithTwin }) {
                   background: active ? "var(--twin-soft)" : "transparent",
                   color: "var(--text)",
                   cursor: savingId === null ? "pointer" : "wait",
-                  textAlign: "left",
+                  textAlign: "start",
                   fontFamily: "inherit",
                 }}
               >
@@ -1750,6 +1729,7 @@ function OverviewTab({
   employee: EmployeeWithTwin;
   activeToolkits: string[];
 }) {
+  const { t } = useT();
   const [domains, setDomains] = useState<string[]>([]);
   const [boundaries, setBoundaries] = useState<string[]>([]);
 
@@ -1780,13 +1760,13 @@ function OverviewTab({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-56)" }}>
       <SectionGroup
-        title="Identity & voice"
-        subhead="What this twin sounds like, what it speaks to with confidence, and where it stays silent."
+        title={t("profile.overview.identity")}
+        subhead={t("profile.overview.identitySub")}
         divider={false}
       >
         {employee.twinStatus === "ready" ? (
           <div>
-            <SectionTitle>Sample voice</SectionTitle>
+            <SectionTitle>{t("profile.overview.sample")}</SectionTitle>
             <div
               className="card"
               style={{
@@ -1798,21 +1778,21 @@ function OverviewTab({
               <div className="row" style={{ gap: "var(--sp-10)", marginBottom: "var(--sp-10)" }}>
                 <Icons.Bot size={14} style={{ color: "var(--twin)" }} />
                 <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--twin)" }}>
-                  Twin reply preview
+                  {t("profile.overview.preview")}
                 </span>
                 <div className="spacer" />
                 <span className="subtle mono" style={{ fontSize: "var(--fs-meta)" }}>
-                  Ask the twin a question at <Link href={`/flow?employee=${employee.id}`} style={{ color: "var(--twin)" }}>/flow</Link>
+                  {t("profile.overview.ask")} <Link href={`/flow?employee=${employee.id}`} style={{ color: "var(--twin)" }}><bdi>/flow</bdi></Link>
                 </span>
               </div>
               <p style={{ fontSize: "var(--fs-base)", lineHeight: 1.6, margin: 0, color: "var(--text-muted)" }}>
-                Sample replies appear here after the twin is trained and you&apos;ve had your first conversation. The voice is shaped by <span className="mono">TONE.md</span>, <span className="mono">EXPERTISE.md</span>, and <span className="mono">CONTEXT.md</span>.
+                {t("profile.overview.sampleDesc", { files: "TONE.md, EXPERTISE.md, CONTEXT.md" })}
               </p>
             </div>
           </div>
         ) : (
           <div>
-            <SectionTitle>Sample voice</SectionTitle>
+            <SectionTitle>{t("profile.overview.sample")}</SectionTitle>
             <div
               className="card"
               style={{
@@ -1821,31 +1801,29 @@ function OverviewTab({
               }}
             >
               <p style={{ fontSize: "var(--fs-base)", lineHeight: 1.6, margin: 0, color: "var(--text-muted)" }}>
-                No replies to preview yet — the twin hasn&apos;t been trained.{" "}
+                {t("profile.overview.noPreview")} {" "}
                 <Link href={`/twin-build?employee=${employee.id}`} style={{ color: "var(--accent)" }}>
-                  Start training
+                  {t("profile.overview.startTraining")}
                 </Link>{" "}
-                to generate the 9 profile files that define the twin&apos;s voice.
+                {t("profile.overview.startTrainingTail")}
               </p>
             </div>
           </div>
         )}
 
         <div>
-          <SectionTitle>Voice</SectionTitle>
+          <SectionTitle>{t("profile.overview.voice")}</SectionTitle>
           <VoicePicker employee={employee} />
         </div>
 
         <div>
-          <SectionTitle>Authoritative domains</SectionTitle>
+          <SectionTitle>{t("profile.overview.domains")}</SectionTitle>
           <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: "0 0 14px", lineHeight: 1.5 }}>
-            The twin will answer with high confidence on these topics. Outside this
-            list, it defers or escalates.
+            {t("profile.overview.domainsDesc")}
           </p>
           {domains.length === 0 ? (
             <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, fontStyle: "italic" }}>
-              No domains parsed from <span className="mono">EXPERTISE.md</span> yet —
-              add bullets to that file to populate this list.
+              {t("profile.overview.domainsEmpty", { file: "EXPERTISE.md" })}
             </p>
           ) : (
             <div className="row" style={{ flexWrap: "wrap", gap: "var(--sp-8)" }}>
@@ -1857,14 +1835,13 @@ function OverviewTab({
         </div>
 
         <div>
-          <SectionTitle>Boundaries</SectionTitle>
+          <SectionTitle>{t("profile.overview.boundaries")}</SectionTitle>
           <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: "0 0 14px", lineHeight: 1.5 }}>
-            Topics the twin will never answer alone. These always escalate to you.
+            {t("profile.overview.boundariesDesc")}
           </p>
           {boundaries.length === 0 ? (
             <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, fontStyle: "italic" }}>
-              No boundaries parsed from <span className="mono">BOUNDARIES.md</span> yet —
-              add bullets to that file to populate this list.
+              {t("profile.overview.boundariesEmpty", { file: "BOUNDARIES.md" })}
             </p>
           ) : (
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -1889,16 +1866,16 @@ function OverviewTab({
       </SectionGroup>
 
       <SectionGroup
-        title="Knowledge & sources"
-        subhead="Where the twin's expertise comes from — live tools, training data, and assigned skills."
+        title={t("profile.overview.knowledge")}
+        subhead={t("profile.overview.knowledgeSub")}
       >
         <div>
-          <SectionTitle>Connected sources</SectionTitle>
+          <SectionTitle>{t("profile.overview.sources")}</SectionTitle>
           {activeToolkits.length === 0 ? (
             <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0 }}>
-              No active connections yet.{" "}
+              {t("profile.overview.noSources")} {" "}
               <Link href={`/connections/${employee.id}`} style={{ color: "var(--text)" }}>
-                Connect tools →
+                {t("profile.overview.connect")} ←
               </Link>
             </p>
           ) : (
@@ -1929,27 +1906,27 @@ function OverviewTab({
         </div>
 
         <div>
-          <SectionTitle>Trained on</SectionTitle>
+          <SectionTitle>{t("profile.overview.trained")}</SectionTitle>
           <LineageCard employee={employee} />
         </div>
 
         <div>
-          <SectionTitle>Org skills</SectionTitle>
+          <SectionTitle>{t("profile.overview.skills")}</SectionTitle>
           <OrgSkillAssignmentCard employee={employee} />
         </div>
       </SectionGroup>
 
       <SectionGroup
-        title="Trust & configuration"
-        subhead="The operating contract you control: consent on file and the model that powers this twin."
+        title={t("profile.overview.trust")}
+        subhead={t("profile.overview.trustSub")}
       >
         <div>
-          <SectionTitle>Consent</SectionTitle>
+          <SectionTitle>{t("profile.overview.consent")}</SectionTitle>
           <ConsentCard employee={employee} />
         </div>
 
         <div>
-          <SectionTitle>Training model</SectionTitle>
+          <SectionTitle>{t("profile.overview.model")}</SectionTitle>
           <ModelPicker employee={employee} />
         </div>
       </SectionGroup>
@@ -2049,6 +2026,7 @@ function FileTreePane({
   onSelect: (sel: SelectedFile) => void;
   onKnowledgeChanged: () => void | Promise<void>;
 }) {
+  const { t } = useT();
   const [profileOpen, setProfileOpen] = useState(true);
   const [knowledgeOpen, setKnowledgeOpen] = useState(true);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -2087,7 +2065,7 @@ function FileTreePane({
   );
 
   async function createFile() {
-    const raw = window.prompt("New knowledge file name (must end in .md):", "notes.md");
+    const raw = window.prompt(t("profile.files.newPrompt"), "notes.md");
     if (!raw) return;
     const name = raw.trim().toLowerCase().endsWith(".md") ? raw.trim() : `${raw.trim()}.md`;
     setError(null);
@@ -2110,7 +2088,7 @@ function FileTreePane({
   }
 
   async function restoreDeleted(entry: KnowledgeVersionRow) {
-    if (!window.confirm(`Restore ${entry.name}? This puts the deleted file back into knowledge/.`)) return;
+    if (!window.confirm(t("profile.files.restoreConfirm", { name: entry.name }))) return;
     setError(null);
     try {
       const r = await fetch(
@@ -2128,9 +2106,9 @@ function FileTreePane({
 
   async function deleteFile(name: string) {
     const restoreNote = isKnowledgeTextName(name)
-      ? " You can restore it later from Recently deleted."
+      ? t("profile.files.restoreNote")
       : "";
-    if (!window.confirm(`Delete ${name}?${restoreNote}`)) return;
+    if (!window.confirm(t("profile.files.deleteConfirm", { name, note: restoreNote }))) return;
     setError(null);
     try {
       const r = await fetch(
@@ -2192,11 +2170,11 @@ function FileTreePane({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            style={{ overflow: "hidden", marginLeft: 12, borderLeft: "1px solid var(--hairline)" }}
+            style={{ overflow: "hidden", marginInlineStart: 12, borderInlineStart: "1px solid var(--hairline)" }}
           >
             {profileFiles.length === 0 ? (
               <div className="subtle" style={{ fontSize: "var(--fs-xs)", padding: "6px 8px 6px 16px", fontFamily: "var(--font-sans, sans-serif)" }}>
-                No profile files yet — run the twin builder.
+                {t("profile.files.profileEmpty")}
               </div>
             ) : (
               profileFiles.map((f) => (
@@ -2246,7 +2224,7 @@ function FileTreePane({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            style={{ overflow: "hidden", marginLeft: 12, borderLeft: "1px solid var(--hairline)" }}
+            style={{ overflow: "hidden", marginInlineStart: 12, borderInlineStart: "1px solid var(--hairline)" }}
           >
             {knowledge.map((f) => (
               <FileTreeRow
@@ -2276,7 +2254,7 @@ function FileTreePane({
             className="subtle"
             style={{ fontSize: "var(--fs-2xs)", fontWeight: 600, marginBottom: "var(--sp-4)" }}
           >
-            Recently deleted
+            {t("profile.files.recentlyDeleted")}
           </div>
           <div className="scrollbar" style={{ maxHeight: 160, overflow: "auto" }}>
             {deleted.map((entry) => (
@@ -2312,7 +2290,7 @@ function FileTreePane({
                   style={{ fontSize: "var(--fs-2xs)", height: "auto", padding: "2px 6px" }}
                   onClick={() => void restoreDeleted(entry)}
                 >
-                  Restore
+                  {t("profile.files.restore")}
                 </button>
               </div>
             ))}
@@ -2351,7 +2329,7 @@ function FileTreePane({
           }}
         />
         <div className="subtle" style={{ fontSize: "var(--fs-2xs)", textAlign: "center", marginBottom: "var(--sp-8)", lineHeight: 1.4 }}>
-          {dragOver ? "Drop to upload" : "Drag files here, or"}
+          {dragOver ? t("profile.files.drop") : t("profile.files.drag")}
         </div>
         <div style={{ display: "flex", gap: "var(--sp-6)" }}>
           <button
@@ -2360,7 +2338,7 @@ function FileTreePane({
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
-            <Icons.Plus size={11} /> {uploading ? "Uploading…" : "Upload"}
+            <Icons.Plus size={11} /> {uploading ? t("profile.files.uploading") : t("profile.files.upload")}
           </button>
           <button
             className="btn sm"
@@ -2368,11 +2346,11 @@ function FileTreePane({
             onClick={createFile}
             disabled={uploading}
           >
-            <Icons.Plus size={11} /> New file
+            <Icons.Plus size={11} /> {t("profile.files.new")}
           </button>
         </div>
         <div className="subtle" style={{ fontSize: "var(--fs-2xs)", textAlign: "center", marginTop: "var(--sp-6)", lineHeight: 1.4 }}>
-          .md, .txt, .csv, .json · PDF/DOCX coming soon
+          {t("profile.files.formats")}
         </div>
         {error && (
           <div style={{ fontSize: "var(--fs-2xs)", color: "var(--danger)", marginTop: "var(--sp-6)", textAlign: "center" }}>
@@ -2418,6 +2396,7 @@ function FileTreeRow({
   onClick: () => void;
   onDelete?: () => void;
 }) {
+  const { t } = useT();
   return (
     <div
       onMouseEnter={() => onHover(true)}
@@ -2426,7 +2405,7 @@ function FileTreeRow({
         display: "flex",
         alignItems: "center",
         gap: "var(--sp-6)",
-        marginLeft: 8,
+        marginInlineStart: 8,
         background: active
           ? "var(--accent-soft)"
           : hovered
@@ -2445,13 +2424,13 @@ function FileTreeRow({
           gap: "var(--sp-8)",
           flex: 1,
           minWidth: 0,
-          padding: "5px 4px 5px 10px",
+          padding: "5px 10px 5px 4px",
           background: "transparent",
           border: "none",
           cursor: "pointer",
           fontFamily: "inherit",
           color: active ? "var(--accent-deep)" : hovered ? "var(--text)" : "var(--text-muted)",
-          textAlign: "left",
+          textAlign: "start",
         }}
       >
         <Icons.Doc
@@ -2477,13 +2456,13 @@ function FileTreeRow({
       {onDelete && (
         <button
           onClick={onDelete}
-          title={`Delete ${name}`}
+          title={t("profile.files.deleteTitle", { name })}
           style={{
             display: "grid",
             placeItems: "center",
             width: 22,
             height: 22,
-            marginRight: 4,
+            marginInlineEnd: 4,
             flexShrink: 0,
             background: "transparent",
             border: "none",
@@ -2516,6 +2495,7 @@ function KnowledgeFileHistory({
   dirty: boolean;
   onRestored: () => Promise<void>;
 }) {
+  const { t, locale } = useT();
   const [versions, setVersions] = useState<KnowledgeVersionRow[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState("");
@@ -2611,13 +2591,13 @@ function KnowledgeFileHistory({
     >
       {loadingList ? (
         <p className="muted" style={{ fontSize: "var(--fs-sm)", margin: 0 }}>
-          Loading history…
+          {t("profile.files.historyLoading")}
         </p>
       ) : listError && versions.length === 0 ? (
         <p style={{ fontSize: "var(--fs-sm)", color: "var(--danger)", margin: 0 }}>{listError}</p>
       ) : versions.length === 0 ? (
         <p className="muted" style={{ fontSize: "var(--fs-sm)", margin: 0, lineHeight: 1.5 }}>
-          No history yet. A snapshot is saved each time this file is edited or deleted.
+          {t("profile.files.historyEmpty")}
         </p>
       ) : (
         <div className="scrollbar" style={{ maxHeight: 180, overflow: "auto" }}>
@@ -2634,7 +2614,7 @@ function KnowledgeFileHistory({
                   alignItems: "baseline",
                   gap: "var(--sp-8)",
                   width: "100%",
-                  textAlign: "left",
+                  textAlign: "start",
                   border: "none",
                   cursor: "pointer",
                   fontFamily: "inherit",
@@ -2647,7 +2627,7 @@ function KnowledgeFileHistory({
                 }}
               >
                 <span style={{ fontSize: "var(--fs-sm)", fontWeight: selectedRow ? 600 : 500 }}>
-                  {formatSnapshotTime(entry.ts)}
+                  {formatSnapshotTime(entry.ts, locale)}
                 </span>
                 <span className="subtle" style={{ fontSize: "var(--fs-xs)" }}>
                   {formatSnapshotSize(entry.sizeBytes)}
@@ -2676,7 +2656,7 @@ function KnowledgeFileHistory({
                 ...(showChanges ? { background: "var(--bg-sunken)" } : {}),
               }}
             >
-              Show changes
+              {t("profile.files.changes")}
             </button>
             <button
               type="button"
@@ -2686,12 +2666,12 @@ function KnowledgeFileHistory({
               style={{ fontSize: "var(--fs-xs)", height: "auto", padding: "3px 8px" }}
             >
               <Icons.Refresh size={11} />{" "}
-              {busy === `restore:${picked.ts}` ? "Restoring…" : "Restore this version"}
+              {busy === `restore:${picked.ts}` ? t("profile.files.restoring") : t("profile.files.restoreVersion")}
             </button>
           </div>
           {showChanges && (
             <p className="muted" style={{ fontSize: "var(--fs-xs)", margin: "8px 0" }}>
-              From this version to the current file
+              {t("profile.files.fromVersion")}
             </p>
           )}
           <div className="scrollbar" style={{ maxHeight: 280, overflow: "auto", marginTop: "var(--sp-8)" }}>
@@ -2748,6 +2728,7 @@ function FileEditorPane({
   selected: SelectedFile | null;
   onKnowledgeChanged: () => void | Promise<void>;
 }) {
+  const { t } = useT();
   const [body, setBody] = useState("");
   const [original, setOriginal] = useState("");
   const [loading, setLoading] = useState(false);
@@ -2848,8 +2829,7 @@ function FileEditorPane({
         <div>
           <Icons.Doc size={22} style={{ color: "var(--text-subtle)", marginBottom: "var(--sp-10)" }} />
           <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, lineHeight: 1.55 }}>
-            Select a file on the left to view and edit it. Profile files shape the
-            twin&apos;s voice; knowledge files enrich what it knows.
+            {t("profile.files.select")}
           </p>
         </div>
       </div>
@@ -2903,18 +2883,18 @@ function FileEditorPane({
               ...(historyOpen ? { background: "var(--bg-sunken)" } : {}),
             }}
           >
-            History
+            {t("profile.files.history")}
           </button>
         )}
         {dirty && (
           <span
-            aria-label="Unsaved changes"
-            title="Unsaved changes"
+            aria-label={t("profile.files.unsaved")}
+            title={t("profile.files.unsaved")}
             style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--warn)", flexShrink: 0 }}
           />
         )}
         {!dirty && savedAt && (
-          <span style={{ fontSize: "var(--fs-meta)", color: "var(--success)" }}>Saved</span>
+          <span style={{ fontSize: "var(--fs-meta)", color: "var(--success)" }}>{t("profile.common.saved")}</span>
         )}
         <button
           onClick={save}
@@ -2922,7 +2902,7 @@ function FileEditorPane({
           style={{ height: 28 }}
           disabled={saving || !dirty || loading}
         >
-          {saving ? "Saving…" : "Save"}
+          {saving ? t("profile.files.saving") : t("profile.files.save")}
         </button>
       </div>
 
@@ -2943,12 +2923,12 @@ function FileEditorPane({
         {selected.group === "profile" ? (
           <>
             <Icons.Spark size={11} style={{ color: "var(--warn)", flexShrink: 0 }} />
-            A base profile file — the Twin Builder may overwrite it on the next rebuild.
+            {t("profile.files.baseNote")}
           </>
         ) : (
           <>
             <Icons.Lock size={11} style={{ color: "var(--twin)", flexShrink: 0 }} />
-            CEO-owned knowledge — the twin reads this but never overwrites it.
+            {t("profile.files.ownedNote")}
           </>
         )}
       </div>
@@ -2972,7 +2952,7 @@ function FileEditorPane({
 
       {loading ? (
         <p className="muted" style={{ fontSize: "var(--fs-ui)", padding: "24px 16px", margin: 0 }}>
-          Loading…
+          {t("profile.files.loading")}
         </p>
       ) : (
         <div style={{ padding: "var(--sp-8)" }}>
@@ -2980,7 +2960,7 @@ function FileEditorPane({
             key={`${selected.group}:${selected.name}`}
             value={original}
             onChange={setBody}
-            placeholder="Start writing…"
+            placeholder={t("profile.files.placeholder")}
           />
         </div>
       )}
@@ -2998,23 +2978,24 @@ function profileMarkdown(raw: string): string {
 }
 
 function VersionDiff({ lines }: { lines: ReturnType<typeof diffLines> }) {
+  const { t } = useT();
   if (lines.length === 1 && lines[0].text === DIFF_TOO_LARGE_TEXT) {
     return (
       <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, lineHeight: 1.55 }}>
-        This file is too large to diff.
+        {t("profile.diff.large")}
       </p>
     );
   }
   if (!lines.some((line) => line.type !== "same")) {
     return (
       <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, lineHeight: 1.55 }}>
-        No changes.
+        {t("profile.diff.none")}
       </p>
     );
   }
   return (
     <div
-      aria-label="Line changes"
+      aria-label={t("profile.diff.label")}
       style={{
         fontFamily: "var(--font-mono, monospace)",
         fontSize: "var(--fs-sm)",
@@ -3096,6 +3077,7 @@ type BuildSummary = {
 };
 
 function VersionsTab({ employeeId }: { employeeId: string }) {
+  const { t, locale } = useT();
   const [builds, setBuilds] = useState<BuildSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [openBuildId, setOpenBuildId] = useState<string | null>(null);
@@ -3307,7 +3289,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
   if (loading) {
     return (
       <div className="muted" style={{ fontSize: "var(--fs-ui)", padding: "24px 0" }}>
-        Loading version history…
+        {t("profile.versions.loading")}
       </div>
     );
   }
@@ -3316,19 +3298,17 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
     return (
       <div className="card" style={{ padding: "var(--sp-24)", maxWidth: 720 }}>
         <h2 style={{ fontSize: "var(--fs-lg)", fontWeight: 600, margin: "0 0 6px" }}>
-          No twin versions yet
+          {t("profile.versions.empty")}
         </h2>
         <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: "0 0 14px", lineHeight: 1.55 }}>
-          Each Twin Builder run becomes a version on this timeline. You&apos;ll be
-          able to compare versions, restore any past version, or cherry-pick
-          individual files across builds.
+          {t("profile.versions.emptyDesc")}
         </p>
         <Link
           href={`/twin-build?employee=${employeeId}`}
           className="btn primary"
           style={{ textDecoration: "none" }}
         >
-          <Icons.Spark size={12} /> Build the first version
+          <Icons.Spark size={12} /> {t("profile.versions.first")}
         </Link>
       </div>
     );
@@ -3341,7 +3321,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
           style={{
             position: "fixed",
             bottom: 24,
-            right: 24,
+            insetInlineEnd: 24,
             padding: "10px 14px",
             background: "var(--surface)",
             border: "1px solid var(--hairline-strong)",
@@ -3356,10 +3336,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
       )}
 
       <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: "0 0 18px", lineHeight: 1.55, maxWidth: 680 }}>
-        Each row is a complete twin snapshot from one Twin Builder run. Expand
-        any version to see the 9 files at that point. Restore individual files
-        to mix-and-match the best output across builds, or restore an entire
-        version to switch the live twin.
+        {t("profile.versions.desc")}
       </p>
 
       {builds.map((b) => {
@@ -3376,7 +3353,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
               onClick={() => setOpenBuildId(isOpen ? null : b.buildId)}
               style={{
                 width: "100%",
-                textAlign: "left",
+                textAlign: "start",
                 background: "transparent",
                 border: "none",
                 padding: "14px 18px",
@@ -3407,12 +3384,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="row" style={{ gap: "var(--sp-10)", alignItems: "baseline" }}>
                   <span style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>
-                    {finished.toLocaleString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    <bdi>{formatDateTime(finished, locale)}</bdi>
                   </span>
                   <span className="subtle mono" style={{ fontSize: "var(--fs-xs)" }}>
                     {b.modelUsed}
@@ -3427,11 +3399,9 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                   )}
                 </div>
                 <div className="subtle" style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-3)" }}>
-                  {writtenCount} file{writtenCount === 1 ? "" : "s"} rewritten ·{" "}
-                  {b.turns} turn{b.turns === 1 ? "" : "s"} · ${b.costUsd.toFixed(3)} ·{" "}
-                  {Math.round(b.durationMs / 1000)}s
+                  {t("profile.versions.files", { count: writtenCount })} · {t("profile.versions.turns", { count: b.turns })} · <bdi>${b.costUsd.toFixed(3)} · {Math.round(b.durationMs / 1000)}s</bdi>
                   {b.activeToolkits.length > 0 ? (
-                    <> · sources: {b.activeToolkits.join(", ")}</>
+                    <> · {t("profile.versions.sources", { sources: b.activeToolkits.join(", ") })}</>
                   ) : null}
                 </div>
               </div>
@@ -3464,8 +3434,8 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                   >
                     <Icons.Refresh size={11} />{" "}
                     {busy === `restoreBuild:${b.buildId}`
-                      ? "Restoring…"
-                      : `Restore entire v${b.version}`}
+                      ? t("profile.versions.restoring")
+                      : t("profile.versions.restoreAll", { version: b.version })}
                   </button>
                   {b.ceoContext && (
                     <span
@@ -3511,7 +3481,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                               color: "var(--accent-deep)",
                             }}
                           >
-                            new
+                            {t("profile.versions.new")}
                           </span>
                         )}
                       </div>
@@ -3527,7 +3497,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                           }
                           disabled={busy === `preview:${f.snapshotTs}`}
                         >
-                          <Icons.Eye size={10} /> Preview
+                          <Icons.Eye size={10} /> {t("profile.versions.preview")}
                         </button>
                         <button
                           className="btn"
@@ -3535,7 +3505,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                           onClick={() => restoreOneFile(f.filename, f.snapshotTs)}
                           disabled={busy === `restore:${f.filename}:${f.snapshotTs}`}
                         >
-                          <Icons.Refresh size={10} /> Restore file
+                          <Icons.Refresh size={10} /> {t("profile.versions.restoreFile")}
                         </button>
                       </div>
                     </div>
@@ -3591,7 +3561,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                 className="subtle mono"
                 style={{ fontSize: "var(--fs-xs)" }}
               >
-                snapshot {previewing.snapshotTs}
+                {t("profile.versions.snapshot", { value: previewing.snapshotTs })}
               </span>
               <button
                 type="button"
@@ -3605,7 +3575,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                   ...(showChanges ? { background: "var(--bg-sunken)" } : {}),
                 }}
               >
-                Show changes
+                {t("profile.files.changes")}
               </button>
               <div className="spacer" />
               <button
@@ -3614,10 +3584,10 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                   restoreOneFile(previewing.filename, previewing.snapshotTs)
                 }
               >
-                <Icons.Refresh size={11} /> Restore this file
+                <Icons.Refresh size={11} /> {t("profile.files.restoreVersion")}
               </button>
               <button className="btn" onClick={() => setPreviewing(null)}>
-                <Icons.X size={11} /> Close
+                <Icons.X size={11} /> {t("profile.versions.close")}
               </button>
             </div>
             {showChanges && (
@@ -3633,8 +3603,8 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
               >
                 <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
                   {diffBaseline === "previous"
-                    ? "From the previous snapshot to this version"
-                    : "From this version to the current file"}
+                    ? t("profile.versions.fromPrevious")
+                    : t("profile.files.fromVersion")}
                 </span>
                 <button
                   type="button"
@@ -3648,7 +3618,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                     ...(diffBaseline === "current" ? { background: "var(--bg-sunken)" } : {}),
                   }}
                 >
-                  Current file
+                  {t("profile.versions.current")}
                 </button>
                 <button
                   type="button"
@@ -3657,7 +3627,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                   disabled={!previousReady}
                   title={
                     matchedLoad?.status === "ready" && !previousReady
-                      ? "No earlier snapshot of this file"
+                      ? t("profile.versions.noPrevious")
                       : undefined
                   }
                   onClick={() => setDiffBaseline("previous")}
@@ -3669,7 +3639,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                     ...(!previousReady ? { color: "var(--text-muted)" } : {}),
                   }}
                 >
-                  Previous snapshot
+                  {t("profile.versions.previous")}
                 </button>
               </div>
             )}
@@ -3680,13 +3650,13 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
               {showChanges ? (
                 matchedLoad?.status === "error" ? (
                   <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, lineHeight: 1.55 }}>
-                    Could not load this comparison.
+                    {t("profile.versions.comparisonError")}
                   </p>
                 ) : matchedLoad?.status !== "ready" || changeLines === null ? (
                   <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, lineHeight: 1.55 }}>
                     {diffBaseline === "previous" && matchedLoad?.status === "ready"
-                      ? "No earlier snapshot of this file."
-                      : "Loading changes…"}
+                      ? t("profile.versions.noPrevious")
+                      : t("profile.versions.loadingChanges")}
                   </p>
                 ) : (
                   <VersionDiff lines={changeLines} />
