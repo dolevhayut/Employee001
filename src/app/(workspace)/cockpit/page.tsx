@@ -71,10 +71,10 @@ const STATUS_KEY: Record<RunStatus, MessageKey> = {
 
 const SURFACE_STYLES: Record<RunSurface, { bg: string; color: string }> = {
   shift: { bg: "var(--bg-sunken)", color: "var(--text-muted)" },
-  routine: { bg: "#ede9fe", color: "#7c3aed" },
-  task: { bg: "#fef3c7", color: "#b45309" },
-  council: { bg: "#dcfce7", color: "#16a34a" },
-  builder: { bg: "#e0f2fe", color: "#0369a1" },
+  routine: { bg: "color-mix(in oklch, var(--accent) 12%, transparent)", color: "var(--accent-deep)" },
+  task: { bg: "color-mix(in oklch, var(--warn) 12%, transparent)", color: "var(--warn)" },
+  council: { bg: "color-mix(in oklch, var(--success) 12%, transparent)", color: "var(--success)" },
+  builder: { bg: "color-mix(in oklch, var(--twin) 12%, transparent)", color: "var(--twin)" },
 };
 
 function formatDuration(startedAt: string, endedAt?: string): string {
@@ -115,8 +115,8 @@ function StatusPill({ status }: { status: RunStatus }) {
   const { t } = useT();
   const meta: Record<RunStatus, { bg: string; color: string }> = {
     running: { bg: "var(--text)", color: "var(--bg)" },
-    complete: { bg: "#dcfce7", color: "#16a34a" },
-    error: { bg: "#fee2e2", color: "#dc2626" },
+    complete: { bg: "color-mix(in oklch, var(--success) 12%, transparent)", color: "var(--success)" },
+    error: { bg: "color-mix(in oklch, var(--danger) 12%, transparent)", color: "var(--danger)" },
     aborted: { bg: "var(--bg-sunken)", color: "var(--text-muted)" },
   };
   const m = meta[status];
@@ -141,7 +141,7 @@ function StatusPill({ status }: { status: RunStatus }) {
             width: 6,
             height: 6,
             borderRadius: "50%",
-            background: "#ffffff",
+            background: "var(--bg)",
             animation: "pulse 1.4s ease-in-out infinite",
           }}
         />
@@ -337,22 +337,22 @@ function LogLine({ ev }: { ev: RunLogEvent }) {
     prefix = "💭 ";
     body = ev.text ?? "";
   } else if (ev.type === "tool_use") {
-    color = "#6366f1";
+    color = "var(--twin)";
     arrow = "forward";
     body = ev.tool;
   } else if (ev.type === "tool_result") {
-    color = "#16a34a";
+    color = "var(--success)";
     arrow = "back";
     body = ev.tool;
   } else if (ev.type === "approval") {
     if (ev.decision === "allow") {
-      color = "#16a34a";
+      color = "var(--success)";
       prefix = "✓ ";
     } else if (ev.decision === "deny") {
       color = "var(--danger)";
       prefix = "✗ ";
     } else {
-      color = "#b45309";
+      color = "var(--warn)";
       prefix = "⤳ ";
     }
     body = ev.tool;
@@ -549,9 +549,9 @@ function CockpitCard({ run }: { run: ActiveRun }) {
             alignSelf: "flex-start",
             padding: "3px 9px",
             borderRadius: 999,
-            background: "rgba(166, 79, 176, 0.10)",
-            border: "1px solid rgba(166, 79, 176, 0.4)",
-            color: "#a64fb0",
+            background: "color-mix(in oklch, var(--twin) 12%, transparent)",
+            border: "1px solid var(--hairline-strong)",
+            color: "var(--twin)",
             fontSize: "var(--fs-meta)",
             fontWeight: 600,
             letterSpacing: "0.02em",
@@ -567,7 +567,7 @@ function CockpitCard({ run }: { run: ActiveRun }) {
           style={{
             padding: "6px 10px",
             borderInlineStart: "2px dashed var(--hairline-strong)",
-            background: "rgba(0,0,0,0.02)",
+            background: "color-mix(in oklch, var(--text) 12%, transparent)",
             color: "var(--text-subtle)",
             fontSize: "var(--fs-meta)",
             fontStyle: "italic",
@@ -718,7 +718,7 @@ export default function CockpitPage() {
               fontWeight: 600,
               borderRadius: 999,
               background: activeCount > 0 ? "var(--accent)" : "var(--bg-sunken)",
-              color: activeCount > 0 ? "#ffffff" : "var(--text-muted)",
+              color: activeCount > 0 ? "var(--bg)" : "var(--text-muted)",
               border: activeCount > 0 ? "none" : "1px solid var(--hairline)",
               height: 24,
             }}
@@ -729,7 +729,7 @@ export default function CockpitPage() {
                   width: 6,
                   height: 6,
                   borderRadius: "50%",
-                  background: "#ffffff",
+                  background: "var(--bg)",
                   animation: "pulse 1.4s ease-in-out infinite",
                 }}
               />
