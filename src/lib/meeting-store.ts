@@ -111,6 +111,11 @@ export function getMeeting(id: string): Meeting | undefined {
   return meetings.get(id);
 }
 
+/** Snapshot of active in-memory meetings. Callers must not mutate the result. */
+export function listMeetings(): Meeting[] {
+  return Array.from(meetings.values());
+}
+
 /**
  * Idempotent — returns the existing meeting if it exists, otherwise creates a
  * new one with the given participants. Used by the API route so the client

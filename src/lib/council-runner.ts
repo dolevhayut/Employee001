@@ -168,7 +168,7 @@ export type CouncilEvent =
       stoppedReason?: "max_budget" | "max_turns" | "natural";
       ts: number;
     }
-  | { type: "employee_error"; employeeId: string; message: string }
+  | { type: "employee_error"; employeeId: string; message: string; costUsd?: number }
   | {
       type: "tool_approval_request";
       employeeId: string;
@@ -596,6 +596,8 @@ export type RunOptions = {
    * artifacts, and (when `consultContext` is set) the ability to consult on.
    */
   consultMode?: boolean;
+  /** A no-side-effects consultation: only local read tools are available. */
+  answerOnly?: boolean;
   /**
    * When set, registers the twin-to-twin consultation MCP server for this run
    * so the twin can consult / request approval from peers. Threaded one hop
@@ -604,6 +606,23 @@ export type RunOptions = {
    */
   consultContext?: ConsultContext;
 };
+
+export function buildToolConfig(options: RunOptions): {
+  allowedTools: string[];
+  disallowedTools?: string[];
+  agents?: ReturnType<typeof buildTwinAgentDefinitions>;
+} {
+  if (options.answerOnly) {
+    return {
+      allowedTools: ["Read", "Glob", "Grep", "mcp__org_brain__search_org_brain"],
+      disallowedTools: ["AskUserQuestion", "Write", "WebSearch", "WebFetch", "Task", "TodoWrite"],
+    };
+  }
+  return {
+    allowedTools: ["TodoWrite", "AskUserQuestion", "Read", "Glob", "Grep", "Write", "WebSearch", "WebFetch", "Task"],
+    agents: buildTwinAgentDefinitions(),
+  };
+}
 
 // ─── Mention detection ────────────────────────────────────────────────────────
 
@@ -841,7 +860,7 @@ export async function runSingleTwin(
       // Twin-to-twin consultation — only when the caller threaded a context.
       // Lets this twin synchronously consult / request approval from peers;
       // the context's depth cap + shared visited-set guard against loops.
-      ...(options.consultContext
+      ...(!options.answerOnly && options.consultContext
         ? { twin_consult: buildConsultMcpServer(options.consultContext) }
         : {}),
       // Per-meeting scratch — only when we're inside a Team Meeting run.
@@ -849,7 +868,7 @@ export async function runSingleTwin(
       // it as `file_shared` so the UI can render the chip in the right
       // order (the SDK yields the `assistant` tool_use BEFORE running the
       // handler, so emitting from there would race the disk write).
-      ...(meetingId
+      ...(!options.answerOnly && meetingId
         ? {
             meeting_scratch: buildMeetingScratchMcpServer(
               meetingId,
@@ -971,6 +990,13 @@ export async function runSingleTwin(
       const typedInput = (input as Record<string, unknown>) ?? {};
       const decision = classifyTool(toolName, typedInput);
       const bare = toolName.replace(/^mcp__[a-z0-9_]+__/i, "");
+
+      if (options.answerOnly) {
+        const allowed = new Set(buildToolConfig(options).allowedTools);
+        if (!allowed.has(toolName)) {
+          return { behavior: "deny", message: "This answer-only consultation permits local read tools only." };
+        }
+      }
 
       // AskUserQuestion → render structured HTML clarification cards in the
       // chat. Block the SDK's built-in renderer; instead emit a dedicated
@@ -1123,6 +1149,7 @@ export async function runSingleTwin(
       },
     });
 
+    const toolConfig = buildToolConfig(options);
     const stream = query({
       prompt,
       options: {
@@ -1155,21 +1182,9 @@ export async function runSingleTwin(
         //   - WebSearch / WebFetch: live research — competitor pricing, API
         //     docs, case studies. Replaces "I think" with "per Stripe's docs
         //     as of today, …".
-        allowedTools: [
-          "TodoWrite",
-          "AskUserQuestion",
-          "Read",
-          "Glob",
-          "Grep",
-          "Write",
-          "WebSearch",
-          "WebFetch",
-          // Task — dispatches to web-researcher / brain-explorer subagents
-          // defined in twin-subagents.ts. The model spawns them in parallel
-          // when a question genuinely needs synthesis from multiple angles.
-          "Task",
-        ],
-        agents: buildTwinAgentDefinitions(),
+        allowedTools: toolConfig.allowedTools,
+        ...(toolConfig.disallowedTools ? { disallowedTools: toolConfig.disallowedTools } : {}),
+        ...(toolConfig.agents ? { agents: toolConfig.agents } : {}),
         toolConfig: { askUserQuestion: { previewFormat: "html" } },
         ...(hasMcp ? { mcpServers } : {}),
         maxTurns: consultMode ? 8 : hasMcp ? 20 : 6,
@@ -1375,7 +1390,7 @@ export async function runSingleTwin(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    onEvent({ type: "employee_error", employeeId: employee.id, message });
+    onEvent({ type: "employee_error", employeeId: employee.id, message, ...(costUsd > 0 ? { costUsd } : {}) });
   }
 
   return finalText;
