@@ -68,7 +68,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   English / עברית switch. In Hebrew the app runs right-to-left in
   Niv Sans; the sidebar, command palette (search works in both languages),
   page titles, empty states, Settings, the Twins roster, the org chart,
-  Approvals, Chat, Team Meeting and the twin profile are translated, with dates in the local format. More screens
+  Approvals, Chat, Team Meeting, the twin profile, the operator and work
+  pages and onboarding are translated, with dates in the local format. More screens
   follow. English
   stays the default and doesn't load the Hebrew font.
 - **Knowledge files keep their history.** Editing or deleting a twin's
