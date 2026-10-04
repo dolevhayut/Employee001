@@ -9,7 +9,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
-- **Dark and cool themes on Settings, Team Meeting, Cockpit and Schedules.**
+- **Dark and cool themes on Settings, Team Meeting, Cockpit, Schedules,
+  Tasks, Approvals, twin training and Live interview.**
   Status badges, file chips, tool tints and dialogs now follow the theme
   instead of fixed light-mode colors.
 - **Approval gate hardened.** Bash and the other never-allowed built-in
@@ -67,6 +68,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
+- **Tamper-evident audit log.** Every new approval-gate entry is hash-chained
+  to the one before it, `GET /api/audit/verify` checks the whole chain across
+  rotated archives, and the Activity log shows the result. Entries written
+  before this version are counted as legacy, not as tampering.
 - **Local model provider (offline).** `employee001 setup` can point twins at a
   local Anthropic-compatible endpoint (for example Ollama >= 0.14) with
   explicit model pins. It fails closed when misconfigured, never forwards your
