@@ -182,6 +182,7 @@ function turnToCapturedItem(turn: TranscriptTurn): CapturedItem {
     provenance: turn.provenance,
     confidence: clamp01(turn.confidence),
     gaps: dedupe(turn.gaps ?? []),
+    evidenceQuote: turn.answer.trim(),
   };
 }
 
@@ -205,6 +206,7 @@ function turnToToolingRef(turn: TranscriptTurn): ToolingRef {
     provenance: turn.provenance,
     confidence: clamp01(turn.confidence),
     gaps: dedupe(turn.gaps ?? []),
+    evidenceQuote: turn.answer.trim(),
   };
 }
 
@@ -344,8 +346,8 @@ successor can rely on to do this person's job.
   "provenance": { ... }
 }
 
-CapturedItem = { id, title, body, provenance, confidence (0..1), gaps: string[] }
-ToolingRef   = { id, system, location, accessVia, ownedBy?, provenance, confidence, gaps }
+CapturedItem = { id, title, body, provenance, confidence (0..1), gaps: string[], evidenceQuote }
+ToolingRef   = { id, system, location, accessVia, ownedBy?, provenance, confidence, gaps, evidenceQuote }
 
 ## Hard rules
 - tooling_map carries NO secrets, passwords, keys, or tokens — references only
@@ -356,6 +358,8 @@ ToolingRef   = { id, system, location, accessVia, ownedBy?, provenance, confiden
   add any you infer.
 - Merge duplicate notes; never invent facts not grounded in the transcript.
 - Prefer specifics and stories over summaries. Keep playbook steps ordered.
+- Every item MUST include evidenceQuote: a short verbatim quote copied from the
+  captured transcript that supports that exact item. Do not paraphrase it.
 
 ## Captured transcript (PII/secret-redacted)
 

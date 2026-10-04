@@ -40,6 +40,7 @@ import {
   type TranscriptTurn,
   type TwinProfileSummary,
 } from "./synthesis";
+import { verifyRcpEvidence } from "./evidence";
 import type {
   CapturedItem,
   ConsentRecord,
@@ -340,7 +341,10 @@ export async function runRelayHandover(args: RunRelayHandoverArgs): Promise<void
     // opus prompt (buildSynthesisPrompt) and stream the SDK here; intentionally
     // NOT wired in this demo so the surface runs with no Anthropic key. We
     // fall back to fixture synthesis for both paths so the demo never stalls.
-    const rcp = synthesizeRcpFixture(synthInput);
+    const rcp = verifyRcpEvidence(
+      synthesizeRcpFixture(synthInput),
+      transcript.map((turn) => turn.answer).join("\n\n"),
+    );
 
     // ─── Phase 4 · coverage (soft gate — PRD 13.2/13.4) ────────────────────
     onEvent({ type: "phase", phase: "coverage", ts: ts() });

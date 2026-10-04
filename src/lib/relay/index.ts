@@ -59,6 +59,7 @@ export type {
 } from "./runner";
 export { scoreCoverage } from "./coverage";
 export type { CoverageResult } from "./coverage";
+export { verifyRcpEvidence } from "./evidence";
 
 // ─── Path helper (kept local so the barrel is self-contained) ─────────────────
 

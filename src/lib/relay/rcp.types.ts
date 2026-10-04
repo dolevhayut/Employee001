@@ -33,6 +33,12 @@ export interface CapturedItem {
   confidence: number;
   /** Known unknowns / what still needs confirming for this item. */
   gaps: string[];
+  /** Short, verbatim excerpt from the source interview that supports this claim. */
+  evidenceQuote?: string;
+  /** Result of local verbatim evidence matching. */
+  verified?: boolean;
+  /** Human-readable explanation when evidence could not be verified. */
+  verificationReason?: string;
 }
 
 /**
@@ -62,6 +68,12 @@ export interface ToolingRef {
   confidence: number;
   /** Known unknowns for this reference. */
   gaps: string[];
+  /** Short, verbatim excerpt from the source interview that supports this reference. */
+  evidenceQuote?: string;
+  /** Result of local verbatim evidence matching. */
+  verified?: boolean;
+  /** Human-readable explanation when evidence could not be verified. */
+  verificationReason?: string;
 }
 
 /**

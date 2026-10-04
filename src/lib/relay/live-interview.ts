@@ -24,6 +24,7 @@ import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 import { INTERVIEWER_SYSTEM_PROMPT, buildInterviewerPrompt } from "./interviewer";
 import { scoreCoverage, type CoverageResult } from "./coverage";
 import { redactPii } from "./synthesis";
+import { verifyRcpEvidence } from "./evidence";
 import {
   RCP_SCHEMA_VERSION,
   type CapturedItem,
@@ -143,6 +144,7 @@ interface RawItem {
   body?: string;
   confidence?: number;
   gaps?: string[];
+  evidenceQuote?: string;
 }
 interface RawTooling {
   system?: string;
@@ -151,6 +153,7 @@ interface RawTooling {
   ownedBy?: string;
   confidence?: number;
   gaps?: string[];
+  evidenceQuote?: string;
 }
 
 function buildLiveSynthesisPrompt(profile: string, conversation: string): string {
@@ -167,17 +170,18 @@ ${conversation}
 ## Your task
 Produce a JSON object capturing the tacit knowledge from the EMPLOYEE's answers. Use ONLY these top-level keys, each an array:
 
-- "decision_rules": rules / approval thresholds / when-to-escalate. Each: { "title", "body", "confidence" (0..1), "gaps": [string] }
-- "playbooks": step-by-step processes. Each: { "title", "body" (ordered steps, markdown list ok), "confidence", "gaps" }
-- "contact_graph": who owns what + informal key people. Each: { "title" (person/role), "body" (what they own + why they matter), "confidence", "gaps" }. Role/handle only — NO private contact info.
-- "edge_cases": war stories / "watch out for X". Each: { "title", "body" (situation + how handled), "confidence", "gaps" }
-- "tooling_map": systems + access. Each: { "system", "location", "accessVia" (how access is granted — a PROCESS), "ownedBy" (role/handle), "confidence", "gaps" }. REFERENCES ONLY — NEVER passwords, API keys, tokens, or any secret value.
-- "glossary": internal terms/acronyms. Each: { "title" (term), "body" (definition), "confidence", "gaps" }
-- "open_loops": in-flight tasks at handover. Each: { "title", "body" (task + state + next action), "confidence", "gaps" }
+- "decision_rules": rules / approval thresholds / when-to-escalate. Each: { "title", "body", "confidence" (0..1), "gaps": [string], "evidenceQuote" }
+- "playbooks": step-by-step processes. Each: { "title", "body" (ordered steps, markdown list ok), "confidence", "gaps", "evidenceQuote" }
+- "contact_graph": who owns what + informal key people. Each: { "title" (person/role), "body" (what they own + why they matter), "confidence", "gaps", "evidenceQuote" }. Role/handle only — NO private contact info.
+- "edge_cases": war stories / "watch out for X". Each: { "title", "body" (situation + how handled), "confidence", "gaps", "evidenceQuote" }
+- "tooling_map": systems + access. Each: { "system", "location", "accessVia" (how access is granted — a PROCESS), "ownedBy" (role/handle), "confidence", "gaps", "evidenceQuote" }. REFERENCES ONLY — NEVER passwords, API keys, tokens, or any secret value.
+- "glossary": internal terms/acronyms. Each: { "title" (term), "body" (definition), "confidence", "gaps", "evidenceQuote" }
+- "open_loops": in-flight tasks at handover. Each: { "title", "body" (task + state + next action), "confidence", "gaps", "evidenceQuote" }
 
 Rules:
 - Only capture what the EMPLOYEE actually said. Do not invent. If a field has nothing real, return an empty array for it.
 - Be honest in "confidence" and "gaps" — note what is still thin or unconfirmed.
+- evidenceQuote is required for every item: copy a short, verbatim excerpt from an EMPLOYEE answer that supports it; never paraphrase.
 - NEVER include secrets in tooling_map. Reference where things live and how access is requested, not the credentials.
 - Output ONLY the JSON object. No prose, no markdown fences.`;
 }
@@ -194,6 +198,7 @@ function toItems(raw: unknown, employeeId: string, field: string): CapturedItem[
       confidence:
         typeof r.confidence === "number" ? clamp01(r.confidence) : 0.7,
       gaps: Array.isArray(r.gaps) ? r.gaps.map((g) => redactPii(String(g))) : [],
+      evidenceQuote: redactPii(String(r.evidenceQuote ?? "").trim()),
     };
   });
 }
@@ -212,6 +217,7 @@ function toTooling(raw: unknown, employeeId: string): ToolingRef[] {
       confidence:
         typeof r.confidence === "number" ? clamp01(r.confidence) : 0.7,
       gaps: Array.isArray(r.gaps) ? r.gaps.map((g) => redactPii(String(g))) : [],
+      evidenceQuote: redactPii(String(r.evidenceQuote ?? "").trim()),
     };
   });
 }
@@ -278,7 +284,7 @@ export async function synthesizeFromConversation(
 
   const generatedAt = new Date().toISOString();
 
-  const rcp: RoleContextPackage = {
+  const synthesizedRcp: RoleContextPackage = {
     source_twin_id: employeeId,
     schema_version: RCP_SCHEMA_VERSION,
     generated_at: generatedAt,
@@ -304,6 +310,8 @@ export async function synthesizeFromConversation(
       auditRunId: "live",
     },
   };
+
+  const rcp = verifyRcpEvidence(synthesizedRcp, conversation);
 
   const coverage = scoreCoverage(rcp);
   rcp.status = coverage.status;

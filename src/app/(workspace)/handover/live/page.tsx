@@ -24,8 +24,8 @@ const BRAND = "#9E6B47";
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type Phase = "consent" | "interviewing" | "synthesizing" | "done";
 
-interface CapturedItem { id: string; title: string; body: string; confidence: number; gaps: string[] }
-interface ToolingRef { id: string; system: string; location: string; accessVia: string; ownedBy?: string }
+interface CapturedItem { id: string; title: string; body: string; confidence: number; gaps: string[]; evidenceQuote?: string; verified?: boolean; verificationReason?: string }
+interface ToolingRef { id: string; system: string; location: string; accessVia: string; ownedBy?: string; evidenceQuote?: string; verified?: boolean; verificationReason?: string }
 interface Rcp {
   source_twin_id: string;
   status: string;
@@ -332,6 +332,8 @@ function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
     { key: "glossary", label: "Glossary" },
     { key: "open_loops", label: "Open loops" },
   ];
+  const evidenceItems = sections.flatMap(({ key }) => rcp[key] as unknown as Array<CapturedItem | ToolingRef>);
+  const verifiedCount = evidenceItems.filter((item) => item.verified === true).length;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ background: "var(--surface, #141414)", border: `1px solid ${ready ? BRAND : "var(--hairline,#2a2a2a)"}`, borderRadius: 10, padding: 18 }}>
@@ -341,6 +343,9 @@ function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
         </div>
         <div style={{ height: 8, background: "#222", borderRadius: 4, overflow: "hidden" }}>
           <div style={{ width: `${pct}%`, height: "100%", background: BRAND }} />
+        </div>
+        <div style={{ marginTop: 10, fontSize: 12, color: "#999" }}>
+          {t("handover.verifiedClaims", { verified: verifiedCount, total: evidenceItems.length })}
         </div>
         {coverage?.gaps && coverage.gaps.length > 0 && (
           <div style={{ marginTop: 10, fontSize: 12, color: "#999" }}>{t("handover.thin", { gaps: coverage.gaps.join(" · ") })}</div>
@@ -357,6 +362,9 @@ function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
               {items.map((it, i) => (
                 <div key={i} style={{ borderInlineStart: `2px solid rgba(158,107,71,.4)`, paddingInlineStart: 12 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{"system" in it ? it.system : it.title}</div>
+                  <div title={it.verificationReason} style={{ marginTop: 3, fontSize: 11, color: it.verified ? "#6dbb79" : "#d8a55e" }}>
+                    {it.verified ? `✓ ${t("handover.verifiedQuote")}` : `! ${t("handover.unverified")}`}
+                  </div>
                   <div style={{ fontSize: 13, color: "#bbb", lineHeight: 1.5, whiteSpace: "pre-wrap", marginTop: 2 }}>
                     {"system" in it ? `${it.location}${it.accessVia ? ` · ${it.accessVia}` : ""}${it.ownedBy ? ` · ${it.ownedBy}` : ""}` : it.body}
                   </div>

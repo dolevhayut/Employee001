@@ -48,6 +48,9 @@ type CapturedItem = {
   provenance: "interview" | "confirmed-from-history";
   confidence: number;
   gaps: string[];
+  evidenceQuote?: string;
+  verified?: boolean;
+  verificationReason?: string;
 };
 
 type ToolingRef = {
@@ -59,6 +62,9 @@ type ToolingRef = {
   provenance: "interview" | "confirmed-from-history";
   confidence: number;
   gaps: string[];
+  evidenceQuote?: string;
+  verified?: boolean;
+  verificationReason?: string;
 };
 
 type PerField = {
@@ -664,6 +670,7 @@ function PhaseStepper({ phasesSeen, current, done }: { phasesSeen: Set<Phase>; c
 // ─── Synthesized RCP view ─────────────────────────────────────────────────────
 
 function RcpItemList({ items, isTooling }: { items: (CapturedItem | ToolingRef)[]; isTooling?: boolean }) {
+  const { t } = useT();
   if (items.length === 0) {
     return (
       <div className="subtle" style={{ fontSize: "var(--fs-meta)", fontStyle: "italic" }}>
@@ -693,6 +700,9 @@ function RcpItemList({ items, isTooling }: { items: (CapturedItem | ToolingRef)[
               <span className="mono subtle" style={{ fontSize: "var(--fs-2xs)" }}>
                 {item.provenance} · {confidencePct(item.confidence)}
               </span>
+              <span title={item.verificationReason} style={{ fontSize: "var(--fs-2xs)", color: item.verified ? "var(--success)" : "var(--warn)", whiteSpace: "nowrap" }}>
+                {item.verified ? `✓ ${t("handover.verifiedQuote")}` : `! ${t("handover.unverified")}`}
+              </span>
             </div>
             <div
               style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", marginTop: 3, whiteSpace: "pre-wrap" }}
@@ -716,6 +726,7 @@ function RcpItemList({ items, isTooling }: { items: (CapturedItem | ToolingRef)[
 }
 
 function RcpView({ rcp }: { rcp: RoleContextPackage }) {
+  const { t } = useT();
   const [rawJson, setRawJson] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
@@ -727,6 +738,10 @@ function RcpView({ rcp }: { rcp: RoleContextPackage }) {
       })),
     [rcp],
   );
+  const evidenceCounts = useMemo(() => {
+    const items = sections.flatMap((section) => section.items);
+    return { verified: items.filter((item) => item.verified === true).length, total: items.length };
+  }, [sections]);
 
   const downloadRcp = () => {
     const subject = rcp.provenance?.consent?.subjectId ?? "handover";
@@ -806,6 +821,9 @@ function RcpView({ rcp }: { rcp: RoleContextPackage }) {
         <span className="mono">{rcp.schema_version}</span>) carries zero Employee001 coupling, so it survives a
         spinout. Tooling is recorded as <em>references only</em> — never credentials.
       </p>
+      <div className="mono subtle" style={{ fontSize: "var(--fs-2xs)", margin: "-6px 0 14px" }}>
+        {t("handover.verifiedClaims", evidenceCounts)}
+      </div>
 
       {rawJson ? (
         <pre
