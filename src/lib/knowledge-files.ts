@@ -29,6 +29,9 @@ export const KNOWLEDGE_MAX_BYTES: number = 25 * 1024 * 1024;
 /** Max extracted text written beside a PDF or DOCX upload: 2 MB. */
 export const KNOWLEDGE_EXTRACTED_TEXT_MAX_BYTES: number = 2 * 1024 * 1024;
 
+/** First line of every generated `${name}.md` companion; delete checks for it. */
+const EXTRACTED_COMPANION_MARKER = "<!-- employee001:extracted -->";
+
 /**
  * Executable / script extensions that must never be written to the knowledge
  * directory regardless of how they arrive. Note: .json is a TEXT file (allowed),
@@ -307,9 +310,10 @@ export async function extractUploadedKnowledgeFile(
   try {
     const extracted = await extractUploadedText(ext, data);
     const { body, truncated } = cappedExtractedText(extracted);
-    const markdown = truncated
-      ? "> **Note:** Extracted text was truncated to 2 MB.\n\n" + body
-      : body;
+    const header =
+      `${EXTRACTED_COMPANION_MARKER}\n_Text extracted from \`${savedName}\`._\n\n` +
+      (truncated ? "> **Note:** Extracted text was truncated to 2 MB.\n\n" : "");
+    const markdown = header + body;
     const dir = knowledgeDir(employeeId);
     const companionName = `${savedName}.md`;
     fs.writeFileSync(path.join(dir, companionName), markdown, {
@@ -342,10 +346,17 @@ export function deleteKnowledgeFile(employeeId: string, name: string): boolean {
     if (!stat.isFile()) return false;
     fs.unlinkSync(full);
     // Drop the extracted `${name}.md` companion with its PDF/DOCX original,
-    // so the twin stops reading text from a file the user deleted.
+    // so the twin stops reading text from a file the user deleted. Only a
+    // file we generated (marker on line 1) goes; a user's own .md stays.
     const ext = extOf(clean);
     if (ext === ".pdf" || ext === ".docx") {
-      fs.rmSync(path.join(dir, `${clean}.md`), { force: true });
+      const companion = path.join(dir, `${clean}.md`);
+      if (
+        fs.existsSync(companion) &&
+        fs.readFileSync(companion, "utf-8").startsWith(EXTRACTED_COMPANION_MARKER)
+      ) {
+        fs.unlinkSync(companion);
+      }
     }
     return true;
   } catch {
