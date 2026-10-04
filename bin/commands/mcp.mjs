@@ -42,7 +42,12 @@ export default async function mcp(argv) {
   });
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
 
+  // Handle requests concurrently: a slow ask_twin must not block pings or
+  // other tool calls. JSON-RPC replies are matched by id, not order.
+  const pending = new Set();
   for await (const line of input) {
-    await bridge.handleLine(line);
+    const task = bridge.handleLine(line).finally(() => pending.delete(task));
+    pending.add(task);
   }
+  await Promise.all(pending);
 }

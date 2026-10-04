@@ -8,35 +8,38 @@ function writeJson(write, value) {
   write(`${JSON.stringify(value)}\n`);
 }
 
-function writeJsonText(write, value) {
-  try {
-    writeJson(write, JSON.parse(value));
-  } catch {
-    // MCP clients require stdout to be newline-delimited JSON-RPC only.
-  }
-}
-
+// Returns true when at least one JSON-RPC message was written.
 async function forwardResponse(response, write) {
   const contentType = response.headers.get("content-type") ?? "";
   const body = await response.text();
+  let wrote = false;
+  const emit = (value) => {
+    writeJson(write, value);
+    wrote = true;
+  };
 
   if (contentType.toLowerCase().includes("text/event-stream")) {
     for (const line of body.split(/\r?\n/)) {
       if (line.startsWith("data:")) {
-        writeJsonText(write, line.slice(5).trimStart());
+        try {
+          emit(JSON.parse(line.slice(5).trimStart()));
+        } catch {
+          // MCP clients require stdout to be newline-delimited JSON-RPC only.
+        }
       }
     }
-    return;
+    return wrote;
   }
 
   try {
     const payload = JSON.parse(body);
     for (const message of Array.isArray(payload) ? payload : [payload]) {
-      writeJson(write, message);
+      emit(message);
     }
   } catch {
     // A malformed upstream response must not corrupt the client's stdio stream.
   }
+  return wrote;
 }
 
 /**
@@ -66,7 +69,19 @@ export function createBridge({ url, fetchImpl = fetch, write, log }) {
           },
           body: JSON.stringify(message),
         });
-        await forwardResponse(response, write);
+        const wrote = await forwardResponse(response, write);
+        // An app without /api/mcp (older version) answers with an HTML 404;
+        // without a reply the client would wait forever.
+        if (!wrote && hasRequestId(message) && response.status !== 202) {
+          writeJson(write, {
+            jsonrpc: "2.0",
+            id: message.id,
+            error: {
+              code: -32002,
+              message: `Employee001 at ${url} has no usable MCP endpoint (HTTP ${response.status}). Update with: npx employee001@latest start`,
+            },
+          });
+        }
       } catch {
         if (!hasRequestId(message)) return;
 

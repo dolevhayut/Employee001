@@ -74,4 +74,36 @@ describe("MCP stdio bridge", () => {
     expect(log).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledWith("Employee001 is not running. Start it with: npx employee001 start");
   });
+
+  it("answers a request when the app replies with a non-JSON error page", async () => {
+    const { bridge, output } = bridgeWith(
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response("<html>404</html>", { status: 404, headers: { "content-type": "text/html" } }),
+      ),
+    );
+
+    await bridge.handleLine(request);
+
+    expect(output).toHaveLength(1);
+    const reply = JSON.parse(output[0]);
+    expect(reply.id).toBe(7);
+    expect(reply.error.code).toBe(-32002);
+    expect(reply.error.message).toContain("HTTP 404");
+  });
+
+  it("does not hold a fast request behind a slow one", async () => {
+    let releaseSlow: (r: Response) => void = () => {};
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockReturnValueOnce(new Promise<Response>((r) => { releaseSlow = r; }))
+      .mockResolvedValueOnce(Response.json({ jsonrpc: "2.0", id: 2, result: {} }));
+    const { bridge, output } = bridgeWith(fetchImpl);
+
+    const slow = bridge.handleLine(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call" }));
+    await bridge.handleLine(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping" }));
+    expect(output.map((l) => JSON.parse(l).id)).toEqual([2]);
+
+    releaseSlow(Response.json({ jsonrpc: "2.0", id: 1, result: {} }));
+    await slow;
+    expect(output.map((l) => JSON.parse(l).id)).toEqual([2, 1]);
+  });
 });
