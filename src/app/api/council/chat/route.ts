@@ -3,8 +3,15 @@ import { runCouncil } from "@/lib/council-runner";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 import { hasEmployeeFiles } from "@/lib/employees-files";
+import { createDemoReplayResponse } from "@/lib/demo-replay";
 
 export async function POST(request: NextRequest) {
+  // Demo replay is explicit, never inferred from missing credentials. This keeps
+  // the default demo free while `employee001 demo --live` stays genuinely live.
+  if (process.env.EMPLOYEE001_DEMO === "1" && process.env.EMPLOYEE001_DEMO_LIVE !== "1") {
+    return createDemoReplayResponse(request.signal);
+  }
+
   const body = await request.json() as {
     question?: string;
     employeeIds?: string[];

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 import {
   Database as DatabaseIcon,
   Page as FileTextIcon,
@@ -1529,6 +1530,7 @@ function TypingIndicator({ emp }: { emp: EmployeeWithTwin }) {
 
 export default function CouncilPage() {
   const { t, locale } = useT();
+  const searchParams = useSearchParams();
   const rtl = locale === "he";
   const roster = useRoster();
   // `null` means "not customized yet" — the active set defaults to every ready
@@ -1553,7 +1555,12 @@ export default function CouncilPage() {
   // Held in state (not a ref) because file chips read it during render to build
   // their download/preview URLs.
   const [meetingId, setMeetingId] = useState<string | null>(null);
-  const [input, setInput] = useState("");
+  // Read `?q=` only while this page instance is created. The demo banner uses
+  // it to offer the recorded meeting question without changing later edits.
+  const [input, setInput] = useState(() => {
+    const question = searchParams.get("q");
+    return question && question.length <= 500 ? question : "";
+  });
   const [typingFor, setTypingFor] = useState<string[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);

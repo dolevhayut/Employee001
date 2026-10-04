@@ -37,9 +37,9 @@ function openInBrowser(url) {
   }
 }
 
-export function buildChildEnv({ home, port, bind, env = {}, strict = false }) {
+export function buildChildEnv({ home, port, bind, env = {}, strict = false, inheritEnv = true }) {
   const childEnv = {
-    ...process.env,
+    ...(inheritEnv ? process.env : {}),
     ...env,
     EMPLOYEE001_HOME: resolve(home),
     HOSTNAME: bind,
@@ -50,7 +50,7 @@ export function buildChildEnv({ home, port, bind, env = {}, strict = false }) {
   return childEnv;
 }
 
-export function launchServer({ home, port, bind, env = {}, open = "/", noOpen = false, strict = false }) {
+export function launchServer({ home, port, bind, env = {}, open = "/", noOpen = false, strict = false, inheritEnv = true }) {
   const absoluteHome = resolve(home);
   const serverScript = join(PKG_ROOT, ".next", "standalone", "server.js");
   if (!existsSync(serverScript)) {
@@ -62,7 +62,7 @@ export function launchServer({ home, port, bind, env = {}, open = "/", noOpen = 
     return null;
   }
 
-  const childEnv = buildChildEnv({ home: absoluteHome, port, bind, env, strict });
+  const childEnv = buildChildEnv({ home: absoluteHome, port, bind, env, strict, inheritEnv });
   const adoption = adoptData({ home: absoluteHome, pkgRoot: PKG_ROOT, env: childEnv });
   if (adoption.warning) {
     process.stderr.write(`Warning: could not check earlier install data: ${adoption.warning.message ?? adoption.warning}\n`);

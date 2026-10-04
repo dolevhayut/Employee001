@@ -18,11 +18,14 @@ Commands:
   export    Snapshot data/ to a tar.gz archive (excludes .env)
   import    Restore data/ from a tar.gz archive
   mcp       Connect Claude Code, Cursor and other MCP clients (stdio bridge to the running app)
+  demo      Try Employee001 with 5 invented twins — no keys, nothing touches your files
   help      Show this message
 
 Common flags:
   --no-open       (start) Do not open browser
   --port <n>      (start) Override port (default 3000)
+  --live          (demo) Pass your model-provider environment through
+  --keep          (demo) Keep the temporary demo data after stopping
   --strict        (start) Disable nonessential outbound traffic
                   (sets CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1)
   --egress        (doctor) After the health checks, list every outbound host
@@ -36,7 +39,7 @@ Examples:
 Docs: https://github.com/dolevhayut/Employee001
 `;
 
-const KNOWN = new Set(["setup", "start", "update", "doctor", "export", "import", "mcp", "help"]);
+const KNOWN = new Set(["setup", "start", "update", "doctor", "export", "import", "mcp", "demo", "help"]);
 
 async function main() {
   const cmd = process.argv[2];
