@@ -85,7 +85,9 @@ jobs:
         run: |
           VERSION="$(node -p "require('./package.json').version")"
           TARBALL="employee001-${VERSION}.tgz"
-          npm pack
+          # --ignore-scripts: skip prepack (a second build), so the tarball holds
+          # exactly the build the leak scan above just checked.
+          npm pack --ignore-scripts
           test -f "$TARBALL" \
             || (echo "::error::Expected publish artifact $TARBALL was not created"; exit 1)
           echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
