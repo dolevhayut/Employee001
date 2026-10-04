@@ -9,6 +9,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- The sidebar version label reads `package.json` at build time instead of a
+  hard-coded "v0.4".
 - **Hebrew replies render right-to-left.** Every paragraph, list, heading,
   quote and table in twin messages picks its own direction (`dir="auto"`), so
   Hebrew lines run right-to-left and mixed Hebrew/English text no longer
