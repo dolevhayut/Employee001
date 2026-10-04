@@ -1,9 +1,7 @@
 import "server-only";
 import fs from "fs";
 import path from "path";
-import mammoth from "mammoth";
-import { extractTextItems, getDocumentProxy } from "unpdf";
-import { textFromPositionedPdfItems } from "@/lib/rtl-text";
+import { Worker } from "node:worker_threads";
 
 const EMPLOYEES_DATA_DIR = path.join(process.cwd(), "data", "employees");
 
@@ -29,6 +27,16 @@ export const KNOWLEDGE_MAX_BYTES: number = 25 * 1024 * 1024;
 
 /** Max extracted text written beside a PDF or DOCX upload: 2 MB. */
 export const KNOWLEDGE_EXTRACTED_TEXT_MAX_BYTES: number = 2 * 1024 * 1024;
+
+/** Extraction happens off the request thread and is stopped after this long. */
+const KNOWLEDGE_EXTRACTION_TIMEOUT_MS = 30_000;
+
+/** DOCX ZIP declarations are checked before a decompressor sees the archive. */
+const DOCX_MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024;
+const DOCX_MAX_ENTRY_UNCOMPRESSED_BYTES = 50 * 1024 * 1024;
+const DOCX_MAX_COMPRESSION_RATIO = 200;
+const UNSAFE_DOCX_WARNING =
+  "This Word file looks unsafe to extract (it expands too much). The original was kept.";
 
 /** First line of every generated `${name}.md` companion; delete checks for it. */
 const EXTRACTED_COMPANION_MARKER = "<!-- employee001:extracted -->";
@@ -261,37 +269,99 @@ type ExtractedKnowledgeFileResult =
   | ExtractedKnowledgeFile
   | { warning: string };
 
-function cappedExtractedText(text: string): { body: string; truncated: boolean } {
-  const bytes = Buffer.from(text, "utf-8");
-  if (bytes.length <= KNOWLEDGE_EXTRACTED_TEXT_MAX_BYTES) {
-    return { body: text, truncated: false };
-  }
+type WorkerExtractionResult = { body: string; truncated: boolean };
 
-  return {
-    body: bytes
-      .subarray(0, KNOWLEDGE_EXTRACTED_TEXT_MAX_BYTES)
-      .toString("utf-8"),
-    truncated: true,
-  };
-}
-
-async function extractUploadedText(ext: string, data: Buffer): Promise<string> {
-  if (ext === ".pdf") {
-    const pdf = await getDocumentProxy(new Uint8Array(data));
-    try {
-      const { items } = await extractTextItems(pdf);
-      return items.map(textFromPositionedPdfItems).join("\n");
-    } finally {
-      await pdf.loadingTask.destroy();
+/**
+ * Read ZIP central-directory metadata without inflating any ZIP member. ZIP64
+ * archives are rejected conservatively: their 32-bit declarations are not
+ * enough to prove they stay inside our limits.
+ */
+function isSafeDocxZip(data: Buffer): boolean {
+  if (data.length < 22) return false;
+  // EOCD is at the end, preceded by at most a 65,535-byte comment.
+  const minEocdOffset = Math.max(0, data.length - 65_557);
+  let eocd = -1;
+  for (let offset = data.length - 22; offset >= minEocdOffset; offset -= 1) {
+    if (data.readUInt32LE(offset) === 0x06054b50) {
+      eocd = offset;
+      break;
     }
   }
+  if (eocd < 0 || eocd + 22 > data.length) return false;
 
-  if (ext === ".docx") {
-    const { value } = await mammoth.extractRawText({ buffer: data });
-    return value;
+  const entries = data.readUInt16LE(eocd + 10);
+  const centralDirectorySize = data.readUInt32LE(eocd + 12);
+  let offset = data.readUInt32LE(eocd + 16);
+  if (
+    entries === 0xffff ||
+    centralDirectorySize === 0xffffffff ||
+    offset === 0xffffffff ||
+    offset + centralDirectorySize > data.length
+  ) {
+    return false;
   }
 
-  throw new Error(`Unsupported extraction type: ${ext}`);
+  let totalUncompressed = 0;
+  for (let entry = 0; entry < entries; entry += 1) {
+    if (offset + 46 > data.length || data.readUInt32LE(offset) !== 0x02014b50) {
+      return false;
+    }
+    const compressed = data.readUInt32LE(offset + 20);
+    const uncompressed = data.readUInt32LE(offset + 24);
+    const nameLength = data.readUInt16LE(offset + 28);
+    const extraLength = data.readUInt16LE(offset + 30);
+    const commentLength = data.readUInt16LE(offset + 32);
+    const nextOffset = offset + 46 + nameLength + extraLength + commentLength;
+    if (
+      compressed === 0xffffffff ||
+      uncompressed === 0xffffffff ||
+      nextOffset > data.length ||
+      uncompressed > DOCX_MAX_ENTRY_UNCOMPRESSED_BYTES ||
+      (uncompressed > 0 &&
+        (compressed === 0 || uncompressed / compressed > DOCX_MAX_COMPRESSION_RATIO))
+    ) {
+      return false;
+    }
+    totalUncompressed += uncompressed;
+    if (totalUncompressed > DOCX_MAX_UNCOMPRESSED_BYTES) return false;
+    offset = nextOffset;
+  }
+  return true;
+}
+
+function extractInWorker(ext: ".pdf" | ".docx", data: Buffer): Promise<WorkerExtractionResult> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL("./knowledge-extract.worker.ts", import.meta.url), {
+      workerData: { ext, data, maxTextBytes: KNOWLEDGE_EXTRACTED_TEXT_MAX_BYTES },
+      resourceLimits: { maxOldGenerationSizeMb: 512 },
+    });
+    let settled = false;
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      callback();
+    };
+    const timeout = setTimeout(() => {
+      finish(() => {
+        void worker.terminate();
+        reject(new Error("Text extraction timed out after 30 seconds."));
+      });
+    }, KNOWLEDGE_EXTRACTION_TIMEOUT_MS);
+
+    worker.once("message", (result: WorkerExtractionResult) => {
+      finish(() => {
+        void worker.terminate();
+        resolve(result);
+      });
+    });
+    worker.once("error", (error) => finish(() => reject(error)));
+    worker.once("exit", (code) => {
+      if (code !== 0) {
+        finish(() => reject(new Error(`Text extraction worker exited with code ${code}.`)));
+      }
+    });
+  });
 }
 
 /**
@@ -307,10 +377,12 @@ export async function extractUploadedKnowledgeFile(
   if (ext !== ".pdf" && ext !== ".docx") {
     return { warning: "This file type does not support text extraction." };
   }
+  if (ext === ".docx" && !isSafeDocxZip(data)) {
+    return { warning: UNSAFE_DOCX_WARNING };
+  }
 
   try {
-    const extracted = await extractUploadedText(ext, data);
-    const { body, truncated } = cappedExtractedText(extracted);
+    const { body, truncated } = await extractInWorker(ext, data);
     const header =
       `${EXTRACTED_COMPANION_MARKER}\n_Text extracted from \`${savedName}\`._\n\n` +
       (truncated ? "> **Note:** Extracted text was truncated to 2 MB.\n\n" : "");
