@@ -47,7 +47,7 @@ function CanvasFullscreenPortal({
         position: "fixed",
         inset: 0,
         zIndex: 9999,
-        background: "color-mix(in srgb, var(--text) 60%, transparent)",
+        background: "rgba(0,0,0,0.6)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",

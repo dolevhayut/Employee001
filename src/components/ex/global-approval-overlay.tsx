@@ -226,7 +226,7 @@ export function GlobalApprovalOverlay() {
         style={{
           position: "fixed",
           inset: 0,
-          background: "color-mix(in srgb, var(--text) 55%, transparent)",
+          background: "rgba(15, 18, 24, 0.55)",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
           zIndex: 1000,
@@ -622,7 +622,7 @@ export function NotificationBell({ count }: { count: number }) {
             padding: "0 3px",
             borderRadius: 999,
             background: "var(--warn)",
-            color: "var(--bg-elevated)",
+            color: "#fff",
             fontSize: "var(--fs-2xs)",
             fontWeight: 700,
             display: "grid",

@@ -108,7 +108,7 @@ export function ClarificationCard({
                 padding: "2px 8px",
                 borderRadius: 6,
                 background: "var(--accent-deep)",
-                color: "var(--bg-elevated)",
+                color: "#fff",
                 letterSpacing: "0.03em",
                 textTransform: "uppercase",
                 flexShrink: 0,
@@ -160,7 +160,7 @@ export function ClarificationCard({
             fontSize: "var(--fs-ui)",
             fontWeight: 600,
             background: allAnswered ? "var(--accent-deep)" : "var(--hairline-strong)",
-            color: "var(--bg-elevated)",
+            color: "#fff",
             border: "none",
             borderRadius: 8,
             cursor: allAnswered && !submitting ? "pointer" : "not-allowed",
@@ -210,7 +210,7 @@ function OptionCard({
         padding: "var(--sp-10)",
         textAlign: "start",
         background: selected ? "var(--accent-deep)" : "var(--bg)",
-        color: selected ? "var(--bg-elevated)" : "var(--text)",
+        color: selected ? "#fff" : "var(--text)",
         border: `1.5px solid ${selected ? "var(--accent-deep)" : "var(--hairline)"}`,
         borderRadius: 10,
         cursor: "pointer",
@@ -229,7 +229,7 @@ function OptionCard({
           style={{
             fontSize: "var(--fs-meta)",
             lineHeight: 1.4,
-            color: selected ? "color-mix(in srgb, var(--bg-elevated) 85%, transparent)" : "var(--text-muted)",
+            color: selected ? "rgba(255,255,255,0.85)" : "var(--text-muted)",
           }}
         >
           {description}
@@ -241,11 +241,11 @@ function OptionCard({
             marginTop: "var(--sp-4)",
             padding: "var(--sp-6)",
             borderRadius: 6,
-            background: selected ? "color-mix(in srgb, var(--bg-elevated) 12%, transparent)" : "var(--surface-soft)",
+            background: selected ? "rgba(255,255,255,0.12)" : "var(--surface-soft)",
             fontSize: "var(--fs-meta)",
             maxHeight: 160,
             overflow: "hidden",
-            color: selected ? "var(--bg-elevated)" : "var(--text)",
+            color: selected ? "#fff" : "var(--text)",
           }}
           dangerouslySetInnerHTML={{ __html: safePreview }}
         />
