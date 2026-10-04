@@ -13,6 +13,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import type { EmployeeWithTwin } from "@/lib/employees";
+import { useOrgName } from "./use-org-name";
 
 const MARKETPLACE_ID_PREFIX = "marketplace-";
 
@@ -133,6 +134,7 @@ function EmployeePopover({
   popover: Popover;
   onClose: () => void;
 }) {
+  const orgName = useOrgName();
   const { employee, isCEO, x, y } = popover;
   if (isCEO) {
     return (
@@ -148,7 +150,7 @@ function EmployeePopover({
           You (CEO)
         </div>
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-          Founder · Employee001
+          {orgName ? `Founder · ${orgName}` : "Founder"}
         </div>
         <div
           style={{

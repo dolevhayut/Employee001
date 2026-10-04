@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
+import { useOrgName } from "@/components/ex/use-org-name";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { Topbar } from "@/components/ex/shell";
 import { Markdown } from "@/components/ex/markdown";
@@ -883,6 +884,66 @@ export default function ProfilePage() {
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
 function Hero({ employee }: { employee: EmployeeWithTwin }) {
+  const orgName = useOrgName();
+  const [boundId, setBoundId] = useState(employee.id);
+  const [nameHe, setNameHe] = useState(employee.nameHe ?? "");
+  const [draft, setDraft] = useState(employee.nameHe ?? "");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (boundId !== employee.id) {
+    setBoundId(employee.id);
+    setNameHe(employee.nameHe ?? "");
+    setDraft(employee.nameHe ?? "");
+    setEditing(false);
+    setSaving(false);
+    setError(null);
+  }
+
+  function beginEdit() {
+    setDraft(nameHe);
+    setError(null);
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setDraft(nameHe);
+    setError(null);
+    setEditing(false);
+  }
+
+  async function saveNameHe() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/employees/${employee.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nameHe: draft }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { error?: string; nameHe?: string }
+        | null;
+      if (!res.ok) {
+        setError(
+          data?.error === "not_hebrew"
+            ? "Enter a Hebrew name, or leave it blank to clear."
+            : "Could not save the Hebrew name.",
+        );
+        return;
+      }
+      const next = typeof data?.nameHe === "string" ? data.nameHe : "";
+      setNameHe(next);
+      setDraft(next);
+      setEditing(false);
+    } catch {
+      setError("Could not save the Hebrew name.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="card" style={{ padding: "var(--sp-24)", maxWidth: 880 }}>
       <div
@@ -932,9 +993,107 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
             }}
           >
             {employee.name}
+            {nameHe ? (
+              <span
+                dir="rtl"
+                style={{
+                  marginLeft: "var(--sp-10)",
+                  color: "var(--text-muted)",
+                  fontWeight: 400,
+                }}
+              >
+                {nameHe}
+              </span>
+            ) : null}
           </h1>
           <div className="muted" style={{ fontSize: "var(--fs-ui)" }}>
-            {employee.role} · Employee001
+            {employee.role}
+            {orgName ? ` · ${orgName}` : ""}
+          </div>
+          <div style={{ marginTop: "var(--sp-6)" }}>
+            {editing ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--sp-8)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
+                  Hebrew name
+                </span>
+                <input
+                  dir="rtl"
+                  value={draft}
+                  aria-label="Hebrew name"
+                  disabled={saving}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void saveNameHe();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelEdit();
+                    }
+                  }}
+                  style={{
+                    minWidth: 160,
+                    padding: "4px 8px",
+                    fontSize: "var(--fs-ui)",
+                    background: "var(--surface)",
+                    border: "1px solid var(--hairline)",
+                    borderRadius: 4,
+                    color: "var(--text)",
+                    fontFamily: "inherit",
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn sm primary"
+                  disabled={saving}
+                  onClick={() => void saveNameHe()}
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className="btn sm ghost"
+                  disabled={saving}
+                  onClick={cancelEdit}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={beginEdit}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  color: "var(--text-muted)",
+                  fontSize: "var(--fs-sm)",
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                }}
+              >
+                {nameHe ? "Edit Hebrew name" : "Add Hebrew name"}
+              </button>
+            )}
+            {error ? (
+              <div
+                style={{
+                  marginTop: "var(--sp-4)",
+                  fontSize: "var(--fs-xs)",
+                  color: "var(--danger)",
+                }}
+              >
+                {error}
+              </div>
+            ) : null}
           </div>
         </div>
         <div

@@ -7,6 +7,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, useSyncExternalStore
 import { createPortal } from "react-dom";
 import { HalfMoon, NavArrowDown, SunLight } from "iconoir-react";
 import { Icons, type IconName } from "./icons";
+import { useOrgName } from "./use-org-name";
 import { type EmployeeWithTwin } from "@/lib/employees";
 import { GlobalApprovalOverlay, NotificationBell, usePendingApprovalCount } from "./global-approval-overlay";
 import { ActiveBuildsBanner } from "./active-builds-banner";
@@ -1011,6 +1012,7 @@ export function Sidebar() {
     sidebarCollapsedSnapshot,
     sidebarCollapsedServerSnapshot,
   );
+  const orgName = useOrgName();
 
   function toggleCollapsed() {
     writeSidebarCollapsed(!collapsed);
@@ -1229,7 +1231,7 @@ export function Sidebar() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
               <div style={{ fontSize: "var(--fs-sm)", fontWeight: 500, color: "var(--text)" }}>Admin</div>
-              <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>Employee001</div>
+              <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>{orgName || "Workspace"}</div>
             </div>
           </div>
         )}
