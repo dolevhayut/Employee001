@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Security
+- **Encrypted backups:** `employee001 export --encrypt` protects the archive
+  with a passphrase (AES-256-GCM); `import` detects it and asks for the
+  passphrase. A wrong passphrase restores nothing.
 - **`doctor` checks that your disk is encrypted and your data folder is
   private** (FileVault / BitLocker / LUKS), and `doctor --fix` makes `data/`
   readable only by you. New files the app writes are private by default.
