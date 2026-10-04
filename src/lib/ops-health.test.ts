@@ -109,4 +109,19 @@ describe("getOpsHealth", () => {
     const older = await getOpsHealth(NOW);
     expect(check(older, "stale_knowledge").count).toBe(1);
   });
+
+  it("does not flag a paused twin (budget 0) as over budget", async () => {
+    mocks.getTwinBudget.mockReturnValue({ dailyBudgetUsd: 0, spentTodayUsd: 0, resetAt: "2026-10-05" });
+    const health = await getOpsHealth(NOW);
+    expect(health.checks.find((c) => c.id === "over_budget")?.status).toBe("ok");
+  });
+
+  it("gives a routine 15 minutes of grace before calling it missed", async () => {
+    const routine = (nextRunAt: number) => ({ id: "r", name: "Standup", enabled: true, createdAt: new Date(NOW - DAY).toISOString(), nextRunAt: new Date(nextRunAt).toISOString(), schedule: { type: "daily", time: "09:00" } });
+    mocks.listRoutines.mockReturnValue([routine(NOW - 10 * 60 * 1000)]);
+    expect((await getOpsHealth(NOW)).checks.find((c) => c.id === "missed_routines")?.status).toBe("ok");
+    mocks.listRoutines.mockReturnValue([routine(NOW - 20 * 60 * 1000)]);
+    expect((await getOpsHealth(NOW)).checks.find((c) => c.id === "missed_routines")?.status).toBe("warn");
+  });
 });
+

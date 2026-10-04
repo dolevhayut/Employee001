@@ -26,6 +26,9 @@ export type OpsHealth = {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ITEM_LIMIT = 5;
+// The scheduler ticks every minute and a run can take a while to start;
+// only call a routine missed once it is clearly overdue.
+const MISSED_GRACE_MS = 15 * 60 * 1000;
 const PROFILE_FILES = [
   "EXPERTISE.md", "DECISIONS.md", "CONTEXT.md", "PEOPLE.md", "PROJECTS.md",
   "PREFERENCES.md", "TONE.md", "BOUNDARIES.md", "EMPLOYMENT.md",
@@ -51,7 +54,7 @@ function routineIsMissed(
   const nextDue = lastRun && !Number.isNaN(lastRun.getTime())
     ? computeNextRun(routine.schedule, lastRun).getTime()
     : new Date(routine.nextRunAt ?? routine.createdAt).getTime();
-  return !Number.isNaN(nextDue) && nextDue < now;
+  return !Number.isNaN(nextDue) && nextDue + MISSED_GRACE_MS < now;
 }
 
 async function hasStaleKnowledge(employeeId: string, cutoff: number): Promise<boolean> {
@@ -84,7 +87,8 @@ export async function getOpsHealth(now = Date.now()): Promise<OpsHealth> {
       const employees = await loadEmployeesFromDisk();
       const overBudget = employees.filter((employee) => {
         const budget = getTwinBudget(employee.id);
-        return budget.spentTodayUsd >= budget.dailyBudgetUsd;
+        // A budget of 0 means the twin is paused on purpose, not over budget.
+        return budget.spentTodayUsd > 0 && budget.spentTodayUsd >= budget.dailyBudgetUsd;
       });
       return warning("over_budget", overBudget.length, overBudget.map((employee) => ({ label: employee.name, href: "/budgets" })));
     }),
