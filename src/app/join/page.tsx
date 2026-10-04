@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useT } from "@/components/ex/i18n-context";
 
 // The employee lands here from a /join?invite=inv_... URL the CEO shared.
 // We validate the invite once, surface a short welcome, and route forward
@@ -137,7 +138,7 @@ function progressReducer(s: ProgressState, ev: BuilderEvent): ProgressState {
           typeof (ev as { activeLookbackDays?: unknown }).activeLookbackDays === "number"
             ? ((ev as { activeLookbackDays: number }).activeLookbackDays)
             : s.lookbackDays,
-        currentActivity: "Reading your connected tools…",
+        currentActivity: "__reading__",
         errorMessage: null,
       };
     case "plan": {
@@ -350,6 +351,7 @@ function ModeTraining({
   onFinished: (summary: ProgressState["finished"]) => void;
   onRetry: () => void;
 }) {
+  const { t } = useT();
   const { progress, connectionLost, elapsedMs } = useBuildStream(
     employeeId,
     buildId,
@@ -372,7 +374,7 @@ function ModeTraining({
           lineHeight: 1.1,
         }}
       >
-        Building your twin.
+        {t("join.building")}
       </h1>
       <p
         style={{
@@ -382,9 +384,7 @@ function ModeTraining({
           marginBottom: 20,
         }}
       >
-        An autonomous Claude agent is studying the lookback window your manager
-        chose, through your connected tools (Slack, GitHub, Gmail, Linear,
-        calendar). This usually takes a few minutes.
+        {t("join.buildingSub")}
       </p>
 
       {progress.lookbackDays !== null && (
@@ -401,7 +401,7 @@ function ModeTraining({
             marginBottom: 18,
           }}
         >
-          Lookback: {progress.lookbackDays} days
+          {t("join.lookback", { days: progress.lookbackDays })}
         </div>
       )}
 
@@ -418,7 +418,7 @@ function ModeTraining({
             lineHeight: 1.5,
           }}
         >
-          <div style={{ marginBottom: 10 }}>Build error: {progress.errorMessage}</div>
+          <div style={{ marginBottom: 10 }}>{t("join.error", { error: progress.errorMessage })}</div>
           <button
             type="button"
             onClick={onRetry}
@@ -434,7 +434,7 @@ function ModeTraining({
               fontFamily: "inherit",
             }}
           >
-            Retry build
+            {t("join.retry")}
           </button>
         </div>
       ) : connectionLost ? (
@@ -448,8 +448,7 @@ function ModeTraining({
             fontSize: 14,
           }}
         >
-          Connection lost — your training continues in the background. Ask your
-          manager for status, or refresh this page.
+          {t("join.lost")}
         </div>
       ) : (
         <>
@@ -462,8 +461,8 @@ function ModeTraining({
             }}
           >
             {progress.currentActivity
-              ? `Currently: ${progress.currentActivity}`
-              : "Connecting to the builder…"}
+              ? t("join.current", { activity: progress.currentActivity === "__reading__" ? t("join.reading") : progress.currentActivity })
+              : t("join.connecting")}
           </div>
 
           <ul
@@ -502,7 +501,7 @@ function ModeTraining({
                   </span>
                   <span>{name}</span>
                   {writing && !done ? (
-                    <span style={{ color: TEXT_MUTED, fontSize: 11 }}>writing…</span>
+                    <span style={{ color: TEXT_MUTED, fontSize: 11 }}>{t("join.writing")}</span>
                   ) : null}
                 </li>
               );
@@ -510,8 +509,7 @@ function ModeTraining({
           </ul>
 
           <div style={{ color: TEXT_MUTED, fontSize: 12, marginBottom: 14 }}>
-            Elapsed: {Math.floor(elapsedMs / 1000)}s · {progress.filesDone.size}/
-            {TWIN_FILE_NAMES.length} files written
+            {t("join.elapsed", { seconds: Math.floor(elapsedMs / 1000), done: progress.filesDone.size, total: TWIN_FILE_NAMES.length })}
           </div>
         </>
       )}
@@ -531,11 +529,11 @@ function ModeTraining({
             fontFamily: "inherit",
           }}
         >
-          I&apos;ll come back later
+          {t("join.later")}
         </button>
       ) : (
         <p style={{ color: TEXT_MUTED, fontSize: 13, margin: 0 }}>
-          We&apos;ll keep working in the background. Close this tab any time.
+          {t("join.laterDone")}
         </p>
       )}
     </Card>
@@ -545,6 +543,7 @@ function ModeTraining({
 // ---------- Mode B: Pending toolkits ----------
 
 function ModePendingToolkits() {
+  const { t } = useT();
   return (
     <Card>
       <Eyebrow />
@@ -556,7 +555,7 @@ function ModePendingToolkits() {
           lineHeight: 1.1,
         }}
       >
-        Connect a tool to start training.
+        {t("join.tool")}
       </h1>
       <p
         style={{
@@ -566,8 +565,7 @@ function ModePendingToolkits() {
           marginBottom: 14,
         }}
       >
-        Your twin can&apos;t be trained until at least one work tool is
-        connected (Slack, GitHub, Gmail, Linear, calendar, etc.).
+        {t("join.toolSub")}
       </p>
       <p
         style={{
@@ -576,9 +574,7 @@ function ModePendingToolkits() {
           lineHeight: 1.55,
         }}
       >
-        Ask your manager to connect a tool from their workspace — once one is
-        live, training resumes automatically in the background. You can close
-        this tab.
+        {t("join.toolHelp")}
       </p>
     </Card>
   );
@@ -587,6 +583,7 @@ function ModePendingToolkits() {
 // ---------- Mode C: Done ----------
 
 function ModeDone({ summary }: { summary: ProgressState["finished"] }) {
+  const { t } = useT();
   const turns = summary?.turns ?? 0;
   const cost = summary?.costUsd ?? 0;
   return (
@@ -603,7 +600,7 @@ function ModeDone({ summary }: { summary: ProgressState["finished"] }) {
           lineHeight: 1.1,
         }}
       >
-        Your twin is live.
+        {t("join.live")}
       </h1>
       <p
         style={{
@@ -613,9 +610,7 @@ function ModeDone({ summary }: { summary: ProgressState["finished"] }) {
           marginBottom: 14,
         }}
       >
-        Your manager can review the 9 profile files you produced and refine
-        them. From there, your twin can answer questions in your voice and act
-        on your behalf — always behind a human-approval gate.
+        {t("join.liveSub")}
       </p>
       {summary ? (
         <div
@@ -631,7 +626,7 @@ function ModeDone({ summary }: { summary: ProgressState["finished"] }) {
         </div>
       ) : null}
       <p style={{ color: TEXT_MUTED, fontSize: 13, lineHeight: 1.55, margin: 0 }}>
-        You can revoke consent any time at <span style={{ fontFamily: "ui-monospace, monospace" }}>/profile</span>{" "}
+        {t("join.revoke")} <bdi><span style={{ fontFamily: "ui-monospace, monospace" }}>/profile</span></bdi>{" "}
         (your manager will share the link).
       </p>
     </Card>
@@ -648,6 +643,7 @@ type DoneViewState =
   | { kind: "generic_done" };
 
 function Page() {
+  const { t } = useT();
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get("invite") ?? "";
@@ -828,7 +824,7 @@ function Page() {
             <Card>
               <Eyebrow />
               <div style={{ color: TEXT_MUTED, fontSize: 14 }}>
-                Checking on your twin…
+                {t("join.checking")}
               </div>
             </Card>
           )}
@@ -863,7 +859,7 @@ function Page() {
                   lineHeight: 1.1,
                 }}
               >
-                You&apos;re all set.
+                {t("join.ready")}
               </h1>
               <p
                 style={{
@@ -872,9 +868,7 @@ function Page() {
                   lineHeight: 1.55,
                 }}
               >
-                Your twin profile has been saved. Your manager will take it from
-                here — once a work tool is connected, your twin starts training.
-                You can close this tab.
+                {t("join.readySub")}
               </p>
             </Card>
           )}
@@ -923,18 +917,17 @@ function Page() {
 
           {state.kind === "loading" && (
             <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
-              Checking your invite…
+              {t("join.inviteChecking")}
             </div>
           )}
 
           {state.kind === "no_token" && (
             <>
               <h1 style={{ fontFamily: SERIF_FONT, fontSize: 32, margin: "0 0 12px" }}>
-                Invite link required.
+                {t("join.required")}
               </h1>
               <p style={{ color: "var(--text-muted)", fontSize: 15, lineHeight: 1.55 }}>
-                This page expects an invitation token. Ask your CEO for the
-                /join link they generated.
+                {t("join.requiredSub")}
               </p>
             </>
           )}
@@ -943,13 +936,13 @@ function Page() {
             <>
               <h1 style={{ fontFamily: SERIF_FONT, fontSize: 32, margin: "0 0 12px" }}>
                 {state.status === "used" || state.status === "already_redeemed"
-                  ? "This invite was already redeemed."
+                  ? t("join.used")
                   : state.status === "expired"
-                    ? "This invite expired."
-                    : "Invite not found."}
+                    ? t("join.expired")
+                    : t("join.missing")}
               </h1>
               <p style={{ color: "var(--text-muted)", fontSize: 15, lineHeight: 1.55 }}>
-                Ask your CEO to send a fresh link.
+                {t("join.fresh")}
               </p>
             </>
           )}
@@ -957,7 +950,7 @@ function Page() {
           {state.kind === "ready" && (
             <>
               <h1 style={{ fontFamily: SERIF_FONT, fontSize: 36, margin: "0 0 12px", lineHeight: 1.1 }}>
-                Welcome{state.invite.name ? `, ${state.invite.name}` : ""}.
+                {t("join.welcome", { suffix: state.invite.name ? `, ${state.invite.name}` : "" })}
               </h1>
               <p
                 style={{
@@ -967,10 +960,7 @@ function Page() {
                   marginBottom: 28,
                 }}
               >
-                You&apos;ve been invited to set up your AI twin
-                {state.invite.role ? ` as ${state.invite.role}` : ""}.
-                It&apos;ll run on your team&apos;s machine and answer questions
-                in your voice, drawing only from what you tell it.
+                {t("join.welcomeSub", { role: state.invite.role ? ` כ־${state.invite.role}` : "" })}
               </p>
               <button
                 type="button"
@@ -988,7 +978,7 @@ function Page() {
                   letterSpacing: "-0.01em",
                 }}
               >
-                Set up my twin →
+                {t("join.cta")} ←
               </button>
             </>
           )}

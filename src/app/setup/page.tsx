@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "iconoir-react";
+import { useT } from "@/components/ex/i18n-context";
 
 const TEAM_SIZES = ["2 – 10", "11 – 50", "51 – 200", "201+"];
 
@@ -47,6 +48,7 @@ function StepOrg({
   size: string | null;
   setSize: (v: string) => void;
 }) {
+  const { t } = useT();
   return (
     <motion.div
       key="org"
@@ -67,10 +69,10 @@ function StepOrg({
           lineHeight: 1.2,
         }}
       >
-        Set up your workspace.
+        {t("setup.title")}
       </h1>
       <p style={{ fontSize: "var(--fs-body)", color: "var(--text-subtle)", margin: "0 0 48px", fontWeight: 400 }}>
-        A few details and you&apos;re in.
+        {t("setup.subtitle")}
       </p>
 
       <div style={{ marginBottom: "var(--sp-36)" }}>
@@ -85,7 +87,7 @@ function StepOrg({
             marginBottom: "var(--sp-10)",
           }}
         >
-          Company name
+          {t("setup.company")}
         </label>
         <input
           autoFocus
@@ -124,7 +126,7 @@ function StepOrg({
             marginBottom: "var(--sp-10)",
           }}
         >
-          Team size
+          {t("setup.size")}
         </label>
         <div style={{ display: "flex", gap: "var(--sp-10)" }}>
           {TEAM_SIZES.map((s) => (
@@ -161,6 +163,7 @@ function StepReason({
   reason: string | null;
   setReason: (v: string) => void;
 }) {
+  const { t } = useT();
   return (
     <motion.div
       key="reason"
@@ -181,10 +184,10 @@ function StepReason({
           lineHeight: 1.2,
         }}
       >
-        What&apos;s the main goal?
+        {t("setup.goal")}
       </h1>
       <p style={{ fontSize: "var(--fs-body)", color: "var(--text-subtle)", margin: "0 0 40px", fontWeight: 400 }}>
-        We&apos;ll tailor your workspace accordingly.
+        {t("setup.goalSub")}
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-12)" }}>
@@ -216,7 +219,7 @@ function StepReason({
                   letterSpacing: "-0.01em",
                 }}
               >
-                {r.headline}
+                {t(`setup.reason.${r.id === "orgbrain" ? "brain" : r.id}` as "setup.reason.preserve")}
               </span>
               <span
                 style={{
@@ -226,7 +229,7 @@ function StepReason({
                   lineHeight: 1.5,
                 }}
               >
-                {r.sub}
+                {t(`setup.reason.${r.id === "orgbrain" ? "brain" : r.id}Sub` as "setup.reason.preserveSub")}
               </span>
             </button>
           );
@@ -267,6 +270,7 @@ function StepTheme({
   theme: ThemeId | null;
   setTheme: (t: ThemeId) => void;
 }) {
+  const { t } = useT();
   return (
     <motion.div
       key="theme"
@@ -287,7 +291,7 @@ function StepTheme({
           lineHeight: 1.2,
         }}
       >
-        Pick your workspace theme.
+        {t("setup.theme")}
       </h1>
       <p
         style={{
@@ -297,7 +301,7 @@ function StepTheme({
           fontWeight: 400,
         }}
       >
-        Sets the tone of your daily view. You can change it later in Settings.
+        {t("setup.themeSub")}
       </p>
       <div
         style={{
@@ -306,12 +310,12 @@ function StepTheme({
           gap: "var(--sp-12)",
         }}
       >
-        {THEMES.map((t) => {
-          const selected = theme === t.id;
+        {THEMES.map((themeOption) => {
+          const selected = theme === themeOption.id;
           return (
             <button
-              key={t.id}
-              onClick={() => setTheme(t.id)}
+              key={themeOption.id}
+              onClick={() => setTheme(themeOption.id)}
               style={{
                 background: selected ? "var(--text)" : "var(--surface)",
                 border: `1.5px solid ${selected ? "var(--text)" : "var(--hairline-strong)"}`,
@@ -328,7 +332,7 @@ function StepTheme({
             >
               {/* Preview window */}
               <div
-                data-theme={t.id}
+                data-theme={themeOption.id}
                 style={{
                   position: "relative",
                   borderRadius: 8,
@@ -451,7 +455,7 @@ function StepTheme({
                     letterSpacing: "-0.01em",
                   }}
                 >
-                  {t.name}
+                  {t(`setup.theme.${themeOption.id === "light" ? "cream" : themeOption.id}` as "setup.theme.cream")}
                 </span>
                 <span
                   style={{
@@ -461,7 +465,7 @@ function StepTheme({
                     lineHeight: 1.5,
                   }}
                 >
-                  {t.tagline}
+                  {t(`setup.theme.${themeOption.id === "light" ? "cream" : themeOption.id}Sub` as "setup.theme.creamSub")}
                 </span>
               </div>
             </button>
@@ -473,7 +477,9 @@ function StepTheme({
 }
 
 function StepReady({ company, reason }: { company: string; reason: string | null }) {
-  const label = REASONS.find((r) => r.id === reason)?.headline ?? "";
+  const { t } = useT();
+  const reasonKey = reason === "orgbrain" ? "brain" : reason;
+  const label = reasonKey ? t(`setup.reason.${reasonKey}` as "setup.reason.preserve") : "";
 
   return (
     <motion.div
@@ -509,10 +515,10 @@ function StepReady({ company, reason }: { company: string; reason: string | null
           lineHeight: 1.2,
         }}
       >
-        {company ? `${company} is ready.` : "You're all set."}
+        {company ? t("setup.readyNamed", { company }) : t("setup.ready")}
       </h1>
       <p style={{ fontSize: "var(--fs-body)", color: "var(--text-subtle)", margin: "0 0 40px", fontWeight: 400 }}>
-        Your workspace is configured. Time to clone your first employee.
+        {t("setup.readySub")}
       </p>
 
       {(company || label) && (
@@ -531,13 +537,13 @@ function StepReady({ company, reason }: { company: string; reason: string | null
         >
           {company && (
             <div style={{ display: "flex", gap: "var(--sp-10)", alignItems: "center" }}>
-              <span style={{ fontSize: "var(--fs-meta)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-subtle)", width: 64 }}>Company</span>
+              <span style={{ fontSize: "var(--fs-meta)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-subtle)", width: 64 }}>{t("setup.company")}</span>
               <span style={{ fontSize: "var(--fs-ui)", fontWeight: 500, color: "var(--text)" }}>{company}</span>
             </div>
           )}
           {label && (
             <div style={{ display: "flex", gap: "var(--sp-10)", alignItems: "center" }}>
-              <span style={{ fontSize: "var(--fs-meta)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-subtle)", width: 64 }}>Goal</span>
+              <span style={{ fontSize: "var(--fs-meta)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-subtle)", width: 64 }}>{t("setup.goalLabel")}</span>
               <span style={{ fontSize: "var(--fs-ui)", fontWeight: 500, color: "var(--text)" }}>{label}</span>
             </div>
           )}
@@ -549,6 +555,7 @@ function StepReady({ company, reason }: { company: string; reason: string | null
 
 export default function SetupPage() {
   const router = useRouter();
+  const { t } = useT();
   const [step, setStep] = useState(0);
   const [company, setCompany] = useState("");
   const [size, setSize] = useState<string | null>(null);
@@ -618,7 +625,7 @@ export default function SetupPage() {
         style={{
           position: "fixed",
           top: 32,
-          left: 40,
+          insetInlineStart: 40,
           fontSize: "var(--fs-ui)",
           fontWeight: 600,
           letterSpacing: "0.12em",
@@ -630,7 +637,7 @@ export default function SetupPage() {
       </div>
 
       {/* Step dots */}
-      <div style={{ position: "fixed", top: 38, right: 40, display: "flex", gap: "var(--sp-7)" }}>
+      <div style={{ position: "fixed", top: 38, insetInlineEnd: 40, display: "flex", gap: "var(--sp-7)" }}>
         {[0, 1, 2, 3].map((i) => (
           <motion.div
             key={i}
@@ -682,7 +689,7 @@ export default function SetupPage() {
               padding: "4px 0",
             }}
           >
-            ← Back
+            {t("setup.back")} →
           </button>
         )}
         <motion.button
@@ -705,7 +712,7 @@ export default function SetupPage() {
             transition: "background .2s, color .2s",
           }}
         >
-          {step === 3 ? "Open dashboard" : "Continue"}
+          {step === 3 ? t("setup.open") : t("setup.continue")}
         </motion.button>
       </motion.div>
     </motion.div>

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icons } from "@/components/ex/icons";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
+import { useT } from "@/components/ex/i18n-context";
 import { INTEGRATIONS, type Integration } from "@/lib/ex-data";
 import {
   CONSENT_SCOPES,
@@ -30,6 +31,7 @@ type Boundaries = {
 const STEPS = ["Consent", "Profile", "Sources", "Boundaries", "Review"] as const;
 
 function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
+  const { t } = useT();
   return (
     <div
       style={{
@@ -61,7 +63,7 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
               letterSpacing: "-0.01em",
             }}
           >
-            {m === "ceo" ? "CEO View" : "Employee View"}
+            {m === "ceo" ? t("onboarding.ceo") : t("onboarding.employee")}
           </button>
         );
       })}
@@ -79,6 +81,7 @@ export default function OnboardingPage() {
 
 function OnboardingPageInner() {
   const router = useRouter();
+  const { t } = useT();
   const searchParams = useSearchParams();
   const empId = searchParams.get("employee") ?? "";
   const inviteToken = searchParams.get("invite") ?? "";
@@ -465,7 +468,7 @@ function OnboardingPageInner() {
                 cursor: disabled ? "not-allowed" : "pointer",
               }}
             >
-              {step === 0 ? "I consent — continue" : "Continue"}{" "}
+              {step === 0 ? t("onboarding.consentContinue") : t("onboarding.continue")}{" "}
               <Icons.Chevron size={12} />
             </button>
               );
@@ -573,6 +576,7 @@ function StepConsent({
   acceptedScopes: Set<ConsentScope>;
   setAcceptedScopes: (s: Set<ConsentScope>) => void;
 }) {
+  const { t } = useT();
   const firstName = employeeName.split(" ")[0] || "the employee";
   const isCeo = viewMode === "ceo";
 
@@ -593,7 +597,7 @@ function StepConsent({
           margin: "0 0 8px",
         }}
       >
-        {isCeo ? `${firstName}, before we begin.` : "Before we begin."}
+        {isCeo ? t("onboarding.beforeNamed", { name: firstName }) : t("onboarding.before")}
       </h1>
       <p
         className="muted"
@@ -601,7 +605,7 @@ function StepConsent({
       >
         {isCeo
           ? `Building a digital twin means modeling how ${firstName} thinks, writes, and decides. We need ${firstName}'s explicit consent before any data is collected.`
-          : "Building your digital twin means modeling how you think, write, and decide. We need your explicit consent before any data is collected."}
+          : t("onboarding.consentBody")}
       </p>
 
       <div
@@ -617,11 +621,11 @@ function StepConsent({
         }}
       >
         <strong style={{ color: "var(--text)" }}>
-          {isCeo ? "Employee rights." : "Your rights."}
+          {isCeo ? "זכויות העובד." : t("onboarding.rights")}
         </strong>{" "}
         {isCeo
           ? <>{firstName} can revoke consent at any time from <span className="mono">/profile</span>. On revocation, their twin is paused immediately and all indexed data is queued for deletion within 30 days.</>
-          : <>You can revoke consent at any time from <span className="mono">/profile</span>. On revocation, your twin is paused immediately and all indexed data is queued for deletion within 30 days.</>}
+          : t("onboarding.rightsBody")}
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-10)" }}>
@@ -720,6 +724,7 @@ function StepYou({
   domain: string;
   setDomain: (v: string) => void;
 }) {
+  const { t } = useT();
   const firstName = name.split(" ")[0] || "the employee";
   const isCeo = viewMode === "ceo";
   return (
@@ -732,7 +737,7 @@ function StepYou({
           margin: "0 0 8px",
         }}
       >
-        {isCeo ? "Tell us who the twin is for." : "Tell us about yourself."}
+        {isCeo ? "למי מיועד התאום?" : t("onboarding.profileTitle")}
       </h1>
       <p
         className="muted"
@@ -740,17 +745,17 @@ function StepYou({
       >
         {isCeo
           ? <>{firstName}&apos;s twin will answer questions in their voice on the topics they own. We start with the basics.</>
-          : "Your twin will answer questions in your voice on the topics you own. We start with the basics."}
+          : t("onboarding.profileSub")}
       </p>
-      <Field label={isCeo ? "Display name" : "Your name"}>
+      <Field label={isCeo ? "שם תצוגה" : t("onboarding.name")}>
         <TextInput value={name} onChange={setName} />
       </Field>
-      <Field label={isCeo ? "Role" : "Your role"}>
+      <Field label={isCeo ? "תפקיד" : t("onboarding.role")}>
         <TextInput value={role} onChange={setRole} />
       </Field>
       <Field
-        label={isCeo ? `What domain is ${firstName} authoritative on?` : "What domain are you authoritative on?"}
-        hint="A short phrase. The twin will defer outside this domain."
+        label={isCeo ? `באיזה תחום ${firstName} הוא/היא סמכות מקצועית?` : t("onboarding.domain")}
+        hint={t("onboarding.domainHint")}
       >
         <TextInput value={domain} onChange={setDomain} />
       </Field>
@@ -805,6 +810,7 @@ function StepSources({
   ) => void;
   inviteToken: string;
 }) {
+  const { t } = useT();
   const isCeo = viewMode === "ceo";
 
   // ─── Live connection state (employee-side OAuth) ────────────────────────
@@ -985,7 +991,7 @@ function StepSources({
           margin: "0 0 8px",
         }}
       >
-        {isCeo ? "What should the twin learn from?" : "What should your twin learn from?"}
+        {isCeo ? "ממה התאום צריך ללמוד?" : t("onboarding.sourcesTitle")}
       </h1>
       <p
         className="muted"
@@ -993,7 +999,7 @@ function StepSources({
       >
         {isCeo
           ? "We pull read-only data across the lookback window you chose through Composio. Tokens never touch our servers."
-          : "Connect the tools you actually use. You'll authorize each one on its own site — Composio holds the tokens, not us, not your manager. Connect at least one to start building your twin."}
+          : t("onboarding.sourcesSub")}
       </p>
       {connError && (
         <div
@@ -1021,8 +1027,8 @@ function StepSources({
               gap: "var(--sp-8)",
             }}
           >
-            {Object.values(extraToolkits).map((t) => {
-              const slug = t.slug.toLowerCase();
+            {Object.values(extraToolkits).map((toolkit) => {
+              const slug = toolkit.slug.toLowerCase();
               const conn = connections[slug];
               const bucket = statusBucket(conn?.status);
               const isBusy = busy === slug;
@@ -1030,7 +1036,7 @@ function StepSources({
               const pending = bucket === "pending";
               return (
                 <div
-                  key={t.slug}
+                  key={toolkit.slug}
                   className="row"
                   style={{
                     padding: "var(--sp-12)",
@@ -1040,14 +1046,14 @@ function StepSources({
                     borderRadius: 6,
                   }}
                 >
-                  {t.iconUrl ? (
+                  {toolkit.iconUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={t.iconUrl} alt="" width={28} height={28} style={{ borderRadius: 4 }} />
+                    <img src={toolkit.iconUrl} alt="" width={28} height={28} style={{ borderRadius: 4 }} />
                   ) : (
-                    <ToolkitIcon slug={t.slug} size={28} />
+                    <ToolkitIcon slug={toolkit.slug} size={28} />
                   )}
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>{t.name}</div>
+                    <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>{toolkit.name}</div>
                     <div
                       className="subtle"
                       style={{
@@ -1061,7 +1067,7 @@ function StepSources({
                     >
                       {pending
                         ? "Complete the connection on the Composio screen, then return here."
-                        : t.description ?? t.slug}
+                        : toolkit.description ?? toolkit.slug}
                     </div>
                   </div>
                   {active ? (
@@ -1095,13 +1101,13 @@ function StepSources({
                         disabled={isBusy || !inviteToken}
                         className="btn accent sm"
                       >
-                        {isBusy ? "Starting…" : "Connect"}
+                        {isBusy ? t("onboarding.connecting") : t("onboarding.connect")}
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeExtra(t.slug)}
+                        onClick={() => removeExtra(toolkit.slug)}
                         className="btn ghost sm"
-                        aria-label={`Remove ${t.name}`}
+                        aria-label={t("onboarding.remove", { name: toolkit.name })}
                       >
                         Remove
                       </button>
@@ -1218,7 +1224,7 @@ function StepSources({
                       className="btn accent sm"
                       style={{ flexShrink: 0 }}
                     >
-                      {isBusy ? "Starting…" : "Connect"}
+                      {isBusy ? t("onboarding.connecting") : t("onboarding.connect")}
                     </button>
                   )}
                 </div>
@@ -1260,10 +1266,10 @@ function StepSources({
         ) : (
           <div>
             <div className="row" style={{ marginBottom: "var(--sp-12)", gap: "var(--sp-8)" }}>
-              <div style={{ fontWeight: 600, fontSize: "var(--fs-ui)" }}>Composio catalog</div>
+              <div style={{ fontWeight: 600, fontSize: "var(--fs-ui)" }}>{t("onboarding.catalog")}</div>
               <span className="subtle" style={{ fontSize: "var(--fs-meta)" }}>
                 {catalogLoading
-                  ? "Loading…"
+                  ? t("onboarding.loading")
                   : catalog
                   ? `${catalog.length} toolkits`
                   : ""}
@@ -1284,7 +1290,7 @@ function StepSources({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search Notion, HubSpot, Stripe, Asana…"
+              placeholder={t("onboarding.search")}
               style={{
                 width: "100%",
                 padding: "10px 12px",
@@ -1318,13 +1324,13 @@ function StepSources({
               }}
               className="scrollbar"
             >
-              {filteredCatalog.map((t) => {
-                const already = Boolean(extraToolkits[t.slug]) || Boolean(connections[t.slug.toLowerCase()]);
+              {filteredCatalog.map((toolkit) => {
+                const already = Boolean(extraToolkits[toolkit.slug]) || Boolean(connections[toolkit.slug.toLowerCase()]);
                 return (
                   <button
-                    key={t.slug}
+                    key={toolkit.slug}
                     type="button"
-                    onClick={() => addFromCatalog(t)}
+                    onClick={() => addFromCatalog(toolkit)}
                     disabled={Boolean(already)}
                     className="row"
                     style={{
@@ -1338,11 +1344,11 @@ function StepSources({
                       opacity: already ? 0.7 : 1,
                     }}
                   >
-                    {t.iconUrl ? (
+                    {toolkit.iconUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={t.iconUrl} alt="" width={24} height={24} style={{ borderRadius: 4 }} />
+                      <img src={toolkit.iconUrl} alt="" width={24} height={24} style={{ borderRadius: 4 }} />
                     ) : (
-                      <ToolkitIcon slug={t.slug} size={24} />
+                      <ToolkitIcon slug={toolkit.slug} size={24} />
                     )}
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div
@@ -1354,7 +1360,7 @@ function StepSources({
                           textOverflow: "ellipsis",
                         }}
                       >
-                        {t.name}
+                        {toolkit.name}
                       </div>
                       <div
                         className="subtle"
@@ -1366,14 +1372,14 @@ function StepSources({
                           textOverflow: "ellipsis",
                         }}
                       >
-                        {t.description ?? t.slug}
+                        {toolkit.description ?? toolkit.slug}
                       </div>
                     </div>
                     <span
                       className="subtle"
                       style={{ fontSize: "var(--fs-meta)", flexShrink: 0 }}
                     >
-                      {already ? "Added" : "+ Add"}
+                      {already ? t("onboarding.added") : t("onboarding.add")}
                     </span>
                   </button>
                 );
@@ -1412,9 +1418,9 @@ function StepSources({
           }}
         >
           {activeCount === 0 ? (
-            <span>Connect at least one tool so we can start building your twin.</span>
+            <span>{t("onboarding.connectHint")}</span>
           ) : activeCount < 3 ? (
-            <span>You can connect more later from <span className="mono">/profile</span>.</span>
+            <span>{t("onboarding.later")}</span>
           ) : null}
           {activeCount > 0 ? (
             <span style={{ color: "var(--text)", fontWeight: 600 }}>
@@ -1436,6 +1442,7 @@ function StepBoundaries({
   boundaries: Boundaries;
   setBoundaries: (b: Boundaries) => void;
 }) {
+  const { t } = useT();
   const isCeo = viewMode === "ceo";
   const items: { k: keyof Boundaries; label: string; desc: string }[] = [
     { k: "comp", label: "Compensation, equity, salary", desc: isCeo ? "Always escalate to employee" : "Always route back to you" },
@@ -1456,7 +1463,7 @@ function StepBoundaries({
       >
         {isCeo
           ? "What should the twin never answer alone?"
-          : "What should your twin never answer on your behalf?"}
+          : t("onboarding.boundaryTitle")}
       </h1>
       <p
         className="muted"
@@ -1517,6 +1524,7 @@ function StepReview({
   chosen: Set<string>;
   boundaries: Boundaries;
 }) {
+  const { t } = useT();
   const isCeo = viewMode === "ceo";
   const sources = INTEGRATIONS.filter((i) => chosen.has(i.id));
   const blocked = Object.values(boundaries).filter(Boolean).length;
@@ -1530,7 +1538,7 @@ function StepReview({
           margin: "0 0 8px",
         }}
       >
-        {isCeo ? "Ready to generate." : "You're all set."}
+        {isCeo ? "מוכנים ליצירה." : t("onboarding.ready")}
       </h1>
       <p
         className="muted"
@@ -1538,17 +1546,17 @@ function StepReview({
       >
         {isCeo
           ? "Profile generation starts now and runs autonomously. Watch live progress on the next screen — usually a few minutes."
-          : "Your responses are recorded. The twin starts building now — you'll see live progress on the next screen. You can close this and come back to the same link any time to check status."}
+          : t("onboarding.readySub")}
       </p>
       <div className="card" style={{ padding: "var(--sp-20)" }}>
         <ReviewRow label={isCeo ? "Twin for" : "Your profile"} value={`${name} — ${role}`} />
-        <ReviewRow label="Domain" value={domain} />
+        <ReviewRow label={t("onboarding.domainLabel")} value={domain} />
         <ReviewRow
-          label="Sources"
+          label={t("onboarding.sources")}
           value={`${sources.length} connected · ${sources.map((s) => s.name).join(", ")}`}
         />
         <ReviewRow
-          label="Boundaries"
+          label={t("onboarding.boundariesLabel")}
           value={`${blocked} topics always escalate`}
         />
 
@@ -1636,6 +1644,7 @@ function PreviewCard({
   chosen: Set<string>;
   viewMode: ViewMode;
 }) {
+  const { t } = useT();
   const isCeo = viewMode === "ceo";
   const initials = (name || "  ")
     .split(" ")
@@ -1739,7 +1748,7 @@ function PreviewCard({
       )}
       {step >= 3 && (
         <div className="card" style={{ padding: "var(--sp-14)" }}>
-          <div className="section-title" style={{ marginBottom: "var(--sp-10)" }}>Sample twin reply</div>
+          <div className="section-title" style={{ marginBottom: "var(--sp-10)" }}>{t("onboarding.sample")}</div>
           <div
             style={{
               background: "var(--surface-soft)",

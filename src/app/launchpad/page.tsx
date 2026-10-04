@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useT } from "@/components/ex/i18n-context";
 
 const SERIF_FONT =
   'var(--font-instrument-serif), "Instrument Serif", ui-serif, Georgia, serif';
@@ -95,6 +96,8 @@ const PALETTE = {
 
 export default function LaunchpadPage() {
   const router = useRouter();
+  const { t } = useT();
+  const actions = ACTIONS.map((action) => ({ ...action, title: t(`launch.${action.id === "budgets" ? "budget" : action.id}` as "launch.knowledge"), blurb: t(`launch.${action.id === "budgets" ? "budget" : action.id}Sub` as "launch.knowledgeSub"), cta: t(`launch.${action.id === "budgets" ? "budget" : action.id}Cta` as "launch.knowledgeCta") }));
 
   return (
     <main
@@ -115,7 +118,7 @@ export default function LaunchpadPage() {
         style={{
           position: "fixed",
           top: 32,
-          left: 40,
+          insetInlineStart: 40,
           display: "flex",
           alignItems: "center",
           gap: 10,
@@ -143,7 +146,7 @@ export default function LaunchpadPage() {
         style={{
           position: "fixed",
           top: 30,
-          right: 40,
+          insetInlineEnd: 40,
           background: "transparent",
           border: `1px solid ${PALETTE.border}`,
           color: PALETTE.inkMuted,
@@ -154,7 +157,7 @@ export default function LaunchpadPage() {
           fontFamily: "inherit",
         }}
       >
-        Go to workspace →
+        {t("launch.skip")} ←
       </button>
 
       <motion.div
@@ -174,7 +177,7 @@ export default function LaunchpadPage() {
             color: PALETTE.ink,
           }}
         >
-          Where do you want to begin?
+          {t("launch.title")}
         </h1>
         <p
           style={{
@@ -185,7 +188,7 @@ export default function LaunchpadPage() {
             lineHeight: 1.55,
           }}
         >
-          Three first moves. Pick one — you can always come back to the others.
+          {t("launch.sub")}
         </p>
 
         <div
@@ -195,7 +198,7 @@ export default function LaunchpadPage() {
             gap: 18,
           }}
         >
-          {ACTIONS.map((a, i) => (
+          {actions.map((a, i) => (
             <motion.button
               key={a.id}
               onClick={() => router.push(a.href)}
@@ -218,7 +221,7 @@ export default function LaunchpadPage() {
                 flexDirection: "column",
                 alignItems: "flex-start",
                 gap: 18,
-                textAlign: "left",
+                textAlign: "start",
                 fontFamily: "inherit",
                 color: PALETTE.ink,
                 minHeight: 280,

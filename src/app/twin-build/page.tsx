@@ -15,6 +15,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Icons } from "@/components/ex/icons";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
+import { useT } from "@/components/ex/i18n-context";
 import type { EmployeeWithTwin } from "@/lib/employees";
 import {
   TWIN_FILE_NAMES,
@@ -172,6 +173,7 @@ function fmtTime(ms: number): string {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 function TwinBuildContent() {
+  const { t } = useT();
   const sp = useSearchParams();
   const employeeId = sp.get("employee") ?? "";
   const ceoContext = sp.get("ctx") ?? undefined;
@@ -520,9 +522,9 @@ function TwinBuildContent() {
   if (!employeeId) {
     return (
       <Centered>
-        <h1>Missing employee</h1>
+          <h1>{t("twinBuild.missing")}</h1>
         <p className="muted" style={{ fontSize: "var(--fs-ui)" }}>
-          Append <code>?employee=&lt;id&gt;</code> to the URL.
+          {t("twinBuild.missingSub")}
         </p>
         <Link href="/employees" className="btn">
           Back to employees
@@ -600,11 +602,11 @@ function TwinBuildContent() {
           </div>
         </div>
         <div className="row" style={{ gap: "var(--sp-14)", alignItems: "center" }}>
-          <Stat label="Files" value={`${completed}/9`} />
-          <Stat label="Turns" value={String(turns)} />
-          <Stat label="Cost" value={`$${costUsd.toFixed(3)}`} />
+          <Stat label={t("twinBuild.files")} value={`${completed}/9`} />
+          <Stat label={t("twinBuild.turns")} value={String(turns)} />
+          <Stat label={t("twinBuild.cost")} value={`$${costUsd.toFixed(3)}`} />
           {phase === "running" && (
-            <Stat label="Elapsed" value={fmtTime(elapsedMs)} />
+            <Stat label={t("twinBuild.elapsed")} value={fmtTime(elapsedMs)} />
           )}
           {phase === "running" ? (
             <button
@@ -626,7 +628,7 @@ function TwinBuildContent() {
                 }}
                 title="How far back to search the connected systems for evidence. 30–360 days."
               >
-                <span>Window</span>
+                <span>{t("twinBuild.window")}</span>
                 <input
                   type="range"
                   min={30}
@@ -641,7 +643,7 @@ function TwinBuildContent() {
                 </span>
               </label>
               <button className="btn primary" onClick={start}>
-                <Icons.Spark size={12} /> Start build
+                <Icons.Spark size={12} /> {t("twinBuild.start")}
               </button>
             </>
           ) : (
@@ -809,7 +811,7 @@ function TwinBuildContent() {
                 className="subtle"
                 style={{ padding: "14px 8px", fontSize: "var(--fs-meta)" }}
               >
-                Nothing yet. Press <strong>Start build</strong>.
+                {t("twinBuild.noActivity")}
               </div>
             )}
           </div>
@@ -829,7 +831,7 @@ function TwinBuildContent() {
           background: "var(--bg-elevated)",
         }}
       >
-        {phase === "idle" && <span>Ready.</span>}
+        {phase === "idle" && <span>{t("twinBuild.ready")}</span>}
         {phase === "running" && (
           <>
             <span className="row" style={{ gap: "var(--sp-6)" }}>
@@ -1095,6 +1097,7 @@ function FilePreview({
 }
 
 function NarrationView({ text }: { text: string }) {
+  const { t } = useT();
   if (!text) {
     return (
       <div
@@ -1106,7 +1109,7 @@ function NarrationView({ text }: { text: string }) {
         }}
       >
         <Icons.Loader size={16} />
-        <div style={{ marginTop: "var(--sp-10)" }}>Agent is planning…</div>
+        <div style={{ marginTop: "var(--sp-10)" }}>{t("twinBuild.planning")}</div>
       </div>
     );
   }
@@ -1133,6 +1136,7 @@ function PreFlight({
   employee: EmployeeWithTwin;
   ceoContext?: string;
 }) {
+  const { t } = useT();
   return (
     <div style={{ maxWidth: 720 }}>
       <h1
@@ -1156,7 +1160,7 @@ function PreFlight({
         className="card"
         style={{ padding: "var(--sp-16)", marginTop: "var(--sp-18)", fontSize: 12.5 }}
       >
-        <strong>Ground rules</strong>
+        <strong>{t("twinBuild.rules")}</strong>
         <ul style={{ margin: "8px 0 0", paddingLeft: "var(--sp-18)", lineHeight: 1.6 }}>
           <li>The agent is sandboxed to read-only tools — no messages sent, no issues created.</li>
           <li>Writes are restricted to the 9 known filenames in the employee folder.</li>

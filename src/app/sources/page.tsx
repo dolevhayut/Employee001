@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { NavArrowDown, NavArrowRight } from "iconoir-react";
-import { PROFILE_SOURCES, SOURCE_TYPE_CONFIG, type ProfileSource } from "@/lib/sources-data";
+import { NavArrowDown, NavArrowLeft } from "iconoir-react";
+import { PROFILE_SOURCES, type ProfileSource } from "@/lib/sources-data";
+import { useT } from "@/components/ex/i18n-context";
 
 function SourceRow({ source, index }: { source: ProfileSource["sources"][0]; index: number }) {
-  const cfg = SOURCE_TYPE_CONFIG[source.type];
+  const { t } = useT();
   const isHuman = source.type === "human";
 
   return (
@@ -40,7 +41,7 @@ function SourceRow({ source, index }: { source: ProfileSource["sources"][0]; ind
           border: isHuman ? "none" : "1px solid var(--hairline-strong)",
         }}
       >
-        {cfg.label}
+        {isHuman ? t("sources.human") : t("sources.system")}
       </div>
 
       {/* Content */}
@@ -99,7 +100,7 @@ function ProfileCard({ profile }: { profile: ProfileSource }) {
           alignItems: "center",
           justifyContent: "space-between",
           fontFamily: 'var(--font-geist), sans-serif',
-          textAlign: "left" as const,
+          textAlign: "start" as const,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-14)" }}>
@@ -189,6 +190,7 @@ function ProfileCard({ profile }: { profile: ProfileSource }) {
 }
 
 export default function SourcesPage() {
+  const { t } = useT();
   const totalSystem = PROFILE_SOURCES.reduce(
     (a, p) => a + p.sources.filter((s) => s.type === "system").length,
     0
@@ -233,8 +235,8 @@ export default function SourcesPage() {
               letterSpacing: "0.01em",
             }}
           >
-            <NavArrowRight width={14} height={14} strokeWidth={2} />
-            Back to Twin
+            <NavArrowLeft width={14} height={14} strokeWidth={2} />
+            {t("sources.back")}
           </a>
           <span style={{ color: "var(--hairline-strong)" }}>·</span>
           <span
@@ -254,11 +256,11 @@ export default function SourcesPage() {
         <div style={{ display: "flex", gap: "var(--sp-20)", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-7)" }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />
-            <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>System sources</span>
+            <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>{t("sources.system")}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-7)" }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--text)" }} />
-            <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>Human questions</span>
+            <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>{t("sources.human")}</span>
           </div>
         </div>
       </div>
@@ -280,10 +282,10 @@ export default function SourcesPage() {
               marginBottom: "var(--sp-8)",
             }}
           >
-            Twin Data Sources
+            {t("sources.title")}
           </h1>
           <p style={{ fontSize: "var(--fs-base)", color: "var(--text-subtle)", lineHeight: 1.6 }}>
-            Each profile file is built from a combination of automatic data from work systems and targeted questions asked directly to the employee.
+            {t("sources.subtitle")}
           </p>
         </motion.div>
 
@@ -300,9 +302,9 @@ export default function SourcesPage() {
           }}
         >
           {[
-            { label: "Profile files", value: PROFILE_SOURCES.length, color: "var(--text)" },
-            { label: "System sources", value: totalSystem, color: "var(--accent)" },
-            { label: "Human questions", value: totalHuman, color: "var(--text)" },
+            { label: t("sources.files"), value: PROFILE_SOURCES.length, color: "var(--text)" },
+            { label: t("sources.system"), value: totalSystem, color: "var(--accent)" },
+            { label: t("sources.human"), value: totalHuman, color: "var(--text)" },
           ].map((stat, i) => (
             <div
               key={i}

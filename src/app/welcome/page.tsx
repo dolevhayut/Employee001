@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { WelcomeHero3D } from "@/components/welcome/WelcomeHero3D";
+import { useT } from "@/components/ex/i18n-context";
 
 // Geist + Instrument Serif are loaded at the root layout
 // (src/app/layout.tsx) and exposed as CSS variables. These pages reference
@@ -31,6 +32,7 @@ const WELCOME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 
 export default function WelcomePage() {
   const router = useRouter();
+  const { t } = useT();
 
   function dismiss() {
     document.cookie = `e001_welcomed=1; path=/; max-age=${WELCOME_COOKIE_MAX_AGE}; samesite=lax`;
@@ -92,7 +94,7 @@ export default function WelcomePage() {
               fontFamily: "inherit",
             }}
           >
-            Skip →
+            {t("welcome.skip")} ←
           </button>
         </header>
 
@@ -130,7 +132,7 @@ export default function WelcomePage() {
               color: PALETTE.ink,
             }}
           >
-            Welcome to the future.
+            {t("welcome.title")}
           </h1>
           <p
             style={{
@@ -142,9 +144,7 @@ export default function WelcomePage() {
               marginInline: "auto",
             }}
           >
-            Your company&apos;s organizational brain. Agent twins of every person
-            on your team, running on your own machine. No cloud. No telemetry.
-            Yours to shape.
+            {t("welcome.body")}
           </p>
           <p
             style={{
@@ -156,7 +156,7 @@ export default function WelcomePage() {
               marginInline: "auto",
             }}
           >
-            Get ready for 2030.
+            {t("welcome.ready")}
           </p>
 
           <div
@@ -180,7 +180,7 @@ export default function WelcomePage() {
               }}
             />
             <div style={{ fontStyle: "italic", color: PALETTE.inkMuted }}>
-              With my blessing,
+              {t("welcome.blessing")}
             </div>
             <div
               style={{
@@ -190,7 +190,7 @@ export default function WelcomePage() {
                 letterSpacing: "-0.01em",
               }}
             >
-              Dolev Hayut
+              דולב חיוט
             </div>
             <div
               style={{
@@ -201,7 +201,7 @@ export default function WelcomePage() {
                 marginTop: 2,
               }}
             >
-              Founder, Employee001
+              {t("welcome.founder")}
             </div>
           </div>
 
@@ -232,7 +232,7 @@ export default function WelcomePage() {
               e.currentTarget.style.transform = "translateY(0)";
             }}
           >
-            Setup Your Workspace →
+            {t("welcome.cta")} ←
           </button>
         </section>
       </div>
