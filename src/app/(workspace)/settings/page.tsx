@@ -71,6 +71,7 @@ export default function SettingsPage() {
           />
 
           <ApiKeysSection />
+          <TelemetrySection />
           <WorkspaceSection />
           <OrgBrainSection />
           <OrgSkillsSection />
@@ -79,6 +80,82 @@ export default function SettingsPage() {
         </div>
       </div>
     </>
+  );
+}
+
+type TelemetryPreview = {
+  install_id?: string;
+  version: string;
+  node_major: number;
+  os: string;
+  active_twins: number;
+  meetings_7d: number;
+  approvals_7d: number;
+};
+
+function TelemetrySection() {
+  const { t } = useT();
+  const [consent, setConsent] = useState(false);
+  const [preview, setPreview] = useState<TelemetryPreview | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/telemetry", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((data: { consent: boolean; preview: TelemetryPreview }) => {
+        setConsent(data.consent);
+        setPreview(data.preview);
+      })
+      .catch(() => setError(true));
+  }, []);
+
+  async function updateConsent(next: boolean) {
+    setSaving(true);
+    setError(false);
+    try {
+      const res = await fetch("/api/telemetry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ consent: next }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      setConsent(next);
+      const refreshed = await fetch("/api/telemetry", { cache: "no-store" });
+      if (refreshed.ok) setPreview((await refreshed.json() as { preview: TelemetryPreview }).preview);
+    } catch {
+      setError(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section style={{ marginBottom: "var(--sp-32)" }}>
+      <SectionHeader title={t("settings.telemetry.title")} desc={t("settings.telemetry.desc")} />
+      <div className="card" style={{ padding: "var(--sp-20)", display: "flex", flexDirection: "column", gap: "var(--sp-16)" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: "var(--sp-10)", cursor: saving ? "wait" : "pointer" }}>
+          <input
+            type="checkbox"
+            checked={consent}
+            disabled={saving}
+            onChange={(event) => void updateConsent(event.target.checked)}
+            style={{ accentColor: "var(--accent)", width: 16, height: 16 }}
+          />
+          <span style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>{t("settings.telemetry.toggle")}</span>
+          <span style={{ marginInlineStart: "auto", fontSize: "var(--fs-xs)", color: consent ? "var(--success)" : "var(--text-subtle)" }}>
+            {t(consent ? "settings.telemetry.on" : "settings.telemetry.off")}
+          </span>
+        </label>
+        <div>
+          <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", marginBottom: "var(--sp-6)" }}>{t("settings.telemetry.preview")}</div>
+          <pre dir="ltr" style={{ margin: 0, padding: "var(--sp-12)", overflowX: "auto", background: "var(--surface)", border: "1px solid var(--hairline)", borderRadius: 6, fontSize: "var(--fs-xs)", lineHeight: 1.5, color: "var(--text)", fontFamily: "var(--font-mono)" }}>
+            {preview ? JSON.stringify(preview, null, 2) : t("settings.telemetry.loading")}
+          </pre>
+        </div>
+        {error && <div style={{ color: "var(--danger)", fontSize: "var(--fs-sm)" }}>{t("settings.telemetry.failed")}</div>}
+      </div>
+    </section>
   );
 }
 

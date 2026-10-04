@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import * as p from "@clack/prompts";
 
@@ -262,6 +262,15 @@ export default async function setup() {
     return;
   }
 
+  const telemetryConsent = await p.confirm({
+    message: "Share anonymous usage counts? Off by default; sends counts only, never names, text, emails, hosts, or paths.",
+    initialValue: false,
+  });
+  if (p.isCancel(telemetryConsent)) {
+    p.cancel("Setup cancelled");
+    return;
+  }
+
   // Always generate (or preserve) an access token. It's a no-op when bound
   // to 127.0.0.1; it becomes the LAN gate the moment the user flips bind to
   // 0.0.0.0, with no second setup step required.
@@ -339,6 +348,23 @@ export default async function setup() {
 
   writeFileSync(ENV_PATH, lines.join("\n"), { mode: 0o600 });
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+
+  // Consent belongs with other local workspace settings, not in .env. Keep
+  // unrelated settings if setup is run again, and only mint an install id
+  // when the operator explicitly opted in.
+  const settingsPath = resolve(DATA_DIR, "settings.json");
+  let settings = {};
+  try {
+    const parsed = JSON.parse(readFileSync(settingsPath, "utf8"));
+    if (parsed && typeof parsed === "object") settings = parsed;
+  } catch {
+    // First-run or corrupt settings: the safe default below replaces it.
+  }
+  const existingTelemetry = settings.telemetry && typeof settings.telemetry === "object" ? settings.telemetry : {};
+  const telemetry = telemetryConsent
+    ? { consent: true, installId: existingTelemetry.installId || randomUUID(), ...(existingTelemetry.lastSentAt ? { lastSentAt: existingTelemetry.lastSentAt } : {}) }
+    : { consent: false };
+  writeFileSync(settingsPath, JSON.stringify({ ...settings, telemetry }, null, 2) + "\n", { mode: 0o600 });
 
   p.note(
     [
