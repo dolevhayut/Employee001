@@ -1000,7 +1000,8 @@ function ModeToggle({ collapsed }: { collapsed: boolean }) {
           width: 28,
           height: 16,
           borderRadius: 999,
-          background: armed ? "var(--success)" : "var(--bg-sunken)",
+          // Accent, not --success: dark --success is near-grey and read as "off".
+          background: armed ? "var(--accent)" : "var(--bg-sunken)",
           border: "1px solid var(--hairline)",
           position: "relative",
           flexShrink: 0,
