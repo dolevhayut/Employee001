@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import { dataDir } from "@/lib/app-home";
 import { withSidecarLock } from "@/lib/sidecar-lock";
 
 export const GoalStatusSchema = z.enum(["active", "done", "dropped"]);
@@ -38,19 +39,37 @@ export type UpdateGoalInput = Omit<Partial<Pick<Goal, "title" | "ownerEmployeeId
   description?: string | null;
 };
 
-// Keep this in one helper so E-120a can move goals to dataDir() in one line.
 function goalsFile(): string {
-  return path.join(process.cwd(), "data", "goals.json");
+  return dataDir("goals.json");
 }
 
 function readAll(): Goal[] {
+  const file = goalsFile();
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(fs.readFileSync(goalsFile(), "utf8"));
-    const result = z.array(GoalSchema).safeParse(parsed);
-    return result.success ? result.data : [];
-  } catch {
-    return [];
+    parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return [];
+    }
+    throw error;
   }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("invalid_goals_file");
+  }
+
+  const goals: Goal[] = [];
+  let skipped = 0;
+  for (const entry of parsed) {
+    const result = GoalSchema.safeParse(entry);
+    if (result.success) goals.push(result.data);
+    else skipped += 1;
+  }
+  if (skipped > 0) {
+    console.warn(`Skipped ${skipped} invalid goal entr${skipped === 1 ? "y" : "ies"} in ${file}`);
+  }
+  return goals;
 }
 
 function writeAll(goals: Goal[]): void {

@@ -3,6 +3,10 @@ import { createGoal, listGoals, GoalStatusSchema } from "@/lib/goals";
 
 export const runtime = "nodejs";
 
+function goalsUnavailable() {
+  return Response.json({ error: "goals_unavailable" }, { status: 500 });
+}
+
 const CreateGoalBodySchema = z.object({
   title: z.string(),
   description: z.string().optional(),
@@ -12,7 +16,11 @@ const CreateGoalBodySchema = z.object({
 }).strict();
 
 export async function GET() {
-  return Response.json({ goals: listGoals() }, { headers: { "Cache-Control": "no-store" } });
+  try {
+    return Response.json({ goals: listGoals() }, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return goalsUnavailable();
+  }
 }
 
 export async function POST(request: Request) {
@@ -31,6 +39,7 @@ export async function POST(request: Request) {
     return Response.json({ goal }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "invalid_goal";
-    return Response.json({ error: message }, { status: 400 });
+    const status = message === "invalid_goal_title" || message === "invalid_goal_parent" ? 400 : 500;
+    return status === 400 ? Response.json({ error: message }, { status }) : goalsUnavailable();
   }
 }

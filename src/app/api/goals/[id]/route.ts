@@ -3,6 +3,10 @@ import { deleteGoal, getGoal, GoalStatusSchema, updateGoal } from "@/lib/goals";
 
 export const runtime = "nodejs";
 
+function goalsUnavailable() {
+  return Response.json({ error: "goals_unavailable" }, { status: 500 });
+}
+
 const UpdateGoalBodySchema = z.object({
   title: z.string().optional(),
   description: z.string().nullable().optional(),
@@ -15,9 +19,13 @@ type GoalRouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, context: GoalRouteContext) {
   const { id } = await context.params;
-  const goal = getGoal(id);
-  if (!goal) return Response.json({ error: "goal_not_found" }, { status: 404 });
-  return Response.json({ goal }, { headers: { "Cache-Control": "no-store" } });
+  try {
+    const goal = getGoal(id);
+    if (!goal) return Response.json({ error: "goal_not_found" }, { status: 404 });
+    return Response.json({ goal }, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return goalsUnavailable();
+  }
 }
 
 export async function PATCH(request: Request, context: GoalRouteContext) {
@@ -38,13 +46,18 @@ export async function PATCH(request: Request, context: GoalRouteContext) {
     return Response.json({ goal });
   } catch (error) {
     const message = error instanceof Error ? error.message : "invalid_goal";
-    return Response.json({ error: message }, { status: 400 });
+    const status = message === "invalid_goal_title" || message === "invalid_goal_parent" ? 400 : 500;
+    return status === 400 ? Response.json({ error: message }, { status }) : goalsUnavailable();
   }
 }
 
 export async function DELETE(_request: Request, context: GoalRouteContext) {
   const { id } = await context.params;
-  const deleted = await deleteGoal(id);
-  if (!deleted) return Response.json({ error: "goal_not_found" }, { status: 404 });
-  return Response.json({ ok: true });
+  try {
+    const deleted = await deleteGoal(id);
+    if (!deleted) return Response.json({ error: "goal_not_found" }, { status: 404 });
+    return Response.json({ ok: true });
+  } catch {
+    return goalsUnavailable();
+  }
 }
