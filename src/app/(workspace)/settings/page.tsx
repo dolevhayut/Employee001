@@ -662,7 +662,7 @@ function OrgSkillModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "color-mix(in oklch, var(--text) 45%, transparent)",
+        background: "rgba(15, 12, 8, 0.45)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -1017,7 +1017,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "color-mix(in oklch, var(--text) 55%, transparent)",
+        background: "rgba(15, 12, 8, 0.55)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -1033,13 +1033,13 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
           width: "min(96vw, 1200px)",
           height: "92vh",
           padding: 0,
-          background: view === "3d" ? "var(--bg-sunken)" : "var(--bg-elevated)",
+          background: view === "3d" ? "#0a0908" : "var(--bg-elevated)",
           boxShadow: "var(--shadow-dialog)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
           borderRadius: 12,
-          border: view === "3d" ? "1px solid var(--hairline)" : undefined,
+          border: view === "3d" ? "1px solid #2a2624" : undefined,
         }}
       >
         <div
@@ -1047,12 +1047,12 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
             padding: "14px 20px",
             borderBottom:
               view === "3d"
-                ? "1px solid color-mix(in oklch, var(--text) 8%, transparent)"
+                ? "1px solid rgba(255,255,255,0.08)"
                 : "1px solid var(--hairline)",
             display: "flex",
             alignItems: "center",
             gap: "var(--sp-16)",
-            color: view === "3d" ? "var(--text)" : undefined,
+            color: view === "3d" ? "#f0e8d8" : undefined,
           }}
         >
           <div style={{ flex: 1 }}>
@@ -1061,7 +1061,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
                 fontSize: "var(--fs-body)",
                 fontWeight: 600,
                 margin: 0,
-                color: view === "3d" ? "var(--text)" : undefined,
+                color: view === "3d" ? "#f5edd9" : undefined,
               }}
             >
               {t("settings.brain.graphHeading")}
@@ -1071,7 +1071,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
                 fontSize: "var(--fs-meta)",
                 marginTop: "var(--sp-2)",
                 marginBottom: 0,
-                color: view === "3d" ? "var(--text-muted)" : "var(--text-subtle)",
+                color: view === "3d" ? "rgba(245,237,217,0.6)" : "var(--text-subtle)",
               }}
             >
               {stats
@@ -1099,7 +1099,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
               padding: "var(--sp-3)",
               borderRadius: 6,
               background:
-                view === "3d" ? "var(--surface-soft)" : "var(--surface)",
+                view === "3d" ? "rgba(255,255,255,0.06)" : "var(--surface)",
             }}
           >
             {(["3d", "2d"] as const).map((mode) => (
@@ -1113,16 +1113,16 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
                   background:
                     view === mode
                       ? view === "3d"
-                        ? "var(--accent)"
+                        ? "#e8c87a"
                         : "var(--text)"
                       : "transparent",
                   color:
                     view === mode
                       ? view === "3d"
-                        ? "var(--bg)"
+                        ? "#1a1612"
                         : "var(--bg)"
                       : view === "3d"
-                      ? "var(--text-muted)"
+                      ? "rgba(245,237,217,0.7)"
                       : undefined,
                   borderColor: "transparent",
                   textTransform: "uppercase",
@@ -1138,9 +1138,9 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
             className="btn ghost sm"
             onClick={onClose}
             style={{
-              color: view === "3d" ? "var(--text)" : undefined,
+              color: view === "3d" ? "rgba(245,237,217,0.85)" : undefined,
               borderColor:
-                view === "3d" ? "color-mix(in oklch, var(--text) 18%, transparent)" : undefined,
+                view === "3d" ? "rgba(245,237,217,0.18)" : undefined,
             }}
           >
             {t("settings.action.close")}
@@ -1154,7 +1154,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
             position: "relative",
             background:
               view === "3d"
-                ? "radial-gradient(circle at 50% 35%, color-mix(in oklch, var(--accent) 12%, transparent), transparent 60%), var(--bg-sunken)"
+                ? "radial-gradient(circle at 50% 35%, rgba(232,200,122,0.06), transparent 60%), #0a0908"
                 : undefined,
           }}
         >
@@ -1287,7 +1287,7 @@ function BrainBuilderModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "color-mix(in oklch, var(--text) 45%, transparent)",
+        background: "rgba(15, 12, 8, 0.45)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -1755,7 +1755,7 @@ function OrgBrainModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "color-mix(in oklch, var(--text) 45%, transparent)",
+        background: "rgba(15, 12, 8, 0.45)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -2431,7 +2431,7 @@ function McpModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "color-mix(in oklch, var(--text) 45%, transparent)",
+        background: "rgba(15, 12, 8, 0.45)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
