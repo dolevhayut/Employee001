@@ -26,6 +26,18 @@ export const GoalSchema = z.object({
 export type Goal = z.infer<typeof GoalSchema>;
 export type GoalStatus = z.infer<typeof GoalStatusSchema>;
 
+/** A prepared, display-only goal used in a twin system prompt. */
+export type GoalPromptItem = { title: string; chain: readonly string[] };
+
+/** Render the bounded goals context injected into a twin's system prompt. */
+export function renderGoalsBlock(goals: readonly GoalPromptItem[]): string {
+  if (goals.length === 0) return "";
+  return `# Goals\n\nActive goals to keep in view:\n${goals
+    .slice(0, 8)
+    .map((goal) => `- ${goal.chain.length > 0 ? goal.chain.join(" › ") : goal.title}`)
+    .join("\n")}`;
+}
+
 export type CreateGoalInput = {
   title: string;
   description?: string;

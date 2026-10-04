@@ -84,6 +84,7 @@ const NAV_SECTIONS: NavSection[] = [
     labelKey: "nav.section.operations",
     items: [
       { href: "/cockpit", labelKey: "nav.cockpit", icon: "Activity" },
+      { href: "/goals", labelKey: "nav.goals", icon: "Flow" },
       { href: "/routines", labelKey: "nav.schedules", icon: "Refresh" },
       { href: "/audit", labelKey: "nav.activityLog", icon: "Logs" },
     ],
@@ -196,6 +197,7 @@ const STATIC_COMMANDS: StaticCommand[] = [
   { id: "inbox", labelKey: "nav.approvals", href: "/inbox", icon: "Bell", group: "popular", hintKey: "shell.cmd.approvals.hint", keywords: "inbox feed activity alerts review approval flagged updates אישורים תיבה התראות עדכונים" },
   { id: "cockpit", labelKey: "nav.cockpit", href: "/cockpit", icon: "Activity", group: "popular", hintKey: "shell.cmd.cockpit.hint", keywords: "live agents running cockpit monitor real-time קוקפיט הרצות סוכנים חי" },
   { id: "tasks", labelKey: "nav.tasks", href: "/tasks", icon: "Zap", group: "popular", hintKey: "shell.cmd.tasks.hint", keywords: "agent execution work runs retry משימות הרצה עבודה" },
+  { id: "goals", labelKey: "nav.goals", href: "/goals", icon: "Flow", group: "navigate", hintKey: "shell.cmd.goals.hint", keywords: "goals objectives strategy company priorities יעדים מטרות אסטרטגיה" },
   { id: "twins", labelKey: "nav.chat", href: "/flow", icon: "Bot", group: "popular", hintKey: "shell.cmd.chat.hint", keywords: "chat with twin memory graph ask clone flow צ'אט תאום זיכרון גרף" },
   { id: "connections", labelKey: "nav.tools", href: "/connections", icon: "Plug", group: "navigate", hintKey: "shell.cmd.tools.hint", keywords: "connections integrations composio slack github gmail tools mcp כלים חיבורים" },
   { id: "marketplace", labelKey: "nav.hire", href: "/marketplace", icon: "Store", group: "navigate", hintKey: "shell.cmd.hire.hint", keywords: "marketplace agents hire catalog גיוס סוכנים" },
@@ -1357,6 +1359,7 @@ const CRUMB_DEFAULT_HREFS: Record<string, string> = {
   Tasks: "/tasks",
   Templates: "/templates",
   Routines: "/routines",
+  Goals: "/goals",
   Cockpit: "/cockpit",
   Budgets: "/budgets",
   Inbox: "/inbox",

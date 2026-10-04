@@ -73,6 +73,7 @@ import { ceoOf, orgClause, readOrgIdentity } from "@/lib/org-identity";
 import { proposalsEnabled, proposeKnowledgeFromMeeting } from "@/lib/knowledge-proposals";
 import { dataDir } from "@/lib/app-home";
 import { canRunModel } from "@/lib/model-provider";
+import { goalChain, listGoals, renderGoalsBlock } from "@/lib/goals";
 
 // ─── Event types ──────────────────────────────────────────────────────────────
 
@@ -273,6 +274,7 @@ function buildSystemPromptBlocks(
   orgSkillsBlock?: string,
   orgBrainBlock?: string,
   memoryBlock?: string,
+  goalsBlock?: string,
   teamMeetingContext?: {
     colleagues: string[];
     /** Pre-rendered transcript of every turn so far in this meeting. */
@@ -528,6 +530,7 @@ Use this when reasoning about deadlines, scheduling, "tomorrow", overdue items, 
     orgBrainBlock,
     orgSkillsBlock,
     memoryBlock,
+    goalsBlock,
     dynamicBlock,
     teamMeetingBlock,
   ].filter((block): block is string => Boolean(block));
@@ -965,6 +968,20 @@ export async function runSingleTwin(
       console.warn(`[org-brain] load skipped: ${message}`);
     }
 
+    let goalsBlock = "";
+    try {
+      const activeGoals = listGoals().filter((goal) =>
+        goal.status === "active" && (goal.ownerEmployeeId === employee.id || goal.ownerEmployeeId === null),
+      );
+      goalsBlock = renderGoalsBlock(activeGoals.slice(0, 8).map((goal) => ({
+        title: goal.title,
+        chain: goalChain(goal.id).reverse().map((ancestor) => ancestor.title),
+      })));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      console.warn(`[goals] load skipped: ${message}`);
+    }
+
     const surface: "chat" | "meeting" | "routine" =
       options.context?.type === "routine"
         ? "routine"
@@ -1182,6 +1199,7 @@ export async function runSingleTwin(
           orgSkillsBlock,
           orgBrainBlock,
           memoryBlock,
+          goalsBlock,
           options.teamMeetingContext
             ? {
                 ...options.teamMeetingContext,

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DELETE, GET as getGoalRoute, PATCH } from "@/app/api/goals/[id]/route";
 import { GET as listGoalsRoute, POST } from "@/app/api/goals/route";
-import { createGoal, deleteGoal, getGoal, goalChain, listGoals, updateGoal } from "./goals";
+import { createGoal, deleteGoal, getGoal, goalChain, listGoals, renderGoalsBlock, updateGoal } from "./goals";
 
 const originalHome = process.env.EMPLOYEE001_HOME;
 let tempDir: string;
@@ -31,6 +31,19 @@ function context(id: string) {
 }
 
 describe("goals", () => {
+  it("renders a compact, bounded prompt block from prepared goal chains", () => {
+    expect(renderGoalsBlock([])).toBe("");
+    expect(renderGoalsBlock([
+      { title: "Ship", chain: ["Company", "Ship"] },
+      { title: "Retain", chain: ["Retain"] },
+    ])).toBe("# Goals\n\nActive goals to keep in view:\n- Company › Ship\n- Retain");
+    const manyGoals = Array.from({ length: 9 }, (_, index) => ({
+      title: `Goal ${index}`,
+      chain: [`Goal ${index}`],
+    }));
+    expect(renderGoalsBlock(manyGoals)).not.toContain("Goal 8");
+  });
+
   it("creates, lists, gets, updates, and deletes goals", async () => {
     const created = await createGoal({ title: "  Ship roadmap  ", description: "  Q4  ", ownerEmployeeId: "ada" });
     expect(created).toMatchObject({ title: "Ship roadmap", description: "Q4", ownerEmployeeId: "ada", parentId: null, status: "active" });

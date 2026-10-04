@@ -9,6 +9,7 @@ import { onboardingEn, onboardingHe } from "./catalog/onboarding";
 import { settingsEn, settingsHe } from "./catalog/settings";
 import { demoEn, demoHe } from "./catalog/demo";
 import { opsHealthEn, opsHealthHe } from "./catalog/ops-health";
+import { goalsEn, goalsHe } from "./catalog/goals";
 
 export const LOCALES = ["en", "he"] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -460,7 +461,7 @@ const coreEn = {
 
 // Area catalogs live in ./catalog/*.ts so parallel work on different
 // screens never edits the same file.
-const en = { ...coreEn, ...profileEn, ...chatMeetingEn, ...operationsEn, ...workEn, ...onboardingEn, ...settingsEn, ...demoEn, ...opsHealthEn } as const;
+const en = { ...coreEn, ...profileEn, ...chatMeetingEn, ...operationsEn, ...workEn, ...onboardingEn, ...settingsEn, ...demoEn, ...opsHealthEn, ...goalsEn } as const;
 
 export type MessageKey = keyof typeof en;
 
@@ -908,7 +909,7 @@ const coreHe: Partial<Record<keyof typeof coreEn, string>> = {
 // English is the product language. Hebrew is optional (shown as beta): a key
 // without a Hebrew string falls back to English, so new screens can ship in
 // English only. The onboarding/consent catalog stays fully translated.
-const he: Partial<Record<MessageKey, string>> = { ...coreHe, ...profileHe, ...chatMeetingHe, ...operationsHe, ...workHe, ...onboardingHe, ...settingsHe, ...demoHe, ...opsHealthHe };
+const he: Partial<Record<MessageKey, string>> = { ...coreHe, ...profileHe, ...chatMeetingHe, ...operationsHe, ...workHe, ...onboardingHe, ...settingsHe, ...demoHe, ...opsHealthHe, ...goalsHe };
 
 export const messages: { en: Record<MessageKey, string>; he: Partial<Record<MessageKey, string>> } = { en, he };
 
