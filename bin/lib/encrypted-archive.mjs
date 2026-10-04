@@ -41,6 +41,7 @@ async function readHeader(archivePath) {
       throw new Error(`Unsupported encrypted archive version: ${header[ENCRYPTED_ARCHIVE_MAGIC.length]}.`);
     }
     return {
+      header,
       salt: header.subarray(9, 9 + SALT_LENGTH),
       nonce: header.subarray(9 + SALT_LENGTH, HEADER_LENGTH),
     };
@@ -81,8 +82,11 @@ export async function encryptArchive(inputPath, outputPath, passphrase, { scrypt
     nonce,
   ]);
 
+  // Authenticate the header too, so magic/version/salt/nonce can't be swapped.
+  cipher.setAAD(header);
+
   try {
-    await writeFile(temporaryOutput, header, { flag: "wx" });
+    await writeFile(temporaryOutput, header, { flag: "wx", mode: 0o600 });
     await pipeline(createReadStream(inputPath), cipher, createWriteStream(temporaryOutput, { flags: "a" }));
     await appendFile(temporaryOutput, cipher.getAuthTag());
     await rename(temporaryOutput, outputPath);
@@ -100,7 +104,7 @@ export async function decryptArchive(inputPath, outputPath, passphrase, { scrypt
   const { size } = await stat(inputPath);
   if (size < HEADER_LENGTH + AUTH_TAG_LENGTH) throw new Error("Encrypted archive is truncated.");
 
-  const { salt, nonce } = await readHeader(inputPath);
+  const { header, salt, nonce } = await readHeader(inputPath);
   const key = await deriveKey(passphrase, salt, scryptOptions);
   const tagOffset = size - AUTH_TAG_LENGTH;
   const tagHandle = await open(inputPath, "r");
@@ -114,6 +118,7 @@ export async function decryptArchive(inputPath, outputPath, passphrase, { scrypt
   }
 
   const decipher = createDecipheriv("aes-256-gcm", key, nonce, { authTagLength: AUTH_TAG_LENGTH });
+  decipher.setAAD(header);
   decipher.setAuthTag(authTag);
   const temporaryOutput = temporaryPath(outputPath);
 
@@ -121,7 +126,8 @@ export async function decryptArchive(inputPath, outputPath, passphrase, { scrypt
     await pipeline(
       createReadStream(inputPath, { start: HEADER_LENGTH, end: tagOffset - 1 }),
       decipher,
-      createWriteStream(temporaryOutput, { flags: "wx" }),
+      // Plaintext tar: private to the user while it exists.
+      createWriteStream(temporaryOutput, { flags: "wx", mode: 0o600 }),
     );
     await rename(temporaryOutput, outputPath);
   } catch (error) {
