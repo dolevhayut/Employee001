@@ -64,6 +64,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
+- **Local model provider (offline).** `employee001 setup` can point twins at a
+  local Anthropic-compatible endpoint (for example Ollama >= 0.14) with
+  explicit model pins. It fails closed when misconfigured, never forwards your
+  Anthropic key, and `doctor --egress` shows whether traffic stays on this
+  machine. Open-weights models are much weaker than Claude: evaluation and
+  air-gapped pilots only.
 - **Boundary mode: run Claude in your own cloud.** `employee001 setup` can
   point twins at Claude on AWS Bedrock, Google Vertex AI or Azure AI Foundry
   instead of the Anthropic API. In that mode, features that call the
