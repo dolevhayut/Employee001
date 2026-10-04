@@ -50,6 +50,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
+- **`npx employee001 doctor --egress`** lists every outside host your
+  current configuration talks to (Anthropic or your cloud provider,
+  Composio, OpenAI embeddings, ElevenLabs, each custom MCP server, web
+  research, updates) and what is sent, without printing any secret.
+  `npx employee001 start --strict` turns off nonessential traffic.
 - **Hebrew name per twin.** Set a twin's Hebrew spelling from its profile
   ("Add Hebrew name"); twins use it when they write in Hebrew. The sidebar,
   profile and org chart show your company's name instead of "Employee001".

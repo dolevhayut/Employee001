@@ -281,8 +281,9 @@ This is the DIY version of our **Professional onboarding** — [we can deploy an
 | Command | What it does |
 |---|---|
 | `npx employee001 setup` | Interactive first-run wizard. Writes `.env`, creates `data/`. |
-| `npx employee001 start` | Starts the local server. Opens browser. `--no-open` / `--port <n>` flags. |
+| `npx employee001 start` | Starts the local server. Opens browser. `--no-open` / `--port <n>` / `--strict` (no nonessential traffic) flags. |
 | `npx employee001 doctor` | Health check — Node version, env, API keys, port, build. |
+| `npx employee001 doctor --egress` | Lists every outside host your current config talks to, and what is sent. |
 | `npx employee001 update` | Checks GitHub releases for a newer version. |
 | `npx employee001 export <path>` | Snapshot `data/` to a tar.gz (excludes secrets). |
 | `npx employee001 import <path>` | Restore `data/` from a tar.gz. `--force` overwrites. |
