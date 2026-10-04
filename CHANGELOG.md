@@ -51,6 +51,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `NAME.pdf.md` / `NAME.docx.md` with the extracted text (capped at 2 MB), so
   the twin can read it. If extraction fails, the upload still succeeds and
   shows a warning. Deleting the original also removes its generated text.
+  Hebrew in PDFs comes out in the right reading order, including mixed
+  tokens like "ב-10:30" and acronyms like צה"ל.
 - **Twins write natural Hebrew.** A shared language section in every twin
   prompt (chat, Team Meeting, shifts) asks for idiomatic Israeli workplace
   Hebrew, translated jargon, and English only where Israelis keep it (product
