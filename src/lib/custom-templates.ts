@@ -7,8 +7,9 @@
 import fs from "fs";
 import path from "path";
 import type { TaskTemplate } from "./task-templates";
+import { dataDir } from "./app-home";
 
-const FILE = path.join(process.cwd(), "data", "custom-templates.json");
+const FILE = dataDir("custom-templates.json");
 
 export type CustomTemplate = TaskTemplate & {
   /** ISO timestamp when this template was first saved. */

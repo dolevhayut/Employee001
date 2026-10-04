@@ -7,6 +7,7 @@ import { Composio } from "@composio/core";
 import { ClaudeAgentSDKProvider } from "@composio/claude-agent-sdk";
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import type { McpSdkServerConfigWithInstance } from "@anthropic-ai/claude-agent-sdk";
+import { dataDir } from "./app-home";
 
 // ─── Toolkit allow-list per role ─────────────────────────────────────────────
 // Curated so each twin can't act outside its functional area.
@@ -34,7 +35,7 @@ export function composioUserIdFor(employeeId: string): string {
 }
 
 const STATE_DIR = (id: string) =>
-  path.join(process.cwd(), "data", "employees", id);
+  dataDir("employees", id);
 const STATE_FILE = (id: string) =>
   path.join(STATE_DIR(id), ".composio.json");
 

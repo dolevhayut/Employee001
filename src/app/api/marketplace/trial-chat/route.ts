@@ -7,6 +7,7 @@ import { runSingleTwin } from "@/lib/council-runner";
 import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
 import type { EmployeeWithTwin } from "@/lib/employees";
 import { TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
+import { dataDir } from "@/lib/app-home";
 
 /**
  * Trial chat for marketplace agents — lets a CEO talk to an agent before
@@ -23,7 +24,7 @@ function ensureTrialProfile(agentId: string): string {
   if (!agent) throw new Error(`Unknown marketplace agent: ${agentId}`);
 
   const trialId = trialEmployeeId(agentId);
-  const dir = path.join(process.cwd(), "data", "employees", trialId);
+  const dir = dataDir("employees", trialId);
   fs.mkdirSync(dir, { recursive: true });
 
   for (const [filename, content] of Object.entries(agent.profileFiles)) {

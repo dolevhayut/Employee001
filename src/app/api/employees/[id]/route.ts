@@ -5,6 +5,7 @@ import path from "path";
 import { getHiredAgentIds, dismissAgent } from "@/lib/hired-agents";
 import { appendAuditEntry } from "@/lib/audit-log";
 import { withSidecarLock } from "@/lib/sidecar-lock";
+import { dataDir } from "@/lib/app-home";
 
 // Slug pattern matches everything our materialisers emit:
 // `dolev-hayut`, `pending-c7bc0d-c7bc0d`, `marketplace-sdr-alex`, etc.
@@ -41,10 +42,9 @@ function employeeDir(id: string, action: "delete" | "update"): { dir: string } |
     );
   }
 
-  const root = process.cwd();
-  const dir = path.join(root, "data", "employees", id);
+  const dir = dataDir("employees", id);
   const resolved = path.resolve(dir);
-  const expectedRoot = path.resolve(path.join(root, "data", "employees")) + path.sep;
+  const expectedRoot = path.resolve(dataDir("employees")) + path.sep;
   if (!resolved.startsWith(expectedRoot)) {
     return NextResponse.json(
       { error: "path_escape", message: `Refused to ${action} outside data/employees/.` },

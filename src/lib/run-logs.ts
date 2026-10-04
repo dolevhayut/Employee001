@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import type { RunSurface } from "@/lib/active-runs";
+import { dataDir } from "@/lib/app-home";
 
 export type RunLogEvent =
   | { ts: string; type: "text"; text: string }
@@ -28,7 +29,7 @@ export type RunLogEventInput = DistributiveOmit<RunLogEvent, "ts">;
 const MAX_LIMIT_BYTES = 1_048_576;
 
 export function logPathFor(surface: RunSurface, runId: string): string {
-  return path.join(process.cwd(), "data", "run-logs", surface, `${runId}.ndjson`);
+  return dataDir("run-logs", surface, `${runId}.ndjson`);
 }
 
 function ensureDirFor(file: string) {

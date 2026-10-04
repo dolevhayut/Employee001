@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { ApprovalRequest } from "@/lib/approval-bus";
+import { dataDir } from "@/lib/app-home";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +72,7 @@ export function feedSourceForApproval(
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
-const FEED_FILE = path.join(process.cwd(), "data", "org", "feed.jsonl");
+const FEED_FILE = dataDir("org", "feed.jsonl");
 
 function ensureDir() {
   const dir = path.dirname(FEED_FILE);

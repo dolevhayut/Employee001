@@ -11,9 +11,10 @@ import {
   type MarketplaceAgent,
 } from "./marketplace";
 import { TWIN_MODEL_PRIMARY } from "./sdk-defaults";
+import { dataDir } from "./app-home";
 
-const HIRED_AGENTS_PATH = path.join(process.cwd(), "data", "hired-agents.json");
-const EMPLOYEES_DATA_DIR = path.join(process.cwd(), "data", "employees");
+const HIRED_AGENTS_PATH = dataDir("hired-agents.json");
+const EMPLOYEES_DATA_DIR = dataDir("employees");
 
 export type HiredAgentRecord = {
   id: string;

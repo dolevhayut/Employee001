@@ -13,6 +13,7 @@ import { NextRequest } from "next/server";
 import fsp from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
+import { dataDir } from "@/lib/app-home";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
     return json({ error: `file exceeds ${MAX_BYTES / (1024 * 1024)}MB limit` }, 413);
   }
 
-  const dir = path.join(process.cwd(), "data", "uploads", employeeId);
+  const dir = dataDir("uploads", employeeId);
   await fsp.mkdir(dir, { recursive: true });
 
   const id = randomBytes(4).toString("hex");

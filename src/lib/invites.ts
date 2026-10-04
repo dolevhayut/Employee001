@@ -10,6 +10,7 @@ import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
+import { dataDir } from "./app-home";
 
 export type Invite = {
   token: string;
@@ -54,7 +55,7 @@ function withLookbackDefault(i: Invite): Invite {
 }
 
 function file(): string {
-  return path.join(process.cwd(), "data", "invites.json");
+  return dataDir("invites.json");
 }
 
 function ensureDir(): void {
@@ -349,7 +350,7 @@ export async function materializeEmployeeFromInvite(
   if (!slug) slug = `pending-${token.slice(4, 10)}`;
 
   const employeeId = `${slug}-${token.slice(4, 10)}`;
-  const dir = path.join(process.cwd(), "data", "employees", employeeId);
+  const dir = dataDir("employees", employeeId);
   const sidecarPath = path.join(dir, "employee.json");
 
   // Idempotency check: sidecar exists → return without touching anything.

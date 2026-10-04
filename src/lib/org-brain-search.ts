@@ -21,6 +21,7 @@
 import "server-only";
 import fs from "fs/promises";
 import fsSync from "fs";
+import { dataDir } from "./app-home";
 import path from "path";
 
 // ─── Tokenisation ─────────────────────────────────────────────────────────────
@@ -152,7 +153,7 @@ type Source = { id: string; label: string; dir: string; files: string[] };
  *  optional org-brain nodes directory. Skips dotted directories (trial
  *  agents, the leading-dot convention used elsewhere in the repo). */
 async function discoverSources(): Promise<Source[]> {
-  const root = path.join(process.cwd(), "data");
+  const root = dataDir();
   const sources: Source[] = [];
 
   // Employee directories
@@ -251,7 +252,7 @@ async function buildIndex(): Promise<Index> {
  *  existing file's content does NOT, so we ALSO check the most recent
  *  file mtime within the tree. */
 async function rootMtime(): Promise<number> {
-  const root = path.join(process.cwd(), "data", "employees");
+  const root = dataDir("employees");
   let latest = 0;
   try {
     const dirs = await fs.readdir(root, { withFileTypes: true });
@@ -383,7 +384,7 @@ export function invalidateIndex(): void {
 export function quickStats(): { sourceCount: number } {
   // Light synchronous probe, no markdown parsing
   try {
-    const root = path.join(process.cwd(), "data", "employees");
+    const root = dataDir("employees");
     if (!fsSync.existsSync(root)) return { sourceCount: 0 };
     let count = 0;
     for (const name of fsSync.readdirSync(root)) {

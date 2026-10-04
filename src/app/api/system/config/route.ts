@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
-import path from "path";
+import { envFilePath } from "@/lib/app-home";
 
 // Returns *presence* of each required API key, never the value itself.
 // Used by the UI to gate the Invite-employee flow on a fully configured
@@ -40,7 +40,7 @@ export async function GET() {
  * PATCH /api/system/config
  * Body: { key: "ANTHROPIC_API_KEY" | "COMPOSIO_API_KEY" | "ELEVENLABS_API_KEY", value: string }
  *
- * Writes the key to .env in the process cwd and updates process.env in-memory.
+ * Writes the key to the configured app home and updates process.env in-memory.
  * The server must be restarted to propagate env changes to all modules that
  * read them at import time (e.g. the Anthropic SDK client).
  */
@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "value_required" }, { status: 400 });
   }
 
-  const envPath = path.join(process.cwd(), ".env");
+  const envPath = envFilePath();
 
   // Read existing .env or start fresh
   let existing = "";

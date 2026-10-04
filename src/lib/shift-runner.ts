@@ -16,6 +16,7 @@ import { runPrefetches, formatFocusBlock } from "@/lib/twin-focus-prefetch";
 import { appendFeedItem } from "@/lib/feed-store";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
+import { dataDir } from "@/lib/app-home";
 import { recordSpend } from "@/lib/twin-budget";
 import { createConsultContext } from "@/lib/twin-consult";
 import { buildConsultMcpServer } from "@/lib/consult-mcp";
@@ -177,7 +178,7 @@ export async function runShift(args: {
   const { employee, trigger, abortController } = args;
   const runId = `shift_${employee.id}_${Date.now()}`;
 
-  const employeeDir = path.join(process.cwd(), "data", "employees", employee.id);
+  const employeeDir = dataDir("employees", employee.id);
 
   registerRun({
     runId,

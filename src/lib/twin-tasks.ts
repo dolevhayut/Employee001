@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ export type TwinTask = {
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
-const EMPLOYEES_DIR = path.join(process.cwd(), "data", "employees");
+const EMPLOYEES_DIR = dataDir("employees");
 
 function tasksDirFor(employeeId: string): string {
   return path.join(EMPLOYEES_DIR, employeeId, ".shift", "tasks");

@@ -16,6 +16,7 @@ import fs from "fs";
 import path from "path";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
+import { dataDir } from "@/lib/app-home";
 import { readAllEmployeeFiles } from "@/lib/employees-files";
 import { listOrgBrainNodes } from "@/lib/org-brain";
 import type { EmployeeGraph, RealEdge, RealNode } from "@/lib/profile-graph-real";
@@ -241,7 +242,7 @@ export async function buildOrgBrainGraph(): Promise<EmployeeGraph> {
 /** Read all .md files in data/scratch/<employeeId>/ — sorted newest-first. */
 type ScratchFile = { filename: string; body: string; mtime: string };
 function readScratchFiles(employeeId: string): ScratchFile[] {
-  const dir = path.join(process.cwd(), "data", "scratch", employeeId);
+  const dir = dataDir("scratch", employeeId);
   try {
     if (!fs.existsSync(dir)) return [];
     const entries = fs
@@ -276,9 +277,7 @@ function readRecentMemoryCards(
   limit: number
 ): MemoryCardLite[] {
   const file = path.join(
-    process.cwd(),
-    "data",
-    "memory",
+    dataDir("memory"),
     employeeId,
     "cards.jsonl"
   );
@@ -327,9 +326,7 @@ function readStructuredFacts(
   limit: number
 ): StructuredFactLite[] {
   const file = path.join(
-    process.cwd(),
-    "data",
-    "memory",
+    dataDir("memory"),
     employeeId,
     "structured.jsonl"
   );

@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
 // Workspace operation mode — the Autonomy toggle (formerly EmployeeX —
 // that name now belongs to the separate product).
@@ -16,7 +17,7 @@ import path from "path";
 
 export type WorkspaceMode = "base" | "x";
 
-const FILE = () => path.join(process.cwd(), "data", "workspace-mode.json");
+const FILE = () => dataDir("workspace-mode.json");
 
 type ModeRecord = {
   mode: WorkspaceMode;

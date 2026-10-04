@@ -8,6 +8,7 @@
 import "server-only";
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
 export type OrgIdentity = {
   name: string;
@@ -17,7 +18,7 @@ export type OrgIdentity = {
 export const ORG_NAME_MAX = 80;
 export const ORG_DESCRIPTION_MAX = 200;
 
-const IDENTITY_FILE = path.join(process.cwd(), "data", "org", "identity.json");
+const IDENTITY_FILE = dataDir("org", "identity.json");
 
 // The values go into system prompts: keep them to a single plain line.
 function clean(value: unknown, max: number): string {

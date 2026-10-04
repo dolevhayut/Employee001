@@ -21,6 +21,7 @@ import {
   getActiveBuild,
   appendBuildEvent,
 } from "@/lib/twin-versions";
+import { dataDir } from "@/lib/app-home";
 import { TWIN_FILE_NAMES } from "@/lib/twin-builder-types";
 import type { EmployeeWithTwin } from "@/lib/employees";
 
@@ -33,9 +34,7 @@ export type PendingBuildSidecar = {
 
 const PENDING_FILE = (employeeId: string) =>
   path.join(
-    process.cwd(),
-    "data",
-    "employees",
+    dataDir("employees"),
     employeeId,
     ".builder-pending.json"
   );

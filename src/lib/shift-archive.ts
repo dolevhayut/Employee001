@@ -13,6 +13,7 @@
 import "server-only";
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
 export type ShiftOutputKind = "image" | "video" | "file" | "link" | "text" | "document";
 
@@ -60,7 +61,7 @@ const MAX_OUTPUT_CHARS = 4096;
 const URL_RE = /https?:\/\/[^\s"'<>)\]]+/g;
 
 function shiftDir(runId: string): string {
-  return path.join(process.cwd(), "data", "shifts", runId);
+  return dataDir("shifts", runId);
 }
 
 function ensureDir(runId: string): string {
@@ -170,7 +171,7 @@ export function readShiftEvents(runId: string): ShiftArchiveEvent[] {
 
 /** List shift archives (manifests only), newest first. Optionally filter by twin. */
 export function listShiftArchives(opts?: { employeeId?: string; limit?: number }): ShiftManifest[] {
-  const root = path.join(process.cwd(), "data", "shifts");
+  const root = dataDir("shifts");
   let dirs: string[];
   try {
     dirs = fs.readdirSync(root);

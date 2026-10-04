@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
 // ─── Rotation ─────────────────────────────────────────────────────────────────
 
@@ -93,7 +94,7 @@ export type AuditEntry = {
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
-const AUDIT_FILE = path.join(process.cwd(), "data", "audit.jsonl");
+const AUDIT_FILE = dataDir("audit.jsonl");
 
 type LastHashCache = {
   filePath: string;

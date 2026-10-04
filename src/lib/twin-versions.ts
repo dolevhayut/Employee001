@@ -24,20 +24,17 @@
 import path from "path";
 import fs from "fs";
 import { TWIN_FILE_NAMES, type TwinFileName } from "./twin-builder-types";
+import { dataDir } from "./app-home";
 
 const ROOT = (id: string) =>
-  path.join(process.cwd(), "data", "employees", id);
+  dataDir("employees", id);
 const VERSIONS_DIR = (id: string) => path.join(ROOT(id), ".versions");
 const FILES_DIR = (id: string) => path.join(VERSIONS_DIR(id), "files");
 const BUILDS_DIR = (id: string) => path.join(VERSIONS_DIR(id), "builds");
 const LOG_FILE = (id: string) => path.join(VERSIONS_DIR(id), "_log.jsonl");
 const EVENTS_FILE = (id: string, buildId: string) =>
   path.join(BUILDS_DIR(id), `${buildId}.events.jsonl`);
-const ACTIVE_BUILDS_FILE = path.join(
-  process.cwd(),
-  "data",
-  "active-builds.json"
-);
+const ACTIVE_BUILDS_FILE = dataDir("active-builds.json");
 
 export function safeIso(d: Date = new Date()): string {
   // Filesystem-safe ISO: replace `:` and `.` with `-`. Sortable as string.

@@ -16,6 +16,7 @@ import { withSidecarLock } from "@/lib/sidecar-lock";
 import { knowledgeEmployeeSegment, sanitizeKnowledgeSegment } from "@/lib/knowledge-versions";
 import { listKnowledgeFiles, readKnowledgeFile, writeKnowledgeFile } from "@/lib/knowledge-files";
 import type { MeetingTurn } from "@/lib/meeting-store";
+import { dataDir } from "./app-home";
 import { isUnderBudget } from "@/lib/twin-budget";
 import { directAnthropicAllowed } from "@/lib/model-provider";
 
@@ -57,9 +58,7 @@ export function proposalsEnabled(): boolean {
 
 function proposalsPath(employeeId: string): string {
   return path.join(
-    process.cwd(),
-    "data",
-    "employees",
+    dataDir("employees"),
     knowledgeEmployeeSegment(employeeId),
     "knowledge-proposals.jsonl",
   );

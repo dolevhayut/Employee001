@@ -18,6 +18,7 @@
 import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
+import { dataDir } from "../app-home";
 import Anthropic from "@anthropic-ai/sdk";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 import { directAnthropicAllowed } from "@/lib/model-provider";
@@ -64,7 +65,7 @@ export function hasApiKey(): boolean {
 
 /** Read the twin's profile files as a single text block for interviewer context. */
 export function loadProfileText(employeeId: string): string {
-  const dir = path.join(process.cwd(), "data", "employees", employeeId);
+  const dir = dataDir("employees", employeeId);
   return PROFILE_FILES.map((name) => {
     try {
       const c = fs.readFileSync(path.join(dir, name), "utf8").trim();
@@ -136,7 +137,7 @@ export async function streamInterviewerTurn(
 // ─── Synthesis (opus) ─────────────────────────────────────────────────────────
 
 const rcpLivePath = (employeeId: string) =>
-  path.join(process.cwd(), "data", "handovers", employeeId, "rcp.live.json");
+  dataDir("handovers", employeeId, "rcp.live.json");
 
 export const RCP_LIVE_PATH = rcpLivePath;
 

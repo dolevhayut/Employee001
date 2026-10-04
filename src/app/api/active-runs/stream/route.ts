@@ -2,10 +2,11 @@ import { NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
 import { listActiveRuns } from "@/lib/active-runs";
+import { dataDir } from "@/lib/app-home";
 
 export const dynamic = "force-dynamic";
 
-const FILE = path.join(process.cwd(), "data", "active-runs.json");
+const FILE = dataDir("active-runs.json");
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);

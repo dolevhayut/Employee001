@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { readEmployeeFileBody } from "@/lib/profile-graph-real";
 import { writeEmployeeFileBody } from "@/lib/employees-files";
 import type { RealNode } from "@/lib/profile-graph-real";
+import { dataDir } from "@/lib/app-home";
 
 function jsonResponse(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -16,9 +17,7 @@ function jsonResponse(payload: unknown, status = 200) {
  *  a synthetic FileContent shape so the existing drawer renders it. */
 function loadMemoryCard(employeeId: string, cardId: string) {
   const file = path.join(
-    process.cwd(),
-    "data",
-    "memory",
+    dataDir("memory"),
     employeeId,
     "cards.jsonl"
   );
@@ -75,7 +74,7 @@ _Recorded ${c.createdAt ?? "—"} · surface: ${c.surface ?? "—"} · run: \`${
 function loadScratchFile(employeeId: string, filename: string) {
   // Strip any directory traversal attempts.
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "");
-  const file = path.join(process.cwd(), "data", "scratch", employeeId, safeName);
+  const file = dataDir("scratch", employeeId, safeName);
   if (!fs.existsSync(file)) return null;
   try {
     const body = fs.readFileSync(file, "utf8");

@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
-const DATA_ROOT = path.join(process.cwd(), "data", "employees");
+const DATA_ROOT = dataDir("employees");
 
 export type FocusPrefetch = {
   label: string;

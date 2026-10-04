@@ -3,6 +3,7 @@ import path from "path";
 import { getComposio, composioUserIdFor, isComposioConfigured, readState } from "@/lib/composio-client";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { enqueueWorkItem } from "@/lib/work-items";
+import { dataDir } from "@/lib/app-home";
 
 // Inbound email → WorkItem. Polls each employee's connected Gmail through
 // the SAME Composio connection the twin already uses for outbound — no new
@@ -18,7 +19,7 @@ const POLL_INTERVAL_MS = 5 * 60 * 1000; // per-employee floor between polls
 const LOOKBACK_QUERY = "in:inbox newer_than:2d";
 const MAX_MESSAGES_PER_POLL = 10;
 
-const STATE_FILE = () => path.join(process.cwd(), "data", "email-poll.json");
+const STATE_FILE = () => dataDir("email-poll.json");
 
 type PollState = Record<string, { lastPollAt: string; lastError?: string }>;
 

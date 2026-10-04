@@ -10,6 +10,7 @@
 import fs from "fs";
 import path from "path";
 import { readAllEmployeeFiles } from "@/lib/employees-files";
+import { dataDir } from "@/lib/app-home";
 
 const MEMORY_CARDS_PER_EMPLOYEE = 6;
 
@@ -262,7 +263,7 @@ export function buildEmployeeGraph(employeeId: string): EmployeeGraph {
 
 type ScratchFile = { filename: string; body: string; mtime: string };
 function readScratchFiles(employeeId: string): ScratchFile[] {
-  const dir = path.join(process.cwd(), "data", "scratch", employeeId);
+  const dir = dataDir("scratch", employeeId);
   try {
     if (!fs.existsSync(dir)) return [];
     const out: ScratchFile[] = [];
@@ -288,9 +289,7 @@ function readRecentMemoryCards(
   limit: number
 ): MemoryCardLite[] {
   const file = path.join(
-    process.cwd(),
-    "data",
-    "memory",
+    dataDir("memory"),
     employeeId,
     "cards.jsonl"
   );
@@ -332,9 +331,7 @@ function readStructuredFacts(
   limit: number
 ): StructuredFactLite[] {
   const file = path.join(
-    process.cwd(),
-    "data",
-    "memory",
+    dataDir("memory"),
     employeeId,
     "structured.jsonl"
   );

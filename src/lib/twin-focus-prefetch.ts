@@ -3,8 +3,9 @@ import path from "path";
 
 import { getComposio, composioUserIdFor } from "@/lib/composio-client";
 import { getFocusConfig, type FocusPrefetch } from "@/lib/twin-focus";
+import { dataDir } from "@/lib/app-home";
 
-const DATA_ROOT = path.join(process.cwd(), "data", "employees");
+const DATA_ROOT = dataDir("employees");
 
 export type PrefetchResult = {
   label: string;

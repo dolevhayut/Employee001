@@ -16,6 +16,7 @@ import {
   readState as readComposioState,
 } from "@/lib/composio-client";
 import { loadOrgCustomMcpServers } from "@/lib/custom-mcp";
+import { dataDir } from "@/lib/app-home";
 import { classifyTool } from "@/lib/tool-policy";
 import {
   newBuildId,
@@ -35,7 +36,7 @@ export type { TwinFileName, TwinBuilderEvent };
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const EMPLOYEE_DATA_DIR = (id: string) =>
-  path.join(process.cwd(), "data", "employees", id);
+  dataDir("employees", id);
 
 function existingFiles(employeeId: string): TwinFileName[] {
   const dir = EMPLOYEE_DATA_DIR(employeeId);

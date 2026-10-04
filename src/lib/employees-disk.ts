@@ -8,6 +8,7 @@ import path from "path";
 import type { ClaudeModel, EmployeeWithTwin } from "./employees";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 import { withSidecarLock } from "./sidecar-lock";
+import { dataDir } from "./app-home";
 
 const AVATAR_PALETTE = [
   "#A8B4C4", "#C4A8B8", "#B8C4A8", "#A8C4B8", "#C4B8A8",
@@ -77,9 +78,7 @@ function isoWeek(date: Date): string {
  * Fire-and-forget: errors are swallowed so a disk hiccup never breaks a chat.
  */
 export async function bumpActivityOnDisk(employeeId: string): Promise<void> {
-  const sidecarPath = path.join(
-    process.cwd(), "data", "employees", employeeId, "employee.json"
-  );
+  const sidecarPath = dataDir("employees", employeeId, "employee.json");
   try {
     await withSidecarLock(employeeId, async () => {
     const raw = await fs.readFile(sidecarPath, "utf8");
@@ -103,7 +102,7 @@ export async function bumpActivityOnDisk(employeeId: string): Promise<void> {
 }
 
 export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
-  const root = path.join(process.cwd(), "data", "employees");
+  const root = dataDir("employees");
 
   let entries: string[];
   try {

@@ -7,6 +7,7 @@ import { getTwinBudget, isUnderBudget, recordSpend, setDailyBudget } from "./twi
 
 let previousCwd: string;
 let tempDir: string;
+let previousHome: string | undefined;
 
 function budgetFile(employeeId: string): string {
   return path.join(tempDir, "data", "employees", employeeId, ".shift", "budget.json");
@@ -14,8 +15,10 @@ function budgetFile(employeeId: string): string {
 
 beforeEach(() => {
   previousCwd = process.cwd();
+  previousHome = process.env.EMPLOYEE001_HOME;
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "e103-budget-"));
   process.chdir(tempDir);
+  delete process.env.EMPLOYEE001_HOME;
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-01-01T12:00:00.000Z"));
 });
@@ -23,10 +26,22 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   process.chdir(previousCwd);
+  if (previousHome === undefined) delete process.env.EMPLOYEE001_HOME;
+  else process.env.EMPLOYEE001_HOME = previousHome;
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
 
 describe("twin budgets", () => {
+  it("writes under EMPLOYEE001_HOME when configured", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "e120a-budget-home-"));
+    process.env.EMPLOYEE001_HOME = home;
+
+    getTwinBudget("ada");
+
+    expect(fs.existsSync(path.join(home, "data", "employees", "ada", ".shift", "budget.json"))).toBe(true);
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+
   it("guarantees a missing budget file receives the default daily allowance", () => {
     expect(fs.existsSync(budgetFile("ada"))).toBe(false);
     expect(getTwinBudget("ada")).toEqual({

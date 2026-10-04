@@ -15,6 +15,7 @@ import {
   writePendingBuild,
   countActiveConnections,
 } from "@/lib/twin-build-runner";
+import { dataDir } from "@/lib/app-home";
 
 export const runtime = "nodejs";
 
@@ -325,7 +326,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     // avoid clobbering markdown the employee may have personalised.
     const materialized = await materializeEmployeeFromInvite(token, { name, role });
     const employeeId = materialized.employeeId;
-    const dir = path.join(process.cwd(), "data", "employees", employeeId);
+    const dir = dataDir("employees", employeeId);
     await fs.mkdir(dir, { recursive: true });
 
     const profile = buildProfileMarkdown(body, { name, role });

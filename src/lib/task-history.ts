@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,8 +48,8 @@ export type TaskEvent = {
 
 // ─── Storage paths ────────────────────────────────────────────────────────────
 
-const HISTORY_FILE = path.join(process.cwd(), "data", "task-history.jsonl");
-const EVENTS_DIR = path.join(process.cwd(), "data", "task-events");
+const HISTORY_FILE = dataDir("task-history.jsonl");
+const EVENTS_DIR = dataDir("task-events");
 
 function ensureDirs() {
   const dir = path.dirname(HISTORY_FILE);

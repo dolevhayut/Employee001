@@ -4,6 +4,7 @@ import {
   getTasksFor,
   type TwinTaskStatus,
 } from "@/lib/twin-tasks";
+import { dataDir } from "@/lib/app-home";
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
@@ -22,8 +23,7 @@ export async function GET(req: NextRequest) {
 
   const all: ReturnType<typeof getTasksFor> = [];
   const fs = await import("fs");
-  const path = await import("path");
-  const root = path.join(process.cwd(), "data", "employees");
+  const root = dataDir("employees");
   try {
     const dirs = fs.readdirSync(root, { withFileTypes: true });
     for (const d of dirs) {

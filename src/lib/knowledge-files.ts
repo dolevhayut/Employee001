@@ -2,6 +2,7 @@ import "server-only";
 import fs from "fs";
 import path from "path";
 import { Worker } from "node:worker_threads";
+import { dataDir } from "./app-home";
 import {
   knowledgeEmployeeSegment,
   snapshotKnowledgeText,
@@ -9,7 +10,7 @@ import {
 } from "./knowledge-versions";
 
 function employeesDataDir(): string {
-  return path.join(process.cwd(), "data", "employees");
+  return dataDir("employees");
 }
 
 export type KnowledgeFile = {

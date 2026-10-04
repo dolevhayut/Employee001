@@ -2,8 +2,9 @@ import fs from "fs";
 import path from "path";
 import { snapshotFile } from "./twin-versions";
 import type { TwinFileName } from "./twin-builder-types";
+import { dataDir } from "./app-home";
 
-const EMPLOYEES_DATA_DIR = path.join(process.cwd(), "data", "employees");
+const EMPLOYEES_DATA_DIR = dataDir("employees");
 
 const PROFILE_FILE_NAMES = [
   "EXPERTISE.md",

@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
 export type TwinBudget = {
   dailyBudgetUsd: number;
@@ -17,9 +18,7 @@ function todayIL(): string {
 
 function budgetPath(employeeId: string): string {
   return path.join(
-    process.cwd(),
-    "data",
-    "employees",
+    dataDir("employees"),
     employeeId,
     ".shift",
     "budget.json"

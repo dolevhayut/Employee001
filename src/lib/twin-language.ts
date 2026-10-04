@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import { dataDir } from "./app-home";
 
 // Language rules shared by every twin prompt (chat, Team Meeting, shifts).
 // Profile files are built from mostly-English work data, so without explicit
@@ -9,7 +10,7 @@ import fs from "fs";
 /** "Noa Friedman → נועה פרידמן" for every teammate whose employee.json
  *  carries a Hebrew spelling (`nameHe`). */
 function hebrewNamesLine(): string {
-  const root = path.join(process.cwd(), "data", "employees");
+  const root = dataDir("employees");
   let ids: string[] = [];
   try {
     ids = fs.readdirSync(root);

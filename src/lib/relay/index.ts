@@ -18,6 +18,7 @@
 
 import fs from "fs";
 import path from "path";
+import { dataDir } from "../app-home";
 
 import {
   RCP_SCHEMA_VERSION,
@@ -64,7 +65,7 @@ export { verifyRcpEvidence } from "./evidence";
 // ─── Path helper (kept local so the barrel is self-contained) ─────────────────
 
 const RCP_PATH = (employeeId: string) =>
-  path.join(process.cwd(), "data", "handovers", employeeId, "rcp.json");
+  dataDir("handovers", employeeId, "rcp.json");
 
 // ─── createHandover ───────────────────────────────────────────────────────────
 

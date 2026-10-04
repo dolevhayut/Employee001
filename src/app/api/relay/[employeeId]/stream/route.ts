@@ -1,8 +1,8 @@
 import fs from "fs";
-import path from "path";
 import { NextRequest } from "next/server";
 import { listActiveRuns, getActiveRun } from "@/lib/active-runs";
 import type { RelayEvent } from "@/lib/relay";
+import { dataDir } from "@/lib/app-home";
 
 export const runtime = "nodejs";
 // Tail can outlive a single page view; cap matches the runner's cap.
@@ -10,7 +10,7 @@ export const maxDuration = 600;
 
 /** Where spawnDetachedRelay/appendHandoverEvent persist the event log. */
 const EVENTS_PATH = (handoverId: string) =>
-  path.join(process.cwd(), "data", "relay", handoverId, "events.jsonl");
+  dataDir("relay", handoverId, "events.jsonl");
 
 /**
  * Read new JSONL events from `offset` bytes onward, returning the parsed

@@ -22,6 +22,7 @@
 import path from "path";
 import fs from "fs";
 import fsp from "fs/promises";
+import { dataDir } from "../app-home";
 
 import type { EmployeeWithTwin } from "@/lib/employees";
 import { appendAuditEntry } from "@/lib/audit-log";
@@ -63,22 +64,22 @@ const SYNTHESIS_MODEL = TWIN_MODEL_OPUS;
 // ─── Path helpers ───────────────────────────────────────────────────────────
 
 const HANDOVER_DIR = (employeeId: string) =>
-  path.join(process.cwd(), "data", "handovers", employeeId);
+  dataDir("handovers", employeeId);
 
 const RCP_PATH = (employeeId: string) =>
   path.join(HANDOVER_DIR(employeeId), "rcp.json");
 
 const SCRATCH_DIR = (employeeId: string) =>
-  path.join(process.cwd(), "data", "scratch", employeeId);
+  dataDir("scratch", employeeId);
 
 const TRANSCRIPT_PATH = (employeeId: string) =>
-  path.join(process.cwd(), "data", "relay", "transcripts", `${employeeId}.json`);
+  dataDir("relay", "transcripts", `${employeeId}.json`);
 
 const EVENTS_PATH = (handoverId: string) =>
-  path.join(process.cwd(), "data", "relay", handoverId, "events.jsonl");
+  dataDir("relay", handoverId, "events.jsonl");
 
 const EMPLOYEE_DATA_DIR = (id: string) =>
-  path.join(process.cwd(), "data", "employees", id);
+  dataDir("employees", id);
 
 // ─── Event contract (RelayEvent) ──────────────────────────────────────────────
 //

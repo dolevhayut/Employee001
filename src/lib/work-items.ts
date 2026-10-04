@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
 // Durable work queue — the autonomy work plane, file-backed like everything
 // else in this repo. A WorkItem is a unit of unattended work (an inbound
@@ -51,7 +52,7 @@ export type WorkItem = {
   updatedAt: string;
 };
 
-const FILE = () => path.join(process.cwd(), "data", "work-items.json");
+const FILE = () => dataDir("work-items.json");
 const LEASE_MS = 15 * 60 * 1000; // a run that outlives this is presumed dead
 const DEFAULT_MAX_ATTEMPTS = 2;
 // Terminal items older than this are pruned. The email poller only looks

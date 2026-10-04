@@ -3,8 +3,9 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { TWIN_MODEL_FALLBACK, TWIN_MODEL_HAIKU } from "@/lib/sdk-defaults";
 import { currentProvider, directAnthropicAllowed, modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
+import { dataDir } from "@/lib/app-home";
 
-const MEMORY_ROOT = path.join(process.cwd(), "data", "memory");
+const MEMORY_ROOT = dataDir("memory");
 const DEFAULT_LIMIT = 5;
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const RRF_K = 50;

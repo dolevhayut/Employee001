@@ -10,8 +10,9 @@
 
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
-const ORG_BRAIN_DIR = path.join(process.cwd(), "data", "org-brain");
+const ORG_BRAIN_DIR = dataDir("org-brain");
 const NODES_DIR = path.join(ORG_BRAIN_DIR, "nodes");
 const DEFAULT_LIMIT = 4;
 

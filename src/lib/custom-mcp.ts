@@ -14,6 +14,7 @@ import type {
   McpServerConfig,
 } from "@anthropic-ai/claude-agent-sdk";
 import { refreshAccessToken } from "./mcp-oauth";
+import { dataDir } from "./app-home";
 
 export type CustomMcpTransport = "http" | "sse";
 
@@ -70,7 +71,7 @@ export type CustomMcpServer = {
   updatedAt: string;
 };
 
-const STATE_DIR = path.join(process.cwd(), "data", "org");
+const STATE_DIR = dataDir("org");
 const STATE_FILE = path.join(STATE_DIR, "custom-mcp.json");
 
 type FileShape = {

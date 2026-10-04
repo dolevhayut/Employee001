@@ -1,14 +1,10 @@
 import fs from "fs";
 import path from "path";
 import type { EmployeeWithTwin } from "@/lib/employees";
+import { dataDir } from "@/lib/app-home";
 
-const ORG_SKILLS_DIR = path.join(process.cwd(), "data", "org-skills");
-const ASSIGNMENTS_FILE = path.join(
-  process.cwd(),
-  "data",
-  "org",
-  "skill-assignments.json"
-);
+const ORG_SKILLS_DIR = dataDir("org-skills");
+const ASSIGNMENTS_FILE = dataDir("org", "skill-assignments.json");
 const DEFAULT_LIMIT = 3;
 
 export type OrgSkillPlaybook = {

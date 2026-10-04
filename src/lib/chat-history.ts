@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
 export type StoredMessage = {
   role: "user" | "twin";
@@ -19,7 +20,7 @@ export type StoredMessage = {
 const CONTEXT_WINDOW = 40;
 
 function historyPath(employeeId: string): string {
-  return path.join(process.cwd(), "data/employees", employeeId, "chat-history.jsonl");
+  return dataDir("employees", employeeId, "chat-history.jsonl");
 }
 
 export function loadChatHistory(employeeId: string): StoredMessage[] {

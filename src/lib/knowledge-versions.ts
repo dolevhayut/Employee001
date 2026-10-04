@@ -2,6 +2,7 @@ import "server-only";
 import fs from "fs";
 import path from "path";
 import { safeIso } from "./twin-versions";
+import { dataDir } from "./app-home";
 
 // Snapshots of text files in a twin's knowledge/ directory.
 //
@@ -64,9 +65,7 @@ export function canonicalKnowledgeTextName(name: string): string | null {
 
 function versionsRoot(employeeId: string): string {
   return path.join(
-    process.cwd(),
-    "data",
-    "employees",
+    dataDir("employees"),
     knowledgeEmployeeSegment(employeeId),
     ".versions",
     "knowledge",
@@ -79,9 +78,7 @@ function logPath(employeeId: string): string {
 
 function knowledgeFilePath(employeeId: string, name: string): string {
   return path.join(
-    process.cwd(),
-    "data",
-    "employees",
+    dataDir("employees"),
     knowledgeEmployeeSegment(employeeId),
     "knowledge",
     name,
@@ -272,9 +269,7 @@ export function restoreKnowledgeVersion(
 export function listRecentlyDeletedKnowledge(employeeId: string): KnowledgeVersionEntry[] {
   let live = new Set<string>();
   const dir = path.join(
-    process.cwd(),
-    "data",
-    "employees",
+    dataDir("employees"),
     knowledgeEmployeeSegment(employeeId),
     "knowledge",
   );

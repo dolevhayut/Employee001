@@ -1,7 +1,7 @@
 import fs from "fs";
-import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { loadChatHistory, appendChatMessage, type StoredMessage } from "@/lib/chat-history";
+import { dataDir } from "@/lib/app-home";
 
 export async function GET(
   _req: NextRequest,
@@ -26,7 +26,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const p = path.join(process.cwd(), "data/employees", id, "chat-history.jsonl");
+  const p = dataDir("employees", id, "chat-history.jsonl");
   if (fs.existsSync(p)) fs.unlinkSync(p);
   return NextResponse.json({ ok: true });
 }

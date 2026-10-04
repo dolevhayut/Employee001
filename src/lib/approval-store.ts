@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { ApprovalRequest } from "@/lib/approval-bus";
+import { dataDir } from "@/lib/app-home";
 
 // Durable mirror of in-flight approvals. The approval-bus itself must stay
 // an in-memory Promise registry (the resolver IS process state — it can't
@@ -15,7 +16,7 @@ import type { ApprovalRequest } from "@/lib/approval-bus";
 // No silent loss ≠ no loss. That honest gap closes when runs get real
 // checkpoints; the feed item is the contract until then.
 
-const FILE = () => path.join(process.cwd(), "data", "approvals-pending.json");
+const FILE = () => dataDir("approvals-pending.json");
 
 type StoreShape = Record<string, ApprovalRequest>;
 

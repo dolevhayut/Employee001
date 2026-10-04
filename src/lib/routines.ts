@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { computeNextCron } from "@/lib/cron";
+import { dataDir } from "@/lib/app-home";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ export type Routine = {
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
-const FILE = path.join(process.cwd(), "data", "routines.json");
+const FILE = dataDir("routines.json");
 
 function ensureDir() {
   const dir = path.dirname(FILE);

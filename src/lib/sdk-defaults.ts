@@ -16,6 +16,7 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import { appendAuditEntry } from "@/lib/audit-log";
 import { modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
+import { dataDir } from "@/lib/app-home";
 
 const PKG_VERSION = "Employee001/0.2.0";
 
@@ -319,13 +320,7 @@ export function buildTwinHooks(
     // Ensure the scratch dir exists so the SDK's Write doesn't fail on first use.
     try {
       const fs = await import("fs");
-      const path = await import("path");
-      const fullDir = path.join(
-        process.cwd(),
-        "data",
-        "scratch",
-        ctx.employeeId
-      );
+      const fullDir = dataDir("scratch", ctx.employeeId);
       fs.mkdirSync(fullDir, { recursive: true });
     } catch {
       /* best-effort — if mkdir fails, the SDK Write will surface the real error */

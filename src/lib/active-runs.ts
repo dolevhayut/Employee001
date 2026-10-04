@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { dataDir } from "./app-home";
 
 export type RunSurface = "shift" | "routine" | "task" | "council" | "builder" | "relay";
 export type RunStatus = "running" | "complete" | "error" | "aborted";
@@ -27,7 +28,7 @@ export type ActiveRun = {
   logPath: string;
 };
 
-const FILE = path.join(process.cwd(), "data", "active-runs.json");
+const FILE = dataDir("active-runs.json");
 const LINGER_MS = 60_000;
 
 function ensureDir() {
