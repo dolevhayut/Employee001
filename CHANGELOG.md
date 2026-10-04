@@ -35,6 +35,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   unless you opt in and an endpoint is configured.
 
 ### Fixed
+- **Smaller download.** The npm package no longer carries a copy of the
+  source tree, tests and tooling inside the server bundle (57 MB → 48 MB).
 - **Your twins now live in your folder and survive upgrades.** With
   `npx employee001`, the app stored everything inside the installed package
   (the npx cache), so a new version started empty and `export` found nothing.
