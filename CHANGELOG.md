@@ -10,7 +10,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 - **Dark and cool themes on Settings, Team Meeting, Cockpit, Schedules,
-  Tasks, Approvals, twin training and Live interview.**
+  Tasks, Approvals, twin training, Live interview, Hire and the org chart.**
+  Hire also used theme names that did not exist, so some of its text had no
+  themed color at all.
   Status badges, file chips, tool tints and dialogs now follow the theme
   instead of fixed light-mode colors.
 - **Approval gate hardened.** Bash and the other never-allowed built-in
