@@ -1,6 +1,8 @@
 // Decides whether a tool call is auto-allowed, requires CEO approval,
 // or hard-blocked. Used by the canUseTool callback in the agent runner.
 
+import type { ToolPolicyOverride, ToolPolicyOverrides } from "./tool-policy-overrides";
+
 export type ToolDecision =
   | { kind: "allow" }
   | { kind: "ask"; reason: string }
@@ -64,6 +66,16 @@ const ALWAYS_BLOCKED_TOOLS = new Set([
   "exitworktree",
 ]);
 
+function overrideFor(
+  original: string,
+  name: string,
+  overrides: ToolPolicyOverrides | undefined,
+): ToolPolicyOverride | undefined {
+  // A raw MCP name can be targeted precisely; the bare action is the useful
+  // default so an override also applies when the SDK adds its MCP prefix.
+  return overrides?.[original] ?? overrides?.[name];
+}
+
 /**
  * Strip the `mcp__<server>__` prefix that the Agent SDK adds to MCP tool
  * names so the classifier sees the bare Composio action name.
@@ -96,6 +108,33 @@ function readActionPrecedesBlockedTerm(name: string): boolean {
   return readIndex !== -1 && blockedIndex !== -1 && readIndex < blockedIndex;
 }
 
+function hardBlockDecision(name: string): ToolDecision | undefined {
+  if (ALWAYS_BLOCKED_TOOLS.has(name.toLowerCase())) {
+    return {
+      kind: "block",
+      reason: `${name} is unavailable to employee twins.`,
+    };
+  }
+
+  // Preserve the read-object exception: LIST_PAYMENT_METHODS and similar
+  // operations remain approval-gated rather than refused outright.
+  if (readActionPrecedesBlockedTerm(name)) return undefined;
+
+  for (const re of HARD_BLOCK_PATTERNS) {
+    if (re.test(name)) {
+      return {
+        kind: "block",
+        reason: `${name} is on the hard-block list (deletes, payments, account changes).`,
+      };
+    }
+  }
+  return undefined;
+}
+
+function matchesHardBlockPattern(name: string): boolean {
+  return HARD_BLOCK_PATTERNS.some((re) => re.test(name));
+}
+
 /**
  * Classify a tool call. The agent loop should pause for "ask" decisions
  * and surface them to the CEO via the approval card; "allow" passes
@@ -103,21 +142,33 @@ function readActionPrecedesBlockedTerm(name: string): boolean {
  */
 export function classifyTool(
   toolName: string,
-  input: Record<string, unknown> | undefined
+  input: Record<string, unknown> | undefined,
+  overrides?: ToolPolicyOverrides,
 ): ToolDecision {
   const original = toolName || "";
   const name = bareName(original); // strip mcp__server__ prefix
 
-  // Local sandbox + SDK built-in tools never need approval.
-  if (LOCAL_SAFE_TOOLS.has(original) || LOCAL_SAFE_TOOLS.has(name)) {
+  // Hard blocks always win, including over a CEO's per-tool preference.
+  const hardBlock = hardBlockDecision(name);
+  if (hardBlock) return hardBlock;
+
+  const override = overrideFor(original, name, overrides);
+  if (override === "off") {
+    return { kind: "block", reason: `${name} is disabled by this employee's tool policy.` };
+  }
+  if (override === "ask") {
+    return { kind: "ask", reason: `${name} requires approval by this employee's tool policy.` };
+  }
+  // A permissive preference cannot turn a destructive-looking action into an
+  // automatic approval. In particular, reads of transfer/removal records stay
+  // in the existing cautious path below.
+  if (override === "allow" && !matchesHardBlockPattern(name)) {
     return { kind: "allow" };
   }
 
-  if (ALWAYS_BLOCKED_TOOLS.has(name.toLowerCase())) {
-    return {
-      kind: "block",
-      reason: `${name} is unavailable to employee twins.`,
-    };
+  // Local sandbox + SDK built-in tools never need approval.
+  if (LOCAL_SAFE_TOOLS.has(original) || LOCAL_SAFE_TOOLS.has(name)) {
+    return { kind: "allow" };
   }
 
   // A read verb before a blocked term usually means the term is the object
@@ -129,16 +180,6 @@ export function classifyTool(
       kind: "ask",
       reason: `${name} reads data whose name looks destructive; confirm it is read-only.`,
     };
-  }
-
-  // Hard-block on destructive patterns regardless of approval.
-  for (const re of HARD_BLOCK_PATTERNS) {
-    if (re.test(name)) {
-      return {
-        kind: "block",
-        reason: `${name} is on the hard-block list (deletes, payments, account changes).`,
-      };
-    }
   }
 
   // Auto-allow read-only patterns.

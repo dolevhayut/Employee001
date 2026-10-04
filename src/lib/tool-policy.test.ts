@@ -38,6 +38,38 @@ describe("classifyTool", () => {
     expect(classifyTool("ExitWorktree", {})).toMatchObject({ kind: "block" });
   });
 
+  it("gives hard blocks precedence over every per-tool override", () => {
+    expect(classifyTool("Bash", {}, { Bash: "allow" })).toMatchObject({ kind: "block" });
+    expect(classifyTool("GITHUB_DELETE_REPOSITORY", {}, { GITHUB_DELETE_REPOSITORY: "allow" }))
+      .toMatchObject({ kind: "block" });
+  });
+
+  it("applies off and ask overrides before the standard policy", () => {
+    expect(classifyTool("GITHUB_GET_ISSUE", {}, { GITHUB_GET_ISSUE: "off" }))
+      .toMatchObject({ kind: "block" });
+    expect(classifyTool("Read", {}, { Read: "ask" })).toMatchObject({ kind: "ask" });
+  });
+
+  it("allows a permitted override to bypass the standard approval policy", () => {
+    expect(classifyTool("GITHUB_CREATE_AN_ISSUE", {}, { GITHUB_CREATE_AN_ISSUE: "allow" }))
+      .toEqual({ kind: "allow" });
+  });
+
+  it("never lets allow unblock transfer or removal patterns, including read actions", () => {
+    expect(classifyTool("BANK_TRANSFER_FUNDS", {}, { BANK_TRANSFER_FUNDS: "allow" }))
+      .toMatchObject({ kind: "block" });
+    expect(classifyTool("BANK_GET_TRANSFER_FUNDS", {}, { BANK_GET_TRANSFER_FUNDS: "allow" }))
+      .toMatchObject({ kind: "ask" });
+    expect(classifyTool("IDENTITY_LIST_REMOVE_USER", {}, { IDENTITY_LIST_REMOVE_USER: "allow" }))
+      .toMatchObject({ kind: "ask" });
+  });
+
+  it("uses a bare override for an MCP-prefixed action", () => {
+    expect(classifyTool("mcp__composio__GITHUB_CREATE_AN_ISSUE", {}, {
+      GITHUB_CREATE_AN_ISSUE: "allow",
+    })).toEqual({ kind: "allow" });
+  });
+
   it("guarantees read-only action verbs are allowed regardless of casing", () => {
     for (const name of [
       "GITHUB_GET_ISSUE",
