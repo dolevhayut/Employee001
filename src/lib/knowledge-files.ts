@@ -365,6 +365,30 @@ function extractInWorker(ext: ".pdf" | ".docx", data: Buffer): Promise<WorkerExt
 }
 
 /**
+ * next dev only: Turbopack's dev bundle can't boot the worker (no
+ * __dirname), so extract on the request thread. The DOCX zip-bomb check
+ * still runs first; the timeout only stops waiting, it can't stop the work.
+ * Production (`employee001 start`) always uses the worker.
+ */
+async function extractInline(ext: ".pdf" | ".docx", data: Buffer): Promise<WorkerExtractionResult> {
+  const { extractKnowledgeText } = await import("@/lib/knowledge-extract-core");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      extractKnowledgeText({ ext, data, maxTextBytes: KNOWLEDGE_EXTRACTED_TEXT_MAX_BYTES }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Text extraction timed out after 30 seconds.")),
+          KNOWLEDGE_EXTRACTION_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Best-effort PDF/DOCX extraction. The original upload is retained even if
  * conversion or writing its `${name}.md` companion fails.
  */
@@ -382,7 +406,9 @@ export async function extractUploadedKnowledgeFile(
   }
 
   try {
-    const { body, truncated } = await extractInWorker(ext, data);
+    const { body, truncated } = await (process.env.NODE_ENV === "production"
+      ? extractInWorker(ext, data)
+      : extractInline(ext, data));
     const header =
       `${EXTRACTED_COMPANION_MARKER}\n_Text extracted from \`${savedName}\`._\n\n` +
       (truncated ? "> **Note:** Extracted text was truncated to 2 MB.\n\n" : "");
