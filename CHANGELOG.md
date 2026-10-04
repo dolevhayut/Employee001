@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **No silently skipped work.** When an unattended run's approval request
+  waits too long (6 hours), Approvals now shows what was skipped and why.
+  For scheduled routines, that item and the "lost in restart" ones get a
+  one-click "Run routine again".
 - PDF and Word extraction can't take the server down: Word files that
   expand suspiciously (zip bombs) are refused before they are opened, and
   extraction runs in a separate worker with a memory cap and a 30-second
