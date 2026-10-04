@@ -365,16 +365,38 @@ const STOPWORDS = new Set([
   "איך",
 ]);
 
-function keywordScore(query: string, content: string): number {
+/**
+ * Corpus-local, IDF-weighted keyword coverage. A match on a term that appears
+ * in few memories contributes more than a match on one that appears nearly
+ * everywhere, while dividing by all query-term weights keeps the score in
+ * [0, 1] for the relevance gate and fusion lanes.
+ */
+function scoreKeywords(query: string, corpus: readonly string[]): number[] {
   const queryTokens = new Set(tokenize(query));
-  if (queryTokens.size === 0) return 0;
+  if (queryTokens.size === 0 || corpus.length === 0) return corpus.map(() => 0);
 
-  const contentTokens = new Set(tokenize(content));
-  let hits = 0;
+  const corpusTokens = corpus.map((entry) => new Set(tokenize(entry)));
+  const documentCount = corpusTokens.length;
+  const weights = new Map<string, number>();
+  let totalWeight = 0;
   for (const token of queryTokens) {
-    if (contentTokens.has(token)) hits++;
+    let documentFrequency = 0;
+    for (const tokens of corpusTokens) {
+      if (tokens.has(token)) documentFrequency++;
+    }
+    const idf = Math.log(1 + (documentCount - documentFrequency + 0.5) / (documentFrequency + 0.5));
+    weights.set(token, idf);
+    totalWeight += idf;
   }
-  return hits / queryTokens.size;
+  if (totalWeight === 0) return corpus.map(() => 0);
+
+  return corpusTokens.map((contentTokens) => {
+    let matchedWeight = 0;
+    for (const token of queryTokens) {
+      if (contentTokens.has(token)) matchedWeight += weights.get(token) ?? 0;
+    }
+    return matchedWeight / totalWeight;
+  });
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {
@@ -456,6 +478,29 @@ function ranksByScore(
     .sort((a, b) => b.score - a.score || (tiebreak ? tiebreak(a.card, b.card) : 0));
 
   return new Map(ranked.map((item, index) => [item.card.id, index]));
+}
+
+/** Like `ranksByScore`, but carries lexical coverage into the RRF distance.
+ *
+ * Pure ordinal ranks made a card that matched one ubiquitous token nearly as
+ * strong as one that covered the decisive query terms: the salience lane could
+ * erase that one-place difference. Dividing each ordinal position by its
+ * normalized keyword coverage preserves the existing RRF fusion while giving
+ * weak lexical matches a proportionally larger distance.
+ */
+function keywordRanksByScore(
+  cards: TwinMemoryCard[],
+  score: (card: TwinMemoryCard) => number,
+  tiebreak?: (a: TwinMemoryCard, b: TwinMemoryCard) => number
+): Map<string, number> {
+  const ranked = cards
+    .map((card) => ({ card, score: score(card) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || (tiebreak ? tiebreak(a.card, b.card) : 0));
+
+  return new Map(
+    ranked.map((item, index) => [item.card.id, (index + 1) / item.score - 1])
+  );
 }
 
 /**
@@ -622,8 +667,10 @@ export async function searchTwinMemory(
   const weights = recallWeights();
 
   const queryEmbedding = await createEmbedding(query, employeeId);
+  const cardCorpus = cards.map((card) => card.content);
+  const keywordValues = scoreKeywords(query, cardCorpus);
   const keywordScores = new Map(
-    cards.map((card) => [card.id, keywordScore(query, card.content)])
+    cards.map((card, index) => [card.id, keywordValues[index] ?? 0])
   );
   const semanticScores = new Map(
     cards.map((card) => [
@@ -657,7 +704,11 @@ export async function searchTwinMemory(
   const byRecency = (a: TwinMemoryCard, b: TwinMemoryCard) =>
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 
-  const keywordRanks = ranksByScore(candidates, (card) => keywordScores.get(card.id) ?? 0, bySalience);
+  const keywordRanks = keywordRanksByScore(
+    candidates,
+    (card) => keywordScores.get(card.id) ?? 0,
+    bySalience
+  );
   const semanticRanks = ranksByScore(candidates, (card) => semanticScores.get(card.id) ?? 0, bySalience);
   const salienceRanks = ranksByScore(candidates, (card) => salienceScores.get(card.id) ?? 0, byRecency);
 
@@ -1162,9 +1213,11 @@ export function searchStructuredMemory(
   const facts = readJsonl<TwinStructuredFact>(structuredPath(employeeId));
   if (facts.length === 0) return [];
 
-  const scored = facts.map((fact) => ({
+  const factCorpus = facts.map((fact) => `${fact.key} ${fact.value}`);
+  const scores = scoreKeywords(query, factCorpus);
+  const scored = facts.map((fact, index) => ({
     fact,
-    score: keywordScore(query, `${fact.key} ${fact.value}`),
+    score: scores[index] ?? 0,
   }));
 
   const matched = scored

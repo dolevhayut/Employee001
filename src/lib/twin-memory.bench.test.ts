@@ -165,6 +165,7 @@ describe("twin-memory deterministic retrieval benchmark", () => {
   it("keeps keyword recall and abstention above the offline baseline", async () => {
     let relevant = 0;
     let recalled = 0;
+    let topOneCorrect = 0;
     let abstentions = 0;
     const rows: string[] = [];
 
@@ -178,19 +179,24 @@ describe("twin-memory deterministic retrieval benchmark", () => {
       else {
         relevant++;
         recalled += Number(passed);
+        topOneCorrect += Number(ids[0] === entry.expectedId);
       }
+      if (entry.label === "GDPR erase") expect(ids[0]).toBe("gdpr-delete");
+      if (entry.label === "CSV/GDPR trap") expect(ids[0]).toBe("csv-import");
       rows.push(`${entry.label} | ${ids.join(",") || "-"} | ${passed ? "PASS" : "FAIL"}`);
     }
 
     const recallAt5 = recalled / relevant;
+    const topOneAccuracy = topOneCorrect / relevant;
     const abstentionAccuracy = abstentions / CASES.filter((entry) => entry.abstain).length;
     console.info(
-      `[twin-memory bench] recall@5=${recallAt5.toFixed(3)} abstention=${abstentionAccuracy.toFixed(3)}\n${rows.join("\n")}`
+      `[twin-memory bench] recall@5=${recallAt5.toFixed(3)} top1=${topOneAccuracy.toFixed(3)} abstention=${abstentionAccuracy.toFixed(3)}\n${rows.join("\n")}`
     );
 
-    // Calibrated from the deterministic no-embedding baseline (11/11 and 5/5);
-    // leave one relevant and one abstention case of headroom for harmless ranking changes.
+    // The IDF-weighted no-embedding fixture reaches 11/11 recall@5, 11/11 top-1,
+    // and 5/5 abstention. Leave one relevant and one abstention case of headroom.
     expect(recallAt5).toBeGreaterThanOrEqual(10 / 11);
+    expect(topOneAccuracy).toBeGreaterThanOrEqual(10 / 11);
     expect(abstentionAccuracy).toBeGreaterThanOrEqual(4 / 5);
   });
 
