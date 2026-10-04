@@ -372,7 +372,11 @@ function CockpitCard({ run }: { run: ActiveRun }) {
   const avatarColor = employee?.avatarColor ?? "var(--surface)";
   const ticking = useTickingNow(run.status === "running");
   const duration = useMemo(
-    () => formatDuration(run.startedAt, run.endedAt),
+    () => {
+      // Keep the memo invalidated while a run is active so Date.now() is reread.
+      void ticking;
+      return formatDuration(run.startedAt, run.endedAt);
+    },
     // ticking value is read inside formatDuration via Date.now() when endedAt absent
     [run.startedAt, run.endedAt, ticking]
   );

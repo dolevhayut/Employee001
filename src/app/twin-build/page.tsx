@@ -468,7 +468,7 @@ function TwinBuildContent() {
       reset: true,
       resuming: data.alreadyRunning,
     });
-  }, [employee, ceoContext, phase, attachToBuild]);
+  }, [employee, ceoContext, lookbackDays, phase, attachToBuild]);
 
   /**
    * On mount: probe `/active`. If a build is already running for this

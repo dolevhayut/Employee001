@@ -15,7 +15,6 @@ import { TwinEditor } from "@/components/editor/TwinEditor";
 import {
   EMPLOYEES_WITH_TWIN,
   CLAUDE_MODELS,
-  ELEVENLABS_VOICES,
   ELEVENLABS_VOICE_STORAGE_KEY,
   type EmployeeWithTwin,
   type ClaudeModel,

@@ -708,6 +708,7 @@ function CommandPalette({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- retained for the planned sidebar twin switcher
 function TwinSwitcher() {
   const router = useRouter();
   const roster = useRoster();

@@ -150,7 +150,7 @@ export default function FlowPage() {
 
   const activeEmployee: EmployeeWithTwin | undefined = useMemo(
     () => readyEmployees.find((e) => e.id === activeId),
-    [activeId]
+    [activeId, readyEmployees]
   );
 
   // Fetch graph when active employee changes. The view reset happens during

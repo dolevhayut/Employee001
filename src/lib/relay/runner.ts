@@ -30,7 +30,6 @@ import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 
 import {
   scoreCoverage,
-  type CoverageResult,
   type PerFieldCoverage,
 } from "./coverage";
 import {
@@ -60,14 +59,6 @@ const CAPTURE_MODEL = TWIN_MODEL_PRIMARY;
 /** Synthesis model id (opus) recorded in provenance in model mode. */
 const SYNTHESIS_MODEL = TWIN_MODEL_OPUS;
 
-const RELAY_PHASES = [
-  "consent",
-  "capture",
-  "synthesize",
-  "coverage",
-  "write",
-] as const;
-
 // ─── Path helpers ───────────────────────────────────────────────────────────
 
 const HANDOVER_DIR = (employeeId: string) =>
@@ -94,7 +85,12 @@ const EMPLOYEE_DATA_DIR = (id: string) =>
 // stay E001-free). RelayEvent is an internal streaming contract shared by the
 // runner, the SSE route, and the headless demo script.
 
-export type RelayPhase = (typeof RELAY_PHASES)[number];
+export type RelayPhase =
+  | "consent"
+  | "capture"
+  | "synthesize"
+  | "coverage"
+  | "write";
 
 export type RelayStoppedReason =
   | "natural"

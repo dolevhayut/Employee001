@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Icons } from "@/components/ex/icons";
 import { Topbar } from "@/components/ex/shell";
 import { PageHead } from "@/components/ex/page-head";
@@ -78,21 +78,6 @@ type ActivityItem = {
   source: string;
   msg: string;
 };
-
-function seedActivity(): ActivityItem[] {
-  return [
-    { id: 1,  kind: "fetch", source: "slack",       msg: "Pulled 8,421 messages across #infra, #platform, #eng-leads" },
-    { id: 2,  kind: "model", source: "claude.opus", msg: "Detected 14 tone patterns from Slack thread history" },
-    { id: 3,  kind: "fetch", source: "github",      msg: "Indexed 312 PR reviews — last 180 days" },
-    { id: 4,  kind: "model", source: "claude.opus", msg: "Wrote TONE.md — 3.2k tokens" },
-    { id: 5,  kind: "fetch", source: "linear",      msg: "Pulled 204 issues + comments by Amir" },
-    { id: 6,  kind: "write", source: "storage",     msg: "TECHNICS.md persisted (4.1k tokens)" },
-    { id: 7,  kind: "model", source: "claude.opus", msg: "Identified 9 recurring architecture questions → QUESTIONS.md" },
-    { id: 8,  kind: "fetch", source: "gmail",       msg: "Sampled 1,840 sent threads (last 6 months)" },
-    { id: 9,  kind: "model", source: "claude.opus", msg: "EXPERTISE.md: detected preference for reversible infra decisions" },
-    { id: 10, kind: "write", source: "storage",     msg: "PHILOSOPHY.md persisted — 18 examples across 6 months" },
-  ];
-}
 
 const LIVE_ACTIVITY: Omit<ActivityItem, "id">[] = [
   { kind: "fetch", source: "slack",       msg: "Scanning new messages since last refresh…" },
@@ -592,7 +577,6 @@ function Phase2Panel({ tick }: { tick: number }) {
 export default function LearningPage() {
   const [tick, setTick] = useState(0);
   const [phase, setPhase] = useState<1 | 2>(1);
-  const activity = useRef(seedActivity());
 
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 1800);

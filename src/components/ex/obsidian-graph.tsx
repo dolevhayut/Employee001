@@ -33,7 +33,6 @@ type LaidOutNode = RealNode & {
 };
 
 const LAYOUT_SIZE = 800;
-const CENTER = LAYOUT_SIZE / 2;
 const SPHERE_RADIUS = 280; // 3D sphere radius in layout units
 const PERSPECTIVE = 700;   // smaller = stronger fish-eye
 const HUB_DEPTH_BOOST = 1.3;

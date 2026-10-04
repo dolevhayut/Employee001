@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { getComposio, isComposioConfigured } from "@/lib/composio-client";
 
 export type ToolkitSummary = {
@@ -16,7 +15,7 @@ export type ToolkitSummary = {
  * GET /api/connections/toolkits
  * Returns the full Composio catalog as a flat list of summaries the UI can render.
  */
-export async function GET(_req: NextRequest) {
+export async function GET() {
   if (!isComposioConfigured()) {
     return new Response(
       JSON.stringify({ error: "COMPOSIO_API_KEY is not set", toolkits: [] }),

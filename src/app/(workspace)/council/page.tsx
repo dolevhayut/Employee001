@@ -973,6 +973,7 @@ function FileTypeIcon({ filename, contentType, size = 28 }: { filename: string; 
   );
 }
 
+/* eslint-disable @next/next/no-img-element -- remote attachment previews require native URLs */
 function FileShareChip({
   chip,
   meetingId,
@@ -1240,6 +1241,8 @@ function FileDrawer({
     </>
   );
 }
+
+/* eslint-enable @next/next/no-img-element */
 
 function DelegationArrow({ fromName, toName }: { fromName: string; toName: string }) {
   return (

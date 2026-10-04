@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Check } from "iconoir-react";
 import { Topbar } from "@/components/ex/shell";
 import { useT } from "@/components/ex/i18n-context";
@@ -153,8 +153,8 @@ export default function ConnectionsForEmployeePage({
     }
   }
 
-  const allowed = data?.allowedToolkits ?? [];
-  const connBySlug = data?.connections ?? {};
+  const allowed = useMemo(() => data?.allowedToolkits ?? [], [data]);
+  const connBySlug = useMemo(() => data?.connections ?? {}, [data]);
 
   const recommended = useMemo(() => {
     if (catalog.length === 0) return [];
@@ -915,34 +915,6 @@ function Stat({
         {value.toLocaleString()}
       </div>
     </div>
-  );
-}
-
-function StatusDot({
-  bucket,
-}: {
-  bucket: "active" | "pending" | "broken" | "disconnected";
-}) {
-  const colors = {
-    active: "var(--success)",
-    pending: "var(--warn)",
-    broken: "var(--danger)",
-    disconnected: "var(--text-subtle)",
-  };
-  const color = colors[bucket];
-  const animated = bucket === "pending";
-  return (
-    <motion.div
-      animate={animated ? { opacity: [1, 0.3, 1] } : {}}
-      transition={animated ? { duration: 1.4, repeat: Infinity } : { duration: 0 }}
-      style={{
-        width: 9,
-        height: 9,
-        borderRadius: "50%",
-        background: color,
-        flexShrink: 0,
-      }}
-    />
   );
 }
 
