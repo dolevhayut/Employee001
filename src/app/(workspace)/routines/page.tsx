@@ -358,20 +358,22 @@ export default function RoutinesPage() {
                     )}
                   </div>
 
-                  {/* Task */}
-                  <p
-                    style={{
-                      fontSize: "var(--fs-sm)",
-                      color: "var(--text-muted)",
-                      margin: "0 0 10px",
-                      padding: "8px 10px",
-                      background: "var(--bg-sunken)",
-                      borderRadius: 6,
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    {r.task}
-                  </p>
+                  {/* Task (shift routines have none) */}
+                  {r.task?.trim() && (
+                    <p
+                      style={{
+                        fontSize: "var(--fs-sm)",
+                        color: "var(--text-muted)",
+                        margin: "0 0 10px",
+                        padding: "8px 10px",
+                        background: "var(--bg-sunken)",
+                        borderRadius: 6,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {r.task}
+                    </p>
+                  )}
 
                   {/* Last run summary */}
                   {r.lastRunSummary && (
