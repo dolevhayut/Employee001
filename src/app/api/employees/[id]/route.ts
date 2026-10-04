@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import path from "path";
 import { getHiredAgentIds, dismissAgent } from "@/lib/hired-agents";
 import { appendAuditEntry } from "@/lib/audit-log";
+import { withSidecarLock } from "@/lib/sidecar-lock";
 
 // Slug pattern matches everything our materialisers emit:
 // `dolev-hayut`, `pending-c7bc0d-c7bc0d`, `marketplace-sdr-alex`, etc.
@@ -146,38 +147,45 @@ export async function PATCH(
     return NextResponse.json({ error: "not_hebrew" }, { status: 400 });
   }
 
-  const sidecarPath = path.join(dir, "employee.json");
-  let raw: string;
-  try {
-    await fs.access(dir);
-    raw = await fs.readFile(sidecarPath, "utf8");
-  } catch {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
-  }
+  // Serialized with other writers of this sidecar (activity counter) so
+  // neither drops the other's fields.
+  const outcome = await withSidecarLock(id, async (): Promise<NextResponse | Record<string, unknown>> => {
+    const sidecarPath = path.join(dir, "employee.json");
+    let raw: string;
+    try {
+      await fs.access(dir);
+      raw = await fs.readFile(sidecarPath, "utf8");
+    } catch {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
 
-  let sidecar: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    let sidecar: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return NextResponse.json({ error: "invalid_sidecar" }, { status: 500 });
+      }
+      sidecar = parsed as Record<string, unknown>;
+    } catch {
       return NextResponse.json({ error: "invalid_sidecar" }, { status: 500 });
     }
-    sidecar = parsed as Record<string, unknown>;
-  } catch {
-    return NextResponse.json({ error: "invalid_sidecar" }, { status: 500 });
-  }
 
-  if (nameHe === "") delete sidecar.nameHe;
-  else sidecar.nameHe = nameHe;
+    if (nameHe === "") delete sidecar.nameHe;
+    else sidecar.nameHe = nameHe;
 
-  const tmp = path.join(dir, `.employee.json.${randomUUID()}.tmp`);
-  try {
-    await fs.writeFile(tmp, JSON.stringify(sidecar, null, 2) + "\n", "utf8");
-    await fs.rename(tmp, sidecarPath);
-  } catch (err) {
-    await fs.unlink(tmp).catch(() => {});
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: "write_failed", message }, { status: 500 });
-  }
+    const tmp = path.join(dir, `.employee.json.${randomUUID()}.tmp`);
+    try {
+      await fs.writeFile(tmp, JSON.stringify(sidecar, null, 2) + "\n", "utf8");
+      await fs.rename(tmp, sidecarPath);
+    } catch (err) {
+      await fs.unlink(tmp).catch(() => {});
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ error: "write_failed", message }, { status: 500 });
+    }
+    return sidecar;
+  });
+  if (outcome instanceof NextResponse) return outcome;
+  const sidecar = outcome;
 
   const employeeName = typeof sidecar.name === "string" ? sidecar.name : id;
   appendAuditEntry({

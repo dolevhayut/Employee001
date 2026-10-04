@@ -19,8 +19,9 @@ function loadOrgName(): Promise<string> {
       })
       .catch(() => "")
       .then((name) => {
-        cached = name;
-        return name;
+        // A save in Settings (setOrgName) during the fetch wins.
+        if (cached === undefined) cached = name;
+        return cached;
       });
   }
   return inflight;

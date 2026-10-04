@@ -7,6 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 import type { ClaudeModel, EmployeeWithTwin } from "./employees";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
+import { withSidecarLock } from "./sidecar-lock";
 
 const AVATAR_PALETTE = [
   "#A8B4C4", "#C4A8B8", "#B8C4A8", "#A8C4B8", "#C4B8A8",
@@ -80,6 +81,7 @@ export async function bumpActivityOnDisk(employeeId: string): Promise<void> {
     process.cwd(), "data", "employees", employeeId, "employee.json"
   );
   try {
+    await withSidecarLock(employeeId, async () => {
     const raw = await fs.readFile(sidecarPath, "utf8");
     const sidecar: DiskSidecar = JSON.parse(raw);
     const thisWeek = isoWeek(new Date());
@@ -94,6 +96,7 @@ export async function bumpActivityOnDisk(employeeId: string): Promise<void> {
       ),
       "utf8",
     );
+    });
   } catch {
     // Non-critical — never crash the chat for a stats write failure.
   }
