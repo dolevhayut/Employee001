@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { TwinMemoryCard, TwinStructuredFact } from "./twin-memory";
 
@@ -129,6 +129,9 @@ function writeFixture(): void {
 }
 
 beforeAll(async () => {
+  // Salience decays with age; freeze "now" so rankings never drift as the
+  // fixture dates get older. Only Date is faked, so promises still run.
+  vi.useFakeTimers({ now: new Date("2026-06-01T00:00:00.000Z"), toFake: ["Date"] });
   for (const key of ENV_KEYS) {
     originalEnv.set(key, process.env[key]);
     delete process.env[key];
@@ -147,6 +150,7 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
+  vi.useRealTimers();
   process.chdir(ORIGINAL_CWD);
   globalThis.fetch = originalFetch;
   for (const key of ENV_KEYS) {
