@@ -4,7 +4,7 @@
 
 ### Your organizational brain.
 
-**Agent twins of your real employees** — running entirely on your own machine, sharing one knowledge layer, executing real work through real tools.
+**AI twins of your real team, on your own machine.** Each twin is trained on one real person's own work, the twins debate your hard questions in a Team Meeting, and nothing they do in the outside world happens without your approval.
 
 [![npm version](https://img.shields.io/npm/v/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
 [![npm downloads](https://img.shields.io/npm/dm/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
@@ -13,7 +13,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg?style=flat-square)](https://nodejs.org)
 [![Discussions](https://img.shields.io/github/discussions/dolevhayut/Employee001?style=flat-square)](https://github.com/dolevhayut/Employee001/discussions)
 
-[**Install**](#install) · [**A council in 30 seconds**](#a-council-in-30-seconds) · [**How it works**](#how-it-actually-works) · [**Vs. alternatives**](#vs-other-ai-for-teams-products) · [**Security model**](#what-twins-can-and-cant-do)
+[**Install**](#install) · [**Why it's different**](#why-its-different) · [**A Team Meeting in 30 seconds**](#a-team-meeting-council-in-30-seconds) · [**How it works**](#how-it-actually-works) · [**Vs. alternatives**](#vs-other-ai-for-teams-products) · [**Security model**](#what-twins-can-and-cant-do)
 
 </div>
 
@@ -41,18 +41,26 @@ npx employee001 start     # opens http://localhost:3000
 > [!IMPORTANT]
 > **Your data never leaves your machine.** Only the prompts a twin generates are sent to the Anthropic API. Employee profiles, audit logs, org knowledge — all of it stays in `./data/` on your hardware. No telemetry, no analytics, no "phone home".
 
+## Why it's different
+
+- **Twins of real people, not role templates.** Each employee connects their own tools (Slack, Gmail, Linear, GitHub ...) and a training agent writes their twin from their actual history: expertise, decisions, tone.
+- **Team Meeting.** Ask one question and the right twins argue it out, challenge each other and land on a verdict you can act on.
+- **Nothing runs unapproved by default.** Every external action (an email, a Slack post, a ticket) stops at an approval gate, and every tool call is written to an audit log. Each employee authorizes their own twin's tools with their own OAuth.
+- **Local-first.** Your profiles, memory, audit log and org knowledge live in `./data/` on your hardware. Prefer a server? Run your own single-tenant cloud instance.
+- **Speaks Hebrew.** Twins converse, write and remember in natural Hebrew, with right-to-left rendering, no extra service needed.
+
 ## What it is
 
 |  | |
 |---|---|
 | 🧠 | **Your organizational brain.** Scattered expertise, past decisions, and work patterns become one living layer your company can query, trust, and grow. |
 | 👤 | **A twin for every employee.** Always-on AI agents that understand a specific person's role, context, tone, and prior work — not generic role templates. |
-| 💬 | **Multi-twin council meetings.** Ask one question and the right twins debate, challenge each other, and converge on a shared answer. |
+| 💬 | **Team Meeting (council).** Ask one question and the right twins debate, challenge each other, and converge on a shared answer. |
 | 🔌 | **Connected to how people actually work.** Email, calendar, docs, Slack, Linear, GitHub, CRM — through [Composio MCP](https://composio.dev), the same tools your people already use. |
 | ⚡ | **Knowledge → execution.** Twins draft Slack messages, file Linear tickets, send emails, follow up — each action gated by your approval. |
 | 🏠 | **Local-first by default.** Runs on your Mac mini (or any Node 22 machine). Bound to `127.0.0.1`. Only prompts leave, only to Anthropic. |
 
-## A council, in 30 seconds
+## A Team Meeting (council), in 30 seconds
 
 > **You:** What should we do before launching the new customer onboarding flow?
 
@@ -119,7 +127,7 @@ sequenceDiagram
     Server-->>Employee: ✅ twin ready
 
     Note over CEO,Composio: 3. Ask, propose, approve, audit
-    CEO->>Server: question (single twin or council)
+    CEO->>Server: question (single twin or Team Meeting)
     Server->>Claude: prompt + profile files + Org Brain
     Claude->>Server: proposes Composio tool call
     Server-->>CEO: 🛑 approval queue
@@ -132,16 +140,21 @@ sequenceDiagram
 
 ## Vs. other AI-for-teams products
 
-|  | ChatGPT Teams / Copilot | Cabinet[^1] | Paperclip[^2] | **Employee001** |
-|---|---|---|---|---|
-| Who the agent represents | Generic assistant | Generic role templates | Configurable AI "employees" | **A twin of a real, named person** |
-| Where data lives | OpenAI / Microsoft cloud | One founder's laptop | Managed cloud or self-host | **Your machine. Prompts only leave, only to Anthropic** |
-| Multi-twin reasoning | — | — | Task routing | **Council debates — twins challenge each other** |
-| Tool execution | Limited connectors | CLI in a terminal | Adapters to external agents | **Native MCP + approval gate on every external action** |
-| Org-wide knowledge | Conversation history | Personal notebook | Task/spend dashboards | **Org Brain — what one twin learns, the rest inherit** |
+As of October 2026:
 
-[^1]: Comparison reflects public information about Cabinet ([hilash/cabinet](https://github.com/hilash/cabinet), MIT-licensed) as of May 2026.
-[^2]: Comparison reflects public information about Paperclip ([paperclip.inc](https://paperclip.inc), MIT-licensed) as of May 2026.
+|  | ChatGPT Teams / Copilot | Cabinet[^1] | Paperclip[^2] | ZooWork[^3] | **Employee001** |
+|---|---|---|---|---|---|
+| Who the agent represents | A generic assistant | Agent teams | Configurable AI "employees" | Agents that engineers build and deliver | **A twin of a real, named person, trained on their own work** |
+| Where it runs | OpenAI / Microsoft cloud | Self-hosted, markdown on disk (cloud on a waitlist) | Self-hosted or managed | Managed cloud | **Your machine, or your own single-tenant cloud. Prompts go to Anthropic** |
+| External actions | Depends on the connector | Human approval queue | Its own approvals; Claude/Codex runs default to full auto since v2026.1001.0 | Approval gates | **Approval gate on every external action, on by default** |
+| Several agents on one question | — | Agent teams | Task routing between agents | Agent workflows | **Team Meeting: twins debate and converge on a verdict** |
+| Shared knowledge | Conversation history | Knowledge base | Company skills learned from finished tasks | Packaged agent skills | **Org Brain: what one twin learns, the others can use** |
+
+[^1]: Public information about Cabinet ([cabinetai/cabinet](https://github.com/cabinetai/cabinet), [runcabinet.com](https://runcabinet.com)) as of 2026-10-04.
+[^2]: Public information about Paperclip ([paperclipai/paperclip](https://github.com/paperclipai/paperclip), release notes for v2026.916.0 and v2026.1001.0) as of 2026-10-04.
+[^3]: Public information about ZooWork, formerly ZooClaw ([zoowork.ai](https://zoowork.ai/)), as of 2026-10-04.
+
+Spotted something out of date? [Open an issue](https://github.com/dolevhayut/Employee001/issues) and we'll fix the table.
 
 ## Built around how people actually work
 
@@ -209,7 +222,7 @@ No twin runs shell commands on your machine. Enforced in two places at once (the
 
 **Web citations.** After any `WebSearch` or `WebFetch`, a `PostToolUse` hook injects an instruction telling the model to cite the URL and the fetch date. Twins can look things up online, but they can't pretend they "just knew" something.
 
-**Models.** `claude-sonnet-4-6` default with `claude-sonnet-4-5` fallback. Override to `claude-opus-4-8` for a single message from the chat UI. Source of truth: [`src/lib/sdk-defaults.ts`](src/lib/sdk-defaults.ts).
+**Models.** `claude-sonnet-5-5` (Claude Sonnet 5.5) by default, with `claude-sonnet-5` as the fallback. Override to Opus for a single message from the chat UI. Source of truth: [`src/lib/sdk-defaults.ts`](src/lib/sdk-defaults.ts).
 
 </details>
 
@@ -284,7 +297,7 @@ The product has shipped the core loop end-to-end. Tracking against the public ro
 - [x] Approval gate on every external tool call
 - [x] In-UI profile editing of the 9 markdown files
 - [x] Per-invite training window (30–360 days)
-- [x] Multi-twin council debates (`/council`)
+- [x] Team Meeting: multi-twin debates (`/council`)
 - [x] Scheduled routines (`/routines`)
 - [x] Marketplace agents (pre-built SDR/DevOps/Writer/Analyst/CSM)
 - [x] Custom MCP servers with OAuth bridge (`/settings`)
@@ -293,7 +306,12 @@ The product has shipped the core loop end-to-end. Tracking against the public ro
 - [x] Autonomous shifts — twins run scheduled work and take action behind a live approval gate, with per-run archives + observability (`/cockpit`)
 - [x] Voice playback for twin answers (ElevenLabs)
 - [x] Self-curating twin memory — salience-ranked recall, dedup-on-write, multilingual (Hebrew/English) fact extraction
-- [x] Hebrew — twins converse and extract memory in Hebrew (Anthropic-only, no extra key)
+- [x] Hebrew — twins converse and extract memory in Hebrew (Anthropic-only, no extra key), with right-to-left rendering
+- [x] Memory relevance gate — twins only recall memories that fit the question, with an optional agentic rerank
+- [x] Claude Sonnet 5.5 by default
+- [x] PDF and Word uploads become readable knowledge (extracted to Markdown next to the original)
+- [x] One sidebar for both modes, an approvals badge, and Autonomy as a pure kill switch for unattended work
+- [x] Single-tenant cloud deploy runbook ([Fly.io](./docs/DEPLOY-CLOUD.md))
 - [ ] Full UI internationalization (i18n)
 - [ ] Multi-CEO / multi-tenant
 - [ ] Mac DMG / Electron wrapper for non-technical CEOs
