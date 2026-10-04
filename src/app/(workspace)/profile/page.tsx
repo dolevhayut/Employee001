@@ -997,7 +997,10 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
               <span
                 dir="rtl"
                 style={{
+                  display: "inline-block",
                   marginLeft: "var(--sp-10)",
+                  whiteSpace: "nowrap",
+                  unicodeBidi: "isolate",
                   color: "var(--text-muted)",
                   fontWeight: 400,
                 }}
