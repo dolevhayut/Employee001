@@ -3,15 +3,14 @@
 import "server-only";
 import fs from "fs/promises";
 import path from "path";
+import { dataDir } from "./app-home";
 import { withSidecarLock } from "./sidecar-lock";
 
 export type ToolPolicyOverride = "allow" | "ask" | "off";
 export type ToolPolicyOverrides = Record<string, ToolPolicyOverride>;
 
-// Keep the data-root decision in one place so moving to dataDir() is a
-// one-line change.
 function employeeDataDir(employeeId: string): string {
-  return path.join(process.cwd(), "data", "employees", employeeId);
+  return dataDir("employees", employeeId);
 }
 
 function overridesPath(employeeId: string): string {
