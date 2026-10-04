@@ -6,10 +6,11 @@ import os from "node:os";
 import path from "node:path";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import pkg from "../../package.json";
+import { dataDir } from "@/lib/app-home";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
-const SETTINGS_FILE = () => path.join(process.cwd(), "data", "settings.json");
+const SETTINGS_FILE = () => dataDir("settings.json");
 
 type StoredSettings = {
   telemetry?: TelemetrySettings;
@@ -99,9 +100,9 @@ function isInLastWeek(value: unknown, now: number): boolean {
 
 function countRecentMeetingDirectories(now: number): number {
   try {
-    return fs.readdirSync(path.join(process.cwd(), "data", "meetings"), { withFileTypes: true })
+    return fs.readdirSync(dataDir("meetings"), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .filter((entry) => isInLastWeek(fs.statSync(path.join(process.cwd(), "data", "meetings", entry.name)).birthtimeMs, now))
+      .filter((entry) => isInLastWeek(fs.statSync(dataDir("meetings", entry.name)).birthtimeMs, now))
       .length;
   } catch {
     return 0;
@@ -110,7 +111,7 @@ function countRecentMeetingDirectories(now: number): number {
 
 function countRecentApprovals(now: number): number {
   try {
-    const root = path.join(process.cwd(), "data", "shifts");
+    const root = dataDir("shifts");
     return fs.readdirSync(root, { withFileTypes: true }).reduce((count, entry) => {
       if (!entry.isDirectory()) return count;
       try {

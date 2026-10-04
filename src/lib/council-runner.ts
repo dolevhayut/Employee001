@@ -68,6 +68,7 @@ import { buildConsultMcpServer } from "@/lib/consult-mcp";
 import type { ConsultContext } from "@/lib/twin-consult";
 import { ceoOf, orgClause, readOrgIdentity } from "@/lib/org-identity";
 import { proposalsEnabled, proposeKnowledgeFromMeeting } from "@/lib/knowledge-proposals";
+import { dataDir } from "@/lib/app-home";
 
 // ─── Event types ──────────────────────────────────────────────────────────────
 
@@ -768,7 +769,7 @@ export async function runSingleTwin(
   // rather than "No files found" — an empty result causes the model to assume
   // scratch is unavailable and skip the Write call entirely.
   try {
-    const scratchDir = path.join(process.cwd(), "data", "scratch", employee.id);
+    const scratchDir = dataDir("scratch", employee.id);
     fs.mkdirSync(scratchDir, { recursive: true });
   } catch { /* non-fatal */ }
 
@@ -780,19 +781,14 @@ export async function runSingleTwin(
 
   // Per-employee profile directory — used to pre-load profile content into
   // the system prompt.
-  const employeeDir = path.join(
-    process.cwd(),
-    "data",
-    "employees",
-    employee.id
-  );
+  const employeeDir = dataDir("employees", employee.id);
 
   // The SDK's Read/Glob/Grep tools sandbox to `cwd` and won't traverse upward
   // via `..`. We therefore set the agent's cwd to `data/` so the twin can
   // freely browse its own profile (`employees/<id>/*.md`), peer profiles
   // (`employees/<other>/*.md`), and the company brain (`org-brain/nodes/*.md`)
   // — but NOT the source code or anything above the data root.
-  const dataRoot = path.join(process.cwd(), "data");
+  const dataRoot = dataDir();
 
   // Prefer SDK session resumption when caller passed a sessionId — the SDK
   // reloads the full transcript (including tool_use/tool_result blocks) so we
@@ -1448,7 +1444,7 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
     allParticipants.filter((e) => e.id !== forId).map((e) => e.firstName);
 
   // Diagnostic file logger
-  const logFile = path.join(process.cwd(), "data", "council-debug.log");
+  const logFile = dataDir("council-debug.log");
   const dlog = (msg: string) => {
     const line = `[${new Date().toISOString()}] ${msg}\n`;
     console.log(msg);

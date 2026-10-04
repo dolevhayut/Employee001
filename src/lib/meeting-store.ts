@@ -20,6 +20,7 @@
 
 import fs from "fs";
 import path from "path";
+import { dataDir } from "@/lib/app-home";
 
 export type MeetingTurn =
   | { kind: "ceo"; text: string; ts: number }
@@ -74,7 +75,7 @@ const meetings = new Map<string, Meeting>();
 /** Hard upper bound for a single shared file. Approved by CEO at 25MB. */
 export const SHARED_FILE_MAX_BYTES = 25 * 1024 * 1024;
 
-const MEETINGS_ROOT = path.join(process.cwd(), "data", "meetings");
+const MEETINGS_ROOT = dataDir("meetings");
 
 // Cold-start wipe: meeting state is in-memory, so any on-disk shared files
 // from a prior process are orphans. Clear them on module load to avoid
