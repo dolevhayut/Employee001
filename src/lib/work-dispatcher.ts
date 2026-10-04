@@ -4,7 +4,7 @@ import { runSingleTwin, type CouncilEvent } from "@/lib/council-runner";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 import { isUnderBudget } from "@/lib/twin-budget";
-import { appendFeedItem } from "@/lib/feed-store";
+import { appendFeedItem, feedSourceForApproval } from "@/lib/feed-store";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
 
@@ -43,7 +43,7 @@ export function recoverOrphanedApprovals(): void {
   for (const o of orphans) {
     try {
       appendFeedItem({
-        source: { kind: "shift", employeeId: o.employeeId, runId: o.runId },
+        source: feedSourceForApproval(o),
         type: "needs-review",
         title: `Approval lost in restart: ${o.bareName ?? o.toolName}`,
         detail:

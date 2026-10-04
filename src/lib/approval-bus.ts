@@ -1,4 +1,5 @@
 import { persistPendingApproval, removePendingApproval } from "@/lib/approval-store";
+import { appendFeedItem, feedSourceForApproval } from "@/lib/feed-store";
 
 // Per-process registry of in-flight tool approval requests.
 // The agent runner registers a Promise here when it hits a tool that needs
@@ -107,6 +108,42 @@ function ttlFor(surface: ApprovalSurface): number {
   return surface === "background" ? BACKGROUND_TTL_MS : CHAT_TTL_MS;
 }
 
+function waitLabel(ttl: number): string {
+  const mins = Math.round(ttl / 60_000);
+  return mins >= 60 ? `${Math.round(mins / 60)}h` : `${mins} minutes`;
+}
+
+/** Expire stale approvals and surface unattended work that was skipped. */
+export function sweepPendingApprovals(now = Date.now()): void {
+  for (const [id, entry] of PENDING.entries()) {
+    const ttl = ttlFor(entry.request.surface);
+    if (now - entry.request.createdAt <= ttl) continue;
+
+    PENDING.delete(id);
+    removePendingApproval(id);
+    const wait = waitLabel(ttl);
+    if (entry.request.surface === "background") {
+      try {
+        appendFeedItem({
+          source: feedSourceForApproval(entry.request),
+          type: "needs-review",
+          title: `Skipped: ${entry.request.bareName ?? entry.request.toolName} wasn't approved in time`,
+          detail:
+            `${entry.request.employeeName ?? entry.request.employeeId} skipped this action after waiting ${wait} for approval. ` +
+            `Reason it asked: ${entry.request.reason}`,
+          priority: 2,
+        });
+      } catch {
+        /* feed is best-effort */
+      }
+    }
+    entry.resolve({
+      action: "deny",
+      message: `Approval timed out — no human response within ${wait}.`,
+    });
+  }
+}
+
 if (typeof globalThis !== "undefined") {
   // Avoid spawning multiple intervals in dev hot-reload
   type GlobalWithInterval = typeof globalThis & {
@@ -115,19 +152,7 @@ if (typeof globalThis !== "undefined") {
   const g = globalThis as GlobalWithInterval;
   if (!g.__approvalSweep) {
     g.__approvalSweep = setInterval(() => {
-      const now = Date.now();
-      for (const [id, entry] of PENDING.entries()) {
-        const ttl = ttlFor(entry.request.surface);
-        if (now - entry.request.createdAt > ttl) {
-          PENDING.delete(id);
-          removePendingApproval(id);
-          const mins = Math.round(ttl / 60_000);
-          entry.resolve({
-            action: "deny",
-            message: `Approval timed out — no human response within ${mins >= 60 ? `${Math.round(mins / 60)}h` : `${mins} minutes`}.`,
-          });
-        }
-      }
+      sweepPendingApprovals();
     }, 60_000);
   }
 }

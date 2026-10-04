@@ -230,6 +230,7 @@ export default function InboxPage() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [hideResolved, setHideResolved] = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [rerunningId, setRerunningId] = useState<string | null>(null);
   const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
@@ -280,6 +281,22 @@ export default function InboxPage() {
       await load();
     } finally {
       setResolvingId(null);
+    }
+  }
+
+  async function runRoutineAgain(itemId: string, routineId: string) {
+    setRerunningId(itemId);
+    try {
+      const run = await fetch(`/api/routines/${routineId}/run`, { method: "POST" });
+      if (!run.ok) return;
+      const resolved = await fetch(`/api/feed/${itemId}/resolve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolution: "approved", note: t("inbox.routineStarted") }),
+      });
+      if (resolved.ok) await load();
+    } finally {
+      setRerunningId(null);
     }
   }
 
@@ -424,6 +441,7 @@ export default function InboxPage() {
               {filteredItems.map((item) => {
                 const isOpenReview = item.type === "needs-review" && item.status === "open";
                 const isResolved = item.status !== "open";
+                const routineSource = item.source.kind === "routine" ? item.source : null;
                 return (
                   <motion.div
                     key={item.id}
@@ -498,6 +516,21 @@ export default function InboxPage() {
                           borderTop: "1px solid var(--hairline)",
                         }}
                       >
+                        {routineSource && (
+                          <button
+                            onClick={() => void runRoutineAgain(item.id, routineSource.routineId)}
+                            disabled={rerunningId === item.id || resolvingId === item.id}
+                            className="btn sm"
+                            style={{ height: 26 }}
+                          >
+                            {rerunningId === item.id ? (
+                              <Icons.Loader size={11} style={{ animation: "spin 1s linear infinite" }} />
+                            ) : (
+                              <Icons.Arrow size={11} />
+                            )}
+                            {rerunningId === item.id ? t("inbox.routineStarted") : t("inbox.runRoutineAgain")}
+                          </button>
+                        )}
                         <button
                           onClick={() => resolve(item.id, "approved")}
                           disabled={resolvingId === item.id}

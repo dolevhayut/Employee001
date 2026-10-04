@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import type { ApprovalRequest } from "@/lib/approval-bus";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,22 @@ export type FeedListFilter = {
   limit?: number;
   since?: string;
 };
+
+/** Keep approval recovery and timeout notices pointed at the actionable origin. */
+export function feedSourceForApproval(
+  approval: Pick<ApprovalRequest, "employeeId" | "runId" | "context">
+): FeedSource {
+  if (approval.context?.type === "routine") {
+    return {
+      kind: "routine",
+      employeeId: approval.employeeId,
+      runId: approval.runId,
+      routineId: approval.context.routineId,
+      routineName: approval.context.routineName,
+    };
+  }
+  return { kind: "shift", employeeId: approval.employeeId, runId: approval.runId };
+}
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
