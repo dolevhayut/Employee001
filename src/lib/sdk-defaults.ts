@@ -103,11 +103,16 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
     thinking,
     disallowedTools: TWIN_HARD_DISALLOWED,
     betas,
-    env: {
-      ...process.env,
-      ...providerEnvForAgentSdk(),
-      CLAUDE_AGENT_SDK_CLIENT_APP: PKG_VERSION,
-    },
+    // Drop undefined entries: providerEnvForAgentSdk() unsets other
+    // providers' flags with undefined, and a stringified "undefined" would
+    // read as truthy in the Claude Code subprocess.
+    env: Object.fromEntries(
+      Object.entries({
+        ...process.env,
+        ...providerEnvForAgentSdk(),
+        CLAUDE_AGENT_SDK_CLIENT_APP: PKG_VERSION,
+      }).filter(([, value]) => value !== undefined),
+    ),
     abortController: args.abortController,
     title: args.title,
     // Predicted follow-ups in chat surfaces — free (rides parent prompt cache).
