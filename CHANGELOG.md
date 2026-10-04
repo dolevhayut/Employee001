@@ -17,6 +17,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   similar proxy, list the public name in `EMPLOYEE001_ALLOWED_HOSTS`.
 
 ### Added
+- **`npx employee001 demo`: try it in one command, no keys, no setup.** Opens
+  a workspace with 5 invented twins at a fictional startup and replays a real
+  Team Meeting about a launch decision, with zero AI calls. Nothing touches
+  your files, and API keys in your shell are never passed to the demo.
+  `--live` makes it ask your own questions with your key.
 - **Ask your org's twins from Claude Code, Cursor and other MCP clients.**
   `claude mcp add employee001 -- npx -y employee001 mcp` connects your editor
   to the running app: list twins, read a profile, search the org brain, see
