@@ -11,6 +11,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  // Require a JSON content type: it forces a CORS preflight, so another site
+  // open in the browser can't flip consent with a "simple" cross-site POST.
+  if (!req.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
+    return NextResponse.json({ error: "json_required" }, { status: 415 });
+  }
   let body: { consent?: unknown };
   try {
     body = await req.json();

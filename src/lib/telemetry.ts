@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
+import pkg from "../../package.json";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
@@ -137,7 +138,7 @@ function runtimePayloadInput(metrics: TelemetryMetrics, installId?: string) {
   return {
     ...metrics,
     ...(installId ? { installId } : {}),
-    version: process.env.npm_package_version ?? "0.5.1",
+    version: pkg.version,
     nodeMajor: Number(process.versions.node.split(".")[0]),
     os: os.platform(),
   };
