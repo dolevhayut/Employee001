@@ -16,6 +16,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Topbar } from "@/components/ex/shell";
 import { HandoverTabs } from "@/components/ex/handover-tabs";
+import { useT } from "@/components/ex/i18n-context";
 
 const DEMO_EMPLOYEE_ID = "itai-cohen";
 const BRAND = "#9E6B47";
@@ -76,6 +77,7 @@ async function streamTurn(
 }
 
 function LivePageInner() {
+  const { t } = useT();
   const params = useSearchParams();
   const employeeId = params.get("employee") ?? DEMO_EMPLOYEE_ID;
 
@@ -156,15 +158,13 @@ function LivePageInner() {
 
         {/* DEMO banner */}
         <div style={{ background: "rgba(158,107,71,.12)", border: `1px solid ${BRAND}`, borderRadius: 10, padding: "10px 14px", fontSize: 13 }}>
-          ⚠️ DEMO — live interview writes to <code>rcp.live.json</code>; the static investor demo is untouched. Not legally reviewed, not for production, not published.
+          ⚠️ {t("handover.liveDemo")}
         </div>
 
         <div>
-          <h1 style={{ fontSize: 26, margin: "4px 0 6px" }}>Live handover interview</h1>
+          <h1 style={{ fontSize: 26, margin: "4px 0 6px" }}>{t("handover.liveTitle")}</h1>
           <p style={{ color: "var(--text-dim, #999)", fontSize: 14, lineHeight: 1.5 }}>
-            The interviewer asks, <strong>you answer for real</strong> (Hebrew or English — it mirrors you), and
-            opus synthesizes a Role Context Package from your words. Subject: <strong>{employeeId}</strong>.
-            Tune the agent in <code>src/lib/relay/interviewer.ts</code>.
+            {t("handover.liveSubtitle")} Subject: <bdi><strong>{employeeId}</strong></bdi>.
           </p>
         </div>
 
@@ -180,14 +180,14 @@ function LivePageInner() {
           <div style={{ background: "var(--surface, #141414)", border: "1px solid var(--hairline, #2a2a2a)", borderRadius: 10, padding: 18 }}>
             <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer", fontSize: 14 }}>
               <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
-              <span>The departing employee has consented to this handover interview (PRD 13.5).</span>
+              <span>{t("handover.consent")}</span>
             </label>
             <button
               onClick={start}
               disabled={!consent}
               style={{ marginTop: 16, background: consent ? BRAND : "#333", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 14, cursor: consent ? "pointer" : "not-allowed" }}
             >
-              Start the interview
+              {t("handover.start")}
             </button>
           </div>
         )}
@@ -199,7 +199,7 @@ function LivePageInner() {
               className="scrollbar"
               style={{ background: "var(--surface, #141414)", border: "1px solid var(--hairline, #2a2a2a)", borderRadius: 10, padding: 16, maxHeight: 460, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}
             >
-              {messages.length === 0 && !streaming && <div style={{ color: "#777", fontSize: 14 }}>Connecting to the interviewer…</div>}
+              {messages.length === 0 && !streaming && <div style={{ color: "#777", fontSize: 14 }}>{t("handover.connecting")}</div>}
               {messages.map((m, i) => (
                 <Bubble key={i} role={m.role} text={m.content} />
               ))}
@@ -211,19 +211,19 @@ function LivePageInner() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } }}
-                placeholder={busy ? "Interviewer is typing…" : "Type your answer…  (⌘/Ctrl+Enter to send)"}
+                placeholder={busy ? t("handover.typing") : t("handover.answer")}
                 disabled={busy || phase === "synthesizing"}
                 rows={2}
                 style={{ flex: 1, background: "var(--surface-2, #0e0e0e)", color: "#eee", border: "1px solid var(--hairline, #2a2a2a)", borderRadius: 8, padding: 10, fontSize: 14, resize: "vertical", fontFamily: "inherit" }}
               />
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <button onClick={send} disabled={busy || !input.trim() || phase === "synthesizing"} style={{ background: BRAND, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 14, cursor: "pointer", opacity: busy || !input.trim() ? 0.5 : 1 }}>Send</button>
+                <button onClick={send} disabled={busy || !input.trim() || phase === "synthesizing"} style={{ background: BRAND, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 14, cursor: "pointer", opacity: busy || !input.trim() ? 0.5 : 1 }}>{t("handover.send")}</button>
                 <button onClick={finish} disabled={busy || answerCount < 1 || phase === "synthesizing"} title={answerCount < 1 ? "Answer at least one question" : "Synthesize the RCP from this conversation"} style={{ background: "transparent", color: BRAND, border: `1px solid ${BRAND}`, borderRadius: 8, padding: "10px 18px", fontSize: 13, cursor: "pointer", opacity: answerCount < 1 || busy ? 0.5 : 1, whiteSpace: "nowrap" }}>
-                  {phase === "synthesizing" ? "Synthesizing…" : "Finish & synthesize"}
+                  {phase === "synthesizing" ? t("handover.synthesizing") : t("handover.finish")}
                 </button>
               </div>
             </div>
-            <div style={{ fontSize: 12, color: "#777" }}>{answerCount} answer{answerCount === 1 ? "" : "s"} captured · synthesis runs on opus from your real answers</div>
+            <div style={{ fontSize: 12, color: "#777" }}>{t("handover.answers", { count: answerCount })}</div>
           </>
         )}
 
@@ -307,11 +307,12 @@ function SynthesizingOverlay() {
 }
 
 function Bubble({ role, text, live }: { role: "user" | "assistant"; text: string; live?: boolean }) {
+  const { t } = useT();
   const isInterviewer = role === "assistant";
   return (
     <div style={{ display: "flex", justifyContent: isInterviewer ? "flex-start" : "flex-end" }}>
       <div style={{ maxWidth: "82%", background: isInterviewer ? "rgba(158,107,71,.10)" : "var(--surface-2, #1c1c1c)", border: `1px solid ${isInterviewer ? "rgba(158,107,71,.4)" : "var(--hairline, #2a2a2a)"}`, borderRadius: 12, padding: "10px 14px", fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: isInterviewer ? BRAND : "#888", marginBottom: 4 }}>{isInterviewer ? "Interviewer" : "You"}</div>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: isInterviewer ? BRAND : "#888", marginBottom: 4 }}>{isInterviewer ? t("handover.interviewer") : t("handover.you")}</div>
         {text}{live && <span style={{ opacity: 0.5 }}>▋</span>}
       </div>
     </div>
@@ -319,6 +320,7 @@ function Bubble({ role, text, live }: { role: "user" | "assistant"; text: string
 }
 
 function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
+  const { t } = useT();
   const pct = Math.round((coverage?.score ?? 0) * 100);
   const ready = rcp.status === "handover-ready";
   const sections: { key: keyof Rcp; label: string }[] = [
@@ -334,14 +336,14 @@ function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ background: "var(--surface, #141414)", border: `1px solid ${ready ? BRAND : "var(--hairline,#2a2a2a)"}`, borderRadius: 10, padding: 18 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 20 }}>Role Context Package</h2>
-          <span style={{ fontSize: 13, color: ready ? BRAND : "#aaa", fontWeight: 600 }}>{rcp.status} · {pct}% coverage · {rcp.synth_mode}</span>
+          <h2 style={{ margin: 0, fontSize: 20 }}>{t("handover.package")}</h2>
+          <span style={{ fontSize: 13, color: ready ? BRAND : "#aaa", fontWeight: 600 }}>{rcp.status} · {t("handover.coverage", { count: pct })} · {rcp.synth_mode}</span>
         </div>
         <div style={{ height: 8, background: "#222", borderRadius: 4, overflow: "hidden" }}>
           <div style={{ width: `${pct}%`, height: "100%", background: BRAND }} />
         </div>
         {coverage?.gaps && coverage.gaps.length > 0 && (
-          <div style={{ marginTop: 10, fontSize: 12, color: "#999" }}>Thin: {coverage.gaps.join(" · ")}</div>
+          <div style={{ marginTop: 10, fontSize: 12, color: "#999" }}>{t("handover.thin", { gaps: coverage.gaps.join(" · ") })}</div>
         )}
       </div>
 
@@ -353,7 +355,7 @@ function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
             <div style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: 0.5, color: BRAND, marginBottom: 10 }}>{label} · {items.length}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {items.map((it, i) => (
-                <div key={i} style={{ borderLeft: `2px solid rgba(158,107,71,.4)`, paddingLeft: 12 }}>
+                <div key={i} style={{ borderInlineStart: `2px solid rgba(158,107,71,.4)`, paddingInlineStart: 12 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{"system" in it ? it.system : it.title}</div>
                   <div style={{ fontSize: 13, color: "#bbb", lineHeight: 1.5, whiteSpace: "pre-wrap", marginTop: 2 }}>
                     {"system" in it ? `${it.location}${it.accessVia ? ` · ${it.accessVia}` : ""}${it.ownedBy ? ` · ${it.ownedBy}` : ""}` : it.body}
@@ -370,10 +372,11 @@ function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
 }
 
 export default function LiveHandoverPage() {
+  const { t } = useT();
   return (
     <>
-      <Topbar crumbs={["Workspace", "Handover", "Live interview"]} />
-      <Suspense fallback={<div style={{ padding: 24 }}>Loading…</div>}>
+      <Topbar crumbs={[t("crumb.workspace"), t("nav.handover"), t("handover.live")]} />
+      <Suspense fallback={<div style={{ padding: 24 }}>{t("handover.loading")}</div>}>
         <LivePageInner />
       </Suspense>
     </>

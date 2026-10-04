@@ -85,7 +85,7 @@ export default function ConnectionsForEmployeePage({
         setError(null);
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Failed to load");
+        setError(err instanceof Error ? err.message : t("connections.notFound"));
       });
   }
 
@@ -139,7 +139,7 @@ export default function ConnectionsForEmployeePage({
   }
 
   async function disconnect(slug: string) {
-    if (!confirm(`Disconnect ${slug}?`)) return;
+    if (!confirm(t("connections.disconnectConfirm", { name: slug }))) return;
     setBusyToolkit(slug);
     try {
       await fetch(`/api/connections/${id}/disconnect`, {
@@ -198,7 +198,7 @@ export default function ConnectionsForEmployeePage({
           ]}
         />
         <div style={{ padding: "var(--sp-32)", color: "var(--text-muted)" }}>
-          Employee not found.
+          {t("connections.notFound")}
         </div>
       </>
     );
@@ -225,7 +225,7 @@ export default function ConnectionsForEmployeePage({
             href="/settings#custom-mcp"
             style={{ fontSize: "var(--fs-sm)", fontWeight: 500, color: "var(--text-muted)", textDecoration: "underline", textUnderlineOffset: 3 }}
           >
-            Org-wide MCP servers
+            {t("connections.orgMcp")}
           </Link>
         }
       />
@@ -366,15 +366,15 @@ export default function ConnectionsForEmployeePage({
               borderRadius: 10,
             }}
           >
-            <Stat label="Active" value={activeCount} color="var(--success)" />
-            <Stat label="Pending" value={pendingCount} color="var(--warn)" />
+            <Stat label={t("connections.active")} value={activeCount} color="var(--success)" />
+            <Stat label={t("connections.pending")} value={pendingCount} color="var(--warn)" />
             <Stat
-              label="Recommended"
+              label={t("connections.recommended")}
               value={recommended.length}
               color="var(--accent-deep)"
             />
             <Stat
-              label="Catalog"
+              label={t("connections.catalog")}
               value={catalog.length}
               color="var(--text-muted)"
             />
@@ -384,8 +384,8 @@ export default function ConnectionsForEmployeePage({
         {/* Active connections */}
         {myConnections.length > 0 && (
           <Section
-            title="Active connections"
-            subtitle="Tools this twin can act on"
+            title={t("connections.activeTitle")}
+            subtitle={t("connections.activeSubtitle")}
           >
             <Grid>
               {myConnections.map(({ slug, toolkit, conn }, i) => (
@@ -409,8 +409,8 @@ export default function ConnectionsForEmployeePage({
         {/* Recommended + catalog — only for marketplace agents */}
         {employee.placement && recommended.length > 0 && (
           <Section
-            title={`Recommended for ${employee.firstName}`}
-            subtitle="Curated tools for the role · click to connect"
+            title={t("connections.recommendedFor", { name: employee.firstName })}
+            subtitle={t("connections.recommendedSubtitle")}
           >
             <Grid>
               {recommended.map((toolkit, i) => (
@@ -449,10 +449,10 @@ export default function ConnectionsForEmployeePage({
                 letterSpacing: "-0.005em",
               }}
             >
-              All toolkits
+              {t("connections.all")}
             </h2>
             <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>
-              {catalog.length.toLocaleString()} available
+              {t("connections.available", { count: catalog.length.toLocaleString() })}
             </span>
             <button
               onClick={() => setShowAll((v) => !v)}
@@ -469,7 +469,7 @@ export default function ConnectionsForEmployeePage({
                 fontFamily: "inherit",
               }}
             >
-              {showAll ? "Hide catalog" : "Browse all"}
+              {showAll ? t("connections.hide") : t("connections.browse")}
             </button>
           </div>
 
@@ -484,7 +484,7 @@ export default function ConnectionsForEmployeePage({
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search 1,000+ toolkits — Slack, GitHub, Stripe, Salesforce…"
+                  placeholder={t("connections.search")}
                   style={{
                     width: "100%",
                     padding: "10px 14px",
@@ -508,7 +508,7 @@ export default function ConnectionsForEmployeePage({
                     fontSize: "var(--fs-ui)",
                   }}
                 >
-                  Loading catalog…
+                  {t("connections.loading")}
                 </div>
               )}
 
@@ -522,8 +522,8 @@ export default function ConnectionsForEmployeePage({
                     }}
                   >
                     {filteredCatalog.length === catalog.length
-                      ? `Showing all ${catalog.length} toolkits`
-                      : `${filteredCatalog.length} matching "${search}"`}
+                      ? t("connections.showingAll", { count: catalog.length })
+                      : t("connections.matching", { count: filteredCatalog.length, query: search })}
                   </div>
                   <Grid>
                     {filteredCatalog.slice(0, 200).map((toolkit, i) => (
@@ -550,8 +550,7 @@ export default function ConnectionsForEmployeePage({
                         color: "var(--text-subtle)",
                       }}
                     >
-                      Showing 200 of {filteredCatalog.length}. Refine your search
-                      to see more.
+                      {t("connections.showingLimit", { count: filteredCatalog.length })}
                     </div>
                   )}
                 </>
@@ -573,26 +572,12 @@ export default function ConnectionsForEmployeePage({
             lineHeight: 1.6,
           }}
         >
-          Connections are scoped to{" "}
-          <strong>{employee.firstName}&apos;s twin</strong> (
-          <code style={mono}>{data?.composioUserId}</code>). The twin can call
-          tools from any active connection inside Team Meeting and{" "}
-          <code style={mono}>/flow</code>. Composio handles OAuth, token refresh,
-          and rate limits.
+          {t("connections.footer", { name: employee.firstName })}
         </div>
       </div>
     </>
   );
 }
-
-const mono = {
-  fontFamily:
-    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-  fontSize: "var(--fs-meta)",
-  background: "var(--surface)",
-  padding: "1px 5px",
-  borderRadius: 3,
-};
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -670,6 +655,7 @@ function ToolkitCard({
   onConnect: () => void;
   onDisconnect: () => void;
 }) {
+  const { t } = useT();
   const statusBucket = bucket(conn?.status);
   const isActive = statusBucket === "active";
   const isPending = statusBucket === "pending";
@@ -701,7 +687,7 @@ function ToolkitCard({
       {/* Recommended star */}
       {isRecommended && (
         <div
-          title="Recommended for this role"
+          title={t("connections.recommendedTitle")}
           style={{
             position: "absolute",
             top: 8,
@@ -750,7 +736,7 @@ function ToolkitCard({
             }}
           >
             {typeof toolkit.toolsCount === "number" && (
-              <span>{toolkit.toolsCount} tools</span>
+              <span>{t("connections.tools", { count: toolkit.toolsCount })}</span>
             )}
             {toolkit.authSchemes && toolkit.authSchemes.length > 0 && (
               <span>{toolkit.authSchemes[0]}</span>

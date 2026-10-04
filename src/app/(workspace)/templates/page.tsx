@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Icons } from "@/components/ex/icons";
 import { Topbar } from "@/components/ex/shell";
 import { PageHead } from "@/components/ex/page-head";
+import { useT } from "@/components/ex/i18n-context";
 
 // ─── Types (mirror src/lib/task-templates.ts + custom-templates.ts) ──────────
 
@@ -37,6 +38,7 @@ const EMPTY_DRAFT: Draft = {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function TemplatesPage() {
+  const { t } = useT();
   const [templates, setTemplates] = useState<TemplateRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
@@ -91,7 +93,7 @@ export default function TemplatesPage() {
 
   async function save() {
     if (!draft.name.trim() || !draft.task.trim()) {
-      setError("Name and task text are required.");
+      setError(t("templates.required"));
       return;
     }
     setSaving(true);
@@ -118,7 +120,7 @@ export default function TemplatesPage() {
   }
 
   async function deleteTemplate(id: string) {
-    if (!confirm("Delete this template? This cannot be undone.")) return;
+    if (!confirm(t("templates.deleteConfirm"))) return;
     const res = await fetch(`/api/templates/${id}`, { method: "DELETE" });
     if (res.ok) refresh();
   }
@@ -136,7 +138,7 @@ export default function TemplatesPage() {
 
   return (
     <>
-      <Topbar crumbs={["Workspace", "Templates"]} />
+      <Topbar crumbs={[t("crumb.workspace"), t("tasks.templates")]} />
       <div
         className="scrollbar"
         style={{ overflow: "auto", padding: "32px 40px 60px" }}
@@ -154,8 +156,8 @@ export default function TemplatesPage() {
             <div style={{ flex: 1 }}>
               <PageHead
                 icon="Doc"
-                title="Task templates"
-                subtitle="Reusable task prompts for your org. Built-ins are defaults; custom templates are yours to edit and share so the CEO can run proven tasks consistently."
+                title={t("templates.title")}
+                subtitle={t("templates.subtitle")}
               />
             </div>
             <button
@@ -163,7 +165,7 @@ export default function TemplatesPage() {
               onClick={startNew}
               disabled={editingId !== null}
             >
-              <Icons.Plus size={11} /> New template
+              <Icons.Plus size={11} /> {t("templates.new")}
             </button>
           </div>
 
@@ -181,7 +183,7 @@ export default function TemplatesPage() {
               <span className="mono" style={{ fontWeight: 600 }}>
                 {builtinCount}
               </span>{" "}
-              built-in
+              {t("templates.builtin")}
             </span>
             <span>
               <span
@@ -190,7 +192,7 @@ export default function TemplatesPage() {
               >
                 {customCount}
               </span>{" "}
-              custom
+              {t("templates.custom")}
             </span>
           </div>
 
@@ -210,7 +212,7 @@ export default function TemplatesPage() {
           {/* Templates grouped by category */}
           {loading ? (
             <p className="muted" style={{ fontSize: "var(--fs-ui)" }}>
-              Loading…
+              {t("templates.loading")}
             </p>
           ) : templates.length === 0 ? (
             <div
@@ -221,7 +223,7 @@ export default function TemplatesPage() {
                 color: "var(--text-muted)",
               }}
             >
-              No templates yet. Click <strong>New template</strong> to add one.
+              {t("templates.empty")}
             </div>
           ) : (
             Object.entries(grouped).map(([cat, items]) => (
@@ -277,6 +279,7 @@ function Editor({
   error: string | null;
   isNew: boolean;
 }) {
+  const { t } = useT();
   return (
     <div
       className="card"
@@ -305,7 +308,7 @@ function Editor({
             color: "var(--accent-deep)",
           }}
         >
-          {isNew ? "New template" : "Edit template"}
+          {isNew ? t("templates.newTitle") : t("templates.editTitle")}
         </span>
       </div>
 
@@ -319,43 +322,43 @@ function Editor({
       >
         {/* Name + category row */}
         <div style={{ display: "flex", gap: "var(--sp-12)" }}>
-          <Field label="Name" required style={{ flex: 2 }}>
+          <Field label={t("templates.name")} required style={{ flex: 2 }}>
             <input
               type="text"
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              placeholder="e.g. Daily standup digest"
+              placeholder={t("templates.namePlaceholder")}
               style={inputStyle}
             />
           </Field>
-          <Field label="Category" style={{ flex: 1 }}>
+          <Field label={t("templates.category")} style={{ flex: 1 }}>
             <input
               type="text"
               value={draft.category}
               onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-              placeholder="Custom"
+              placeholder={t("templates.categoryPlaceholder")}
               style={inputStyle}
             />
           </Field>
         </div>
 
-        <Field label="Description">
+        <Field label={t("templates.description")}>
           <input
             type="text"
             value={draft.description}
             onChange={(e) =>
               setDraft({ ...draft, description: e.target.value })
             }
-            placeholder="One-line summary shown in the slash menu"
+              placeholder={t("templates.descriptionPlaceholder")}
             style={inputStyle}
           />
         </Field>
 
-        <Field label="Task" required>
+        <Field label={t("templates.task")} required>
           <textarea
             value={draft.task}
             onChange={(e) => setDraft({ ...draft, task: e.target.value })}
-            placeholder='The actual prompt that fills the textarea, e.g. "Pull all PRs from the last 24h..."'
+            placeholder={t("templates.taskPlaceholder")}
             style={{
               ...inputStyle,
               minHeight: 110,
@@ -389,14 +392,14 @@ function Editor({
           }}
         >
           <button className="btn sm" onClick={onCancel} disabled={saving}>
-            Cancel
+            {t("templates.cancel")}
           </button>
           <button
             className="btn primary sm"
             onClick={onSave}
             disabled={saving}
           >
-            {saving ? "Saving…" : isNew ? "Create template" : "Save changes"}
+            {saving ? t("templates.saving") : isNew ? t("templates.create") : t("templates.save")}
           </button>
         </div>
       </div>
@@ -428,7 +431,7 @@ function Field({
       >
         {label}
         {required && (
-          <span style={{ color: "var(--danger)", marginLeft: "var(--sp-4)" }}>*</span>
+          <span style={{ color: "var(--danger)", marginInlineStart: "var(--sp-4)" }}>*</span>
         )}
       </span>
       {children}
@@ -462,6 +465,7 @@ function TemplateRow({
   onDelete: () => void;
   isLast: boolean;
 }) {
+  const { t } = useT();
   const [expanded, setExpanded] = useState(false);
   const isCustom = template.kind === "custom";
 
@@ -489,7 +493,7 @@ function TemplateRow({
             marginTop: "var(--sp-3)",
             color: "var(--text-subtle)",
           }}
-          title={expanded ? "Collapse" : "Show task text"}
+          title={expanded ? t("templates.collapse") : t("templates.showText")}
         >
           <Icons.Chevron
             size={11}
@@ -515,7 +519,7 @@ function TemplateRow({
             <span
               className="mono subtle"
               style={{ fontSize: "var(--fs-xs)" }}
-              title="Slash command shortcut"
+              title={t("templates.shortcut")}
             >
               /{template.id}
             </span>
@@ -532,7 +536,7 @@ function TemplateRow({
                   letterSpacing: ".05em",
                 }}
               >
-                Default
+                {t("templates.default")}
               </span>
             )}
             {isCustom && (
@@ -548,7 +552,7 @@ function TemplateRow({
                   letterSpacing: ".05em",
                 }}
               >
-                Custom
+                {t("templates.custom")}
               </span>
             )}
           </div>
@@ -564,7 +568,7 @@ function TemplateRow({
             }}
           >
             {template.description || (
-              <em style={{ opacity: 0.6 }}>No description</em>
+              <em style={{ opacity: 0.6 }}>{t("templates.noDescription")}</em>
             )}
           </div>
           {template.requiresToolkits && template.requiresToolkits.length > 0 && (
@@ -572,7 +576,7 @@ function TemplateRow({
               className="subtle"
               style={{ fontSize: "var(--fs-xs)", display: "flex", gap: "var(--sp-6)" }}
             >
-              <span>Requires:</span>
+              <span>{t("templates.requires")}</span>
               {template.requiresToolkits.map((t) => (
                 <span
                   key={t}
@@ -594,13 +598,13 @@ function TemplateRow({
         <div style={{ display: "flex", gap: "var(--sp-6)", flexShrink: 0 }}>
           {isCustom ? (
             <>
-              <button className="btn sm ghost" onClick={onEdit} title="Edit">
+              <button className="btn sm ghost" onClick={onEdit} title={t("templates.edit")}>
                 <Icons.Pencil size={11} />
               </button>
               <button
                 className="btn sm ghost"
                 onClick={onDelete}
-                title="Delete"
+                title={t("templates.delete")}
                 style={{ color: "var(--danger)" }}
               >
                 <Icons.X size={11} />
@@ -610,9 +614,9 @@ function TemplateRow({
             <span
               className="subtle"
               style={{ fontSize: "var(--fs-meta)", padding: "0 4px", lineHeight: "26px" }}
-              title="Built-in templates can't be edited"
+              title={t("templates.builtinReadOnly")}
             >
-              Read-only
+              {t("templates.readOnly")}
             </span>
           )}
         </div>
@@ -621,7 +625,8 @@ function TemplateRow({
       {expanded && (
         <div
           style={{
-            padding: "10px 16px 16px 39px",
+            padding: "10px 16px 16px",
+            paddingInlineStart: 39,
             background: "var(--bg-elevated)",
             borderTop: "1px solid var(--hairline)",
           }}
@@ -630,7 +635,7 @@ function TemplateRow({
             className="section-title"
             style={{ fontSize: "var(--fs-2xs)", marginBottom: "var(--sp-6)" }}
           >
-            Task text
+            {t("templates.taskText")}
           </div>
           <div
             style={{

@@ -105,6 +105,7 @@ function AgentCardComponent({
   onTryChat: (id: string) => void;
   loading: boolean;
 }) {
+  const { t } = useT();
   return (
     <div
       style={{
@@ -140,7 +141,7 @@ function AgentCardComponent({
                   letterSpacing: "0.05em",
                 }}
               >
-                Hired
+                {t("hire.hiredBadge")}
               </span>
             )}
           </div>
@@ -197,7 +198,7 @@ function AgentCardComponent({
               }}
             >
               <Icons.Eye size={13} />
-              View profile
+              {t("hire.viewProfile")}
             </a>
             <button
               onClick={() => onDismiss(agent.id)}
@@ -218,7 +219,7 @@ function AgentCardComponent({
               }}
             >
               <Icons.X size={13} />
-              Leave
+              {t("hire.leave")}
             </button>
           </>
         ) : (
@@ -241,10 +242,10 @@ function AgentCardComponent({
                 cursor: loading ? "not-allowed" : "pointer",
                 opacity: loading ? 0.6 : 1,
               }}
-              title={`Chat with ${agent.firstName} before hiring`}
+              title={t("hire.tryChatTitle", { name: agent.firstName })}
             >
               <Icons.MessageSquare size={13} />
-              Try chat
+              {t("hire.tryChat")}
             </button>
             <button
               onClick={() => onHire(agent.id)}
@@ -272,7 +273,7 @@ function AgentCardComponent({
               ) : (
                 <Icons.UserPlus size={13} />
               )}
-              Hire agent
+              {t("hire.hire")}
             </button>
           </>
         )}
@@ -984,16 +985,16 @@ export default function MarketplacePage() {
       if (res.ok) {
         setAgents((prev) => prev.map((a) => (a.id === agentId ? { ...a, hired: true } : a)));
         const agent = agents.find((a) => a.id === agentId);
-        showToast(`${agent?.firstName ?? "Agent"} hired — ready on your team`, "success");
+        showToast(t("hire.hiredToast", { name: agent?.firstName ?? "Agent" }), "success");
         setPendingAgent(null);
         setPlacementDraft(null);
         router.refresh();
       } else {
         const err = (await res.json()) as { error?: string };
-        showToast(err.error ?? "Failed to hire agent", "error");
+        showToast(err.error ?? t("hire.failed"), "error");
       }
     } catch {
-      showToast("Network error", "error");
+      showToast(t("hire.networkError"), "error");
     } finally {
       setActionLoading(null);
     }
@@ -1006,13 +1007,13 @@ export default function MarketplacePage() {
       if (res.ok) {
         setAgents((prev) => prev.map((a) => (a.id === agentId ? { ...a, hired: false } : a)));
         const agent = agents.find((a) => a.id === agentId);
-        showToast(`${agent?.firstName ?? "Agent"} removed from your team`, "success");
+        showToast(t("hire.removedToast", { name: agent?.firstName ?? "Agent" }), "success");
         router.refresh();
       } else {
-        showToast("Failed to dismiss agent", "error");
+        showToast(t("hire.dismissFailed"), "error");
       }
     } catch {
-      showToast("Network error", "error");
+      showToast(t("hire.networkError"), "error");
     } finally {
       setActionLoading(null);
     }
@@ -1038,7 +1039,7 @@ export default function MarketplacePage() {
         crumbs={[t("nav.hire")]}
         actions={
           <span style={{ fontSize: "var(--fs-sm)", color: "var(--muted)" }}>
-            {agents.length} agents · {hiredCount} hired
+            {t("hire.agents", { count: agents.length })} · {t("hire.hired", { count: hiredCount })}
           </span>
         }
       />
@@ -1109,8 +1110,8 @@ export default function MarketplacePage() {
       >
         <PageHead
           icon="Store"
-          title="Hire external AI agents"
-          subtitle="Hand-curated agents for roles your team doesn't cover yet. Each comes with a complete 9-file profile, defined expertise, and guardrails — ready to assign tasks on day one."
+          title={t("hire.title")}
+          subtitle={t("hire.subtitle")}
         />
 
         <div style={{ display: "flex", gap: "var(--sp-12)", alignItems: "center", flexWrap: "wrap" }}>
@@ -1131,7 +1132,7 @@ export default function MarketplacePage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search role, skill…"
+              placeholder={t("hire.search")}
               style={{
                 background: "transparent",
                 border: "none",

@@ -13,6 +13,8 @@ import {
 } from "@/components/ex/employee-canvas";
 import { type EmployeeWithTwin } from "@/lib/employees";
 import { useRoster } from "@/components/ex/roster-context";
+import { useT } from "@/components/ex/i18n-context";
+import { formatRelativeTime } from "@/lib/i18n/format";
 import {
   filterTemplates,
   type TaskTemplate,
@@ -133,14 +135,6 @@ type PersistedEvent = {
 
 function bareName(tool: string): string {
   return tool.replace(/^mcp__[a-z0-9_]+__/i, "");
-}
-
-function relTime(iso: string): string {
-  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (sec < 60) return "just now";
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
-  return `${Math.floor(sec / 86400)}d ago`;
 }
 
 /**
@@ -294,6 +288,7 @@ function eventsToLog(events: PersistedEvent[]): TaskLogEntry[] {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
+  const { t } = useT();
   const roster = useRoster();
   const readyEmployees = roster.filter((e) => e.twinStatus === "ready");
   const [selectedId, setSelectedId] = useState<string>("");
@@ -684,11 +679,11 @@ export default function TasksPage() {
     const name = saveModalName.trim();
     const text = task.trim();
     if (!name) {
-      setSaveModalError("Name is required.");
+      setSaveModalError(t("tasks.nameRequired"));
       return;
     }
     if (!text) {
-      setSaveModalError("Task text is empty.");
+      setSaveModalError(t("tasks.taskEmpty"));
       return;
     }
 
@@ -722,13 +717,13 @@ export default function TasksPage() {
   return (
     <>
       <Topbar
-        crumbs={["Workspace", "Tasks"]}
+        crumbs={[t("crumb.workspace"), t("nav.tasks")]}
         actions={
           <Link
             href="/templates"
             style={{ fontSize: "var(--fs-sm)", fontWeight: 500, color: "var(--text-muted)", textDecoration: "underline", textUnderlineOffset: 3 }}
           >
-            Templates
+            {t("tasks.templates")}
           </Link>
         }
       />
@@ -739,8 +734,8 @@ export default function TasksPage() {
         <div style={{ maxWidth: 880 }}>
           <PageHead
             icon="Arrow"
-            title="Tasks"
-            subtitle="Send a one-off task to a twin. The twin will execute using connected tools (Slack, GitHub, Gmail, etc.) with approval gates for sensitive actions."
+            title={t("tasks.title")}
+            subtitle={t("tasks.subtitle")}
             style={{ marginBottom: "var(--sp-20)" }}
           />
 
@@ -775,7 +770,7 @@ export default function TasksPage() {
                   flexShrink: 0,
                 }}
               >
-                Assign to
+                {t("tasks.assign")}
               </span>
               <div
                 style={{
@@ -815,12 +810,12 @@ export default function TasksPage() {
                   marginBottom: "var(--sp-10)",
                 }}
               >
-                Available tools
+                {t("tasks.availableTools")}
               </div>
 
               {loadingConn ? (
                 <div className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
-                  Loading connections…
+                  {t("tasks.loadingConnections")}
                 </div>
               ) : activeToolkits.length === 0 ? (
                 <div
@@ -838,10 +833,9 @@ export default function TasksPage() {
                 >
                   <Icons.Plug size={14} style={{ color: "var(--warn)", flexShrink: 0 }} />
                   <div>
-                    <span style={{ fontWeight: 600 }}>No tools connected.</span>{" "}
+                    <span style={{ fontWeight: 600 }}>{t("tasks.noTools")}</span>{" "}
                     <span className="subtle">
-                      {selected?.name.split(" ")[0]} needs to connect integrations
-                      through their onboarding flow before tasks can be executed.
+                      {t("tasks.noToolsDesc", { name: selected?.name.split(" ")[0] ?? "" })}
                     </span>
                   </div>
                 </div>
@@ -894,7 +888,7 @@ export default function TasksPage() {
                         return (
                           <span
                             key={slug}
-                            title={`Not connected — ${selected?.name.split(" ")[0]} can connect via onboarding`}
+                            title={t("tasks.notConnected", { name: selected?.name.split(" ")[0] ?? "" })}
                             style={{
                               display: "inline-flex",
                               alignItems: "center",
@@ -928,8 +922,8 @@ export default function TasksPage() {
                 onChange={(e) => setTask(e.target.value)}
                 placeholder={
                   selected
-                    ? `What should ${selected.name.split(" ")[0]} do? Type / for templates, or describe a task in your own words.`
-                    : "Select an employee above…"
+                    ? t("tasks.placeholder", { name: selected.name.split(" ")[0] })
+                    : t("tasks.selectEmployee")
                 }
                 disabled={running || !selectedId}
                 onKeyDown={(e) => {
@@ -1012,10 +1006,10 @@ export default function TasksPage() {
                   gap: "var(--sp-8)",
                 }}
               >
-                <span>{running ? "Running…" : "⌘↵ to execute"}</span>
+                <span>{running ? t("tasks.running") : t("tasks.executeHint")}</span>
                 <span style={{ opacity: 0.6 }}>·</span>
-                <span title="Hard budget cap per task — agent stops if exceeded">
-                  Budget cap{" "}
+                <span title={t("tasks.budgetTitle")}>
+                  {t("tasks.budgetCap")}{" "}
                   <span className="mono" style={{ fontWeight: 600 }}>
                     $0.50
                   </span>
@@ -1032,12 +1026,12 @@ export default function TasksPage() {
                   }
                   title="Save the current task as a reusable template"
                 >
-                  <Icons.Plus size={11} /> Save as template
+                  <Icons.Plus size={11} /> {t("tasks.saveAsTemplate")}
                 </button>
               )}
               {running ? (
                 <button className="btn sm" onClick={handleCancel}>
-                  <Icons.X size={11} /> Cancel
+                  <Icons.X size={11} /> {t("tasks.cancel")}
                 </button>
               ) : (
                 <button
@@ -1045,7 +1039,7 @@ export default function TasksPage() {
                   onClick={execute}
                   disabled={!task.trim() || !selectedId}
                 >
-                  <Icons.Zap size={11} /> Execute
+                  <Icons.Zap size={11} /> {t("tasks.execute")}
                 </button>
               )}
             </div>
@@ -1064,7 +1058,7 @@ export default function TasksPage() {
                   margin: "0 0 12px",
                 }}
               >
-                Output
+                {t("tasks.output")}
               </h2>
               <div
                 className="card scrollbar"
@@ -1121,12 +1115,12 @@ export default function TasksPage() {
                   margin: 0,
                 }}
               >
-                Recent tasks
+                {t("tasks.recent")}
               </h2>
               <button
                 className="btn ghost sm"
                 onClick={refreshHistory}
-                title="Refresh history"
+                title={t("tasks.refresh")}
                 style={{ height: 22 }}
               >
                 <Icons.Refresh size={10} />
@@ -1134,7 +1128,7 @@ export default function TasksPage() {
               <div className="spacer" />
               {history.length > 0 && (
                 <span className="subtle mono" style={{ fontSize: "var(--fs-meta)" }}>
-                  {history.length} run{history.length !== 1 ? "s" : ""}
+                  {t("tasks.runs", { count: history.length })}
                 </span>
               )}
             </div>
@@ -1148,7 +1142,7 @@ export default function TasksPage() {
                   color: "var(--text-muted)",
                 }}
               >
-                No tasks yet. Assign one above to see it here.
+                {t("tasks.noTasks")}
               </div>
             ) : (
               <div
@@ -1217,7 +1211,7 @@ export default function TasksPage() {
             >
               <Icons.Plus size={13} style={{ color: "var(--accent-deep)" }} />
               <span style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>
-                Save as template
+                {t("tasks.saveModalTitle")}
               </span>
             </div>
             <div
@@ -1240,7 +1234,7 @@ export default function TasksPage() {
                     letterSpacing: ".05em",
                   }}
                 >
-                  Template name
+                  {t("tasks.templateName")}
                 </span>
                 <input
                   type="text"
@@ -1252,7 +1246,7 @@ export default function TasksPage() {
                     if (e.key === "Escape" && !savingTemplate)
                       setSaveModalOpen(false);
                   }}
-                  placeholder="e.g. Daily PR digest"
+                  placeholder={t("tasks.templateNamePlaceholder")}
                   style={{
                     width: "100%",
                     padding: "9px 12px",
@@ -1271,16 +1265,7 @@ export default function TasksPage() {
                 className="subtle"
                 style={{ fontSize: "var(--fs-meta)", lineHeight: 1.45 }}
               >
-                Saved as a Custom template. Edit or delete later from the{" "}
-                <span
-                  style={{
-                    fontWeight: 600,
-                    color: "var(--text)",
-                  }}
-                >
-                  Templates
-                </span>{" "}
-                page.
+                {t("tasks.savedTemplateInfo")}
               </div>
 
               {saveModalError && (
@@ -1311,14 +1296,14 @@ export default function TasksPage() {
                   onClick={() => setSaveModalOpen(false)}
                   disabled={savingTemplate}
                 >
-                  Cancel
+                  {t("tasks.cancel")}
                 </button>
                 <button
                   className="btn primary sm"
                   onClick={confirmSaveAsTemplate}
                   disabled={savingTemplate || !saveModalName.trim()}
                 >
-                  {savingTemplate ? "Saving…" : "Save template"}
+                  {savingTemplate ? t("templates.saving") : t("tasks.save")}
                 </button>
               </div>
             </div>
@@ -1588,16 +1573,16 @@ function EmployeeChip({
 
 // ─── History Row ─────────────────────────────────────────────────────────────
 
-function statusBadge(status: TaskStatus) {
+function statusBadge(status: TaskStatus, t: ReturnType<typeof useT>["t"]) {
   switch (status) {
     case "running":
-      return { label: "Running", color: "var(--warn)", bg: "rgba(180,140,60,0.10)" };
+      return { label: t("tasks.status.running"), color: "var(--warn)", bg: "rgba(180,140,60,0.10)" };
     case "complete":
-      return { label: "Complete", color: "var(--success)", bg: "rgba(60,140,80,0.10)" };
+      return { label: t("tasks.status.complete"), color: "var(--success)", bg: "rgba(60,140,80,0.10)" };
     case "error":
-      return { label: "Error", color: "var(--danger)", bg: "rgba(220,60,60,0.08)" };
+      return { label: t("tasks.status.error"), color: "var(--danger)", bg: "rgba(220,60,60,0.08)" };
     case "aborted":
-      return { label: "Aborted", color: "var(--text-muted)", bg: "var(--bg-elevated)" };
+      return { label: t("tasks.status.aborted"), color: "var(--text-muted)", bg: "var(--bg-elevated)" };
   }
 }
 
@@ -1620,8 +1605,9 @@ function HistoryRow({
   onRerun: (run: TaskRun) => void;
   isLast: boolean;
 }) {
+  const { t, locale } = useT();
   const employee = useRoster().find((e) => e.id === run.employeeId);
-  const badge = statusBadge(run.status);
+  const badge = statusBadge(run.status, t);
   const dur = durationLabel(run.startedAt, run.endedAt);
   const replayLog = events ? eventsToLog(events) : null;
 
@@ -1692,7 +1678,7 @@ function HistoryRow({
           >
             <span>{run.employeeName}</span>
             <span>·</span>
-            <span>{relTime(run.startedAt)}</span>
+            <span>{formatRelativeTime(run.startedAt, locale)}</span>
             {dur && (
               <>
                 <span>·</span>
@@ -1779,11 +1765,11 @@ function HistoryRow({
         >
           {loadingEvents ? (
             <div className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
-              Loading replay…
+              {t("tasks.loadingReplay")}
             </div>
           ) : !replayLog || replayLog.length === 0 ? (
             <div className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
-              No event log recorded.
+              {t("tasks.noEventLog")}
             </div>
           ) : (
             <div
@@ -1829,7 +1815,7 @@ function HistoryRow({
                 }}
               >
                 <Icons.Refresh size={11} />
-                Re-run
+                {t("tasks.rerun")}
               </button>
             </div>
           )}
@@ -1846,6 +1832,7 @@ function ToolUseRow({
 }: {
   entry: { kind: "tool_use"; tool: string; input: unknown; status: "pending" | "done" };
 }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const action = humanizeToolAction(entry.tool, entry.input);
   const hasArgs = Boolean(
@@ -1885,7 +1872,7 @@ function ToolUseRow({
       >
         {pending ? (
           <span
-            aria-label="running"
+            aria-label={t("tasks.running")}
             style={{
               width: 8,
               height: 8,
@@ -1962,6 +1949,7 @@ function TaskLogRow({
   entry: TaskLogEntry;
   onApproval: (approvalId: string, action: "allow" | "deny") => void;
 }) {
+  const { t } = useT();
   const [decided, setDecided] = useState<"allow" | "deny" | null>(null);
 
   switch (entry.kind) {
@@ -1983,7 +1971,7 @@ function TaskLogRow({
         <div className="row" style={{ gap: "var(--sp-6)", alignItems: "center" }}>
           <Icons.Check size={11} style={{ color: "var(--success)" }} />
           <span className="mono subtle" style={{ fontSize: "var(--fs-meta)" }}>
-            {bareName(entry.tool)} completed
+            {bareName(entry.tool)} {t("tasks.completed")}
           </span>
         </div>
       );
@@ -2012,7 +2000,7 @@ function TaskLogRow({
               }}
             />
             <span style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>
-              Approval needed
+              {t("tasks.approvalNeeded")}
             </span>
             <span
               className="mono"
@@ -2059,7 +2047,7 @@ function TaskLogRow({
                   onApproval(entry.approvalId, "allow");
                 }}
               >
-                <Icons.Check size={11} /> Approve
+                <Icons.Check size={11} /> {t("tasks.approve")}
               </button>
               <button
                 className="btn sm"
@@ -2069,7 +2057,7 @@ function TaskLogRow({
                   onApproval(entry.approvalId, "deny");
                 }}
               >
-                <Icons.X size={11} /> Deny
+                <Icons.X size={11} /> {t("tasks.deny")}
               </button>
             </div>
           ) : (
@@ -2087,7 +2075,7 @@ function TaskLogRow({
                       fontWeight: 500,
                     }}
                   >
-                    Approved
+                    {t("tasks.approved")}
                   </span>
                 </>
               ) : (
@@ -2100,7 +2088,7 @@ function TaskLogRow({
                       fontWeight: 500,
                     }}
                   >
-                    Denied
+                    {t("tasks.denied")}
                   </span>
                 </>
               )}
@@ -2119,7 +2107,7 @@ function TaskLogRow({
             <Icons.X size={11} style={{ color: "var(--danger)" }} />
           )}
           <span className="subtle" style={{ fontSize: "var(--fs-meta)" }}>
-            Tool {entry.decision === "allow" ? "approved" : "denied"}
+            {entry.decision === "allow" ? t("tasks.toolApproved") : t("tasks.toolDenied")}
           </span>
         </div>
       );
@@ -2144,7 +2132,7 @@ function TaskLogRow({
                 color: "var(--danger)",
               }}
             >
-              {bareName(entry.tool)} blocked
+              {bareName(entry.tool)} {t("tasks.blocked")}
             </span>
           </div>
           <div
@@ -2184,16 +2172,16 @@ function TaskLogRow({
           )}
           <span style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>
             {hitBudget
-              ? "Stopped at budget cap"
+              ? t("tasks.stoppedBudget")
               : hitTurns
-              ? "Stopped at turn limit"
-              : "Task complete"}
+              ? t("tasks.stoppedTurns")
+              : t("tasks.complete")}
           </span>
           <span className="badge success" style={{ fontSize: "var(--fs-xs)" }}>
-            Confidence {entry.confidence.toFixed(2)}
+            {t("tasks.confidence", { value: entry.confidence.toFixed(2) })}
           </span>
           <span className="subtle mono" style={{ fontSize: "var(--fs-xs)" }}>
-            {entry.turns} turn{entry.turns !== 1 ? "s" : ""}
+            {t("tasks.turns", { count: entry.turns })}
           </span>
           {typeof entry.costUsd === "number" && (
             <span
@@ -2223,7 +2211,7 @@ function TaskLogRow({
             color: "var(--danger)",
           }}
         >
-          Error: {entry.message}
+          {t("tasks.error", { message: entry.message })}
         </div>
       );
   }

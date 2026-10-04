@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useT } from "@/components/ex/i18n-context";
 import { Topbar } from "@/components/ex/shell";
 import { HandoverTabs } from "@/components/ex/handover-tabs";
 
@@ -993,6 +994,7 @@ function InfoStep({ n, title, children }: { n: number; title: string; children: 
 type RunPhase = "idle" | "starting" | "running" | "done" | "error";
 
 function HandoverPageInner() {
+  const { t } = useT();
   const params = useSearchParams();
   const employeeId = params.get("employee") ?? DEMO_EMPLOYEE_ID;
 
@@ -1064,7 +1066,7 @@ function HandoverPageInner() {
 
   return (
     <>
-      <Topbar crumbs={["Workspace", "Handover"]} />
+      <Topbar crumbs={[t("crumb.workspace"), t("nav.handover")]} />
       <div className="scrollbar" style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
         <div style={{ maxWidth: 960, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
           <HandoverTabs />
@@ -1088,11 +1090,10 @@ function HandoverPageInner() {
           {/* Header */}
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", margin: "0 0 4px", color: "var(--text)" }}>
-              Relay handover
+              {t("handover.title")}
             </h1>
             <p style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", margin: 0, lineHeight: 1.5 }}>
-              Capture a departing employee&apos;s working knowledge — decision rules, playbooks, the contact graph,
-              edge cases, tooling, glossary, and open loops — into a portable Role Context Package. Subject:{" "}
+              {t("handover.subtitle")} Subject:{" "}
               <span className="mono" style={{ color: "var(--text)" }}>
                 {employeeId}
               </span>
@@ -1104,7 +1105,7 @@ function HandoverPageInner() {
           {/* Start / consent card */}
           {runPhase === "idle" || runPhase === "starting" || runPhase === "error" ? (
             <Panel>
-              <SectionLabel>Consent gate (demo · soft)</SectionLabel>
+              <SectionLabel>{t("handover.consentGate")}</SectionLabel>
               <label
                 style={{
                   display: "flex",
@@ -1121,8 +1122,7 @@ function HandoverPageInner() {
                   style={{ marginTop: 2, width: 16, height: 16, accentColor: "#9E6B47", flexShrink: 0 }}
                 />
                 <span style={{ fontSize: "var(--fs-sm)", color: "var(--text)", lineHeight: 1.5 }}>
-                  The departing employee consented to this handover. (Demo default 13.5 — this is a soft consent gate
-                  shown for the demo; this build is not legally reviewed.)
+                  {t("handover.consentNotice")}
                 </span>
               </label>
 
@@ -1158,7 +1158,7 @@ function HandoverPageInner() {
                   cursor: consentChecked ? "pointer" : "not-allowed",
                 }}
               >
-                {runPhase === "starting" ? "Starting…" : "Start handover export"}
+                {runPhase === "starting" ? t("handover.starting") : t("handover.startExport")}
               </button>
             </Panel>
           ) : null}
@@ -1184,7 +1184,7 @@ function HandoverPageInner() {
                 )}
                 {connectionLost && !done && (
                   <div className="subtle" style={{ fontSize: "var(--fs-meta)", marginTop: 8, color: "var(--warn)" }}>
-                    Connection lost — the handover continues in the background. Refresh to reattach.
+                    {t("handover.connectionLost")}
                   </div>
                 )}
                 {state.errorMessage && (
@@ -1207,9 +1207,9 @@ function HandoverPageInner() {
                   <CoverageMeter coverage={state.coverage} />
                 ) : (
                   <Panel>
-                    <SectionLabel>Coverage</SectionLabel>
+                    <SectionLabel>{t("handover.coverageTitle")}</SectionLabel>
                     <div className="subtle" style={{ fontSize: "var(--fs-meta)" }}>
-                      Scored after capture completes.
+                      {t("handover.coveragePending")}
                     </div>
                   </Panel>
                 )}
@@ -1224,7 +1224,7 @@ function HandoverPageInner() {
                 <span style={{ fontSize: 18, color: "var(--success)" }}>✓</span>
                 <div>
                   <div style={{ fontSize: "var(--fs-base)", fontWeight: 700, color: "var(--text)" }}>
-                    Handover synthesized.
+                    {t("handover.synthesized")}
                   </div>
                   <div className="mono subtle" style={{ fontSize: "var(--fs-2xs)", marginTop: 2 }}>
                     {state.done?.status} · {Math.round((state.done?.weightedScore ?? 0) * 100)}% coverage ·{" "}
