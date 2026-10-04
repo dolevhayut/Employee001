@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Security
+- **`doctor` checks that your disk is encrypted and your data folder is
+  private** (FileVault / BitLocker / LUKS), and `doctor --fix` makes `data/`
+  readable only by you. New files the app writes are private by default.
 - **Other websites can no longer act on your local Employee001.** A page open
   in your browser could send requests to the app on 127.0.0.1 (for example,
   approve a pending twin action), and a DNS-rebinding page could read its
@@ -41,6 +44,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   unless you opt in and an endpoint is configured.
 
 ### Fixed
+- **Team Meeting and chat work on Bedrock, Vertex, Foundry and local models.**
+  They used to refuse to start without an Anthropic API key even when another
+  provider was configured.
 - **Smaller download.** The npm package no longer carries a copy of the
   source tree, tests and tooling inside the server bundle (57 MB → 48 MB).
 - **Your twins now live in your folder and survive upgrades.** With
