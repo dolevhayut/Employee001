@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **`doctor` and `start` warn about unsupported Node versions.** Node 26 breaks
+  a native module; you now get a clear "use Node 24 LTS" message instead of a
+  build error, and Node older than 22 stops before starting.
 - **Unattended work starts with the server.** Schedules, catch-up of missed
   runs and recovery of approvals lost in a restart used to wait until someone
   opened Schedules or Tasks.
