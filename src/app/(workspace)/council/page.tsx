@@ -1565,12 +1565,17 @@ function CouncilPageInner() {
   // Held in state (not a ref) because file chips read it during render to build
   // their download/preview URLs.
   const [meetingId, setMeetingId] = useState<string | null>(null);
-  // Read `?q=` only while this page instance is created. The demo banner uses
-  // it to offer the recorded meeting question without changing later edits.
-  const [input, setInput] = useState(() => {
-    const question = searchParams.get("q");
-    return question && question.length <= 500 ? question : "";
-  });
+  // `?q=` prefills the input (the demo banner links to the recorded
+  // question). Re-apply it when the param changes, because the banner link is
+  // a client-side navigation to this same, already-mounted page.
+  const rawQ = searchParams.get("q");
+  const prefill = rawQ && rawQ.length <= 500 ? rawQ : "";
+  const [input, setInput] = useState(prefill);
+  const [appliedPrefill, setAppliedPrefill] = useState(prefill);
+  if (prefill !== appliedPrefill) {
+    setAppliedPrefill(prefill);
+    if (prefill) setInput(prefill);
+  }
   const [typingFor, setTypingFor] = useState<string[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);

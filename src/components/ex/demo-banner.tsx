@@ -1,11 +1,32 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useT } from "@/components/ex/i18n-context";
 
-export function DemoBanner({ question, live = false }: { question: string; live?: boolean }) {
+type DemoStatus = { demo: boolean; live?: boolean; question?: string };
+
+export function DemoBanner() {
   const { t } = useT();
+  const [status, setStatus] = useState<DemoStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/demo", { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<DemoStatus>) : null))
+      .then((value) => {
+        if (!cancelled) setStatus(value);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!status?.demo) return null;
+  const live = status.live === true;
+  const question = status.question ?? "";
   return (
     <motion.aside
       initial={{ opacity: 0, y: -8 }}
@@ -31,7 +52,7 @@ export function DemoBanner({ question, live = false }: { question: string; live?
         {t(live ? "demo.banner.live" : "demo.banner.replay")}
       </span>
       <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>{t("demo.banner.body")}</span>
-      {!live && (
+      {!live && question && (
         <Link
           href={`/council?q=${encodeURIComponent(question)}`}
           style={{ fontSize: "var(--fs-sm)", color: "var(--accent)", fontWeight: 650, textDecoration: "none", whiteSpace: "nowrap" }}
