@@ -30,6 +30,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   unless you opt in and an endpoint is configured.
 
 ### Fixed
+- **Your twins now live in your folder and survive upgrades.** With
+  `npx employee001`, the app stored everything inside the installed package
+  (the npx cache), so a new version started empty and `export` found nothing.
+  Data now lives in the `data/` folder next to your `.env`, as `setup` always
+  intended. On first start, twins from an earlier install are copied over
+  automatically (the old copy is left untouched), and `doctor` shows where
+  your data is.
 - **`doctor` and `start` warn about unsupported Node versions.** Node 26 breaks
   a native module; you now get a clear "use Node 24 LTS" message instead of a
   build error, and Node older than 22 stops before starting.
