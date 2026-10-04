@@ -253,7 +253,7 @@ function HealthCheckCard() {
           )}
         </div>
         {health?.status === "ok" && (
-          <span style={{ background: "var(--success)", color: "#fff", borderRadius: 999, padding: "3px 8px", fontSize: "var(--fs-meta)", fontWeight: 700 }}>
+          <span style={{ background: "color-mix(in oklch, var(--success) 14%, transparent)", color: "var(--success)", borderRadius: 999, padding: "3px 8px", fontSize: "var(--fs-meta)", fontWeight: 700 }}>
             {t("opsHealth.allClear")}
           </span>
         )}
