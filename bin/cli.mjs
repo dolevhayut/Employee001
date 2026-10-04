@@ -22,6 +22,9 @@ Commands:
 Common flags:
   --no-open       (start) Do not open browser
   --port <n>      (start) Override port (default 3000)
+  --strict        (start) Disable nonessential outbound traffic
+                  (sets CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1)
+  --egress        (doctor) After the health checks, list every outbound host
   --force         (import) Overwrite a non-empty data/ directory
 
 Examples:

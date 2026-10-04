@@ -1,5 +1,5 @@
 import { accessSync, constants, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:net";
 import semver from "semver";
@@ -46,6 +46,195 @@ async function checkAnthropic(key) {
   }
 }
 
+function readEnvFile(path) {
+  if (!existsSync(path)) return {};
+  try {
+    return parseEnv(readFileSync(path, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+/** File values win, matching doctor checks; process env fills anything unset. */
+function egressConfig() {
+  const cwd = process.cwd();
+  const file = {
+    ...readEnvFile(resolve(cwd, ".env")),
+    ...readEnvFile(resolve(cwd, ".env.local")),
+  };
+  return (key) => {
+    const fromFile = file[key];
+    if (fromFile) return fromFile;
+    return process.env[key] || "";
+  };
+}
+
+/** Claude Code treats 1 / true / yes / on as on. */
+function flagOn(value) {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(String(value).toLowerCase().trim());
+}
+
+/** Hostname only. Drops userinfo, path, query, and headers. */
+function hostnameOnly(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text) return "";
+  try {
+    const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`;
+    return new URL(withScheme).hostname;
+  } catch {
+    return "";
+  }
+}
+
+function safeToken(value, fallback) {
+  if (/^[A-Za-z0-9._-]{1,64}$/.test(value)) return value;
+  return fallback;
+}
+
+/**
+ * Agent SDK `query()` forwards process env into Claude Code, which routes
+ * to Bedrock / Vertex / Foundry when those flags are set. Direct
+ * `new Anthropic()` calls stay on ANTHROPIC_BASE_URL or api.anthropic.com.
+ */
+function modelHosts(get) {
+  const direct = hostnameOnly(get("ANTHROPIC_BASE_URL")) || "api.anthropic.com";
+  const directOn = Boolean(get("ANTHROPIC_API_KEY") || get("ANTHROPIC_AUTH_TOKEN"));
+
+  if (flagOn(get("CLAUDE_CODE_USE_BEDROCK"))) {
+    const region = safeToken(get("AWS_REGION") || get("AWS_DEFAULT_REGION"), "<region>");
+    const host = hostnameOnly(get("ANTHROPIC_BEDROCK_BASE_URL")) || `bedrock-runtime.${region}.amazonaws.com`;
+    return { agent: { host, on: true, when: "twin runs (CLAUDE_CODE_USE_BEDROCK)" }, direct, directOn };
+  }
+  if (flagOn(get("CLAUDE_CODE_USE_VERTEX"))) {
+    const region = safeToken(get("CLOUD_ML_REGION"), "global");
+    const fallback = region === "global" ? "aiplatform.googleapis.com" : `${region}-aiplatform.googleapis.com`;
+    const host = hostnameOnly(get("ANTHROPIC_VERTEX_BASE_URL")) || fallback;
+    return { agent: { host, on: true, when: "twin runs (CLAUDE_CODE_USE_VERTEX)" }, direct, directOn };
+  }
+  if (flagOn(get("CLAUDE_CODE_USE_FOUNDRY"))) {
+    const resource = safeToken(get("ANTHROPIC_FOUNDRY_RESOURCE"), "<resource>");
+    const host =
+      hostnameOnly(get("ANTHROPIC_FOUNDRY_BASE_URL")) || `${resource}.services.ai.azure.com`;
+    return { agent: { host, on: true, when: "twin runs (CLAUDE_CODE_USE_FOUNDRY)" }, direct, directOn };
+  }
+  return {
+    agent: { host: direct, on: directOn, when: "twin chat, training, and memory distillation" },
+    direct,
+    directOn,
+  };
+}
+
+function customMcpServers() {
+  const path = resolve(process.cwd(), "data", "org", "custom-mcp.json");
+  if (!existsSync(path)) return [];
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.servers)) return parsed.servers;
+    return [];
+  } catch {
+    warn("custom MCP", "data/org/custom-mcp.json could not be read");
+    return [];
+  }
+}
+
+function printEgress() {
+  const get = egressConfig();
+  const model = modelHosts(get);
+  const rows = [];
+
+  rows.push({
+    host: model.agent.host,
+    sends: "prompts + profile context",
+    when: model.agent.when,
+    enabled: model.agent.on,
+  });
+  if (model.agent.host !== model.direct) {
+    rows.push({
+      host: model.direct,
+      sends: "prompts (direct Anthropic SDK: rerank, dreamer, relay)",
+      when: "memory distillation, relay interview, follow-ups",
+      enabled: model.directOn,
+    });
+  }
+
+  const composioHost = hostnameOnly(get("COMPOSIO_BASE_URL")) || "backend.composio.dev";
+  rows.push({
+    host: composioHost,
+    sends: "tool calls + OAuth",
+    when: "when COMPOSIO_API_KEY is set",
+    enabled: Boolean(get("COMPOSIO_API_KEY")),
+  });
+
+  const memoryOn = get("TWIN_MEMORY_ENABLED").toLowerCase() !== "false";
+  rows.push({
+    host: "api.openai.com",
+    sends: "embeddings for semantic memory",
+    when: "recall and write, if OPENAI_API_KEY is set and TWIN_MEMORY_ENABLED is not false",
+    enabled: Boolean(get("OPENAI_API_KEY")) && memoryOn,
+  });
+
+  rows.push({
+    host: "api.elevenlabs.io",
+    sends: "text-to-speech",
+    when: "when ELEVENLABS_API_KEY is set",
+    enabled: Boolean(get("ELEVENLABS_API_KEY")),
+  });
+
+  for (const server of customMcpServers()) {
+    if (!server || typeof server !== "object") continue;
+    const host = hostnameOnly(server.url);
+    if (!host) continue;
+    rows.push({
+      host,
+      sends: "MCP tool calls",
+      when: "when this server is enabled in data/org/custom-mcp.json",
+      enabled: server.enabled === true,
+    });
+  }
+
+  const twinsCanRun = model.agent.on || model.directOn;
+  rows.push({
+    host: "any host",
+    sends: "search queries and fetched pages",
+    when: "when a twin uses WebSearch or WebFetch",
+    enabled: twinsCanRun,
+  });
+
+  rows.push({
+    host: "api.github.com",
+    sends: "release metadata",
+    when: "only when you run employee001 update",
+    enabled: false,
+  });
+
+  const npmHost = hostnameOnly(get("npm_config_registry")) || "registry.npmjs.org";
+  rows.push({
+    host: npmHost,
+    sends: "package tarball",
+    when: "only when you run employee001 update",
+    enabled: false,
+  });
+
+  process.stdout.write("\nOutbound destinations\n");
+  process.stdout.write(`  ${COLOR.dim}host · what is sent · when · enabled?${COLOR.reset}\n`);
+
+  let active = 0;
+  for (const row of rows) {
+    const detail = `${row.sends} · ${row.when} · ${row.enabled ? "yes" : "no"}`;
+    if (row.enabled) {
+      ok(row.host, detail);
+      active++;
+    } else {
+      warn(row.host, detail);
+    }
+  }
+
+  const noun = active === 1 ? "destination" : "destinations";
+  process.stdout.write(`\n${active} ${noun} active with your current config.\n`);
+}
+
 function portFree(port) {
   return new Promise((resolveP) => {
     const s = createServer();
@@ -55,7 +244,7 @@ function portFree(port) {
   });
 }
 
-export default async function doctor() {
+export default async function doctor(argv = []) {
   let issues = 0;
 
   process.stdout.write("\nEmployee001 — doctor\n\n");
@@ -158,6 +347,9 @@ export default async function doctor() {
   const server = resolve(PKG_ROOT, ".next", "standalone", "server.js");
   if (existsSync(server)) ok("Standalone build", server);
   else warn("Standalone build", "missing — needed for `employee001 start`");
+
+  // --egress appends this section; the checks above still run.
+  if (argv.includes("--egress")) printEgress();
 
   process.stdout.write("\n");
   if (issues === 0) process.stdout.write("All good.\n");

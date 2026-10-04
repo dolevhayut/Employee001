@@ -50,6 +50,7 @@ export default async function start(argv) {
   const fileEnv = parseEnv(readFileSync(envPath, "utf8"));
 
   const noOpen = argv.includes("--no-open");
+  const strict = argv.includes("--strict");
   const portFlagIdx = argv.indexOf("--port");
   const portArg = portFlagIdx >= 0 ? argv[portFlagIdx + 1] : undefined;
 
@@ -73,6 +74,9 @@ export default async function start(argv) {
     PORT: String(port),
     NODE_ENV: "production",
   };
+  if (strict) {
+    childEnv.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
+  }
 
   const isLoopback =
     !bind || bind === "127.0.0.1" || bind === "::1" || bind === "localhost";
@@ -93,6 +97,9 @@ export default async function start(argv) {
       banner.push("  WARNING: EMPLOYEE001_TOKEN is not set. The proxy will refuse every");
       banner.push("  request until you set one. Re-run `employee001 setup`.");
     }
+  }
+  if (strict) {
+    banner.push("  Strict: nonessential traffic disabled (CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1).");
   }
   banner.push("");
   banner.push("  Press Ctrl+C to stop.");
