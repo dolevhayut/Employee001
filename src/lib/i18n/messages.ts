@@ -1,6 +1,9 @@
 // Typed UI catalogs. Components never read these directly — they call `t`
 // with the active locale, usually via the bound helper from `useT()`.
 
+import { profileEn, profileHe } from "./catalog/profile";
+import { chatMeetingEn, chatMeetingHe } from "./catalog/chat-meeting";
+
 export const LOCALES = ["en", "he"] as const;
 export type Locale = (typeof LOCALES)[number];
 
@@ -8,7 +11,7 @@ export function isLocale(value: string | null): value is Locale {
   return value === "en" || value === "he";
 }
 
-const en = {
+const coreEn = {
   "nav.section.work": "Work",
   "nav.section.twins": "Twins",
   "nav.section.operations": "Operations",
@@ -449,9 +452,13 @@ const en = {
   "inbox.overlay.badJson": "Invalid JSON",
 } as const;
 
+// Area catalogs live in ./catalog/*.ts so parallel work on different
+// screens never edits the same file.
+const en = { ...coreEn, ...profileEn, ...chatMeetingEn } as const;
+
 export type MessageKey = keyof typeof en;
 
-const he: Record<MessageKey, string> = {
+const coreHe: Record<keyof typeof coreEn, string> = {
   "nav.section.work": "עבודה",
   "nav.section.twins": "תאומים",
   "nav.section.operations": "תפעול",
@@ -891,6 +898,8 @@ const he: Record<MessageKey, string> = {
   "inbox.overlay.skip": "דילוג",
   "inbox.overlay.badJson": "JSON לא תקין",
 };
+
+const he: Record<MessageKey, string> = { ...coreHe, ...profileHe, ...chatMeetingHe };
 
 export const messages: Record<Locale, Record<MessageKey, string>> = { en, he };
 
