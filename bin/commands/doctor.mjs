@@ -6,6 +6,7 @@ import { checkNodeVersion } from "../lib/node-version.mjs";
 import { countTwins } from "../lib/adopt-data.mjs";
 import { checkDiskEncryption } from "../lib/disk-encryption.mjs";
 import { checkDataPermissions, fixDataPermissions } from "../lib/data-permissions.mjs";
+import { KEYCHAIN_PLACEHOLDER, SECRET_NAMES } from "../lib/keychain.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(HERE, "..", "..");
@@ -56,6 +57,14 @@ function readEnvFile(path) {
   } catch {
     return {};
   }
+}
+
+export function plaintextSecretNames(env) {
+  return SECRET_NAMES.filter((name) => env[name] && env[name] !== KEYCHAIN_PLACEHOLDER);
+}
+
+function isKeychainSecret(value) {
+  return value === KEYCHAIN_PLACEHOLDER;
 }
 
 /** File values win, matching doctor checks; process env fills anything unset. */
@@ -293,6 +302,13 @@ export default async function doctor(argv = []) {
     issues++;
   }
 
+  const plaintextSecrets = plaintextSecretNames(env);
+  if (plaintextSecrets.length) {
+    warn("Secrets", `${plaintextSecrets.join(", ")} stored in plaintext — run \`employee001 secure\``);
+  } else {
+    ok("Secrets", "no plaintext secrets in .env");
+  }
+
   // Provider (settings presence only; doctor never validates customer-cloud credentials).
   const provider = (env.EMPLOYEE001_MODEL_PROVIDER || process.env.EMPLOYEE001_MODEL_PROVIDER || "anthropic").toLowerCase();
   if (["anthropic", "bedrock", "vertex", "foundry", "local"].includes(provider)) ok("Claude provider", provider);
@@ -304,6 +320,8 @@ export default async function doctor(argv = []) {
     const configured = provider === "bedrock" ? env.AWS_REGION || process.env.AWS_REGION : provider === "vertex" ? (env.CLOUD_ML_REGION || process.env.CLOUD_ML_REGION) && (env.ANTHROPIC_VERTEX_PROJECT_ID || process.env.ANTHROPIC_VERTEX_PROJECT_ID) : provider === "foundry" ? env.ANTHROPIC_FOUNDRY_RESOURCE || process.env.ANTHROPIC_FOUNDRY_RESOURCE : (env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_BASE_URL) && (env.ANTHROPIC_DEFAULT_OPUS_MODEL || process.env.ANTHROPIC_DEFAULT_OPUS_MODEL) && (env.ANTHROPIC_DEFAULT_SONNET_MODEL || process.env.ANTHROPIC_DEFAULT_SONNET_MODEL) && (env.ANTHROPIC_DEFAULT_HAIKU_MODEL || process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL);
     if (configured) ok("Customer-cloud settings", "present (credentials are not checked)");
     else { fail("Customer-cloud settings", "missing — run `employee001 setup`"); issues++; }
+  } else if (isKeychainSecret(aKey)) {
+    ok("ANTHROPIC_API_KEY", "stored in the OS keychain (resolved at start)");
   } else if (!aKey) {
     fail("ANTHROPIC_API_KEY", "not set — required");
     issues++;
@@ -317,7 +335,8 @@ export default async function doctor(argv = []) {
   }
 
   // Composio (required — powers the 30-360 day twin-training backfill, default 90)
-  if (env.COMPOSIO_API_KEY) ok("COMPOSIO_API_KEY", "set");
+  if (isKeychainSecret(env.COMPOSIO_API_KEY)) ok("COMPOSIO_API_KEY", "stored in the OS keychain (resolved at start)");
+  else if (env.COMPOSIO_API_KEY) ok("COMPOSIO_API_KEY", "set");
   else {
     fail(
       "COMPOSIO_API_KEY",
@@ -327,7 +346,8 @@ export default async function doctor(argv = []) {
   }
 
   // ElevenLabs (optional)
-  if (env.ELEVENLABS_API_KEY) ok("ELEVENLABS_API_KEY", "set");
+  if (isKeychainSecret(env.ELEVENLABS_API_KEY)) ok("ELEVENLABS_API_KEY", "stored in the OS keychain (resolved at start)");
+  else if (env.ELEVENLABS_API_KEY) ok("ELEVENLABS_API_KEY", "set");
   else warn("ELEVENLABS_API_KEY", "not set — twin voices disabled");
 
   // Bind + access token
@@ -336,10 +356,12 @@ export default async function doctor(argv = []) {
   const token = env.EMPLOYEE001_TOKEN || process.env.EMPLOYEE001_TOKEN;
   if (isLoopback) {
     ok(`Bind ${bind}`, "loopback — local-only, no access token required");
-    if (token) ok("EMPLOYEE001_TOKEN", "set (unused on loopback, ready if you flip to 0.0.0.0)");
+    if (isKeychainSecret(token)) ok("EMPLOYEE001_TOKEN", "stored in the OS keychain (unused on loopback, ready if you flip to 0.0.0.0)");
+    else if (token) ok("EMPLOYEE001_TOKEN", "set (unused on loopback, ready if you flip to 0.0.0.0)");
   } else {
     warn(`Bind ${bind}`, "exposed beyond loopback — use a firewall or Tailscale");
-    if (token && token.length >= 16) ok("EMPLOYEE001_TOKEN", `set (${token.length} chars)`);
+    if (isKeychainSecret(token)) ok("EMPLOYEE001_TOKEN", "stored in the OS keychain (resolved at start)");
+    else if (token && token.length >= 16) ok("EMPLOYEE001_TOKEN", `set (${token.length} chars)`);
     else if (token) {
       fail("EMPLOYEE001_TOKEN", `too short (${token.length} chars) — regenerate with setup`);
       issues++;

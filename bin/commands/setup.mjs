@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import * as p from "@clack/prompts";
+import { createKeychain, KEYCHAIN_PLACEHOLDER, SECRET_NAMES } from "../lib/keychain.mjs";
 
 // Claude Code's brand orange (R204 G120 G92 — close to the official wordmark).
 // 24-bit ANSI works on every modern terminal we ship to; FORCE_COLOR=0 or a
@@ -275,6 +276,30 @@ export default async function setup() {
   // to 127.0.0.1; it becomes the LAN gate the moment the user flips bind to
   // 0.0.0.0, with no second setup step required.
   const token = existing.EMPLOYEE001_TOKEN || generateToken();
+  const secretValues = {
+    ANTHROPIC_API_KEY: anthropicKey || (existing.ANTHROPIC_API_KEY === KEYCHAIN_PLACEHOLDER ? KEYCHAIN_PLACEHOLDER : ""),
+    COMPOSIO_API_KEY: composioKey || (existing.COMPOSIO_API_KEY === KEYCHAIN_PLACEHOLDER ? KEYCHAIN_PLACEHOLDER : ""),
+    ELEVENLABS_API_KEY: elevenLabsKey || (existing.ELEVENLABS_API_KEY === KEYCHAIN_PLACEHOLDER ? KEYCHAIN_PLACEHOLDER : ""),
+    OPENAI_API_KEY: openaiKey || (existing.OPENAI_API_KEY === KEYCHAIN_PLACEHOLDER ? KEYCHAIN_PLACEHOLDER : ""),
+    EMPLOYEE001_TOKEN: token,
+  };
+  const keychain = createKeychain();
+  const secretsToStore = SECRET_NAMES.filter((name) => secretValues[name] && secretValues[name] !== KEYCHAIN_PLACEHOLDER);
+  const keychainFailures = [];
+  if (keychain.available && secretsToStore.length) {
+    const storeInKeychain = await p.confirm({
+      message: "Store API keys in your macOS Keychain? (recommended)",
+      initialValue: true,
+    });
+    if (p.isCancel(storeInKeychain)) { p.cancel("Setup cancelled"); return; }
+    if (storeInKeychain) {
+      for (const name of secretsToStore) {
+        const value = secretValues[name];
+        if (keychain.store(name, value) && keychain.read(name) === value) secretValues[name] = KEYCHAIN_PLACEHOLDER;
+        else keychainFailures.push(name);
+      }
+    }
+  }
 
   // Local endpoint settings are written only for the local provider: an
   // empty or stale ANTHROPIC_BASE_URL must never redirect Anthropic/cloud runs.
@@ -306,7 +331,7 @@ export default async function setup() {
     `EMPLOYEE001_MODEL_PROVIDER=${provider}`,
     "",
     "# Required only for the Anthropic API provider. Get one from https://console.anthropic.com",
-    `ANTHROPIC_API_KEY=${anthropicKey}`,
+    `ANTHROPIC_API_KEY=${secretValues.ANTHROPIC_API_KEY}`,
     "# AWS Bedrock: configure standard AWS credentials outside this file.",
     `AWS_REGION=${awsRegion}`,
     "# Google Vertex AI: configure Google Cloud credentials outside this file.",
@@ -323,15 +348,15 @@ export default async function setup() {
     "# markdown files. Marketplace agents (Alex Morgan etc.) work without",
     "# it. Add the key here later or from /employees when you're ready to",
     "# invite your first real employee.",
-    `COMPOSIO_API_KEY=${composioKey ?? ""}`,
+    `COMPOSIO_API_KEY=${secretValues.COMPOSIO_API_KEY}`,
     "",
     "# Optional. ElevenLabs for cloned twin voices.",
-    `ELEVENLABS_API_KEY=${elevenLabsKey ?? ""}`,
+    `ELEVENLABS_API_KEY=${secretValues.ELEVENLABS_API_KEY}`,
     "",
     "# Optional. Optimizes the twins' memory — more accurate recall of the",
     "# most relevant past context, so answers stay sharp over time. Everything",
     "# works without it (memory falls back to keyword recall).",
-    `OPENAI_API_KEY=${openaiKey ?? ""}`,
+    `OPENAI_API_KEY=${secretValues.OPENAI_API_KEY}`,
     "",
     "# Bind address. Default 127.0.0.1 — only this machine can reach the app.",
     "# Set to 0.0.0.0 to expose on your LAN (use a firewall or Tailscale!).",
@@ -339,7 +364,7 @@ export default async function setup() {
     "",
     "# Shared-secret access token. Required when EMPLOYEE001_BIND is non-loopback.",
     "# Ignored when bound to 127.0.0.1. Rotate by deleting and re-running `setup`.",
-    `EMPLOYEE001_TOKEN=${token}`,
+    `EMPLOYEE001_TOKEN=${secretValues.EMPLOYEE001_TOKEN}`,
     "",
     "# Local server port.",
     `PORT=${port}`,
@@ -347,6 +372,9 @@ export default async function setup() {
   ];
 
   writeFileSync(ENV_PATH, lines.join("\n"), { mode: 0o600 });
+  if (keychainFailures.length) {
+    p.note(`Could not store ${keychainFailures.join(", ")} in the OS keychain; those values remain in .env.`, "Keychain");
+  }
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
 
   // Consent belongs with other local workspace settings, not in .env. Keep

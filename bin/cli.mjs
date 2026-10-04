@@ -15,6 +15,7 @@ Commands:
   start     Start the local server (binds to 127.0.0.1 by default)
   update    Check GitHub releases for a newer version
   doctor    Run a health check on your install
+  secure    Move plaintext .env secrets into your OS keychain
   export    Snapshot data/ to a tar.gz archive (excludes .env)
   import    Restore data/ from a tar.gz archive
   mcp       Connect Claude Code, Cursor and other MCP clients (stdio bridge to the running app)
@@ -40,7 +41,7 @@ Examples:
 Docs: https://github.com/dolevhayut/Employee001
 `;
 
-const KNOWN = new Set(["setup", "start", "update", "doctor", "export", "import", "mcp", "demo", "help"]);
+const KNOWN = new Set(["setup", "start", "update", "doctor", "secure", "export", "import", "mcp", "demo", "help"]);
 
 async function main() {
   const cmd = process.argv[2];

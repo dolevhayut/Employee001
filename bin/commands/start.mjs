@@ -4,12 +4,13 @@ import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkNodeVersion } from "../lib/node-version.mjs";
 import { adoptData } from "../lib/adopt-data.mjs";
+import { createKeychain, resolveEnvPlaceholders } from "../lib/keychain.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // bin/commands/start.mjs → ../../  is the package root
 const PKG_ROOT = resolve(HERE, "..", "..");
 
-function parseEnv(text) {
+export function parseEnv(text) {
   const out = {};
   for (const line of text.split("\n")) {
     const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
@@ -47,6 +48,9 @@ export function buildChildEnv({ home, port, bind, env = {}, strict = false, inhe
     NODE_ENV: "production",
   };
   if (strict) childEnv.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
+  for (const [name, value] of Object.entries(env)) {
+    if (value === undefined) delete childEnv[name];
+  }
   return childEnv;
 }
 
@@ -160,14 +164,18 @@ export default async function start(argv) {
   }
 
   const fileEnv = parseEnv(readFileSync(envPath, "utf8"));
+  const resolved = resolveEnvPlaceholders(fileEnv, createKeychain());
+  for (const name of resolved.missing) {
+    process.stderr.write(`Could not read ${name} from the OS keychain; continuing without it.\n`);
+  }
 
   const noOpen = argv.includes("--no-open");
   const strict = argv.includes("--strict");
   const portFlagIdx = argv.indexOf("--port");
   const portArg = portFlagIdx >= 0 ? argv[portFlagIdx + 1] : undefined;
 
-  const port = portArg ?? fileEnv.PORT ?? process.env.PORT ?? "3000";
-  const bind = fileEnv.EMPLOYEE001_BIND ?? process.env.EMPLOYEE001_BIND ?? "127.0.0.1";
+  const port = portArg ?? resolved.env.PORT ?? process.env.PORT ?? "3000";
+  const bind = resolved.env.EMPLOYEE001_BIND ?? process.env.EMPLOYEE001_BIND ?? "127.0.0.1";
 
-  launchServer({ home: cwd, port, bind, env: fileEnv, noOpen, strict });
+  launchServer({ home: cwd, port, bind, env: resolved.env, noOpen, strict });
 }

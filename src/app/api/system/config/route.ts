@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import { envFilePath } from "@/lib/app-home";
+import { KEYCHAIN_PLACEHOLDER, readKeychainSecret, storeKeychainSecret, type SecretName } from "@/lib/keychain";
 
 // Returns *presence* of each required API key, never the value itself.
 // Used by the UI to gate the Invite-employee flow on a fully configured
@@ -68,6 +69,17 @@ export async function PATCH(req: NextRequest) {
     existing = fs.readFileSync(envPath, "utf8");
   } catch {
     // .env doesn't exist yet — that's fine
+  }
+
+  const existingMatch = existing.match(new RegExp(`^${key}\\s*=\\s*(.*?)\\s*$`, "m"));
+  const existingValue = existingMatch?.[1]?.replace(/^(?:"(.*)"|'(.*)')$/, "$1$2");
+  if (existingValue === KEYCHAIN_PLACEHOLDER) {
+    const secretName = key as SecretName;
+    if (!storeKeychainSecret(secretName, value) || readKeychainSecret(secretName) !== value) {
+      return NextResponse.json({ error: "keychain_unavailable" }, { status: 503 });
+    }
+    process.env[key] = value;
+    return NextResponse.json({ ok: true, restart_required: true });
   }
 
   // Replace the key line if it exists, otherwise append
