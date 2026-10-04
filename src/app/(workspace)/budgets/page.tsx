@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { PageHead } from "@/components/ex/page-head";
@@ -112,20 +112,88 @@ function EditableLimit({
   );
 }
 
+function LoadErrorPanel({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      style={{
+        display: "inline-flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: "var(--sp-10)",
+        maxWidth: 420,
+        padding: "var(--sp-12) var(--sp-14)",
+        border: "1px solid var(--hairline)",
+        borderRadius: 8,
+        background: "color-mix(in oklch, var(--danger) 12%, transparent)",
+      }}
+    >
+      <p
+        style={{
+          margin: 0,
+          fontSize: "var(--fs-ui)",
+          fontWeight: 600,
+          color: "var(--danger)",
+          lineHeight: 1.45,
+        }}
+      >
+        {message}
+      </p>
+      <button type="button" className="btn sm" onClick={onRetry}>
+        Try again
+      </button>
+    </div>
+  );
+}
+
+function RefreshMiss() {
+  return (
+    <p
+      style={{
+        margin: "0 0 var(--sp-12)",
+        fontSize: "var(--fs-sm)",
+        color: "var(--text-muted)",
+      }}
+    >
+      {"Couldn't refresh"}
+    </p>
+  );
+}
+
 export default function BudgetsPage() {
   const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [rows, setRows] = useState<BudgetRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const loadSeq = useRef(0);
 
   // Promise chain (not an async body) so no setState is reachable on a
   // synchronous path from the mount effect — the updates run only in the async
   // continuations.
   const load = useCallback(() => {
+    const seq = ++loadSeq.current;
     return fetch("/api/budgets")
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-      .then((data) => setRows(data as BudgetRow[]))
-      .catch(() => { /* ignore */ })
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (seq !== loadSeq.current) return;
+        setRows(data as BudgetRow[]);
+        setLoadError(null);
+        setHasLoaded(true);
+      })
+      .catch(() => {
+        if (seq !== loadSeq.current) return;
+        setLoadError("Couldn't load budgets.");
+      })
+      .finally(() => {
+        if (seq === loadSeq.current) setLoading(false);
+      });
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -138,7 +206,8 @@ export default function BudgetsPage() {
 
   const totalLimit = rows.reduce((s, r) => s + r.dailyBudgetUsd, 0);
   const totalSpent = rows.reduce((s, r) => s + r.spentTodayUsd, 0);
-  const showAutonomyEmpty = modeLoaded && mode === "base" && !loading && rows.length === 0;
+  const showAutonomyEmpty =
+    modeLoaded && mode === "base" && hasLoaded && !loading && rows.length === 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -172,7 +241,10 @@ export default function BudgetsPage() {
           subtitle="Set daily spend caps per twin and monitor today’s usage against limits."
           style={{ marginBottom: "var(--sp-16)", maxWidth: 1100 }}
         />
-        {showAutonomyEmpty ? (
+        {loadError && hasLoaded && <RefreshMiss />}
+        {loadError && !hasLoaded ? (
+          <LoadErrorPanel message={loadError} onRetry={() => void load()} />
+        ) : showAutonomyEmpty ? (
           <AutonomyEmptyState
             title="Spend has nothing to track yet"
             description="Daily caps and the money twins use while working unattended show up here after Autonomy is on."

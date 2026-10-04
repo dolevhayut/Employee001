@@ -363,6 +363,60 @@ function LogLine({ ev }: { ev: RunLogEvent }) {
   );
 }
 
+function LoadErrorPanel({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      style={{
+        display: "inline-flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: "var(--sp-10)",
+        maxWidth: 420,
+        padding: "var(--sp-12) var(--sp-14)",
+        border: "1px solid var(--hairline)",
+        borderRadius: 8,
+        background: "color-mix(in oklch, var(--danger) 12%, transparent)",
+      }}
+    >
+      <p
+        style={{
+          margin: 0,
+          fontSize: "var(--fs-ui)",
+          fontWeight: 600,
+          color: "var(--danger)",
+          lineHeight: 1.45,
+        }}
+      >
+        {message}
+      </p>
+      <button type="button" className="btn sm" onClick={onRetry}>
+        Try again
+      </button>
+    </div>
+  );
+}
+
+function RefreshMiss() {
+  return (
+    <p
+      style={{
+        margin: "0 0 var(--sp-12)",
+        fontSize: "var(--fs-sm)",
+        color: "var(--text-muted)",
+      }}
+    >
+      {"Couldn't refresh"}
+    </p>
+  );
+}
+
 function CockpitCard({ run }: { run: ActiveRun }) {
   const employee = useRoster().find((e) => e.id === run.employeeId);
   const initials =
@@ -563,21 +617,32 @@ export default function CockpitPage() {
   const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [runs, setRuns] = useState<ActiveRun[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [filter, setFilter] = useState<SurfaceFilter>("all");
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     try {
       const res = await fetch("/api/active-runs?includeRecent=1", {
         cache: "no-store",
       });
-      if (res.ok) {
-        const data = (await res.json()) as ActiveRun[];
-        setRuns(Array.isArray(data) ? data : []);
+      if (seq !== loadSeq.current) return;
+      if (!res.ok) {
+        setLoadError("Couldn't load runs.");
+        return;
       }
+      const data = (await res.json()) as ActiveRun[];
+      if (seq !== loadSeq.current) return;
+      setRuns(Array.isArray(data) ? data : []);
+      setLoadError(null);
+      setHasLoaded(true);
     } catch {
-      // swallow
+      if (seq !== loadSeq.current) return;
+      setLoadError("Couldn't load runs.");
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, []);
 
@@ -595,7 +660,10 @@ export default function CockpitPage() {
           setLoading(false);
           try {
             const data = JSON.parse(e.data) as ActiveRun[];
+            loadSeq.current += 1;
             setRuns(Array.isArray(data) ? data : []);
+            setLoadError(null);
+            setHasLoaded(true);
           } catch { /* ignore malformed */ }
         };
         es.onerror = () => {
@@ -632,9 +700,9 @@ export default function CockpitPage() {
     [runs]
   );
 
-  const isEmpty = !loading && filtered.length === 0;
+  const isEmpty = hasLoaded && !loading && filtered.length === 0;
   const showAutonomyEmpty =
-    modeLoaded && mode === "base" && !loading && runs.length === 0;
+    modeLoaded && mode === "base" && hasLoaded && !loading && runs.length === 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
@@ -736,7 +804,10 @@ export default function CockpitPage() {
           subtitle="Live observability across all running agents — see current tool, cost, duration, and a streaming log tail."
           style={{ marginBottom: "var(--sp-16)", maxWidth: 1100 }}
         />
-        {isEmpty ? (
+        {loadError && hasLoaded && <RefreshMiss />}
+        {loadError && !hasLoaded ? (
+          <LoadErrorPanel message={loadError} onRetry={() => void load()} />
+        ) : isEmpty ? (
           showAutonomyEmpty ? (
             <AutonomyEmptyState
               title="Cockpit is quiet"

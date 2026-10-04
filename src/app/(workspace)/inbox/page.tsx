@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
@@ -218,27 +218,92 @@ function ResolutionChip({ resolution, resolvedAt }: { resolution: string; resolv
   );
 }
 
+function LoadErrorPanel({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      style={{
+        display: "inline-flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: "var(--sp-10)",
+        maxWidth: 420,
+        padding: "var(--sp-12) var(--sp-14)",
+        border: "1px solid var(--hairline)",
+        borderRadius: 8,
+        background: "color-mix(in oklch, var(--danger) 12%, transparent)",
+      }}
+    >
+      <p
+        style={{
+          margin: 0,
+          fontSize: "var(--fs-ui)",
+          fontWeight: 600,
+          color: "var(--danger)",
+          lineHeight: 1.45,
+        }}
+      >
+        {message}
+      </p>
+      <button type="button" className="btn sm" onClick={onRetry}>
+        Try again
+      </button>
+    </div>
+  );
+}
+
+function RefreshMiss() {
+  return (
+    <p
+      style={{
+        margin: "0 0 var(--sp-12)",
+        fontSize: "var(--fs-sm)",
+        color: "var(--text-muted)",
+      }}
+    >
+      {"Couldn't refresh"}
+    </p>
+  );
+}
+
 export default function InboxPage() {
   const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [hideResolved, setHideResolved] = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     const params = new URLSearchParams();
     if (hideResolved) params.set("status", "open");
     try {
       const res = await fetch(`/api/feed?${params}`, { cache: "no-store" });
-      if (res.ok) {
-        const data = (await res.json()) as FeedItem[];
-        setItems(Array.isArray(data) ? data : []);
+      if (seq !== loadSeq.current) return;
+      if (!res.ok) {
+        setLoadError("Couldn't load approvals.");
+        return;
       }
+      const data = (await res.json()) as FeedItem[];
+      if (seq !== loadSeq.current) return;
+      setItems(Array.isArray(data) ? data : []);
+      setLoadError(null);
+      setHasLoaded(true);
     } catch {
-      // swallow — polling will retry
+      if (seq !== loadSeq.current) return;
+      setLoadError("Couldn't load approvals.");
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [hideResolved]);
 
@@ -269,9 +334,9 @@ export default function InboxPage() {
     }
   }
 
-  const isEmpty = !loading && filteredItems.length === 0;
+  const isEmpty = hasLoaded && !loading && filteredItems.length === 0;
   const showAutonomyEmpty =
-    modeLoaded && mode === "base" && !loading && items.length === 0;
+    modeLoaded && mode === "base" && hasLoaded && !loading && items.length === 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
@@ -368,7 +433,10 @@ export default function InboxPage() {
           subtitle="A single feed for updates, alerts, task handoffs, and approvals across all twins."
           style={{ marginBottom: "var(--sp-16)", maxWidth: 880 }}
         />
-        {isEmpty && (
+        {loadError && hasLoaded && <RefreshMiss />}
+        {loadError && !hasLoaded ? (
+          <LoadErrorPanel message={loadError} onRetry={() => void load()} />
+        ) : isEmpty ? (
           showAutonomyEmpty ? (
             <AutonomyEmptyState
               title="Approvals is clear"
@@ -401,9 +469,7 @@ export default function InboxPage() {
             </p>
           </div>
           )
-        )}
-
-        {!isEmpty && (
+        ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-8)", maxWidth: 880 }}>
             <AnimatePresence initial={false}>
               {filteredItems.map((item) => {
