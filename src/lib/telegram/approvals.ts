@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { dataDir } from "@/lib/app-home";
 import { resolveApproval, type ApprovalRequest } from "@/lib/approval-bus";
 import type { TelegramClient, TelegramUpdate } from "./client";
 
@@ -11,7 +12,7 @@ const CALLBACK_PREFIX = "ap";
 const SIGNATURE_LENGTH = 16;
 
 function secretFile(): string {
-  return path.join(process.cwd(), "data", "telegram-approval-secret");
+  return dataDir("telegram-approval-secret");
 }
 
 /** Stable per-install secret. This deliberately stays local and is never sent to Telegram. */
@@ -126,9 +127,9 @@ export async function handleCallback(
   const isHebrew = options.language === "he";
   const text = resolved
     ? callback.action === "approve"
-      ? isHebrew ? "האישור אושר" : "Approval approved"
-      : isHebrew ? "האישור דולג" : "Approval skipped"
-    : isHebrew ? "האישור כבר טופל או פג תוקפו" : "Approval already handled or expired";
+      ? isHebrew ? "אושר" : "Approved"
+      : isHebrew ? "דולג" : "Skipped"
+    : isHebrew ? "כבר טופל או שפג תוקפו" : "Already handled or expired";
   await options.client?.answerCallbackQuery(query.id, text);
   if (resolved) await options.client?.editMessageText(message.chat.id, message.message_id, text);
   return resolved ? "resolved" : "missing";
