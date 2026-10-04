@@ -7,6 +7,7 @@ import {
   writeKnowledgeFile,
   type KnowledgeFile,
 } from "@/lib/knowledge-files";
+import { listRecentlyDeletedKnowledge } from "@/lib/knowledge-versions";
 
 export const runtime = "nodejs";
 
@@ -41,7 +42,8 @@ export async function GET(
     return jsonResponse({ error: "employee not found" }, 404);
   }
   const files = listKnowledgeFiles(id);
-  return jsonResponse({ files });
+  const deleted = listRecentlyDeletedKnowledge(id);
+  return jsonResponse({ files, deleted });
 }
 
 export async function POST(

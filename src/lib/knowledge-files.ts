@@ -2,8 +2,15 @@ import "server-only";
 import fs from "fs";
 import path from "path";
 import { Worker } from "node:worker_threads";
+import {
+  knowledgeEmployeeSegment,
+  snapshotKnowledgeText,
+  sanitizeKnowledgeSegment,
+} from "./knowledge-versions";
 
-const EMPLOYEES_DATA_DIR = path.join(process.cwd(), "data", "employees");
+function employeesDataDir(): string {
+  return path.join(process.cwd(), "data", "employees");
+}
 
 export type KnowledgeFile = {
   name: string;
@@ -80,15 +87,7 @@ const KNOWLEDGE_EXEC_BLOCKLIST: readonly string[] = [
  * segment). Never allows "/" or "..".
  */
 function safeName(name: string): string | null {
-  if (typeof name !== "string") return null;
-  // Reject anything that contains a path separator before sanitizing so we
-  // never silently flatten "a/b" into "a-b".
-  if (name.includes("/") || name.includes("\\")) return null;
-  if (name.includes("..")) return null;
-  const cleaned = name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  if (!cleaned || cleaned === "." || cleaned === "..") return null;
-  if (cleaned.includes("..")) return null;
-  return cleaned;
+  return sanitizeKnowledgeSegment(name);
 }
 
 function extOf(name: string): string {
@@ -109,8 +108,8 @@ function approxTokens(byteLength: number): number {
 
 /** Absolute path to the knowledge dir for an employee. Creates it on demand. */
 export function knowledgeDir(employeeId: string): string {
-  const safeId = safeName(employeeId) ?? "_invalid";
-  const dir = path.join(EMPLOYEES_DATA_DIR, safeId, "knowledge");
+  const safeId = knowledgeEmployeeSegment(employeeId);
+  const dir = path.join(employeesDataDir(), safeId, "knowledge");
   try {
     fs.mkdirSync(dir, { recursive: true });
   } catch {
@@ -204,6 +203,12 @@ export function writeKnowledgeFile(
 
   const dir = knowledgeDir(employeeId);
   const full = path.join(dir, clean);
+  // Keep the previous text so an edit can be undone. The new body stays
+  // only in the live file.
+  if (fs.existsSync(full) && fs.statSync(full).isFile()) {
+    const prev = fs.readFileSync(full, "utf-8");
+    snapshotKnowledgeText(employeeId, clean, prev, "edit");
+  }
   fs.writeFileSync(full, body, "utf-8");
   return statToKnowledgeFile(dir, clean);
 }
@@ -443,20 +448,26 @@ export function deleteKnowledgeFile(employeeId: string, name: string): boolean {
     if (!fs.existsSync(full)) return false;
     const stat = fs.statSync(full);
     if (!stat.isFile()) return false;
-    fs.unlinkSync(full);
-    // Drop the extracted `${name}.md` companion with its PDF/DOCX original,
-    // so the twin stops reading text from a file the user deleted. Only a
-    // file we generated (marker on line 1) goes; a user's own .md stays.
     const ext = extOf(clean);
+    if (isTextExt(ext)) {
+      snapshotKnowledgeText(employeeId, clean, fs.readFileSync(full, "utf-8"), "delete");
+    }
+    // Snapshot an extracted companion before either unlink. Only a file we
+    // generated (marker on line 1) goes; a user's own .md stays.
+    let companionToDelete: string | null = null;
     if (ext === ".pdf" || ext === ".docx") {
-      const companion = path.join(dir, `${clean}.md`);
-      if (
-        fs.existsSync(companion) &&
-        fs.readFileSync(companion, "utf-8").startsWith(EXTRACTED_COMPANION_MARKER)
-      ) {
-        fs.unlinkSync(companion);
+      const companionName = `${clean}.md`;
+      const companion = path.join(dir, companionName);
+      if (fs.existsSync(companion) && fs.statSync(companion).isFile()) {
+        const text = fs.readFileSync(companion, "utf-8");
+        if (text.startsWith(EXTRACTED_COMPANION_MARKER)) {
+          snapshotKnowledgeText(employeeId, companionName, text, "delete");
+          companionToDelete = companion;
+        }
       }
     }
+    fs.unlinkSync(full);
+    if (companionToDelete) fs.unlinkSync(companionToDelete);
     return true;
   } catch {
     return false;

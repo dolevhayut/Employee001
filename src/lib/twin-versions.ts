@@ -39,7 +39,7 @@ const ACTIVE_BUILDS_FILE = path.join(
   "active-builds.json"
 );
 
-function safeIso(d: Date = new Date()): string {
+export function safeIso(d: Date = new Date()): string {
   // Filesystem-safe ISO: replace `:` and `.` with `-`. Sortable as string.
   return d.toISOString().replace(/[:.]/g, "-");
 }

@@ -98,6 +98,13 @@ type KnowledgeFileMeta = {
   mtime: string;
 };
 
+type KnowledgeVersionRow = {
+  ts: string;
+  name: string;
+  sizeBytes: number;
+  source: string;
+};
+
 // Which group the currently-selected file lives in. "profile" files are the
 // 9 base files (twin-builder may overwrite them); "knowledge" files are
 // CEO-owned enrichment files that are never overwritten.
@@ -107,6 +114,31 @@ type SelectedFile = { group: FileGroup; name: string };
 
 // Extensions the knowledge upload picker accepts — text only (agent-readable).
 const KNOWLEDGE_ACCEPT = ".md,.markdown,.txt,.csv,.json";
+const KNOWLEDGE_TEXT_EXT_LIST = [".md", ".markdown", ".txt", ".csv", ".json"];
+
+function isKnowledgeTextName(name: string): boolean {
+  const dot = name.lastIndexOf(".");
+  const ext = dot >= 0 ? name.slice(dot).toLowerCase() : "";
+  return KNOWLEDGE_TEXT_EXT_LIST.includes(ext);
+}
+
+function formatSnapshotTime(ts: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2}T)(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/.exec(ts);
+  if (!match) return ts;
+  const date = new Date(`${match[1]}${match[2]}:${match[3]}:${match[4]}.${match[5]}Z`);
+  if (Number.isNaN(date.getTime())) return ts;
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatSnapshotSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
 
 type EmployeeSkillsPayload = {
   skills: OrgSkillPlaybook[];
@@ -1943,6 +1975,7 @@ function FilesTab({
   onSelect: (sel: SelectedFile) => void;
 }) {
   const [knowledge, setKnowledge] = useState<KnowledgeFileMeta[]>([]);
+  const [deletedKnowledge, setDeletedKnowledge] = useState<KnowledgeVersionRow[]>([]);
 
   const loadKnowledge = useCallback(async () => {
     try {
@@ -1950,8 +1983,12 @@ function FilesTab({
         cache: "no-store",
       });
       if (!r.ok) return;
-      const data = (await r.json()) as { files?: KnowledgeFileMeta[] };
+      const data = (await r.json()) as {
+        files?: KnowledgeFileMeta[];
+        deleted?: KnowledgeVersionRow[];
+      };
       setKnowledge(data.files ?? []);
+      setDeletedKnowledge(data.deleted ?? []);
     } catch {
       /* leave list as-is on transient error */
     }
@@ -1976,6 +2013,7 @@ function FilesTab({
         employeeId={employeeId}
         profileFiles={profileFiles}
         knowledge={knowledge}
+        deleted={deletedKnowledge}
         selected={selected}
         onSelect={onSelect}
         onKnowledgeChanged={loadKnowledge}
@@ -1995,6 +2033,7 @@ function FileTreePane({
   employeeId,
   profileFiles,
   knowledge,
+  deleted,
   selected,
   onSelect,
   onKnowledgeChanged,
@@ -2002,6 +2041,7 @@ function FileTreePane({
   employeeId: string;
   profileFiles: FileNode[];
   knowledge: KnowledgeFileMeta[];
+  deleted: KnowledgeVersionRow[];
   selected: SelectedFile | null;
   onSelect: (sel: SelectedFile) => void;
   onKnowledgeChanged: () => void | Promise<void>;
@@ -2066,8 +2106,28 @@ function FileTreePane({
     }
   }
 
+  async function restoreDeleted(entry: KnowledgeVersionRow) {
+    if (!window.confirm(`Restore ${entry.name}? This puts the deleted file back into knowledge/.`)) return;
+    setError(null);
+    try {
+      const r = await fetch(
+        `/api/employees/${employeeId}/knowledge/${encodeURIComponent(entry.name)}/versions/${encodeURIComponent(entry.ts)}/restore`,
+        { method: "POST" },
+      );
+      const data = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!r.ok || !data.ok) throw new Error(data.error ?? "Restore failed");
+      await onKnowledgeChanged();
+      onSelect({ group: "knowledge", name: entry.name });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Restore failed");
+    }
+  }
+
   async function deleteFile(name: string) {
-    if (!window.confirm(`Delete ${name}? This permanently removes it from the twin's knowledge.`)) return;
+    const restoreNote = isKnowledgeTextName(name)
+      ? " You can restore it later from Recently deleted."
+      : "";
+    if (!window.confirm(`Delete ${name}?${restoreNote}`)) return;
     setError(null);
     try {
       const r = await fetch(
@@ -2200,6 +2260,62 @@ function FileTreePane({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {deleted.length > 0 && (
+        <div
+          style={{
+            marginTop: "var(--sp-8)",
+            padding: "0 8px",
+            fontFamily: "var(--font-sans, sans-serif)",
+          }}
+        >
+          <div
+            className="subtle"
+            style={{ fontSize: "var(--fs-2xs)", fontWeight: 600, marginBottom: "var(--sp-4)" }}
+          >
+            Recently deleted
+          </div>
+          <div className="scrollbar" style={{ maxHeight: 160, overflow: "auto" }}>
+            {deleted.map((entry) => (
+              <div
+                key={`${entry.name}:${entry.ts}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--sp-6)",
+                  marginBottom: "var(--sp-4)",
+                }}
+              >
+                <span
+                  dir="auto"
+                  title={entry.name}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: "var(--fs-xs)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {entry.name}
+                </span>
+                <span className="subtle" style={{ fontSize: "var(--fs-2xs)", flexShrink: 0 }}>
+                  {formatSnapshotSize(entry.sizeBytes)}
+                </span>
+                <button
+                  type="button"
+                  className="btn sm"
+                  style={{ fontSize: "var(--fs-2xs)", height: "auto", padding: "2px 6px" }}
+                  onClick={() => void restoreDeleted(entry)}
+                >
+                  Restore
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upload + new-file controls (drag-and-drop zone is the whole footer) */}
       <div
@@ -2382,6 +2498,242 @@ function FileTreeRow({
   );
 }
 
+function KnowledgeFileHistory({
+  employeeId,
+  name,
+  currentBody,
+  refreshKey,
+  dirty,
+  onRestored,
+}: {
+  employeeId: string;
+  name: string;
+  currentBody: string;
+  refreshKey: number;
+  dirty: boolean;
+  onRestored: () => Promise<void>;
+}) {
+  const [versions, setVersions] = useState<KnowledgeVersionRow[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+  const [listError, setListError] = useState("");
+  const [picked, setPicked] = useState<{ ts: string; body: string } | null>(null);
+  const [showChanges, setShowChanges] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await fetch(
+          `/api/employees/${employeeId}/knowledge/${encodeURIComponent(name)}/versions`,
+          { cache: "no-store" },
+        );
+        const data = (await r.json()) as { versions?: KnowledgeVersionRow[]; error?: string };
+        if (!r.ok) throw new Error(data.error ?? "Could not load history");
+        if (!cancelled) {
+          setVersions(data.versions ?? []);
+          setListError("");
+        }
+      } catch (e) {
+        if (!cancelled) setListError(e instanceof Error ? e.message : "Could not load history");
+      } finally {
+        if (!cancelled) setLoadingList(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId, name, refreshKey]);
+
+  const changeLines = useMemo(() => {
+    if (!showChanges || !picked) return null;
+    return diffLines(picked.body, currentBody);
+  }, [showChanges, picked, currentBody]);
+
+  async function selectVersion(ts: string) {
+    setBusy(`open:${ts}`);
+    setListError("");
+    try {
+      const r = await fetch(
+        `/api/employees/${employeeId}/knowledge/${encodeURIComponent(name)}/versions/${encodeURIComponent(ts)}`,
+        { cache: "no-store" },
+      );
+      const data = (await r.json()) as { body?: string; error?: string };
+      if (!r.ok || typeof data.body !== "string") {
+        throw new Error(data.error ?? "Could not load this version");
+      }
+      setPicked({ ts, body: data.body });
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : "Could not load this version");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function restore(ts: string) {
+    const unsaved = dirty ? " Unsaved edits in the editor will be discarded." : "";
+    if (
+      !window.confirm(
+        `Restore ${name} to this version? The current file will be saved as a new version first.${unsaved}`,
+      )
+    ) {
+      return;
+    }
+    setBusy(`restore:${ts}`);
+    setListError("");
+    try {
+      const r = await fetch(
+        `/api/employees/${employeeId}/knowledge/${encodeURIComponent(name)}/versions/${encodeURIComponent(ts)}/restore`,
+        { method: "POST" },
+      );
+      const data = (await r.json()) as { ok?: boolean; error?: string };
+      if (!r.ok || !data.ok) throw new Error(data.error ?? "Restore failed");
+      setPicked(null);
+      setShowChanges(false);
+      await onRestored();
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : "Restore failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        borderBottom: "1px solid var(--hairline)",
+        background: "var(--surface)",
+        padding: "12px 16px",
+      }}
+    >
+      {loadingList ? (
+        <p className="muted" style={{ fontSize: "var(--fs-sm)", margin: 0 }}>
+          Loading history…
+        </p>
+      ) : listError && versions.length === 0 ? (
+        <p style={{ fontSize: "var(--fs-sm)", color: "var(--danger)", margin: 0 }}>{listError}</p>
+      ) : versions.length === 0 ? (
+        <p className="muted" style={{ fontSize: "var(--fs-sm)", margin: 0, lineHeight: 1.5 }}>
+          No history yet. A snapshot is saved each time this file is edited or deleted.
+        </p>
+      ) : (
+        <div className="scrollbar" style={{ maxHeight: 180, overflow: "auto" }}>
+          {versions.map((entry) => {
+            const selectedRow = picked?.ts === entry.ts;
+            return (
+              <button
+                key={entry.ts}
+                type="button"
+                onClick={() => void selectVersion(entry.ts)}
+                disabled={busy === `open:${entry.ts}`}
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "var(--sp-8)",
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  color: "var(--text)",
+                  borderRadius: 4,
+                  padding: "6px 8px",
+                  background: selectedRow
+                    ? "color-mix(in oklch, var(--accent) 14%, transparent)"
+                    : "transparent",
+                }}
+              >
+                <span style={{ fontSize: "var(--fs-sm)", fontWeight: selectedRow ? 600 : 500 }}>
+                  {formatSnapshotTime(entry.ts)}
+                </span>
+                <span className="subtle" style={{ fontSize: "var(--fs-xs)" }}>
+                  {formatSnapshotSize(entry.sizeBytes)}
+                </span>
+                <span className="subtle mono" style={{ fontSize: "var(--fs-xs)" }}>
+                  {entry.source}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {picked && (
+        <div style={{ marginTop: "var(--sp-10)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-6)", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="btn"
+              aria-pressed={showChanges}
+              onClick={() => setShowChanges((on) => !on)}
+              style={{
+                fontSize: "var(--fs-xs)",
+                height: "auto",
+                padding: "3px 8px",
+                ...(showChanges ? { background: "var(--bg-sunken)" } : {}),
+              }}
+            >
+              Show changes
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void restore(picked.ts)}
+              disabled={busy === `restore:${picked.ts}`}
+              style={{ fontSize: "var(--fs-xs)", height: "auto", padding: "3px 8px" }}
+            >
+              <Icons.Refresh size={11} />{" "}
+              {busy === `restore:${picked.ts}` ? "Restoring…" : "Restore this version"}
+            </button>
+          </div>
+          {showChanges && (
+            <p className="muted" style={{ fontSize: "var(--fs-xs)", margin: "8px 0" }}>
+              From this version to the current file
+            </p>
+          )}
+          <div className="scrollbar" style={{ maxHeight: 280, overflow: "auto", marginTop: "var(--sp-8)" }}>
+            {showChanges && changeLines ? (
+              <VersionDiff lines={changeLines} />
+            ) : (
+              <div
+                aria-label="Version text"
+                style={{
+                  fontFamily: "var(--font-mono, monospace)",
+                  fontSize: "var(--fs-sm)",
+                  lineHeight: 1.5,
+                  border: "1px solid var(--hairline)",
+                  borderRadius: 5,
+                  padding: "8px 0",
+                }}
+              >
+                {picked.body.split("\n").map((line, index) => (
+                  <div
+                    key={`${picked.ts}-${index}`}
+                    dir="auto"
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      overflowWrap: "anywhere",
+                      padding: "0 var(--sp-8)",
+                    }}
+                  >
+                    {line.length === 0 ? "\u00a0" : line}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {listError && versions.length > 0 && (
+        <p style={{ fontSize: "var(--fs-sm)", color: "var(--danger)", margin: "8px 0 0" }}>
+          {listError}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── File editor (right pane) ─────────────────────────────────────────────────
 
 function FileEditorPane({
@@ -2399,6 +2751,7 @@ function FileEditorPane({
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const fileUrl = useCallback(
     (sel: SelectedFile) =>
@@ -2415,6 +2768,7 @@ function FileEditorPane({
   const [loadingSel, setLoadingSel] = useState<SelectedFile | null>(selected);
   if (loadingSel !== selected) {
     setLoadingSel(selected);
+    setHistoryOpen(false);
     if (selected) {
       setLoading(true);
       setError("");
@@ -2500,6 +2854,20 @@ function FileEditorPane({
   }
 
   const dirty = body !== original;
+  const knowledgeText =
+    selected.group === "knowledge" && isKnowledgeTextName(selected.name);
+
+  async function reloadFromDisk() {
+    if (!selected) return;
+    const r = await fetch(fileUrl(selected), { cache: "no-store" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = (await r.json()) as { body?: string };
+    const next = data.body ?? "";
+    setBody(next);
+    setOriginal(next);
+    setSavedAt(Date.now());
+    if (selected.group === "knowledge") await onKnowledgeChanged();
+  }
 
   return (
     <div
@@ -2521,6 +2889,20 @@ function FileEditorPane({
           {selected.group}/{selected.name}
         </span>
         <div style={{ flex: 1 }} />
+        {knowledgeText && (
+          <button
+            type="button"
+            className="btn sm"
+            aria-pressed={historyOpen}
+            onClick={() => setHistoryOpen((open) => !open)}
+            style={{
+              height: 28,
+              ...(historyOpen ? { background: "var(--bg-sunken)" } : {}),
+            }}
+          >
+            History
+          </button>
+        )}
         {dirty && (
           <span
             aria-label="Unsaved changes"
@@ -2567,6 +2949,17 @@ function FileEditorPane({
           </>
         )}
       </div>
+
+      {historyOpen && knowledgeText && (
+        <KnowledgeFileHistory
+          employeeId={employeeId}
+          name={selected.name}
+          currentBody={original}
+          refreshKey={savedAt ?? 0}
+          dirty={dirty}
+          onRestored={reloadFromDisk}
+        />
+      )}
 
       {error && (
         <div style={{ fontSize: "var(--fs-sm)", color: "var(--danger)", padding: "10px 16px", borderBottom: "1px solid var(--hairline)" }}>
