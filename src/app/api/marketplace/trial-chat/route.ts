@@ -8,6 +8,7 @@ import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
 import type { EmployeeWithTwin } from "@/lib/employees";
 import { TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 import { dataDir } from "@/lib/app-home";
+import { canRunModel } from "@/lib/model-provider";
 
 /**
  * Trial chat for marketplace agents — lets a CEO talk to an agent before
@@ -69,9 +70,10 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const modelRun = canRunModel();
+  if (!modelRun.ok) {
     return new Response(
-      JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
+      JSON.stringify({ error: modelRun.reason }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

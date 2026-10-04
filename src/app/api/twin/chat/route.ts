@@ -8,6 +8,7 @@ import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
 import { bumpActivityOnDisk } from "@/lib/employees-disk";
 import { generateFollowups } from "@/lib/followup-suggestions";
 import { appendTaskRun } from "@/lib/task-history";
+import { canRunModel } from "@/lib/model-provider";
 
 const PROFILE_FILE_NAMES = [
   "EXPERTISE.md", "DECISIONS.md", "CONTEXT.md", "PEOPLE.md",
@@ -72,9 +73,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const modelRun = canRunModel();
+  if (!modelRun.ok) {
     return new Response(
-      JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
+      JSON.stringify({ error: modelRun.reason }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

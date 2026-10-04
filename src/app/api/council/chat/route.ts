@@ -4,6 +4,7 @@ import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 import { hasEmployeeFiles } from "@/lib/employees-files";
 import { createDemoReplayResponse } from "@/lib/demo-replay";
+import { canRunModel } from "@/lib/model-provider";
 
 export async function POST(request: NextRequest) {
   // Demo replay is explicit, never inferred from missing credentials. This keeps
@@ -54,9 +55,10 @@ export async function POST(request: NextRequest) {
     (e) => e.twinStatus === "ready" && hasEmployeeFiles(e.id)
   );
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const modelRun = canRunModel();
+  if (!modelRun.ok) {
     return new Response(
-      JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
+      JSON.stringify({ error: modelRun.reason }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

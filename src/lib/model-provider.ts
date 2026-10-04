@@ -18,6 +18,25 @@ export function directAnthropicAllowed(env: Env = process.env): boolean {
   return currentProvider(env) === "anthropic" || env.EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC === "1";
 }
 
+/** Whether the selected model provider has the configuration required to run an Agent SDK call. */
+export function canRunModel(env: Env = process.env): { ok: true } | { ok: false; reason: string } {
+  const required = (keys: string[]) => {
+    const missing = keys.filter((key) => !env[key]?.trim());
+    return missing.length ? { ok: false as const, reason: `${missing.join(", ")} is not configured` } : { ok: true as const };
+  };
+
+  switch (currentProvider(env)) {
+    case "anthropic": return required(["ANTHROPIC_API_KEY"]);
+    case "bedrock": return required(["AWS_REGION"]);
+    case "vertex": return required(["CLOUD_ML_REGION", "ANTHROPIC_VERTEX_PROJECT_ID"]);
+    case "foundry": return required(["ANTHROPIC_FOUNDRY_RESOURCE"]);
+    case "local": {
+      const reason = localProviderConfigurationError(env);
+      return reason ? { ok: false, reason } : { ok: true };
+    }
+  }
+}
+
 /** Provider flags/settings passed to every Agent SDK child process. Credentials
  * remain inherited. Never add CLAUDE_CODE_USE_ANTHROPIC_AWS: it is not customer Bedrock. */
 export function providerEnvForAgentSdk(env: Env = process.env): Env {

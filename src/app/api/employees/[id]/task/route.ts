@@ -13,6 +13,7 @@ import {
 import { appendFeedItem } from "@/lib/feed-store";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
+import { canRunModel } from "@/lib/model-provider";
 
 export async function POST(
   request: NextRequest,
@@ -50,9 +51,10 @@ export async function POST(
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const modelRun = canRunModel();
+  if (!modelRun.ok) {
     return new Response(
-      JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
+      JSON.stringify({ error: modelRun.reason }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

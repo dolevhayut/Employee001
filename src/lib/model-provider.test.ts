@@ -1,5 +1,22 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const councilMocks = vi.hoisted(() => ({
+  runCouncil: vi.fn(),
+}));
+
+vi.mock("@/lib/council-runner", () => ({
+  runCouncil: councilMocks.runCouncil,
+}));
+vi.mock("@/lib/employees-disk", () => ({
+  loadEmployeesFromDisk: vi.fn(async () => [{ id: "local-twin", twinStatus: "ready" }]),
+}));
+vi.mock("@/lib/hired-agents", () => ({ getHiredEmployees: vi.fn(() => []) }));
+vi.mock("@/lib/employees-files", () => ({ hasEmployeeFiles: vi.fn(() => true) }));
+
+import { NextRequest } from "next/server";
+import { POST as councilChat } from "@/app/api/council/chat/route";
 import {
+  canRunModel,
   currentProvider,
   directAnthropicAllowed,
   modelForProvider,
@@ -14,6 +31,7 @@ const providerKeys = [
   "ANTHROPIC_FOUNDRY_RESOURCE", "ANTHROPIC_DEFAULT_SONNET_MODEL",
   "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL",
   "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
+  "ANTHROPIC_API_KEY", "EMPLOYEE001_DEMO", "EMPLOYEE001_DEMO_LIVE",
 ] as const;
 const original = new Map(providerKeys.map((key) => [key, process.env[key]]));
 
@@ -30,6 +48,26 @@ describe("model provider", () => {
     expect(currentProvider({ EMPLOYEE001_MODEL_PROVIDER: "vertex" })).toBe("vertex");
     expect(currentProvider({ EMPLOYEE001_MODEL_PROVIDER: "local" })).toBe("local");
     expect(currentProvider({ EMPLOYEE001_MODEL_PROVIDER: "unknown" })).toBe("anthropic");
+  });
+
+  it("accepts each configured provider and reports its missing configuration", () => {
+    const local = {
+      ANTHROPIC_BASE_URL: "http://localhost:11434",
+      ANTHROPIC_DEFAULT_OPUS_MODEL: "local-opus",
+      ANTHROPIC_DEFAULT_SONNET_MODEL: "local-sonnet",
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: "local-haiku",
+    };
+
+    expect(canRunModel({ ANTHROPIC_API_KEY: "key" })).toEqual({ ok: true });
+    expect(canRunModel({})).toEqual({ ok: false, reason: "ANTHROPIC_API_KEY is not configured" });
+    expect(canRunModel({ EMPLOYEE001_MODEL_PROVIDER: "bedrock", AWS_REGION: "us-east-1" })).toEqual({ ok: true });
+    expect(canRunModel({ EMPLOYEE001_MODEL_PROVIDER: "bedrock" })).toEqual({ ok: false, reason: "AWS_REGION is not configured" });
+    expect(canRunModel({ EMPLOYEE001_MODEL_PROVIDER: "vertex", CLOUD_ML_REGION: "us-east5", ANTHROPIC_VERTEX_PROJECT_ID: "project" })).toEqual({ ok: true });
+    expect(canRunModel({ EMPLOYEE001_MODEL_PROVIDER: "vertex", CLOUD_ML_REGION: "us-east5" })).toEqual({ ok: false, reason: "ANTHROPIC_VERTEX_PROJECT_ID is not configured" });
+    expect(canRunModel({ EMPLOYEE001_MODEL_PROVIDER: "foundry", ANTHROPIC_FOUNDRY_RESOURCE: "resource" })).toEqual({ ok: true });
+    expect(canRunModel({ EMPLOYEE001_MODEL_PROVIDER: "foundry" })).toEqual({ ok: false, reason: "ANTHROPIC_FOUNDRY_RESOURCE is not configured" });
+    expect(canRunModel({ EMPLOYEE001_MODEL_PROVIDER: "local", ...local })).toEqual({ ok: true });
+    expect(canRunModel({ EMPLOYEE001_MODEL_PROVIDER: "local" })).toEqual({ ok: false, reason: "ANTHROPIC_BASE_URL must be an http(s) URL" });
   });
 
   it("passes the selected customer-cloud Agent SDK environment", () => {
@@ -85,5 +123,26 @@ describe("model provider", () => {
       ANTHROPIC_DEFAULT_SONNET_MODEL: "local-sonnet",
       ANTHROPIC_DEFAULT_HAIKU_MODEL: "local-haiku",
     })).toBeNull();
+  });
+
+  it("runs council chat with a configured local provider and no Anthropic key", async () => {
+    process.env.EMPLOYEE001_MODEL_PROVIDER = "local";
+    process.env.ANTHROPIC_BASE_URL = "http://localhost:11434";
+    process.env.ANTHROPIC_DEFAULT_OPUS_MODEL = "local-opus";
+    process.env.ANTHROPIC_DEFAULT_SONNET_MODEL = "local-sonnet";
+    process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL = "local-haiku";
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.EMPLOYEE001_DEMO;
+    delete process.env.EMPLOYEE001_DEMO_LIVE;
+    councilMocks.runCouncil.mockResolvedValueOnce({ meetingId: "local-meeting" });
+
+    const response = await councilChat(new NextRequest("http://localhost/api/council/chat", {
+      method: "POST",
+      body: JSON.stringify({ question: "Can the local model respond?", employeeIds: ["local-twin"] }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(councilMocks.runCouncil).toHaveBeenCalledOnce();
+    expect(await response.text()).toContain('"meetingId":"local-meeting"');
   });
 });

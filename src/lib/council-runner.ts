@@ -69,6 +69,7 @@ import type { ConsultContext } from "@/lib/twin-consult";
 import { ceoOf, orgClause, readOrgIdentity } from "@/lib/org-identity";
 import { proposalsEnabled, proposeKnowledgeFromMeeting } from "@/lib/knowledge-proposals";
 import { dataDir } from "@/lib/app-home";
+import { canRunModel } from "@/lib/model-provider";
 
 // ─── Event types ──────────────────────────────────────────────────────────────
 
@@ -1415,8 +1416,9 @@ export type RunCouncilArgs = {
 export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: string }> {
   const { responders, question, allParticipants, onEvent } = args;
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not set");
+  const modelRun = canRunModel();
+  if (!modelRun.ok) {
+    throw new Error(modelRun.reason);
   }
 
   const MAX_DELEGATION_ROUNDS = 3;
