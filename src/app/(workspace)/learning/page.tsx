@@ -51,10 +51,10 @@ type Integration = {
 };
 
 const INTEGRATIONS: Integration[] = [
-  { id: "slack",  name: "Slack",   icon: "S", maxHistory: "90 days",  seeded: "90 days",  records: "8,421 messages", color: "var(--twin)" },
-  { id: "github", name: "GitHub",  icon: "G", maxHistory: "Unlimited", seeded: "180 days", records: "312 PR reviews",  color: "var(--text-muted)" },
-  { id: "linear", name: "Linear",  icon: "L", maxHistory: "Unlimited", seeded: "180 days", records: "204 issues",      color: "var(--accent-deep)" },
-  { id: "gmail",  name: "Gmail",   icon: "M", maxHistory: "12+ mo",   seeded: "180 days", records: "1,840 threads",   color: "var(--danger)" },
+  { id: "slack",  name: "Slack",   icon: "S", maxHistory: "90 days",  seeded: "90 days",  records: "8,421 messages", color: "#4A154B" },
+  { id: "github", name: "GitHub",  icon: "G", maxHistory: "Unlimited", seeded: "180 days", records: "312 PR reviews",  color: "#24292e" },
+  { id: "linear", name: "Linear",  icon: "L", maxHistory: "Unlimited", seeded: "180 days", records: "204 issues",      color: "#5E6AD2" },
+  { id: "gmail",  name: "Gmail",   icon: "M", maxHistory: "12+ mo",   seeded: "180 days", records: "1,840 threads",   color: "#EA4335" },
 ];
 
 type RefreshEvent = {
@@ -179,7 +179,7 @@ function Phase1Panel() {
               background: "var(--success)",
               display: "grid",
               placeItems: "center",
-              color: "var(--bg-elevated)",
+              color: "#fff",
               flexShrink: 0,
             }}
           >
@@ -246,7 +246,7 @@ function Phase1Panel() {
                 background: int.color,
                 display: "grid",
                 placeItems: "center",
-                color: "var(--bg-elevated)",
+                color: "#fff",
                 fontSize: "var(--fs-meta)",
                 fontWeight: 700,
                 flexShrink: 0,
@@ -809,7 +809,7 @@ function Phase1PanelCompact() {
               background: "var(--success)",
               display: "grid",
               placeItems: "center",
-              color: "var(--bg-elevated)",
+              color: "#fff",
               flexShrink: 0,
             }}
           >

@@ -627,7 +627,7 @@ function EmployeeCard({
             display: "grid",
             placeItems: "center",
             background:
-              "linear-gradient(180deg, color-mix(in srgb, var(--surface) 0%, transparent), color-mix(in srgb, var(--surface) 55%, transparent))",
+              "linear-gradient(180deg, transparent, color-mix(in srgb, var(--surface) 55%, transparent))",
             borderRadius: "inherit",
             pointerEvents: "none",
           }}

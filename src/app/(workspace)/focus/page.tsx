@@ -435,7 +435,7 @@ function PrefetchModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "color-mix(in srgb, var(--text) 45%, transparent)",
+        background: "rgba(15,18,24,0.45)",
         backdropFilter: "blur(4px)",
         zIndex: 100,
         display: "grid",

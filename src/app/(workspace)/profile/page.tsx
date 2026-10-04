@@ -853,7 +853,7 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
             padding: "10px 20px",
             fontSize: "var(--fs-ui)",
             fontWeight: 600,
-            color: confirmed ? "var(--bg-elevated)" : "var(--text-subtle)",
+            color: confirmed ? "#FFFFFF" : "var(--text-subtle)",
             background: confirmed ? "var(--danger)" : "var(--bg-sunken)",
             border: `1px solid ${confirmed ? "var(--danger)" : "var(--hairline)"}`,
             borderRadius: 6,
@@ -1241,7 +1241,7 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
                   }}
                 >
                   {active && (
-                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--bg-elevated)" }} />
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1304,7 +1304,7 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
                   }}
                 >
                   {active && (
-                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--bg-elevated)" }} />
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1488,7 +1488,7 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
                       display: "grid", placeItems: "center", cursor: "pointer",
                     }}
                   >
-                    {active && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--bg-elevated)" }} />}
+                    {active && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />}
                   </button>
 
                   {/* Info */}
@@ -3523,7 +3523,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
           style={{
             position: "fixed",
             inset: 0,
-            background: "color-mix(in srgb, var(--text) 45%, transparent)",
+            background: "rgba(15,18,24,0.45)",
             zIndex: 60,
             display: "flex",
             alignItems: "center",
