@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **Approval gate hardened.** Bash and the other never-allowed built-in
+  tools are refused by the policy layer too, destructive tool names
+  (delete, refund, payment, fund transfer, user removal) are caught
+  regardless of naming style, and look-alikes that read data ask first
+  instead of running automatically. Schedules reject malformed cron
+  expressions.
 - **No silently skipped work.** When an unattended run's approval request
   waits too long (6 hours), Approvals now shows what was skipped and why.
   For scheduled routines, that item and the "lost in restart" ones get a
