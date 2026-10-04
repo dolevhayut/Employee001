@@ -217,6 +217,14 @@ export default function AuditPage() {
   // Archive month (e.g. "2026-04") or empty for the live audit.jsonl.
   const [filterArchive, setFilterArchive] = useState("");
   const [page, setPage] = useState(1);
+  const [integrity, setIntegrity] = useState<{ ok: boolean; checked: number; firstBadId?: string }>();
+
+  useEffect(() => {
+    void fetch("/api/audit/verify", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((result: { ok: boolean; checked: number; firstBadId?: string }) => setIntegrity(result))
+      .catch(() => setIntegrity({ ok: false, checked: 0 }));
+  }, []);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
@@ -303,6 +311,23 @@ export default function AuditPage() {
           </button>
         }
       />
+
+      {integrity && (
+        <div
+          style={{
+            padding: "var(--sp-7) 24px",
+            color: integrity.ok ? "var(--success)" : "var(--danger)",
+            fontSize: "var(--fs-sm)",
+            background: "var(--bg)",
+            borderBottom: "1px solid var(--hairline)",
+            flexShrink: 0,
+          }}
+        >
+          {integrity.ok
+            ? t("audit.integrity.verified", { count: integrity.checked })
+            : t("audit.integrity.failed", { id: integrity.firstBadId ?? "unknown" })}
+        </div>
+      )}
 
       {/* Filter bar */}
       <div

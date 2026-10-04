@@ -145,6 +145,8 @@ export const operationsEn = {
   "audit.more": "more",
   "audit.prev": "Prev",
   "audit.next": "Next",
+  "audit.integrity.verified": "Log integrity verified ({count} entries)",
+  "audit.integrity.failed": "Log integrity check failed at {id}",
 
   "routines.new": "New routine",
   "routines.title": "Routines",
@@ -419,6 +421,8 @@ export const operationsHe: Record<keyof typeof operationsEn, string> = {
   "audit.more": "נוספים",
   "audit.prev": "הקודם",
   "audit.next": "הבא",
+  "audit.integrity.verified": "שלמות היומן אומתה ({count} רשומות)",
+  "audit.integrity.failed": "בדיקת שלמות היומן נכשלה ב־{id}",
 
   "routines.new": "שגרה חדשה",
   "routines.title": "שגרות",

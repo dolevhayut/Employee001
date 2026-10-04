@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "fs";
 import path from "path";
 
@@ -84,11 +85,95 @@ export type AuditEntry = {
   agentType?: string;
   /** Subagent instance id from the SDK hook input (parent_tool_use_id link). */
   agentId?: string;
+  /** Hash of the preceding hashed row, or "genesis" for a new chain. */
+  prevHash?: string;
+  /** SHA-256 of prevHash plus the canonical row payload. */
+  hash?: string;
 };
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
 const AUDIT_FILE = path.join(process.cwd(), "data", "audit.jsonl");
+
+type LastHashCache = {
+  filePath: string;
+  hash: string | undefined;
+  size: number;
+  mtimeMs: number;
+};
+
+let lastHashCache: LastHashCache | undefined;
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map((item) => stableJson(item)).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** Match JSONL serialization first, then sort object keys recursively. */
+function canonicalJson(value: unknown): string {
+  return stableJson(JSON.parse(JSON.stringify(value)) as unknown);
+}
+
+function hashRow(prevHash: string, row: Omit<AuditEntry, "hash">): string {
+  return createHash("sha256")
+    .update(`${prevHash}\n${canonicalJson(row)}`)
+    .digest("hex");
+}
+
+/** Read only the final line, even when the active log is large. */
+function readLastLine(filePath: string): string | undefined {
+  const stat = fs.statSync(filePath);
+  if (stat.size === 0) return undefined;
+
+  const fd = fs.openSync(filePath, "r");
+  try {
+    let end = stat.size;
+    let suffix = "";
+    while (end > 0) {
+      const length = Math.min(8192, end);
+      end -= length;
+      const buffer = Buffer.alloc(length);
+      fs.readSync(fd, buffer, 0, length, end);
+      suffix = buffer.toString("utf8") + suffix;
+      const withoutTrailingNewlines = suffix.replace(/\n+$/, "");
+      const priorLineBreak = withoutTrailingNewlines.lastIndexOf("\n");
+      if (priorLineBreak >= 0) return withoutTrailingNewlines.slice(priorLineBreak + 1);
+      if (end === 0) return withoutTrailingNewlines || undefined;
+    }
+    return undefined;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function lastHashInFile(filePath: string): string | undefined {
+  if (!fs.existsSync(filePath)) return undefined;
+  const stat = fs.statSync(filePath);
+  if (lastHashCache && lastHashCache.filePath === filePath && lastHashCache.size === stat.size && lastHashCache.mtimeMs === stat.mtimeMs) {
+    return lastHashCache.hash;
+  }
+
+  let hash: string | undefined;
+  const line = readLastLine(filePath);
+  if (line) {
+    try {
+      const row = JSON.parse(line) as AuditEntry;
+      hash = typeof row.hash === "string" ? row.hash : undefined;
+    } catch {
+      // A malformed final line cannot contribute a predecessor; verification
+      // will surface the malformed data separately.
+    }
+  }
+  lastHashCache = { filePath, hash, size: stat.size, mtimeMs: stat.mtimeMs };
+  return hash;
+}
 
 function ensureDir() {
   const dir = path.dirname(AUDIT_FILE);
@@ -103,17 +188,28 @@ function makeId(): string {
 
 /** Append one entry to data/audit.jsonl (non-blocking). */
 export function appendAuditEntry(
-  entry: Omit<AuditEntry, "id" | "ts">
+  entry: Omit<AuditEntry, "id" | "ts" | "prevHash" | "hash">
 ): void {
   try {
     ensureDir();
     maybeRotate(AUDIT_FILE);
-    const row: AuditEntry = {
+    // The active tail is the normal predecessor. If rotation moved every
+    // active row, continue from the newest archive so the chronological chain
+    // remains intact.
+    const previous = lastHashInFile(AUDIT_FILE) ?? lastHashFromNewestArchive();
+    const unsignedRow: Omit<AuditEntry, "hash"> = {
       id: makeId(),
       ts: new Date().toISOString(),
       ...entry,
+      prevHash: previous ?? "genesis",
+    };
+    const row: AuditEntry = {
+      ...unsignedRow,
+      hash: hashRow(unsignedRow.prevHash!, unsignedRow),
     };
     fs.appendFileSync(AUDIT_FILE, JSON.stringify(row) + "\n", "utf8");
+    const stat = fs.statSync(AUDIT_FILE);
+    lastHashCache = { filePath: AUDIT_FILE, hash: row.hash, size: stat.size, mtimeMs: stat.mtimeMs };
   } catch {
     // Audit writes must never crash the agent run.
   }
@@ -176,6 +272,77 @@ function listArchives(): string[] {
 
 function pathForArchive(month: string): string {
   return path.join(path.dirname(AUDIT_FILE), `audit.${month}.jsonl`);
+}
+
+function lastHashFromNewestArchive(): string | undefined {
+  for (const month of listArchives()) {
+    const hash = lastHashInFile(pathForArchive(month));
+    if (hash) return hash;
+  }
+  return undefined;
+}
+
+export type AuditChainVerification = {
+  ok: boolean;
+  checked: number;
+  legacy: number;
+  firstBadId?: string;
+  reason?: string;
+};
+
+/** Verify every archive (oldest first) followed by the active log. */
+export function verifyAuditChain(): AuditChainVerification {
+  let checked = 0;
+  let legacy = 0;
+  let previous = "genesis";
+  let chainStarted = false;
+
+  const files = [
+    ...listArchives().sort().map(pathForArchive),
+    AUDIT_FILE,
+  ];
+
+  for (const filePath of files) {
+    if (!fs.existsSync(filePath)) continue;
+    const lines = fs.readFileSync(filePath, "utf8").split("\n").filter(Boolean);
+    for (const line of lines) {
+      let row: AuditEntry;
+      try {
+        row = JSON.parse(line) as AuditEntry;
+      } catch {
+        return { ok: false, checked, legacy, reason: "invalid JSON row" };
+      }
+
+      if (!row.hash || !row.prevHash) {
+        if (!chainStarted) {
+          legacy++;
+          continue;
+        }
+        return {
+          ok: false,
+          checked,
+          legacy,
+          firstBadId: row.id,
+          reason: "missing hash fields after chain start",
+        };
+      }
+
+      const unsignedRow = { ...row };
+      delete unsignedRow.hash;
+      const expected = hashRow(row.prevHash, unsignedRow);
+      if (row.prevHash !== previous) {
+        return { ok: false, checked, legacy, firstBadId: row.id, reason: "previous hash mismatch" };
+      }
+      if (row.hash !== expected) {
+        return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
+      }
+      chainStarted = true;
+      previous = row.hash;
+      checked++;
+    }
+  }
+
+  return { ok: true, checked, legacy };
 }
 
 /**
