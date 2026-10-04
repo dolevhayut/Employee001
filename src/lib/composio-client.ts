@@ -10,6 +10,7 @@ import type { McpSdkServerConfigWithInstance } from "@anthropic-ai/claude-agent-
 import { dataDir } from "./app-home";
 import { toolkitAllowed } from "./consent-policy";
 import { loadConsentStatus } from "./consent-status";
+import { disableEmailTrigger, ensureEmailTrigger } from "@/lib/email-intake-trigger";
 
 // ─── Toolkit allow-list per role ─────────────────────────────────────────────
 // Curated so each twin can't act outside its functional area.
@@ -247,6 +248,9 @@ export async function refreshConnections(
   }
 
   await writeState(employeeId, state);
+  // OAuth status refresh is the first reliable point at which Gmail is ACTIVE.
+  // This is intentionally best-effort: the poller stays the safety net.
+  if (state.connections.gmail?.status === "ACTIVE") void ensureEmailTrigger(employeeId);
   return state;
 }
 
@@ -271,6 +275,7 @@ export async function disconnectToolkit(
 
   delete state.connections[toolkit];
   await writeState(employeeId, state);
+  if (toolkit === "gmail") await disableEmailTrigger(employeeId);
 }
 
 /**

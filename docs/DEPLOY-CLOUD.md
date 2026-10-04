@@ -182,6 +182,20 @@ fly proxy 3000:8080            # → http://localhost:3000 tunneled to the Machi
 Then migrate data (next section), point a subdomain at it (`fly certs add acme.yourdomain.com`),
 and hand out invite links that now use `APP_URL`.
 
+### Real-time Gmail intake (optional)
+
+Employee001 remains local-first: without a public URL it keeps its normal five-minute
+mail poll. To enable Composio push on Fly, set `APP_URL=https://acme.yourdomain.com`
+(or `EMPLOYEE001_PUBLIC_URL`) and `COMPOSIO_WEBHOOK_SECRET` (the Composio signing
+secret). Composio delivers to `/api/email/composio`, where the raw body is verified
+before it is queued. With a registered trigger, the poller becomes a 30-minute
+reconciliation pass. A missing, loopback, or non-HTTPS URL—or a registration
+failure—logs the reason and automatically retains five-minute polling.
+
+In the Composio project, set that same public endpoint as the project's webhook
+subscription. The installed Composio SDK version registers Gmail trigger instances;
+the project-level subscription determines where those instances deliver events.
+
 ---
 
 ## Data migration — zero loss
