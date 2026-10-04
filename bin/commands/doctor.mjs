@@ -87,6 +87,10 @@ function hostnameOnly(raw) {
   }
 }
 
+function isLocalhost(host) {
+  return host === "localhost" || host === "127.0.0.1" || host === "::1";
+}
+
 function safeToken(value, fallback) {
   if (/^[A-Za-z0-9._-]{1,64}$/.test(value)) return value;
   return fallback;
@@ -102,6 +106,20 @@ function modelHosts(get) {
   const provider = (get("EMPLOYEE001_MODEL_PROVIDER") || "anthropic").toLowerCase();
   const directAllowed = provider === "anthropic" || get("EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC") === "1";
   const directOn = directAllowed && Boolean(get("ANTHROPIC_API_KEY") || get("ANTHROPIC_AUTH_TOKEN"));
+
+  if (provider === "local") {
+    const host = hostnameOnly(get("ANTHROPIC_BASE_URL"));
+    return {
+      agent: {
+        host: host || "<missing local endpoint>",
+        on: Boolean(host),
+        when: `twin runs (local Anthropic-compatible endpoint${isLocalhost(host) ? "; stays on this machine" : ""})`,
+      },
+      direct,
+      directOn: false,
+      directAllowed: false,
+    };
+  }
 
   if (flagOn(get("CLAUDE_CODE_USE_BEDROCK"))) {
     const region = safeToken(get("AWS_REGION") || get("AWS_DEFAULT_REGION"), "<region>");
@@ -273,13 +291,13 @@ export default async function doctor(argv = []) {
 
   // Provider (settings presence only; doctor never validates customer-cloud credentials).
   const provider = (env.EMPLOYEE001_MODEL_PROVIDER || process.env.EMPLOYEE001_MODEL_PROVIDER || "anthropic").toLowerCase();
-  if (["anthropic", "bedrock", "vertex", "foundry"].includes(provider)) ok("Claude provider", provider);
+  if (["anthropic", "bedrock", "vertex", "foundry", "local"].includes(provider)) ok("Claude provider", provider);
   else { fail("Claude provider", `${provider} is invalid — run \`employee001 setup\``); issues++; }
 
   // Anthropic key is only required and checked for direct Anthropic API mode.
   const aKey = env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
   if (provider !== "anthropic") {
-    const configured = provider === "bedrock" ? env.AWS_REGION || process.env.AWS_REGION : provider === "vertex" ? (env.CLOUD_ML_REGION || process.env.CLOUD_ML_REGION) && (env.ANTHROPIC_VERTEX_PROJECT_ID || process.env.ANTHROPIC_VERTEX_PROJECT_ID) : env.ANTHROPIC_FOUNDRY_RESOURCE || process.env.ANTHROPIC_FOUNDRY_RESOURCE;
+    const configured = provider === "bedrock" ? env.AWS_REGION || process.env.AWS_REGION : provider === "vertex" ? (env.CLOUD_ML_REGION || process.env.CLOUD_ML_REGION) && (env.ANTHROPIC_VERTEX_PROJECT_ID || process.env.ANTHROPIC_VERTEX_PROJECT_ID) : provider === "foundry" ? env.ANTHROPIC_FOUNDRY_RESOURCE || process.env.ANTHROPIC_FOUNDRY_RESOURCE : (env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_BASE_URL) && (env.ANTHROPIC_DEFAULT_OPUS_MODEL || process.env.ANTHROPIC_DEFAULT_OPUS_MODEL) && (env.ANTHROPIC_DEFAULT_SONNET_MODEL || process.env.ANTHROPIC_DEFAULT_SONNET_MODEL) && (env.ANTHROPIC_DEFAULT_HAIKU_MODEL || process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL);
     if (configured) ok("Customer-cloud settings", "present (credentials are not checked)");
     else { fail("Customer-cloud settings", "missing — run `employee001 setup`"); issues++; }
   } else if (!aKey) {

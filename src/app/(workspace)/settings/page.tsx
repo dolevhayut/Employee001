@@ -219,7 +219,7 @@ function WorkspaceSection() {
   useEffect(() => {
     fetch("/api/model-provider", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-      .then((data: { label: string }) => setProvider(data.label))
+      .then((data: { provider: string }) => setProvider(data.provider))
       .catch(() => setProvider(null));
   }, []);
 
@@ -306,7 +306,7 @@ function WorkspaceSection() {
           style={{ marginTop: "var(--sp-16)", paddingTop: "var(--sp-16)", borderTop: "1px solid var(--hairline)" }}
         >
           <div style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>
-            {t("profile.provider.label")} {provider ?? "…"}
+            {t("profile.provider.label")} {provider ? t(`profile.provider.${provider}` as MessageKey) : "…"}
           </div>
           <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
             {t("profile.provider.note")}

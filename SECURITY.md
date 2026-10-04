@@ -18,6 +18,7 @@ Employee001 keeps profiles, memory, audit logs, and org knowledge in `./data/` o
 |---|---|---|---|
 | `api.anthropic.com` (or `ANTHROPIC_BASE_URL`) | Prompts and profile context | Twin chat, training, and memory distillation when `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` is set | Remove the Anthropic credential; stop the server when it is not in use |
 | Your own Claude cloud endpoint: Amazon Bedrock, Google Vertex AI, or Azure AI Foundry | Prompts and profile context | A twin runs with `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, or `CLAUDE_CODE_USE_FOUNDRY` set | Unset the selected provider flag and its credentials/configuration |
+| Local Anthropic-compatible endpoint (`ANTHROPIC_BASE_URL`) | Prompts and profile context | A twin runs with `EMPLOYEE001_MODEL_PROVIDER=local`; localhost stays on this machine | Stop the local endpoint or unset its configuration |
 | Direct Anthropic endpoint (`api.anthropic.com` or `ANTHROPIC_BASE_URL`) | Prompts for direct Anthropic SDK calls (rerank, dreamer, relay) | Memory distillation, relay interview, or follow-ups when an Anthropic credential is set, including alongside a cloud endpoint | Remove the Anthropic credential or do not use those features |
 | `backend.composio.dev` (or `COMPOSIO_BASE_URL`) | Tool calls and OAuth data | `COMPOSIO_API_KEY` is set | Remove `COMPOSIO_API_KEY` and disconnect connected accounts |
 | `api.openai.com` | Embeddings for semantic memory | `OPENAI_API_KEY` is set and `TWIN_MEMORY_ENABLED` is not `false` | Remove `OPENAI_API_KEY` or set `TWIN_MEMORY_ENABLED=false` |
@@ -29,7 +30,7 @@ Employee001 keeps profiles, memory, audit logs, and org knowledge in `./data/` o
 
 ### Run Claude in your own cloud
 
-Set up AWS Bedrock, Google Vertex AI, or Azure AI Foundry with `employee001 setup` to send Agent SDK twin traffic to the provider selected in your own cloud account. Employee001 uses `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, or `CLAUDE_CODE_USE_FOUNDRY`; it does not use `CLAUDE_CODE_USE_ANTHROPIC_AWS`, which is Anthropic-operated.
+Set up AWS Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible endpoint with `employee001 setup`. The local preset requires an http(s) `ANTHROPIC_BASE_URL` and explicit model pins; `ANTHROPIC_AUTH_TOKEN` is optional. Ollama >= 0.14 is one compatible example. Employee001 uses `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, or `CLAUDE_CODE_USE_FOUNDRY` for cloud providers; it does not use `CLAUDE_CODE_USE_ANTHROPIC_AWS`, which is Anthropic-operated.
 
 In this boundary mode, the direct Anthropic endpoint is disabled by default. That disables memory rerank, follow-up suggestions, knowledge proposals, and live Relay because those features use the direct Anthropic SDK. `EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1` is an explicit egress opt-in; `employee001 doctor --egress` reports its effective state. This changes where Agent SDK model prompts go, not the egress behavior of enabled Composio, OpenAI embeddings, ElevenLabs, web research, or custom MCP services.
 

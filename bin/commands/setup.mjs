@@ -119,6 +119,7 @@ export default async function setup() {
       { value: "bedrock", label: "AWS Bedrock" },
       { value: "vertex", label: "Google Vertex AI" },
       { value: "foundry", label: "Azure AI Foundry" },
+      { value: "local", label: "Local model (offline)", hint: "Evaluation and air-gapped pilots" },
     ],
   });
   if (p.isCancel(provider)) {
@@ -131,6 +132,11 @@ export default async function setup() {
   let vertexRegion = "";
   let vertexProject = "";
   let foundryResource = "";
+  let localBaseUrl = "";
+  let localAuthToken = "";
+  let localOpusModel = "";
+  let localSonnetModel = "";
+  let localHaikuModel = "";
   if (provider === "anthropic") {
     anthropicKey = await p.password({
       message: "Anthropic API key (required) — get one from https://console.anthropic.com",
@@ -150,10 +156,29 @@ export default async function setup() {
   } else if (provider === "vertex") {
     vertexRegion = await p.text({ message: "Google Cloud ML region", initialValue: existing.CLOUD_ML_REGION ?? "", validate: (v) => v.trim() ? undefined : "Google Cloud ML region is required" });
     if (!p.isCancel(vertexRegion)) vertexProject = await p.text({ message: "Google Cloud project ID", initialValue: existing.ANTHROPIC_VERTEX_PROJECT_ID ?? "", validate: (v) => v.trim() ? undefined : "Project ID is required" });
-  } else {
+  } else if (provider === "foundry") {
     foundryResource = await p.text({ message: "Azure AI Foundry resource name", initialValue: existing.ANTHROPIC_FOUNDRY_RESOURCE ?? "", validate: (v) => v.trim() ? undefined : "Foundry resource is required" });
+  } else {
+    p.note(
+      "Open-weights models are much weaker than Claude. Tool use may fail, and Hebrew quality may be poor. Use this only for evaluation and air-gapped pilots.",
+      "Local model (offline)",
+    );
+    localBaseUrl = await p.text({
+      message: "Anthropic-compatible endpoint URL (required)",
+      initialValue: existing.ANTHROPIC_BASE_URL ?? "http://localhost:11434",
+      validate(v) {
+        try {
+          const url = new URL(v.trim());
+          return ["http:", "https:"].includes(url.protocol) && url.hostname ? undefined : "Enter an http(s) URL";
+        } catch { return "Enter an http(s) URL"; }
+      },
+    });
+    if (!p.isCancel(localBaseUrl)) localAuthToken = await p.password({ message: "Endpoint auth token (optional — leave blank if not needed)", mask: "•" });
+    if (!p.isCancel(localAuthToken)) localOpusModel = await p.text({ message: "Local Opus-equivalent model ID (required)", initialValue: existing.ANTHROPIC_DEFAULT_OPUS_MODEL ?? "", validate: (v) => v.trim() ? undefined : "A local model ID is required; Employee001 never guesses it" });
+    if (!p.isCancel(localOpusModel)) localSonnetModel = await p.text({ message: "Local Sonnet-equivalent model ID (required)", initialValue: existing.ANTHROPIC_DEFAULT_SONNET_MODEL ?? "", validate: (v) => v.trim() ? undefined : "A local model ID is required; Employee001 never guesses it" });
+    if (!p.isCancel(localSonnetModel)) localHaikuModel = await p.text({ message: "Local Haiku-equivalent model ID (required)", initialValue: existing.ANTHROPIC_DEFAULT_HAIKU_MODEL ?? "", validate: (v) => v.trim() ? undefined : "A local model ID is required; Employee001 never guesses it" });
   }
-  if (p.isCancel(awsRegion) || p.isCancel(vertexRegion) || p.isCancel(vertexProject) || p.isCancel(foundryResource)) { p.cancel("Setup cancelled"); return; }
+  if (p.isCancel(awsRegion) || p.isCancel(vertexRegion) || p.isCancel(vertexProject) || p.isCancel(foundryResource) || p.isCancel(localBaseUrl) || p.isCancel(localAuthToken) || p.isCancel(localOpusModel) || p.isCancel(localSonnetModel) || p.isCancel(localHaikuModel)) { p.cancel("Setup cancelled"); return; }
 
   // Composio is optional at setup time. The Anthropic key alone gets you
   // a working install — you can already hire marketplace agents (Alex
@@ -258,6 +283,12 @@ export default async function setup() {
     `ANTHROPIC_VERTEX_PROJECT_ID=${vertexProject}`,
     "# Azure AI Foundry: configure Azure credentials outside this file.",
     `ANTHROPIC_FOUNDRY_RESOURCE=${foundryResource}`,
+    "# Local Anthropic-compatible endpoint. Use only with operator-supplied model IDs.",
+    `ANTHROPIC_BASE_URL=${localBaseUrl}`,
+    `ANTHROPIC_AUTH_TOKEN=${localAuthToken}`,
+    `ANTHROPIC_DEFAULT_OPUS_MODEL=${localOpusModel}`,
+    `ANTHROPIC_DEFAULT_SONNET_MODEL=${localSonnetModel}`,
+    `ANTHROPIC_DEFAULT_HAIKU_MODEL=${localHaikuModel}`,
     "",
     "# Optional. Composio MCP powers the autonomous training loop for",
     "# inviting real employees: a Claude agent studies the CEO-chosen",
