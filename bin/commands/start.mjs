@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,6 +52,7 @@ export function buildChildEnv({ home, port, bind, env = {}, strict = false, inhe
 
 export function launchServer({ home, port, bind, env = {}, open = "/", noOpen = false, strict = false, inheritEnv = true }) {
   const absoluteHome = resolve(home);
+  mkdirSync(join(absoluteHome, "data"), { recursive: true, mode: 0o700 });
   const serverScript = join(PKG_ROOT, ".next", "standalone", "server.js");
   if (!existsSync(serverScript)) {
     process.stderr.write(
@@ -101,11 +102,17 @@ export function launchServer({ home, port, bind, env = {}, open = "/", noOpen = 
   banner.push("");
   process.stdout.write(banner.join("\n"));
 
-  const child = spawn(process.execPath, [serverScript], {
-    cwd: dirname(serverScript),
-    env: childEnv,
-    stdio: "inherit",
-  });
+  const previousUmask = process.umask(0o077);
+  let child;
+  try {
+    child = spawn(process.execPath, [serverScript], {
+      cwd: dirname(serverScript),
+      env: childEnv,
+      stdio: "inherit",
+    });
+  } finally {
+    process.umask(previousUmask);
+  }
 
   let opened = false;
   setTimeout(() => {

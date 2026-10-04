@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { createServer } from "node:net";
 import { checkNodeVersion } from "../lib/node-version.mjs";
 import { countTwins } from "../lib/adopt-data.mjs";
+import { checkDiskEncryption } from "../lib/disk-encryption.mjs";
+import { checkDataPermissions, fixDataPermissions } from "../lib/data-permissions.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(HERE, "..", "..");
@@ -351,7 +353,7 @@ export default async function doctor(argv = []) {
   const dataDir = resolve(process.cwd(), "data");
   if (!existsSync(dataDir)) {
     try {
-      mkdirSync(dataDir, { recursive: true });
+      mkdirSync(dataDir, { recursive: true, mode: 0o700 });
       ok("data/", "created");
     } catch (err) {
       fail("data/", `cannot create: ${err.message}`);
@@ -366,6 +368,29 @@ export default async function doctor(argv = []) {
       fail("data/", "exists but not writable");
       issues++;
     }
+  }
+
+  // Knowledge files are read directly by twins. Keep their directory private,
+  // and report whether the containing disk is encrypted by the operating system.
+  const encryption = checkDiskEncryption({ dataDir });
+  if (encryption.status === "on") ok("Disk encryption", encryption.detail);
+  else if (encryption.status === "off") {
+    warn("Disk encryption", "Your twins' knowledge is stored unencrypted on an unencrypted disk. Turn on FileVault / BitLocker / LUKS.");
+  } else {
+    warn("Disk encryption", encryption.detail);
+  }
+
+  try {
+    if (argv.includes("--fix")) {
+      const { changed } = fixDataPermissions(dataDir);
+      ok("Data permissions", `${changed} ${changed === 1 ? "item" : "items"} made private`);
+    } else {
+      const { insecure } = checkDataPermissions(dataDir);
+      if (insecure.length) warn("Data permissions", `${insecure.length} path${insecure.length === 1 ? " is" : "s are"} group/world readable — run \`employee001 doctor --fix\``);
+      else ok("Data permissions", "private");
+    }
+  } catch (err) {
+    warn("Data permissions", `could not check: ${err.message}`);
   }
 
   const twinCount = countTwins(dataDir);
