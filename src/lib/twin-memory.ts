@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import { TWIN_MODEL_FALLBACK, TWIN_MODEL_HAIKU } from "@/lib/sdk-defaults";
 
 const MEMORY_ROOT = path.join(process.cwd(), "data", "memory");
 const DEFAULT_LIMIT = 5;
@@ -493,7 +494,7 @@ export function salience(card: TwinMemoryCard, access: AccessMap, nowMs: number)
 // first token, so it is a latency trade the operator opts into.
 // Haiku for the same reason the Dreamer uses it: this is a cheap per-turn
 // classification, and it sits in the latency path.
-const RERANK_MODEL_DEFAULT = "claude-haiku-4-5";
+const RERANK_MODEL_DEFAULT = TWIN_MODEL_HAIKU;
 const DEFAULT_RERANK_CANDIDATES = 12;
 
 function agenticRerankEnabled(): boolean {
@@ -962,8 +963,8 @@ type RawFact = Pick<
   "type" | "key" | "value" | "confidence" | "source"
 >;
 
-const DREAMER_MODEL_DEFAULT = "claude-haiku-4-5"; // cheap/fast; runs per turn
-const DREAMER_FALLBACK_MODEL = "claude-sonnet-4-5"; // mirrors TWIN_MODEL_FALLBACK
+const DREAMER_MODEL_DEFAULT = TWIN_MODEL_HAIKU; // cheap/fast; runs per turn
+const DREAMER_FALLBACK_MODEL = TWIN_MODEL_FALLBACK;
 
 const DREAMER_TYPES: ReadonlySet<string> = new Set<TwinStructuredType>([
   "decision",

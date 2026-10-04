@@ -10,6 +10,7 @@ import {
   getMarketplaceAgent,
   type MarketplaceAgent,
 } from "./marketplace";
+import { TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 
 const HIRED_AGENTS_PATH = path.join(process.cwd(), "data", "hired-agents.json");
 const EMPLOYEES_DATA_DIR = path.join(process.cwd(), "data", "employees");
@@ -192,8 +193,8 @@ function marketplaceAgentToEmployee(
     profileFilesComplete: Object.keys(agent.profileFiles).length,
     lastActiveAt: hiredAt,
     questionsThisWeek: 0,
-    seedModel: "claude-sonnet-5",
-    refreshModel: "claude-sonnet-5",
+    seedModel: TWIN_MODEL_PRIMARY,
+    refreshModel: TWIN_MODEL_PRIMARY,
     ttsVoiceId: "EXAVITQu4vr4xnSDxMaL",
     skills: agent.skills.map((s) => ({
       id: s.toLowerCase().replace(/\s+/g, "-"),

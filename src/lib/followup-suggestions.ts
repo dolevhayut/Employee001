@@ -6,8 +6,9 @@
 
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { TWIN_MODEL_HAIKU } from "@/lib/sdk-defaults";
 
-const MODEL = "claude-haiku-4-5";
+const MODEL = TWIN_MODEL_HAIKU;
 const MAX_TOKENS = 200;
 
 /** Strict JSON shape we ask the model for. */

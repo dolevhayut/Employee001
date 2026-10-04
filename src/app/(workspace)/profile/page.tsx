@@ -1013,8 +1013,8 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  const seedMeta   = CLAUDE_MODELS.find((m) => m.id === seedModel)!;
-  const refreshMeta = CLAUDE_MODELS.find((m) => m.id === refreshModel)!;
+  const seedMeta   = CLAUDE_MODELS.find((m) => m.id === seedModel) ?? CLAUDE_MODELS[0];
+  const refreshMeta = CLAUDE_MODELS.find((m) => m.id === refreshModel) ?? CLAUDE_MODELS[0];
   const estSeed    = (BASE_SEED_COST * seedMeta.seedCostMultiplier).toFixed(2);
   const estRefresh = (BASE_REFRESH_COST * refreshMeta.refreshCostMultiplier).toFixed(2);
 

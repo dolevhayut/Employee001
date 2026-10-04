@@ -6,6 +6,7 @@ import { getMarketplaceAgent } from "@/lib/marketplace";
 import { runSingleTwin } from "@/lib/council-runner";
 import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
 import type { EmployeeWithTwin } from "@/lib/employees";
+import { TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 
 /**
  * Trial chat for marketplace agents — lets a CEO talk to an agent before
@@ -89,8 +90,8 @@ export async function POST(request: NextRequest) {
     twinConfidence: 0.85,
     profileFilesComplete: Object.keys(agent.profileFiles).length,
     questionsThisWeek: 0,
-    seedModel: "claude-sonnet-5",
-    refreshModel: "claude-sonnet-5",
+    seedModel: TWIN_MODEL_PRIMARY,
+    refreshModel: TWIN_MODEL_PRIMARY,
     ttsVoiceId: "EXAVITQu4vr4xnSDxMaL",
     skills: agent.skills.map((s) => ({
       id: s.toLowerCase().replace(/\s+/g, "-"),

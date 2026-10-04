@@ -26,6 +26,7 @@ import fsp from "fs/promises";
 import type { EmployeeWithTwin } from "@/lib/employees";
 import { appendAuditEntry } from "@/lib/audit-log";
 import { registerRun, unregisterRun, updateRun } from "@/lib/active-runs";
+import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 
 import {
   scoreCoverage,
@@ -55,9 +56,9 @@ export const DEMO_BANNER =
   "DEMO — not legally reviewed, not for production, not published";
 
 /** Capture model id (sonnet) recorded in provenance in model mode. */
-const CAPTURE_MODEL = "claude-sonnet-5";
+const CAPTURE_MODEL = TWIN_MODEL_PRIMARY;
 /** Synthesis model id (opus) recorded in provenance in model mode. */
-const SYNTHESIS_MODEL = "claude-opus-5";
+const SYNTHESIS_MODEL = TWIN_MODEL_OPUS;
 
 const RELAY_PHASES = [
   "consent",

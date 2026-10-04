@@ -12,8 +12,9 @@
 // when each subagent is appropriate.
 
 import type { AgentDefinition } from "@anthropic-ai/claude-agent-sdk";
+import { TWIN_MODEL_HAIKU } from "@/lib/sdk-defaults";
 
-const RESEARCHER_MODEL = "claude-haiku-4-5-20251001";
+const RESEARCHER_MODEL = TWIN_MODEL_HAIKU;
 
 export const TWIN_SUBAGENT_NAMES = ["web-researcher", "brain-explorer", "gap-finder"] as const;
 export type TwinSubagentName = (typeof TWIN_SUBAGENT_NAMES)[number];

@@ -19,9 +19,14 @@ import { appendAuditEntry } from "@/lib/audit-log";
 const PKG_VERSION = "Employee001/0.2.0";
 
 /** Models we know about. Keep in lock-step with the dropdown in /settings. */
-export const TWIN_MODEL_PRIMARY = "claude-sonnet-5";
-export const TWIN_MODEL_FALLBACK = "claude-sonnet-4-5";
+export const TWIN_MODEL_PRIMARY = "claude-sonnet-5-5";
+// Previous-generation Sonnet: a distinct model so a 5.5 outage or refusal
+// actually lands somewhere else.
+export const TWIN_MODEL_FALLBACK = "claude-sonnet-5";
+// Opus 5.5 needs the Claude Code runtime >= 2.1.280, which ships with Agent SDK
+// 0.3.x (E-010). The bundled 0.2.x runtime returns 400 for it, so stay on Opus 5.
 export const TWIN_MODEL_OPUS = "claude-opus-5";
+export const TWIN_MODEL_HAIKU = "claude-haiku-4-5";
 
 /** Tools we never want a twin to call, ever. Removes them from the model's
  *  context entirely (smaller prompt, clearer intent, no Bash escape hatch).

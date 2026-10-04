@@ -5,7 +5,8 @@
 import "server-only";
 import fs from "fs/promises";
 import path from "path";
-import type { EmployeeWithTwin } from "./employees";
+import type { ClaudeModel, EmployeeWithTwin } from "./employees";
+import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 
 const AVATAR_PALETTE = [
   "#A8B4C4", "#C4A8B8", "#B8C4A8", "#A8C4B8", "#C4B8A8",
@@ -45,6 +46,10 @@ type DiskSidecar = {
   lastActiveAt?: string;
   questionsThisWeek?: number;
   weekOf?: string; // ISO week string e.g. "2026-W20"
+  /** Legacy single-model records apply the selected model to both workflows. */
+  model?: ClaudeModel;
+  seedModel?: ClaudeModel;
+  refreshModel?: ClaudeModel;
   /**
    * Set when materialised from an invite before the employee finished the
    * consent wizard. Such records have placeholder markdown that would
@@ -153,8 +158,8 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
         sidecar.weekOf === isoWeek(new Date()) ? (sidecar.questionsThisWeek ?? 0) : 0,
       skills: [],
       orgSkillIds: [],
-      seedModel: "claude-opus-5",
-      refreshModel: "claude-sonnet-5",
+      seedModel: sidecar.seedModel ?? sidecar.model ?? TWIN_MODEL_OPUS,
+      refreshModel: sidecar.refreshModel ?? sidecar.model ?? TWIN_MODEL_PRIMARY,
       ttsVoiceId: "EXAVITQu4vr4xnSDxMaL",
     });
   }

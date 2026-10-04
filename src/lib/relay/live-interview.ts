@@ -19,6 +19,7 @@ import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
 import Anthropic from "@anthropic-ai/sdk";
+import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 
 import { INTERVIEWER_SYSTEM_PROMPT, buildInterviewerPrompt } from "./interviewer";
 import { scoreCoverage, type CoverageResult } from "./coverage";
@@ -32,8 +33,8 @@ import {
 } from "./rcp.types";
 
 /** PRD: capture = sonnet (fast/warm), synthesis = opus (deep reasoning). */
-export const CAPTURE_MODEL = "claude-sonnet-5";
-export const SYNTHESIS_MODEL = "claude-opus-5";
+export const CAPTURE_MODEL = TWIN_MODEL_PRIMARY;
+export const SYNTHESIS_MODEL = TWIN_MODEL_OPUS;
 
 /** The mandatory demo banner (ConsentRecord.banner literal, PRD 13.5). */
 const DEMO_BANNER =

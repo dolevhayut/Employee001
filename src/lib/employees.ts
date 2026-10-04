@@ -22,14 +22,21 @@ export const EMPLOYEES: Employee[] = [];
 export type TwinStatus = "ready" | "building" | "pending";
 
 export type ClaudeModel =
+  | "claude-sonnet-5-5"
+  | "claude-haiku-4-5"
+  // Valid ids, not yet in the picker: the bundled Agent SDK 0.2.x runtime
+  // rejects them (needs Claude Code >= 2.1.280). E-010 adds them to CLAUDE_MODELS.
+  | "claude-opus-5-5"
+  | "claude-fable-5-1"
+  // Legacy ids — kept valid so employee JSON created before the Claude 5.5
+  // upgrade continues to type-check and load.
   | "claude-opus-5"
   | "claude-sonnet-5"
-  | "claude-haiku-4-5"
-  // Legacy ids — kept valid so twins created before the Claude 5 upgrade still
-  // type-check. Both remain valid, served API models.
   | "claude-opus-4-8"
-  | "claude-sonnet-4-6";
+  | "claude-sonnet-4-6"
+  | "claude-sonnet-4-5";
 
+// Cost multipliers are relative to Claude Opus 5 ($5/MTok input) = 1.0.
 export const CLAUDE_MODELS: {
   id: ClaudeModel;
   label: string;
@@ -37,6 +44,21 @@ export const CLAUDE_MODELS: {
   seedCostMultiplier: number;
   refreshCostMultiplier: number;
 }[] = [
+  {
+    id: "claude-sonnet-5-5",
+    label: "Sonnet 5.5",
+    sub: "Balanced — recommended for most employees",
+    seedCostMultiplier: 0.25,
+    refreshCostMultiplier: 0.25,
+  },
+  {
+    id: "claude-haiku-4-5",
+    label: "Claude Haiku 4.5",
+    sub: "Fastest & cheapest — good for high-volume or junior roles",
+    seedCostMultiplier: 0.12,
+    refreshCostMultiplier: 0.12,
+  },
+  // Legacy ids remain selectable so existing employee settings still render.
   {
     id: "claude-opus-5",
     label: "Claude Opus 5",
@@ -54,11 +76,25 @@ export const CLAUDE_MODELS: {
     refreshCostMultiplier: 0.25,
   },
   {
-    id: "claude-haiku-4-5",
-    label: "Claude Haiku 4.5",
-    sub: "Fastest & cheapest — good for high-volume or junior roles",
-    seedCostMultiplier: 0.12,
-    refreshCostMultiplier: 0.12,
+    id: "claude-opus-4-8",
+    label: "Claude Opus 4.8",
+    sub: "Legacy — retained for existing employee profiles",
+    seedCostMultiplier: 1.0,
+    refreshCostMultiplier: 1.0,
+  },
+  {
+    id: "claude-sonnet-4-6",
+    label: "Claude Sonnet 4.6",
+    sub: "Legacy — retained for existing employee profiles",
+    seedCostMultiplier: 0.38,
+    refreshCostMultiplier: 0.38,
+  },
+  {
+    id: "claude-sonnet-4-5",
+    label: "Claude Sonnet 4.5",
+    sub: "Legacy — retained for existing employee profiles",
+    seedCostMultiplier: 0.38,
+    refreshCostMultiplier: 0.38,
   },
 ];
 

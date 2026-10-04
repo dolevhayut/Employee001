@@ -23,7 +23,7 @@ import {
   listBuilds,
   snapshotRootFile,
 } from "@/lib/twin-versions";
-import { buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
+import { buildBaseOptions, buildTwinHooks, TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
 
@@ -528,7 +528,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
         buildId,
         startedAt: buildStartedAt,
         finishedAt: new Date(),
-        modelUsed: "claude-sonnet-5",
+        modelUsed: TWIN_MODEL_PRIMARY,
         costUsd,
         turns,
         stoppedReason,
