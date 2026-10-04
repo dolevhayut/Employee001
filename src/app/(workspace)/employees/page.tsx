@@ -16,8 +16,6 @@ import { Topbar } from "@/components/ex/shell";
 import { useT } from "@/components/ex/i18n-context";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import type { MessageKey } from "@/lib/i18n/messages";
-import { INTEGRATIONS as INTEGRATION_META } from "@/lib/demo";
-import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { OrgChart } from "@/components/ex/org-chart";
 import {
   EMPLOYEES_WITH_TWIN,
@@ -80,31 +78,6 @@ function writeFavorites(next: Set<string>): void {
     // ignore
   }
   favoritesListeners.forEach((cb) => cb());
-}
-
-function SourceLogo({ id, size = 16 }: { id: string; size?: number }) {
-  const meta = INTEGRATION_META[id];
-  const slug = meta?.simpleIconSlug ?? id;
-  const label = meta?.name ?? id;
-  return (
-    <span
-      title={label}
-      aria-label={label}
-      style={{
-        width: 26,
-        height: 26,
-        borderRadius: 5,
-        background: "var(--surface)",
-        border: "1px solid var(--hairline)",
-        display: "grid",
-        placeItems: "center",
-        flexShrink: 0,
-        overflow: "hidden",
-      }}
-    >
-      <ToolkitIcon slug={slug} size={size} />
-    </span>
-  );
 }
 
 function StarButton({
@@ -186,18 +159,6 @@ function Stat({
         {hint}
       </div>
     </div>
-  );
-}
-
-function ConfidencePill({ value }: { value: number }) {
-  const { t } = useT();
-  const pct = Math.round(value * 100);
-  const tone = value >= 0.85 ? "success" : value >= 0.7 ? "warn" : "danger";
-  return (
-    <span className={"badge " + tone} style={{ fontSize: "var(--fs-xs)" }}>
-      <span className={"dot " + tone} style={{ boxShadow: "none" }} />
-      <bdi>{t("twins.confidence", { pct })}</bdi>
-    </span>
   );
 }
 
@@ -530,8 +491,6 @@ function EmployeeCard({
 }) {
   const { t, locale } = useT();
   const dimmed = emp.twinStatus === "pending";
-  const visibleIntegrations = emp.integrations.slice(0, 5);
-  const overflow = emp.integrations.length - visibleIntegrations.length;
 
   return (
     <div

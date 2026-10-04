@@ -22,10 +22,9 @@ jobs:
 
       - run: npm ci
 
-      # Errors fail the run (0 today); warnings are still allowed while the
-      # remaining legacy ones get cleaned up.
+      # Zero errors and zero warnings; any new warning fails the run.
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --max-warnings 0
 
       - name: Test
         run: npm test
