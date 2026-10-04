@@ -926,8 +926,8 @@ function FileRow({
         padding: "9px 10px",
         margin: "2px 0",
         borderRadius: 5,
-        border: "1px solid " + (isActive ? "var(--hairline-strong)" : "color-mix(in oklch, var(--hairline) 0%, transparent)"),
-        background: isActive ? "var(--surface)" : "color-mix(in oklch, var(--surface) 0%, transparent)",
+        border: "1px solid " + (isActive ? "var(--hairline-strong)" : "transparent"),
+        background: isActive ? "var(--surface)" : "transparent",
         color: "var(--text)",
         cursor: "pointer",
         fontFamily: "inherit",
@@ -979,8 +979,8 @@ function FileRow({
       <style jsx>{`
         @keyframes pulse {
           0%   { box-shadow: 0 0 0 0 ${dotColor}; }
-          70%  { box-shadow: 0 0 0 6px color-mix(in oklch, ${dotColor} 0%, transparent); }
-          100% { box-shadow: 0 0 0 0 color-mix(in oklch, ${dotColor} 0%, transparent); }
+          70%  { box-shadow: 0 0 0 6px transparent; }
+          100% { box-shadow: 0 0 0 0 transparent; }
         }
       `}</style>
     </button>
