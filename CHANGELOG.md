@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- PDF and Word extraction can't take the server down: Word files that
+  expand suspiciously (zip bombs) are refused before they are opened, and
+  extraction runs in a separate worker with a memory cap and a 30-second
+  limit. The upload itself always succeeds.
 - Cockpit, Spend and Approvals show "Couldn't load …" with Try again when
   their data fails to load, instead of pretending the page is empty. A view
   that already loaded stays on screen with a quiet "Couldn't refresh".
