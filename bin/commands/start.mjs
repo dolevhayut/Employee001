@@ -115,7 +115,14 @@ export function launchServer({ home, port, bind, env = {}, open = "/", noOpen = 
     }
   }, 1500);
 
-  const forward = (sig) => () => child.kill(sig);
+  // Next's graceful shutdown waits for open keep-alive connections (an open
+  // browser tab), which can leave Ctrl+C hanging; force it after 5 seconds.
+  const forward = (sig) => () => {
+    child.kill(sig);
+    setTimeout(() => {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    }, 5000).unref();
+  };
   process.on("SIGINT", forward("SIGINT"));
   process.on("SIGTERM", forward("SIGTERM"));
 
