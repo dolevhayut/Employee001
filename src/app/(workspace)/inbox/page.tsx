@@ -40,10 +40,10 @@ type FeedItem = {
 type FilterKey = "all" | FeedType;
 
 const TYPE_META: Record<FeedType, { label: MessageKey; color: string; bg: string }> = {
-  "update":        { label: "inbox.type.update", color: "#64748b", bg: "#f1f5f9" },
-  "alert":         { label: "inbox.type.alert",  color: "#dc2626", bg: "#fee2e2" },
-  "needs-review":  { label: "inbox.type.review", color: "#b45309", bg: "#fef3c7" },
-  "task-handoff":  { label: "inbox.type.handoff", color: "#6366f1", bg: "#e0e7ff" },
+  "update":        { label: "inbox.type.update", color: "var(--twin)", bg: "color-mix(in oklch, var(--twin) 12%, transparent)" },
+  "alert":         { label: "inbox.type.alert",  color: "var(--danger)", bg: "color-mix(in oklch, var(--danger) 12%, transparent)" },
+  "needs-review":  { label: "inbox.type.review", color: "var(--warn)", bg: "color-mix(in oklch, var(--warn) 12%, transparent)" },
+  "task-handoff":  { label: "inbox.type.handoff", color: "var(--twin)", bg: "color-mix(in oklch, var(--twin) 12%, transparent)" },
 };
 
 const FILTERS: { key: FilterKey; label: MessageKey }[] = [
@@ -201,7 +201,7 @@ function ResolutionChip({ resolution, resolvedAt }: { resolution: string; resolv
   const lower = resolution.toLowerCase();
   const isNegative = lower.includes("reject") || lower.includes("dismiss") || lower.includes("denied");
   const symbol = isNegative ? "✗" : "✓";
-  const color = isNegative ? "var(--text-muted)" : "#16a34a";
+  const color = isNegative ? "var(--text-muted)" : "var(--success)";
   const label =
     lower === "approved"
       ? t("inbox.resolution.approved")
@@ -552,9 +552,9 @@ export default function InboxPage() {
                           className="btn sm"
                           style={{
                             height: 26,
-                            background: "#16a34a",
-                            borderColor: "#16a34a",
-                            color: "white",
+                            background: "var(--success)",
+                            borderColor: "var(--success)",
+                            color: "var(--bg)",
                           }}
                         >
                           <Icons.Check size={11} /> {t("inbox.approve")}
@@ -565,9 +565,9 @@ export default function InboxPage() {
                           className="btn sm"
                           style={{
                             height: 26,
-                            background: "#fef3c7",
-                            borderColor: "#fde68a",
-                            color: "#b45309",
+                            background: "color-mix(in oklch, var(--warn) 12%, transparent)",
+                            borderColor: "var(--warn)",
+                            color: "var(--warn)",
                           }}
                         >
                           <Icons.X size={11} /> {t("inbox.reject")}

@@ -824,7 +824,7 @@ export default function TasksPage() {
                     alignItems: "center",
                     gap: "var(--sp-10)",
                     padding: "8px 12px",
-                    background: "rgba(180,140,60,0.06)",
+                    background: "color-mix(in oklch, var(--warn) 12%, transparent)",
                     border: "1px solid var(--warn)",
                     borderRadius: 8,
                     fontSize: "var(--fs-sm)",
@@ -1197,7 +1197,7 @@ export default function TasksPage() {
               maxWidth: "90vw",
               padding: 0,
               overflow: "hidden",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.18)",
+              boxShadow: "var(--shadow-dialog)",
             }}
           >
             <div
@@ -1274,7 +1274,7 @@ export default function TasksPage() {
                     fontSize: "var(--fs-sm)",
                     color: "var(--danger)",
                     padding: "6px 10px",
-                    background: "rgba(220,60,60,0.06)",
+                    background: "color-mix(in oklch, var(--danger) 12%, transparent)",
                     borderRadius: 6,
                     border: "1px solid var(--danger)",
                   }}
@@ -1349,7 +1349,7 @@ function SlashMenu({
         background: "var(--surface)",
         border: "1px solid var(--hairline)",
         borderRadius: "0 0 8px 8px",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+        boxShadow: "var(--shadow-dropdown)",
         zIndex: 20,
         maxHeight: 360,
         overflowY: "auto",
@@ -1576,11 +1576,11 @@ function EmployeeChip({
 function statusBadge(status: TaskStatus, t: ReturnType<typeof useT>["t"]) {
   switch (status) {
     case "running":
-      return { label: t("tasks.status.running"), color: "var(--warn)", bg: "rgba(180,140,60,0.10)" };
+      return { label: t("tasks.status.running"), color: "var(--warn)", bg: "color-mix(in oklch, var(--warn) 12%, transparent)" };
     case "complete":
-      return { label: t("tasks.status.complete"), color: "var(--success)", bg: "rgba(60,140,80,0.10)" };
+      return { label: t("tasks.status.complete"), color: "var(--success)", bg: "color-mix(in oklch, var(--success) 12%, transparent)" };
     case "error":
-      return { label: t("tasks.status.error"), color: "var(--danger)", bg: "rgba(220,60,60,0.08)" };
+      return { label: t("tasks.status.error"), color: "var(--danger)", bg: "color-mix(in oklch, var(--danger) 12%, transparent)" };
     case "aborted":
       return { label: t("tasks.status.aborted"), color: "var(--text-muted)", bg: "var(--bg-elevated)" };
   }
@@ -1984,7 +1984,7 @@ function TaskLogRow({
             padding: "14px 16px",
             background: resolved
               ? "var(--bg-elevated)"
-              : "rgba(180,140,60,0.06)",
+              : "color-mix(in oklch, var(--warn) 12%, transparent)",
             borderRadius: 8,
             border: `1px solid ${resolved ? "var(--hairline)" : "var(--warn)"}`,
           }}
@@ -2117,7 +2117,7 @@ function TaskLogRow({
         <div
           style={{
             padding: "10px 14px",
-            background: "rgba(220,60,60,0.06)",
+            background: "color-mix(in oklch, var(--danger) 12%, transparent)",
             borderRadius: 8,
             border: "1px solid var(--danger)",
           }}
@@ -2155,7 +2155,7 @@ function TaskLogRow({
           style={{
             padding: "12px 16px",
             background: hitBudget
-              ? "rgba(220,60,60,0.06)"
+              ? "color-mix(in oklch, var(--danger) 12%, transparent)"
               : "var(--bg-elevated)",
             borderRadius: 8,
             border: `1px solid ${hitBudget ? "var(--danger)" : "var(--hairline)"}`,
@@ -2204,7 +2204,7 @@ function TaskLogRow({
         <div
           style={{
             padding: "12px 16px",
-            background: "rgba(220,60,60,0.06)",
+            background: "color-mix(in oklch, var(--danger) 12%, transparent)",
             borderRadius: 8,
             border: "1px solid var(--danger)",
             fontSize: "var(--fs-ui)",
