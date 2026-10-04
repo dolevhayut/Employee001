@@ -17,6 +17,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   scrambles punctuation. Lists and quotes use logical (start/end) spacing.
 
 ### Changed
+- **Operator pages explain themselves when Autonomy is off.** Cockpit, Spend,
+  Activity log, Schedules and Approvals show what will appear there once twins
+  work unattended, with a one-click "Turn on Autonomy" (no reload). Pages with
+  real data are unchanged. Schedules gets a Focus tab, and Spend links to
+  Workspace costs.
 - **New sidebar.** One navigation for both modes: Work (Approvals with a
   pending-count badge, Tasks, Team Meeting), Twins (Twins, Chat, Hire),
   Operations (Cockpit, Schedules, Activity log), Control (Spend, Tools & MCP)
