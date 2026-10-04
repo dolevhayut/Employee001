@@ -58,6 +58,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
+- **Twins learn from Team Meetings, with your OK.** After a meeting, each
+  twin that spoke can suggest a short addition to its knowledge files (a
+  decision, an owner, a deadline). Suggestions appear under "Suggested
+  updates" in the twin's Files tab; nothing is written until you accept, and
+  accepted text keeps file history. Capped per meeting and within each
+  twin's budget; turn off with `TWIN_KNOWLEDGE_PROPOSALS=0`.
 - **Hebrew interface, first steps.** Settings → Workspace has an
   English / עברית switch. In Hebrew the app runs right-to-left in
   Niv Sans; the sidebar, command palette (search works in both languages),

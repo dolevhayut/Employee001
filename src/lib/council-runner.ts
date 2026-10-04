@@ -67,6 +67,7 @@ import { knowledgeIndexMarkdown } from "@/lib/knowledge-files";
 import { buildConsultMcpServer } from "@/lib/consult-mcp";
 import type { ConsultContext } from "@/lib/twin-consult";
 import { ceoOf, orgClause, readOrgIdentity } from "@/lib/org-identity";
+import { proposalsEnabled, proposeKnowledgeFromMeeting } from "@/lib/knowledge-proposals";
 
 // ─── Event types ──────────────────────────────────────────────────────────────
 
@@ -1418,6 +1419,9 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
   // Append the CEO's message to the transcript first — every twin's prompt
   // will render it as the most recent turn.
   appendTurn(meeting.id, { kind: "ceo", text: question, ts: Date.now() });
+  // Knowledge proposals read only this run's turns, so a follow-up question
+  // in the same meeting doesn't re-propose what was already suggested.
+  const runStartIndex = meeting.transcript.length - 1;
 
   // Twins who have already taken a turn IN THIS RUN — prevents the same
   // delegation cascade from re-tagging someone we just heard from. (We
@@ -1643,5 +1647,19 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
   }
 
   onEvent({ type: "council_done" });
+
+  // Learnings → knowledge proposals (E-084). Fire-and-forget: the CEO already
+  // has the answer; suggestions show up in each twin's Files tab for approval.
+  if (proposalsEnabled()) {
+    const spoke = allParticipants
+      .filter((e) => spokenThisRun.has(e.id))
+      .map((e) => ({ id: e.id, name: e.name }));
+    void proposeKnowledgeFromMeeting({
+      meetingId: meeting.id,
+      turns: meeting.transcript.slice(runStartIndex),
+      twins: spoke,
+    });
+  }
+
   return { meetingId: meeting.id };
 }

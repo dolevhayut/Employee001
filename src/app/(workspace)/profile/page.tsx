@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { KnowledgeProposalsPanel } from "@/components/ex/knowledge-proposals-panel";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -2001,6 +2002,8 @@ function FilesTab({
   }, [loadKnowledge]);
 
   return (
+    <>
+    <KnowledgeProposalsPanel employeeId={employeeId} onAccepted={() => void loadKnowledge()} />
     <div
       style={{
         display: "grid",
@@ -2024,6 +2027,7 @@ function FilesTab({
         onKnowledgeChanged={loadKnowledge}
       />
     </div>
+    </>
   );
 }
 
