@@ -101,12 +101,98 @@ function extractInviteToken(request: NextRequest): string | undefined {
   return m?.[1];
 }
 
+const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+type Authority = { name: string; port: string | undefined };
+
+// Strict HTTP Host grammar: a hostname or [IPv6], optional :port. Anything
+// else (userinfo, path, fragment, spaces) is rejected rather than "parsed".
+const HOST_RE = /^(\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::(\d{1,5}))?$/i;
+
+function parseHost(value: string | null): Authority | undefined {
+  const m = value?.trim().match(HOST_RE);
+  if (!m) return undefined;
+  return { name: m[1].toLowerCase().replace(/\.$/, ""), port: m[2] };
+}
+
+function parseOrigin(value: string): (Authority & { defaultPort: string }) | undefined {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return {
+      name: url.hostname.toLowerCase().replace(/\.$/, ""),
+      port: url.port || undefined,
+      defaultPort: url.protocol === "https:" ? "443" : "80",
+    };
+  } catch {
+    return undefined; // includes the opaque "null" origin
+  }
+}
+
+function samePort(origin: Authority & { defaultPort: string }, host: Authority): boolean {
+  const originPort = origin.port ?? origin.defaultPort;
+  return host.port ? originPort === host.port : originPort === origin.defaultPort;
+}
+
+function extraAllowedHosts(): Set<string> {
+  return new Set(
+    (process.env.EMPLOYEE001_ALLOWED_HOSTS ?? "")
+      .split(",")
+      .map((h) => h.trim().toLowerCase().replace(/\.$/, ""))
+      .filter(Boolean),
+  );
+}
+
+function forbidden(reason: string): NextResponse {
+  return new NextResponse(JSON.stringify({ error: "forbidden", reason }), {
+    status: 403,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+// Cross-site guard. A web page open in the user's browser can send requests
+// to the local app, and with DNS rebinding (evil.example resolving to
+// 127.0.0.1) it can even read the responses. So:
+//   - on a loopback bind, the Host header must be a loopback name (or one
+//     listed in EMPLOYEE001_ALLOWED_HOSTS, e.g. for `tailscale serve`);
+//   - on every bind, a state-changing request from a browser must be
+//     same-origin: its Origin must match the Host (a loopback alias on the
+//     same port, or an allow-listed host, also counts on a loopback bind).
+//     Requests with no Origin and no cross-site Sec-Fetch-Site (curl, CLIs,
+//     webhooks) are allowed.
+export function crossSiteBlock(request: NextRequest, loopback: boolean): NextResponse | null {
+  const host = parseHost(request.headers.get("host"));
+  const allowed = extraAllowedHosts();
+  if (loopback && (!host || (!LOOPBACK_HOSTNAMES.has(host.name) && !allowed.has(host.name)))) {
+    return forbidden("host");
+  }
+  if (!UNSAFE_METHODS.has(request.method)) return null;
+
+  const originHeader = request.headers.get("origin");
+  if (!originHeader) {
+    return request.headers.get("sec-fetch-site") === "cross-site" ? forbidden("origin") : null;
+  }
+  const origin = parseOrigin(originHeader);
+  if (!origin || !host) return forbidden("origin");
+  if (origin.name === host.name && samePort(origin, host)) return null;
+  if (loopback && allowed.has(origin.name)) return null;
+  if (loopback && LOOPBACK_HOSTNAMES.has(origin.name) && LOOPBACK_HOSTNAMES.has(host.name) && samePort(origin, host)) {
+    return null;
+  }
+  return forbidden("origin");
+}
+
 export function proxy(request: NextRequest) {
+  const bind = process.env.EMPLOYEE001_BIND;
+  const loopback = isLoopbackBind(bind);
+  const blocked = crossSiteBlock(request, loopback);
+  if (blocked) return blocked;
+
   const welcome = firstVisitRedirect(request);
   if (welcome) return welcome;
 
-  const bind = process.env.EMPLOYEE001_BIND;
-  if (isLoopbackBind(bind)) {
+  if (loopback) {
     return NextResponse.next();
   }
 
