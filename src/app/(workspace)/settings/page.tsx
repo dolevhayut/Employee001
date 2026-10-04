@@ -182,8 +182,52 @@ function ApiKeysSection() {
 }
 
 function WorkspaceSection() {
-  const [name, setName] = useState("Employee001");
-  const [domain, setDomain] = useState("employee001.io");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [saved, setSaved] = useState<{ name: string; description: string } | null>(null);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/org/identity", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((data: { identity: { name: string; description: string } }) => {
+        if (cancelled) return;
+        // Only fill fields the user hasn't started typing in.
+        setName((current) => current || data.identity.name);
+        setDescription((current) => current || data.identity.description);
+        setSaved(data.identity);
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const dirty = saved !== null && (name !== saved.name || description !== saved.description);
+
+  async function save() {
+    const submitted = { name, description };
+    setStatus("saving");
+    try {
+      const res = await fetch("/api/org/identity", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const data = (await res.json()) as { identity: { name: string; description: string } };
+      // Show the cleaned values, unless the user kept typing during the save.
+      setName((current) => (current === submitted.name ? data.identity.name : current));
+      setDescription((current) => (current === submitted.description ? data.identity.description : current));
+      setSaved(data.identity);
+      setStatus("saved");
+    } catch {
+      setStatus("error");
+    }
+  }
 
   return (
     <section style={{ marginBottom: "var(--sp-32)" }}>
@@ -207,7 +251,7 @@ function WorkspaceSection() {
               flexShrink: 0,
             }}
           >
-            {name.slice(0, 1).toUpperCase()}
+            {(name || "?").slice(0, 1).toUpperCase()}
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>Workspace logo</div>
@@ -218,9 +262,26 @@ function WorkspaceSection() {
           <button className="btn sm">Upload</button>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-16)" }}>
-          <Field label="Organization name" value={name} onChange={setName} />
-          <Field label="Domain" value={domain} onChange={setDomain} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "var(--sp-16)" }}>
+          <Field label="Organization name" value={name} onChange={setName} placeholder="Acme" />
+          <Field
+            label="What the company does (one line)"
+            value={description}
+            onChange={setDescription}
+            placeholder="A two-sided marketplace for local contractors"
+          />
+        </div>
+        <div className="row" style={{ alignItems: "center", gap: "var(--sp-12)", marginTop: "var(--sp-16)" }}>
+          <button className="btn primary sm" onClick={save} disabled={!dirty || status === "saving"}>
+            {status === "saving" ? "Saving…" : "Save"}
+          </button>
+          <span className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
+            {status === "saved" && !dirty
+              ? "Saved. Twins use this from their next run."
+              : status === "error"
+                ? "Couldn't load or save. Try again."
+                : "Twins introduce themselves as working here."}
+          </span>
         </div>
       </div>
     </section>

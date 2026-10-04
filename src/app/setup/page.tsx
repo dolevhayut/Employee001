@@ -576,6 +576,15 @@ export default function SetupPage() {
     true;
 
   function next() {
+    if (step === 0) {
+      // Twins introduce themselves as working at this company. Best-effort:
+      // the name can always be fixed later in Settings → Workspace.
+      void fetch("/api/org/identity", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: company }),
+      }).catch(() => {});
+    }
     if (step < 3) {
       setStep((s) => s + 1);
     } else {
