@@ -313,7 +313,7 @@ function Card({ children }: { children: React.ReactNode }) {
         border: `1px solid ${PANEL_BORDER}`,
         borderRadius: 14,
         padding: "44px 36px",
-        boxShadow: "0 24px 60px -28px color-mix(in oklch, var(--text) 60%, transparent)",
+        boxShadow: "var(--shadow-dialog)",
       }}
     >
       {children}
@@ -906,7 +906,7 @@ function Page() {
             border: "1px solid var(--hairline)",
             borderRadius: 14,
             padding: "44px 36px",
-            boxShadow: "0 8px 24px -16px color-mix(in oklch, var(--text) 8%, transparent)",
+            boxShadow: "var(--shadow)",
           }}
         >
           <div
