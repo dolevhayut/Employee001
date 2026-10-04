@@ -8,6 +8,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- **Other websites can no longer act on your local Employee001.** A page open
+  in your browser could send requests to the app on 127.0.0.1 (for example,
+  approve a pending twin action), and a DNS-rebinding page could read its
+  data. The app now refuses requests whose Host isn't local and any
+  state-changing request from another site. Behind `tailscale serve` or a
+  similar proxy, list the public name in `EMPLOYEE001_ALLOWED_HOSTS`.
+
 ### Added
 - **Anonymous usage counts, off unless you turn them on.** Settings shows
   exactly what would be sent (counts only: twins, meetings, approvals,
