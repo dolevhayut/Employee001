@@ -24,6 +24,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   themed color at all.
   Status badges, file chips, tool tints and dialogs now follow the theme
   instead of fixed light-mode colors.
+- **The knowledge graph, the Activity log and chat dialogs follow the
+  theme too.** The graph recolors live when you switch themes.
 - **Approval gate hardened.** Bash and the other never-allowed built-in
   tools are refused by the policy layer too, destructive tool names
   (delete, refund, payment, fund transfer, user removal) are caught
