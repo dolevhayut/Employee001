@@ -341,6 +341,12 @@ export function deleteKnowledgeFile(employeeId: string, name: string): boolean {
     const stat = fs.statSync(full);
     if (!stat.isFile()) return false;
     fs.unlinkSync(full);
+    // Drop the extracted `${name}.md` companion with its PDF/DOCX original,
+    // so the twin stops reading text from a file the user deleted.
+    const ext = extOf(clean);
+    if (ext === ".pdf" || ext === ".docx") {
+      fs.rmSync(path.join(dir, `${clean}.md`), { force: true });
+    }
     return true;
   } catch {
     return false;
