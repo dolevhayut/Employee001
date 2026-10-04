@@ -19,7 +19,7 @@ import { HandoverTabs } from "@/components/ex/handover-tabs";
 import { useT } from "@/components/ex/i18n-context";
 
 const DEMO_EMPLOYEE_ID = "itai-cohen";
-const BRAND = "#9E6B47";
+const BRAND = "var(--accent)";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type Phase = "consent" | "interviewing" | "synthesizing" | "done";
@@ -157,19 +157,19 @@ function LivePageInner() {
         <HandoverTabs />
 
         {/* DEMO banner */}
-        <div style={{ background: "rgba(158,107,71,.12)", border: `1px solid ${BRAND}`, borderRadius: 10, padding: "10px 14px", fontSize: 13 }}>
+        <div style={{ background: "color-mix(in oklch, var(--accent) 12%, transparent)", border: `1px solid ${BRAND}`, borderRadius: 10, padding: "10px 14px", fontSize: 13 }}>
           ⚠️ {t("handover.liveDemo")}
         </div>
 
         <div>
           <h1 style={{ fontSize: 26, margin: "4px 0 6px" }}>{t("handover.liveTitle")}</h1>
-          <p style={{ color: "var(--text-dim, #999)", fontSize: 14, lineHeight: 1.5 }}>
+          <p style={{ color: "var(--text-muted)", fontSize: 14, lineHeight: 1.5 }}>
             {t("handover.liveSubtitle")} Subject: <bdi><strong>{employeeId}</strong></bdi>.
           </p>
         </div>
 
         {error && (
-          <div style={{ background: "rgba(220,80,80,.12)", border: "1px solid #c55", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#e88" }}>
+          <div style={{ background: "color-mix(in oklch, var(--danger) 12%, transparent)", border: "1px solid var(--danger)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--danger)" }}>
             {error}
           </div>
         )}
@@ -177,7 +177,7 @@ function LivePageInner() {
         {phase === "synthesizing" && <SynthesizingOverlay />}
 
         {phase === "consent" && (
-          <div style={{ background: "var(--surface, #141414)", border: "1px solid var(--hairline, #2a2a2a)", borderRadius: 10, padding: 18 }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--hairline)", borderRadius: 10, padding: 18 }}>
             <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer", fontSize: 14 }}>
               <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
               <span>{t("handover.consent")}</span>
@@ -185,7 +185,7 @@ function LivePageInner() {
             <button
               onClick={start}
               disabled={!consent}
-              style={{ marginTop: 16, background: consent ? BRAND : "#333", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 14, cursor: consent ? "pointer" : "not-allowed" }}
+              style={{ marginTop: 16, background: consent ? BRAND : "var(--bg-sunken)", color: "var(--text)", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 14, cursor: consent ? "pointer" : "not-allowed" }}
             >
               {t("handover.start")}
             </button>
@@ -197,9 +197,9 @@ function LivePageInner() {
             <div
               ref={feedRef}
               className="scrollbar"
-              style={{ background: "var(--surface, #141414)", border: "1px solid var(--hairline, #2a2a2a)", borderRadius: 10, padding: 16, maxHeight: 460, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}
+              style={{ background: "var(--surface)", border: "1px solid var(--hairline)", borderRadius: 10, padding: 16, maxHeight: 460, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}
             >
-              {messages.length === 0 && !streaming && <div style={{ color: "#777", fontSize: 14 }}>{t("handover.connecting")}</div>}
+              {messages.length === 0 && !streaming && <div style={{ color: "var(--text-subtle)", fontSize: 14 }}>{t("handover.connecting")}</div>}
               {messages.map((m, i) => (
                 <Bubble key={i} role={m.role} text={m.content} />
               ))}
@@ -214,16 +214,16 @@ function LivePageInner() {
                 placeholder={busy ? t("handover.typing") : t("handover.answer")}
                 disabled={busy || phase === "synthesizing"}
                 rows={2}
-                style={{ flex: 1, background: "var(--surface-2, #0e0e0e)", color: "#eee", border: "1px solid var(--hairline, #2a2a2a)", borderRadius: 8, padding: 10, fontSize: 14, resize: "vertical", fontFamily: "inherit" }}
+                style={{ flex: 1, background: "var(--surface-soft)", color: "var(--text)", border: "1px solid var(--hairline)", borderRadius: 8, padding: 10, fontSize: 14, resize: "vertical", fontFamily: "inherit" }}
               />
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <button onClick={send} disabled={busy || !input.trim() || phase === "synthesizing"} style={{ background: BRAND, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 14, cursor: "pointer", opacity: busy || !input.trim() ? 0.5 : 1 }}>{t("handover.send")}</button>
-                <button onClick={finish} disabled={busy || answerCount < 1 || phase === "synthesizing"} title={answerCount < 1 ? "Answer at least one question" : "Synthesize the RCP from this conversation"} style={{ background: "transparent", color: BRAND, border: `1px solid ${BRAND}`, borderRadius: 8, padding: "10px 18px", fontSize: 13, cursor: "pointer", opacity: answerCount < 1 || busy ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                <button onClick={send} disabled={busy || !input.trim() || phase === "synthesizing"} style={{ background: BRAND, color: "var(--text)", border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 14, cursor: "pointer", opacity: busy || !input.trim() ? 0.5 : 1 }}>{t("handover.send")}</button>
+                <button onClick={finish} disabled={busy || answerCount < 1 || phase === "synthesizing"} title={answerCount < 1 ? "Answer at least one question" : "Synthesize the RCP from this conversation"} style={{ background: "color-mix(in oklch, var(--accent) 0%, transparent)", color: BRAND, border: `1px solid ${BRAND}`, borderRadius: 8, padding: "10px 18px", fontSize: 13, cursor: "pointer", opacity: answerCount < 1 || busy ? 0.5 : 1, whiteSpace: "nowrap" }}>
                   {phase === "synthesizing" ? t("handover.synthesizing") : t("handover.finish")}
                 </button>
               </div>
             </div>
-            <div style={{ fontSize: 12, color: "#777" }}>{t("handover.answers", { count: answerCount })}</div>
+            <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>{t("handover.answers", { count: answerCount })}</div>
           </>
         )}
 
@@ -278,7 +278,7 @@ function SynthesizingOverlay() {
           {/* outer rotating ring */}
           <div style={{
             position: "absolute", inset: 0, borderRadius: "50%",
-            background: `conic-gradient(from 0deg, ${BRAND}, rgba(158,107,71,0) 72%)`,
+            background: `conic-gradient(from 0deg, ${BRAND}, color-mix(in oklch, var(--accent) 0%, transparent) 72%)`,
             animation: "relay-spin 1.15s linear infinite",
             WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0)",
             mask: "radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0)",
@@ -286,7 +286,7 @@ function SynthesizingOverlay() {
           {/* inner counter-rotating thin ring */}
           <div style={{
             position: "absolute", inset: 16, borderRadius: "50%",
-            background: `conic-gradient(from 180deg, rgba(158,107,71,.55), rgba(158,107,71,0) 60%)`,
+            background: "conic-gradient(from 180deg, color-mix(in oklch, var(--accent) 55%, transparent), color-mix(in oklch, var(--accent) 0%, transparent) 60%)",
             animation: "relay-spin-rev 1.9s linear infinite",
             WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
             mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
@@ -298,9 +298,9 @@ function SynthesizingOverlay() {
             <LearningIcon size={46} />
           </div>
         </div>
-        <div style={{ fontSize: 17, fontWeight: 600, color: "#eee" }}>Synthesizing the Role Context Package</div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: "var(--text)" }}>Synthesizing the Role Context Package</div>
         <div key={i} style={{ fontSize: 14, color: BRAND, minHeight: 20, animation: "relay-fade .45s ease" }}>{SYNTH_STAGES[i]}</div>
-        <div style={{ fontSize: 12, color: "#777" }}>opus is turning your answers into a portable handover asset</div>
+        <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>opus is turning your answers into a portable handover asset</div>
       </div>
     </div>
   );
@@ -311,8 +311,8 @@ function Bubble({ role, text, live }: { role: "user" | "assistant"; text: string
   const isInterviewer = role === "assistant";
   return (
     <div style={{ display: "flex", justifyContent: isInterviewer ? "flex-start" : "flex-end" }}>
-      <div style={{ maxWidth: "82%", background: isInterviewer ? "rgba(158,107,71,.10)" : "var(--surface-2, #1c1c1c)", border: `1px solid ${isInterviewer ? "rgba(158,107,71,.4)" : "var(--hairline, #2a2a2a)"}`, borderRadius: 12, padding: "10px 14px", fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: isInterviewer ? BRAND : "#888", marginBottom: 4 }}>{isInterviewer ? t("handover.interviewer") : t("handover.you")}</div>
+      <div style={{ maxWidth: "82%", background: isInterviewer ? "color-mix(in oklch, var(--accent) 12%, transparent)" : "var(--surface-soft)", border: `1px solid ${isInterviewer ? "color-mix(in oklch, var(--accent) 40%, transparent)" : "var(--hairline)"}`, borderRadius: 12, padding: "10px 14px", fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: isInterviewer ? BRAND : "var(--text-subtle)", marginBottom: 4 }}>{isInterviewer ? t("handover.interviewer") : t("handover.you")}</div>
         {text}{live && <span style={{ opacity: 0.5 }}>▋</span>}
       </div>
     </div>
@@ -336,19 +336,19 @@ function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
   const verifiedCount = evidenceItems.filter((item) => item.verified === true).length;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ background: "var(--surface, #141414)", border: `1px solid ${ready ? BRAND : "var(--hairline,#2a2a2a)"}`, borderRadius: 10, padding: 18 }}>
+      <div style={{ background: "var(--surface)", border: `1px solid ${ready ? BRAND : "var(--hairline)"}`, borderRadius: 10, padding: 18 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ margin: 0, fontSize: 20 }}>{t("handover.package")}</h2>
-          <span style={{ fontSize: 13, color: ready ? BRAND : "#aaa", fontWeight: 600 }}>{rcp.status} · {t("handover.coverage", { count: pct })} · {rcp.synth_mode}</span>
+          <span style={{ fontSize: 13, color: ready ? BRAND : "var(--text-muted)", fontWeight: 600 }}>{rcp.status} · {t("handover.coverage", { count: pct })} · {rcp.synth_mode}</span>
         </div>
-        <div style={{ height: 8, background: "#222", borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ height: 8, background: "var(--bg-sunken)", borderRadius: 4, overflow: "hidden" }}>
           <div style={{ width: `${pct}%`, height: "100%", background: BRAND }} />
         </div>
-        <div style={{ marginTop: 10, fontSize: 12, color: "#999" }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
           {t("handover.verifiedClaims", { verified: verifiedCount, total: evidenceItems.length })}
         </div>
         {coverage?.gaps && coverage.gaps.length > 0 && (
-          <div style={{ marginTop: 10, fontSize: 12, color: "#999" }}>{t("handover.thin", { gaps: coverage.gaps.join(" · ") })}</div>
+          <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>{t("handover.thin", { gaps: coverage.gaps.join(" · ") })}</div>
         )}
       </div>
 
@@ -356,16 +356,16 @@ function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
         const items = rcp[key] as unknown as Array<CapturedItem | ToolingRef>;
         if (!items || items.length === 0) return null;
         return (
-          <div key={key} style={{ background: "var(--surface, #141414)", border: "1px solid var(--hairline, #2a2a2a)", borderRadius: 10, padding: 16 }}>
+          <div key={key} style={{ background: "var(--surface)", border: "1px solid var(--hairline)", borderRadius: 10, padding: 16 }}>
             <div style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: 0.5, color: BRAND, marginBottom: 10 }}>{label} · {items.length}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {items.map((it, i) => (
-                <div key={i} style={{ borderInlineStart: `2px solid rgba(158,107,71,.4)`, paddingInlineStart: 12 }}>
+                <div key={i} style={{ borderInlineStart: "2px solid color-mix(in oklch, var(--accent) 40%, transparent)", paddingInlineStart: 12 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{"system" in it ? it.system : it.title}</div>
-                  <div title={it.verificationReason} style={{ marginTop: 3, fontSize: 11, color: it.verified ? "#6dbb79" : "#d8a55e" }}>
+                  <div title={it.verificationReason} style={{ marginTop: 3, fontSize: 11, color: it.verified ? "var(--success)" : "var(--warn)" }}>
                     {it.verified ? `✓ ${t("handover.verifiedQuote")}` : `! ${t("handover.unverified")}`}
                   </div>
-                  <div style={{ fontSize: 13, color: "#bbb", lineHeight: 1.5, whiteSpace: "pre-wrap", marginTop: 2 }}>
+                  <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5, whiteSpace: "pre-wrap", marginTop: 2 }}>
                     {"system" in it ? `${it.location}${it.accessVia ? ` · ${it.accessVia}` : ""}${it.ownedBy ? ` · ${it.ownedBy}` : ""}` : it.body}
                   </div>
                 </div>
@@ -374,7 +374,7 @@ function RcpView({ rcp, coverage }: { rcp: Rcp; coverage: Coverage | null }) {
           </div>
         );
       })}
-      <div style={{ fontSize: 12, color: "#777" }}>Saved to <code>data/handovers/{rcp.source_twin_id}/rcp.live.json</code>. Refine the prompt and run again to compare.</div>
+      <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>Saved to <code>data/handovers/{rcp.source_twin_id}/rcp.live.json</code>. Refine the prompt and run again to compare.</div>
     </div>
   );
 }
