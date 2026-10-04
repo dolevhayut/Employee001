@@ -31,6 +31,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   scrambles punctuation. Lists and quotes use logical (start/end) spacing.
 
 ### Changed
+- **Twins recall the right memory first more often.** Keyword recall now
+  weighs rare, decisive words (like "GDPR" or "CSV") above common ones, so
+  without embeddings the top memory is the relevant one in 11 of 11
+  benchmark questions, up from 8.
 - **Operator pages explain themselves when Autonomy is off.** Cockpit, Spend,
   Activity log, Schedules and Approvals show what will appear there once twins
   work unattended, with a one-click "Turn on Autonomy" (no reload). Pages with
