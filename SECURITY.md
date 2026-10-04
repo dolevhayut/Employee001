@@ -50,6 +50,12 @@ The audit log keeps each row's time, tool and outcome, but the tool input and th
 
 You host Employee001, so it runs inside your environment and within your compliance scope. We make no SOC 2 or ISO claims. Assess the deployment, connected services, access controls, and data handling against the requirements that apply to your organization, as you would with other self-hosted software.
 
+## Verifying a release
+
+Download the release tarball, then verify its build provenance with the GitHub CLI:
+
+`gh attestation verify employee001-0.6.0.tgz -R dolevhayut/Employee001`
+
 ## Reporting a Vulnerability
 
 **Do not open a public GitHub issue for security vulnerabilities.**

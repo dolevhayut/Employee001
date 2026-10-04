@@ -24,6 +24,10 @@ jobs:
     name: Build and publish
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write      # needed for `gh release create`
+      attestations: write  # needed for build-provenance attestation
+      id-token: write      # needed for npm provenance and build-provenance attestation
 
     steps:
       - name: Checkout
@@ -67,8 +71,24 @@ jobs:
           test -d .next/standalone/.next/static \
             || (echo "::error::post-build did not copy .next/static into standalone"; exit 1)
 
-      - name: Pack (dry run, for log inspection)
-        run: npm pack --dry-run
+      - name: Generate production dependency SBOM
+        id: sbom
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          SBOM="employee001-${VERSION}.cdx.json"
+          npx -y @cyclonedx/cyclonedx-npm@6.0.1 --omit dev --output-format JSON \
+            --output-file "$SBOM"
+          echo "sbom=$SBOM" >> "$GITHUB_OUTPUT"
+
+      - name: Pack publish artifact
+        id: pack
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          TARBALL="employee001-${VERSION}.tgz"
+          npm pack
+          test -f "$TARBALL" \
+            || (echo "::error::Expected publish artifact $TARBALL was not created"; exit 1)
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
 
       - name: Determine npm dist-tag from version
         id: npm_tag
@@ -90,11 +110,18 @@ jobs:
           echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
           echo "Will publish $PKG_VERSION under dist-tag: $DIST_TAG"
 
+      - name: Attest publish artifact
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.pack.outputs.tarball }}
+
       - name: Use npm with Trusted Publishing support
         run: npm install -g npm@11.20.0
 
+      # Trusted Publishing (OIDC): no NPM_TOKEN. Publishes the exact tarball
+      # that was scanned and attested above.
       - name: Publish to npm
-        run: npm publish --provenance --access public --tag ${{ steps.npm_tag.outputs.dist_tag }}
+        run: npm publish "${{ steps.pack.outputs.tarball }}" --provenance --access public --tag ${{ steps.npm_tag.outputs.dist_tag }}
 
       - name: Create GitHub release
         env:
@@ -109,4 +136,6 @@ jobs:
             --title "$TAG" \
             --generate-notes \
             --verify-tag \
-            $PRERELEASE_FLAG
+            $PRERELEASE_FLAG \
+            "${{ steps.pack.outputs.tarball }}" \
+            "${{ steps.sbom.outputs.sbom }}"
