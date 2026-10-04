@@ -8,7 +8,7 @@ Start Employee001 before connecting a client:
 npx employee001 start
 ```
 
-The server is local only. The default endpoint is:
+The default loopback endpoint is:
 
 ```
 http://127.0.0.1:3000/api/mcp
@@ -24,10 +24,16 @@ Run this in the project where you use Claude Code:
 claude mcp add employee001 -- npx -y employee001 mcp
 ```
 
-The `employee001 mcp` command is a stdio bridge. It forwards MCP requests to the running local app. To use another local port or endpoint, add `--url`:
+The `employee001 mcp` command is a stdio bridge. It forwards MCP requests to the running app. To use another port or endpoint, add `--url`:
 
 ```bash
 npx -y employee001 mcp --url http://127.0.0.1:3001/api/mcp
+```
+
+For a LAN or Fly instance, configure `EMPLOYEE001_TOKEN` in the bridge's current directory `.env`, or pass it with `--token`. The token is sent only as an HTTP Bearer credential and is never printed:
+
+```bash
+npx -y employee001 mcp --url https://employee001.example.com/api/mcp --token "$EMPLOYEE001_TOKEN"
 ```
 
 ### Cursor
@@ -73,6 +79,15 @@ http://127.0.0.1:3000/api/mcp
 ```
 
 Use the client’s normal MCP HTTP configuration. The endpoint is stateless and returns JSON-RPC responses.
+
+For an instance bound beyond loopback, use its reachable URL and set the same `EMPLOYEE001_TOKEN` used by Employee001 as an HTTP Bearer token:
+
+```text
+https://employee001.example.com/api/mcp
+Authorization: Bearer <EMPLOYEE001_TOKEN>
+```
+
+Treat this token like a full-access credential: it grants access to every MCP tool, including `ask_twin`, which can spend money.
 
 For example, this lists the available tools:
 
@@ -312,19 +327,21 @@ The HTTP endpoint can also return JSON-RPC errors before a tool runs:
 
 | Error    | Meaning                                                                                                                       |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `-32001` | MCP is loopback-only in this version.                                                                                         |
 | `-32002` | The stdio bridge could not reach Employee001. It reports: `Employee001 is not running. Start it with: npx employee001 start`. |
 | `-32003` | The request has a forbidden host or origin.                                                                                   |
+| `-32004` | A non-loopback MCP request is missing its Bearer token or the token is invalid.                                               |
 
 Every MCP tool call is recorded in Employee001's local audit log. Question and query previews are limited to 120 characters in that entry.
 
-## Local-only security and process model
+## Network security and process model
 
-MCP is intentionally loopback-only in this version. Employee001 rejects a non-loopback `EMPLOYEE001_BIND`. It also accepts only `127.0.0.1`, `localhost`, or `[::1]` in the HTTP `Host` header, and rejects browser origins outside those local hosts. This protects the local endpoint from DNS rebinding and browser cross-site requests.
+On the default loopback bind, MCP accepts only `127.0.0.1`, `localhost`, or `[::1]` in the HTTP `Host` header, and rejects browser origins outside those local hosts. This protects the local endpoint from DNS rebinding and browser cross-site requests.
+
+When Employee001 is bound to a LAN address, `0.0.0.0`, or deployed on Fly, `/api/mcp` requires `Authorization: Bearer <EMPLOYEE001_TOKEN>`. LAN and deployment hostnames are accepted, but browser requests must still have an `Origin` matching the request Host. Keep the token private: it grants full MCP access, including `ask_twin` spending.
 
 Run Employee001 as one local Node process. MCP rate limits, in-flight calls, Team Meetings, and pending approvals are process-local. Restarting the app clears meetings and in-memory request state.
 
-Do not expose `/api/mcp` through a public tunnel, reverse proxy, or network interface. Remote authentication is not part of this release.
+Do not put the token in a URL, client-side code, logs, or a public configuration file. Use TLS for public or remote deployments.
 
 ## Troubleshooting
 
@@ -336,11 +353,13 @@ Start the app in another terminal, then retry your client:
 npx employee001 start
 ```
 
-The bridge expects `http://127.0.0.1:3000/api/mcp` by default. If your app runs on another port, use the matching URL:
+The bridge expects `http://127.0.0.1:3000/api/mcp` by default. If your app runs on another port or host, use the matching URL:
 
 ```bash
 npx -y employee001 mcp --url http://127.0.0.1:3001/api/mcp
 ```
+
+For a non-loopback endpoint, also provide the matching Employee001 token using `--token`, or set `EMPLOYEE001_TOKEN` in `./.env`.
 
 ### The client cannot see `ask_twin`
 

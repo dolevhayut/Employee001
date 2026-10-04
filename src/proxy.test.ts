@@ -9,6 +9,7 @@ function req(url: string, init: { method?: string; headers?: Record<string, stri
 afterEach(() => {
   delete process.env.EMPLOYEE001_BIND;
   delete process.env.EMPLOYEE001_ALLOWED_HOSTS;
+  delete process.env.EMPLOYEE001_TOKEN;
 });
 
 describe("crossSiteBlock on a loopback bind", () => {
@@ -97,5 +98,36 @@ describe("proxy", () => {
   it("rejects a rebinding request before anything else", () => {
     const res = proxy(req("http://evil.example:3000/api/approvals/pending", { headers: { host: "evil.example:3000" } }));
     expect(res.status).toBe(403);
+  });
+
+  it("accepts a valid Bearer token only for POST /api/mcp on a non-loopback bind", async () => {
+    process.env.EMPLOYEE001_BIND = "0.0.0.0";
+    process.env.EMPLOYEE001_TOKEN = "correct-token";
+    const mcp = proxy(req("http://192.168.1.20:3000/api/mcp", {
+      method: "POST",
+      headers: { host: "192.168.1.20:3000", authorization: "Bearer correct-token" },
+    }));
+    expect(mcp.headers.get("x-middleware-next")).toBe("1");
+
+    const otherPath = proxy(req("http://192.168.1.20:3000/api/tasks", {
+      method: "POST",
+      headers: { host: "192.168.1.20:3000", authorization: "Bearer correct-token" },
+    }));
+    expect(otherPath.status).toBe(401);
+    expect(await otherPath.json()).toEqual({ error: "unauthorized", reason: "missing or invalid token" });
+
+    const wrongToken = proxy(req("http://192.168.1.20:3000/api/mcp", {
+      method: "POST",
+      headers: { host: "192.168.1.20:3000", authorization: "Bearer wrong-token" },
+    }));
+    expect(wrongToken.status).toBe(401);
+  });
+
+  it("does not require a Bearer token on loopback", () => {
+    const res = proxy(req("http://127.0.0.1:3000/api/mcp", {
+      method: "POST",
+      headers: { host: "127.0.0.1:3000" },
+    }));
+    expect(res.headers.get("x-middleware-next")).toBe("1");
   });
 });

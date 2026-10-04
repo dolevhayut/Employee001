@@ -1,13 +1,13 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { checkLocalRequest } from "@/lib/mcp-server/guard";
+import { checkLocalRequest, timingSafeEqual } from "@/lib/mcp-server/guard";
 import { buildPublicMcpServer, isLoopbackBind } from "@/lib/mcp-server/server";
 
 export const dynamic = "force-dynamic";
 
-function rpcError(code: number, message: string): Response {
+function rpcError(code: number, message: string, status = 403): Response {
   return new Response(
     JSON.stringify({ jsonrpc: "2.0", error: { code, message }, id: null }),
-    { status: 403, headers: { "content-type": "application/json" } },
+    { status, headers: { "content-type": "application/json" } },
   );
 }
 
@@ -18,8 +18,17 @@ function methodNotAllowed(): Response {
 export async function POST(request: Request): Promise<Response> {
   const rejected = checkLocalRequest(request);
   if (rejected) return rejected;
-  if (!isLoopbackBind(process.env.EMPLOYEE001_BIND))
-    return rpcError(-32001, "MCP is loopback-only in this version");
+  if (!isLoopbackBind(process.env.EMPLOYEE001_BIND)) {
+    const expected = process.env.EMPLOYEE001_TOKEN;
+    const bearer = request.headers.get("authorization");
+    if (
+      !expected ||
+      !bearer?.startsWith("Bearer ") ||
+      !timingSafeEqual(bearer.slice("Bearer ".length), expected)
+    ) {
+      return rpcError(-32004, "missing or invalid token", 401);
+    }
+  }
   const server = buildPublicMcpServer();
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,

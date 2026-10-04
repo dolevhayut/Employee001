@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { timingSafeEqual } from "@/lib/mcp-server/guard";
 
 // Employee001 runs as a single-user local app. By default it binds to
 // 127.0.0.1, in which case this proxy is a no-op — the OS itself is the
@@ -19,15 +20,6 @@ function isLoopbackBind(bind: string | undefined): boolean {
   if (!bind) return true;
   const v = bind.trim();
   return v === "" || v === "127.0.0.1" || v === "::1" || v === "localhost";
-}
-
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
 }
 
 function unauthorizedHtml(pathAndQuery: string): string {
@@ -215,6 +207,16 @@ export function proxy(request: NextRequest) {
   }
 
   const url = request.nextUrl;
+  const bearer = request.headers.get("authorization");
+  if (
+    request.method === "POST" &&
+    url.pathname === "/api/mcp" &&
+    bearer?.startsWith("Bearer ") &&
+    timingSafeEqual(bearer.slice("Bearer ".length), expected)
+  ) {
+    return NextResponse.next();
+  }
+
   const queryToken = url.searchParams.get("token");
   if (queryToken && timingSafeEqual(queryToken, expected)) {
     const clean = url.clone();

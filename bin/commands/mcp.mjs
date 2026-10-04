@@ -20,9 +20,12 @@ function parseEnv(text) {
   return out;
 }
 
-function defaultUrl() {
+function localEnv() {
   const envPath = resolve(process.cwd(), ".env");
-  const env = existsSync(envPath) ? parseEnv(readFileSync(envPath, "utf8")) : {};
+  return existsSync(envPath) ? parseEnv(readFileSync(envPath, "utf8")) : {};
+}
+
+function defaultUrl(env) {
   return `http://127.0.0.1:${env.PORT ?? "3000"}/api/mcp`;
 }
 
@@ -33,10 +36,19 @@ export default async function mcp(argv) {
     process.exitCode = 1;
     return;
   }
+  const tokenIndex = argv.indexOf("--token");
+  if (tokenIndex >= 0 && !argv[tokenIndex + 1]) {
+    process.stderr.write("Missing value for --token\n");
+    process.exitCode = 1;
+    return;
+  }
 
-  const url = urlIndex >= 0 ? argv[urlIndex + 1] : defaultUrl();
+  const env = localEnv();
+  const url = urlIndex >= 0 ? argv[urlIndex + 1] : defaultUrl(env);
+  const token = tokenIndex >= 0 ? argv[tokenIndex + 1] : env.EMPLOYEE001_TOKEN;
   const bridge = createBridge({
     url,
+    token,
     write: (line) => process.stdout.write(line),
     log: (message) => process.stderr.write(`${message}\n`),
   });

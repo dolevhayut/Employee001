@@ -3,12 +3,13 @@ import { createBridge } from "../../bin/lib/mcp-bridge.mjs";
 
 const request = JSON.stringify({ jsonrpc: "2.0", id: 7, method: "tools/list" });
 
-function bridgeWith(fetchImpl: typeof fetch) {
+function bridgeWith(fetchImpl: typeof fetch, token?: string) {
   const output: string[] = [];
   const log = vi.fn();
   return {
     bridge: createBridge({
       url: "http://127.0.0.1:3000/api/mcp",
+      token,
       fetchImpl,
       write: (line: string) => output.push(line),
       log,
@@ -34,6 +35,22 @@ describe("MCP stdio bridge", () => {
       "http://127.0.0.1:3000/api/mcp",
       expect.objectContaining({ method: "POST", body: request }),
     );
+  });
+
+  it("sends a Bearer token only when one is configured", async () => {
+    const fetchWithToken = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ jsonrpc: "2.0", id: 7, result: {} }));
+    const { bridge: tokenBridge } = bridgeWith(fetchWithToken, "lan-token");
+    await tokenBridge.handleLine(request);
+    expect(fetchWithToken.mock.calls[0][1]).toMatchObject({
+      headers: expect.objectContaining({ authorization: "Bearer lan-token" }),
+    });
+
+    const fetchWithoutToken = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ jsonrpc: "2.0", id: 7, result: {} }));
+    const { bridge: noTokenBridge } = bridgeWith(fetchWithoutToken);
+    await noTokenBridge.handleLine(request);
+    expect(fetchWithoutToken.mock.calls[0][1]).toMatchObject({
+      headers: expect.not.objectContaining({ authorization: expect.anything() }),
+    });
   });
 
   it("forwards JSON messages from SSE data lines", async () => {

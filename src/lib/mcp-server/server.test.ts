@@ -106,6 +106,7 @@ beforeEach(() => {
     .__e001McpInFlight;
   delete process.env.EMPLOYEE001_MCP_ASK_TWIN;
   delete process.env.EMPLOYEE001_BIND;
+  delete process.env.EMPLOYEE001_TOKEN;
   m.loadEmployeesFromDisk.mockResolvedValue([ready]);
   m.readEmployeeFile.mockReturnValue("profile");
   m.searchOrgBrain.mockResolvedValue([
@@ -371,7 +372,7 @@ describe("ask_twin execution and audit", () => {
 });
 
 describe("MCP route", () => {
-  it("enforces bind and host, serves loopback tools/list, and rejects GET", async () => {
+  it("requires a token on non-loopback binds, accepts LAN Hosts, and serves loopback tools/list", async () => {
     const body = JSON.stringify({
       jsonrpc: "2.0",
       id: 1,
@@ -379,18 +380,59 @@ describe("MCP route", () => {
       params: {},
     });
     process.env.EMPLOYEE001_BIND = "0.0.0.0";
+    process.env.EMPLOYEE001_TOKEN = "lan-token";
     let response = await POST(
-      new Request("http://localhost/api/mcp", {
+      new Request("http://lan-hostname.local/api/mcp", {
         method: "POST",
         headers: {
-          host: "localhost",
+          host: "lan-hostname.local",
           "content-type": "application/json",
           accept: "application/json, text/event-stream",
         },
         body,
       }),
     );
-    expect(await response.json()).toMatchObject({ error: { code: -32001 } });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: { code: -32004, message: "missing or invalid token" } });
+    response = await POST(
+      new Request("http://lan-hostname.local/api/mcp", {
+        method: "POST",
+        headers: {
+          host: "lan-hostname.local",
+          authorization: "Bearer lan-token",
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body,
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { result: { tools: unknown[] } }).result.tools).toHaveLength(7);
+    response = await POST(
+      new Request("http://lan-hostname.local/api/mcp", {
+        method: "POST",
+        headers: {
+          host: "lan-hostname.local",
+          origin: "https://evil.example",
+          authorization: "Bearer lan-token",
+        },
+        body,
+      }),
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { code: -32003, message: "forbidden origin" } });
+    response = await POST(
+      new Request("http://lan-hostname.local:3000/api/mcp", {
+        method: "POST",
+        headers: {
+          host: "lan-hostname.local:3000",
+          origin: "http://lan-hostname.local:8080",
+          authorization: "Bearer lan-token",
+        },
+        body,
+      }),
+    );
+    expect(response.status).toBe(403);
     delete process.env.EMPLOYEE001_BIND;
     response = await POST(
       new Request("http://evil.test/api/mcp", {

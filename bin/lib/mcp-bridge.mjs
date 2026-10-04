@@ -45,7 +45,7 @@ async function forwardResponse(response, write) {
 /**
  * Forward newline-delimited JSON-RPC between an MCP stdio client and Employee001.
  */
-export function createBridge({ url, fetchImpl = fetch, write, log }) {
+export function createBridge({ url, token, fetchImpl = fetch, write, log }) {
   let loggedNotRunning = false;
 
   return {
@@ -66,6 +66,7 @@ export function createBridge({ url, fetchImpl = fetch, write, log }) {
           headers: {
             "content-type": "application/json",
             accept: "application/json, text/event-stream",
+            ...(token ? { authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify(message),
         });
