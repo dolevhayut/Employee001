@@ -10,6 +10,7 @@ import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
 import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 import { LoadErrorPanel, RefreshMiss } from "@/components/ex/load-error";
 import { useT } from "@/components/ex/i18n-context";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 type RunSurface = "shift" | "routine" | "task" | "council" | "builder";
 type RunStatus = "running" | "complete" | "error" | "aborted";
@@ -44,14 +45,29 @@ type RunLogEvent =
 
 type SurfaceFilter = "all" | RunSurface;
 
-const FILTERS: { key: SurfaceFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "shift", label: "Shifts" },
-  { key: "routine", label: "Routines" },
-  { key: "task", label: "Tasks" },
-  { key: "council", label: "Council" },
-  { key: "builder", label: "Builder" },
+const FILTERS: { key: SurfaceFilter; labelKey: MessageKey }[] = [
+  { key: "all", labelKey: "cockpit.filter.all" },
+  { key: "shift", labelKey: "cockpit.filter.shift" },
+  { key: "routine", labelKey: "cockpit.filter.routine" },
+  { key: "task", labelKey: "cockpit.filter.task" },
+  { key: "council", labelKey: "cockpit.filter.council" },
+  { key: "builder", labelKey: "cockpit.filter.builder" },
 ];
+
+const SURFACE_KEY: Record<RunSurface, MessageKey> = {
+  shift: "cockpit.surface.shift",
+  routine: "cockpit.surface.routine",
+  task: "cockpit.surface.task",
+  council: "cockpit.surface.council",
+  builder: "cockpit.surface.builder",
+};
+
+const STATUS_KEY: Record<RunStatus, MessageKey> = {
+  running: "cockpit.status.running",
+  complete: "cockpit.status.done",
+  error: "cockpit.status.failed",
+  aborted: "cockpit.status.aborted",
+};
 
 const SURFACE_STYLES: Record<RunSurface, { bg: string; color: string }> = {
   shift: { bg: "var(--bg-sunken)", color: "var(--text-muted)" },
@@ -96,11 +112,12 @@ function useTickingNow(active: boolean): number {
 }
 
 function StatusPill({ status }: { status: RunStatus }) {
-  const meta: Record<RunStatus, { bg: string; color: string; label: string }> = {
-    running: { bg: "var(--text)", color: "var(--bg)", label: "running" },
-    complete: { bg: "#dcfce7", color: "#16a34a", label: "done" },
-    error: { bg: "#fee2e2", color: "#dc2626", label: "failed" },
-    aborted: { bg: "var(--bg-sunken)", color: "var(--text-muted)", label: "aborted" },
+  const { t } = useT();
+  const meta: Record<RunStatus, { bg: string; color: string }> = {
+    running: { bg: "var(--text)", color: "var(--bg)" },
+    complete: { bg: "#dcfce7", color: "#16a34a" },
+    error: { bg: "#fee2e2", color: "#dc2626" },
+    aborted: { bg: "var(--bg-sunken)", color: "var(--text-muted)" },
   };
   const m = meta[status];
   return (
@@ -129,12 +146,13 @@ function StatusPill({ status }: { status: RunStatus }) {
           }}
         />
       )}
-      {m.label}
+      {t(STATUS_KEY[status])}
     </span>
   );
 }
 
 function SurfaceChip({ surface }: { surface: RunSurface }) {
+  const { t } = useT();
   const s = SURFACE_STYLES[surface] ?? { bg: "var(--bg-sunken)", color: "var(--text-muted)" };
   return (
     <span
@@ -150,7 +168,7 @@ function SurfaceChip({ surface }: { surface: RunSurface }) {
         whiteSpace: "nowrap",
       }}
     >
-      {surface}
+      {t(SURFACE_KEY[surface])}
     </span>
   );
 }
@@ -183,7 +201,7 @@ function StatCell({ label, value, mono = false }: { label: string; value: string
           whiteSpace: "nowrap",
         }}
       >
-        {value}
+        {mono ? <bdi>{value}</bdi> : value}
       </span>
     </div>
   );
@@ -198,6 +216,7 @@ function LogTail({
   status: RunStatus;
   initialText?: string;
 }) {
+  const { t } = useT();
   const [lines, setLines] = useState<RunLogEvent[]>(() =>
     initialText
       ? [{ ts: new Date().toISOString(), type: "text", text: initialText } as RunLogEvent]
@@ -291,7 +310,7 @@ function LogTail({
     >
       {lines.length === 0 ? (
         <div style={{ color: "var(--text-subtle)", fontStyle: "italic" }}>
-          waiting for output…
+          {t("cockpit.waiting")}
         </div>
       ) : (
         lines.map((ev, i) => <LogLine key={i} ev={ev} />)
@@ -301,10 +320,13 @@ function LogTail({
 }
 
 function LogLine({ ev }: { ev: RunLogEvent }) {
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   let color = "var(--text-muted)";
   let prefix = "";
   let body = "";
   let italic = false;
+  let arrow: "forward" | "back" | null = null;
 
   if (ev.type === "text") {
     color = "var(--text)";
@@ -316,11 +338,11 @@ function LogLine({ ev }: { ev: RunLogEvent }) {
     body = ev.text ?? "";
   } else if (ev.type === "tool_use") {
     color = "#6366f1";
-    prefix = "→ ";
+    arrow = "forward";
     body = ev.tool;
   } else if (ev.type === "tool_result") {
     color = "#16a34a";
-    prefix = "← ";
+    arrow = "back";
     body = ev.tool;
   } else if (ev.type === "approval") {
     if (ev.decision === "allow") {
@@ -342,15 +364,18 @@ function LogLine({ ev }: { ev: RunLogEvent }) {
     color = "var(--danger)";
     prefix = "⚠ ";
     body = ev.message;
-  } else if (ev.type === "done") {
+  }
+
+  const done = ev.type === "done";
+  const turns = done ? (ev.turns ?? "?") : "";
+  const cost = done ? (ev.costUsd?.toFixed(4) ?? "0.00") : "";
+  if (done) {
     color = "var(--text-subtle)";
     prefix = "▣ ";
-    const turns = ev.turns ?? "?";
-    const cost = ev.costUsd?.toFixed(4) ?? "0.00";
-    body = `done · ${ev.summary ?? ""} (${turns} turns, $${cost})`;
   }
 
   const line = truncate(`${prefix}${body}`, 240);
+  const toolLine = arrow !== null;
   return (
     <div
       style={{
@@ -360,12 +385,32 @@ function LogLine({ ev }: { ev: RunLogEvent }) {
         wordBreak: "break-word",
       }}
     >
-      {line}
+      {toolLine ? (
+        <>
+          <span style={{ display: "inline-block", transform: rtl ? "scaleX(-1)" : undefined }}>
+            {arrow === "forward" ? "→" : "←"}
+          </span>{" "}
+          <bdi>{truncate(body, 240)}</bdi>
+        </>
+      ) : done ? (
+        <>
+          {prefix}
+          {t("cockpit.log.done")}
+          {ev.type === "done" && ev.summary ? ` · ${truncate(ev.summary, 180)}` : ""}
+          {" ("}
+          <bdi>{String(turns)}</bdi> {t("cockpit.log.turns")}, <bdi>${cost}</bdi>
+          {")"}
+        </>
+      ) : (
+        line
+      )}
     </div>
   );
 }
 
 function CockpitCard({ run }: { run: ActiveRun }) {
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   const employee = useRoster().find((e) => e.id === run.employeeId);
   const initials =
     employee?.initials ?? run.employeeName.slice(0, 2).toUpperCase();
@@ -482,14 +527,14 @@ function CockpitCard({ run }: { run: ActiveRun }) {
         }}
       >
         <StatCell
-          label={run.status === "running" ? "Running" : "Duration"}
+          label={run.status === "running" ? t("cockpit.stat.running") : t("cockpit.stat.duration")}
           value={duration}
           mono
         />
-        <StatCell label="Cost" value={formatCost(run.costUsd)} mono />
-        <StatCell label="Tools" value={String(run.toolCalls)} mono />
+        <StatCell label={t("cockpit.stat.cost")} value={formatCost(run.costUsd)} mono />
+        <StatCell label={t("cockpit.stat.tools")} value={String(run.toolCalls)} mono />
         <StatCell
-          label="Current"
+          label={t("cockpit.stat.current")}
           value={run.currentTool ? truncate(run.currentTool, 18) : "—"}
           mono
         />
@@ -512,7 +557,8 @@ function CockpitCard({ run }: { run: ActiveRun }) {
             letterSpacing: "0.02em",
           }}
         >
-          ✦ {run.subagentCount} subagent{run.subagentCount === 1 ? "" : "s"} spawned
+          ✦ <bdi>{run.subagentCount}</bdi>{" "}
+          {run.subagentCount === 1 ? t("cockpit.subagentOne") : t("cockpit.subagentMany")}
         </div>
       )}
 
@@ -556,8 +602,8 @@ function CockpitCard({ run }: { run: ActiveRun }) {
               color: "var(--text-muted)",
             }}
           >
-            Details
-            <Icons.Chevron size={12} />
+            {t("cockpit.details")}
+            <Icons.Chevron size={12} style={rtl ? { transform: "rotate(180deg)" } : undefined} />
           </a>
         </div>
       )}
@@ -688,7 +734,8 @@ export default function CockpitPage() {
                 }}
               />
             )}
-            {activeCount} active
+            <bdi>{activeCount}</bdi>{" "}
+            {activeCount === 1 ? t("cockpit.activeOne") : t("cockpit.activeMany")}
           </span>
         }
       />
@@ -734,7 +781,7 @@ export default function CockpitPage() {
                 gap: "var(--sp-6)",
               }}
             >
-              <span>{f.label}</span>
+              <span>{t(f.labelKey)}</span>
               <span
                 style={{
                   fontSize: "var(--fs-xs)",
@@ -743,7 +790,7 @@ export default function CockpitPage() {
                   opacity: 0.8,
                 }}
               >
-                {count}
+                <bdi>{count}</bdi>
               </span>
             </button>
           );
@@ -753,8 +800,8 @@ export default function CockpitPage() {
       <div className="scrollbar" style={{ flex: 1, overflow: "auto", padding: "20px 24px 60px" }}>
         <PageHead
           icon="Activity"
-          title="Cockpit"
-          subtitle="Live observability across all running agents — see current tool, cost, duration, and a streaming log tail."
+          title={t("nav.cockpit")}
+          subtitle={t("cockpit.subtitle")}
           style={{ marginBottom: "var(--sp-16)", maxWidth: 1100 }}
         />
         {loadError && hasLoaded && <RefreshMiss />}
@@ -780,10 +827,10 @@ export default function CockpitPage() {
           >
             <Icons.Bot size={48} style={{ opacity: 0.25, marginBottom: "var(--sp-14)" }} />
             <h2 style={{ fontSize: "var(--fs-lg)", fontWeight: 600, color: "var(--text)", margin: "0 0 6px" }}>
-              No agents running right now
+              {t("cockpit.emptyTitle")}
             </h2>
             <p style={{ fontSize: "var(--fs-ui)", lineHeight: 1.55, margin: 0 }}>
-              Cards appear here when shifts, routines, or tasks fire.
+              {t("cockpit.emptyBody")}
             </p>
           </div>
           )

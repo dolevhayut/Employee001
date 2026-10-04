@@ -6,6 +6,8 @@ import { motion } from "framer-motion";
 import { NavArrowRight } from "iconoir-react";
 import { type EmployeeWithTwin } from "@/lib/employees";
 import { useRoster } from "@/components/ex/roster-context";
+import { useT } from "@/components/ex/i18n-context";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 type Props = {
   /** Controlled selected id. When provided, the picker reflects this value
@@ -21,10 +23,10 @@ type Props = {
   placeholder?: string;
 };
 
-function statusLabel(emp: EmployeeWithTwin): string {
-  if (emp.twinStatus === "ready") return "Twin ready";
-  if (emp.twinStatus === "building") return "Building twin";
-  return "Not started";
+function statusKey(emp: EmployeeWithTwin): MessageKey {
+  if (emp.twinStatus === "ready") return "routines.picker.ready";
+  if (emp.twinStatus === "building") return "routines.picker.building";
+  return "routines.picker.notStarted";
 }
 
 function statusColor(emp: EmployeeWithTwin): string {
@@ -40,6 +42,8 @@ function statusColor(emp: EmployeeWithTwin): string {
  * (default) and as a controlled form input (`value` + `navigate={false}`).
  */
 export function EmployeePicker({ value, onSelect, navigate = true, readyOnly, placeholder }: Props) {
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   const router = useRouter();
   const searchParams = useSearchParams();
   const roster = useRoster();
@@ -93,7 +97,7 @@ export function EmployeePicker({ value, onSelect, navigate = true, readyOnly, pl
           background: "var(--surface)",
         }}
       >
-        {placeholder ?? "No employees yet"}
+        {placeholder ?? t("routines.picker.none")}
       </div>
     );
   }
@@ -119,7 +123,7 @@ export function EmployeePicker({ value, onSelect, navigate = true, readyOnly, pl
         }}
       >
         <Avatar emp={active} />
-        <div style={{ minWidth: 0, flex: 1, textAlign: "left" }}>
+        <div style={{ minWidth: 0, flex: 1, textAlign: "start" }}>
           <div
             style={{
               fontSize: "var(--fs-ui)",
@@ -152,7 +156,7 @@ export function EmployeePicker({ value, onSelect, navigate = true, readyOnly, pl
           height={12}
           strokeWidth={1.5}
           color="var(--text-subtle)"
-          style={{ transform: open ? "rotate(90deg)" : "rotate(0)", transition: "transform 0.18s", flexShrink: 0 }}
+          style={{ transform: open ? "rotate(90deg)" : rtl ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.18s", flexShrink: 0 }}
         />
       </button>
 
@@ -164,7 +168,7 @@ export function EmployeePicker({ value, onSelect, navigate = true, readyOnly, pl
           style={{
             position: "absolute",
             top: "calc(100% + 6px)",
-            left: 0,
+            insetInlineStart: 0,
             width: "100%",
             minWidth: 240,
             maxHeight: 280,
@@ -200,7 +204,7 @@ export function EmployeePicker({ value, onSelect, navigate = true, readyOnly, pl
                   border: "none",
                   borderRadius: 6,
                   cursor: disabled ? "not-allowed" : "pointer",
-                  textAlign: "left",
+                  textAlign: "start",
                   fontFamily: "inherit",
                   opacity: disabled ? 0.55 : 1,
                   transition: "background 0.12s",
@@ -228,7 +232,7 @@ export function EmployeePicker({ value, onSelect, navigate = true, readyOnly, pl
                     flexShrink: 0,
                   }}
                 >
-                  {statusLabel(emp)}
+                  {t(statusKey(emp))}
                 </span>
               </button>
             );

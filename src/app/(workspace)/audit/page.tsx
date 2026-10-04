@@ -7,46 +7,48 @@ import { useRoster } from "@/components/ex/roster-context";
 import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
 import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 import { useT } from "@/components/ex/i18n-context";
+import { formatDateTime, formatRelativeTime } from "@/lib/i18n/format";
+import type { MessageKey } from "@/lib/i18n/messages";
 import type { AuditEntry, AuditVerdict } from "@/lib/audit-log";
 
 // ─── Verdict helpers ──────────────────────────────────────────────────────────
 
 const VERDICT_META: Record<
   AuditVerdict,
-  { label: string; color: string; bg: string; dot: string }
+  { labelKey: MessageKey; color: string; bg: string; dot: string }
 > = {
   auto_allow: {
-    label: "Auto-read",
+    labelKey: "audit.verdict.auto",
     color: "var(--text-muted)",
     bg: "var(--surface-soft)",
     dot: "var(--text-subtle)",
   },
   ceo_approved: {
-    label: "CEO approved",
+    labelKey: "audit.verdict.approved",
     color: "#16a34a",
     bg: "#dcfce7",
     dot: "#16a34a",
   },
   ceo_denied: {
-    label: "CEO denied",
+    labelKey: "audit.verdict.denied",
     color: "#b45309",
     bg: "#fef3c7",
     dot: "#b45309",
   },
   hard_blocked: {
-    label: "Blocked",
+    labelKey: "audit.verdict.blocked",
     color: "#dc2626",
     bg: "#fee2e2",
     dot: "#dc2626",
   },
   executed: {
-    label: "Executed",
+    labelKey: "audit.verdict.executed",
     color: "var(--text-muted)",
     bg: "var(--surface-soft)",
     dot: "#0ea5e9",
   },
   deferred_to_flow: {
-    label: "Deferred →/flow",
+    labelKey: "audit.verdict.deferred",
     color: "#7c3aed",
     bg: "#ede9fe",
     dot: "#7c3aed",
@@ -54,6 +56,8 @@ const VERDICT_META: Record<
 };
 
 function VerdictBadge({ verdict }: { verdict: AuditVerdict }) {
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   const m = VERDICT_META[verdict];
   return (
     <span
@@ -79,19 +83,17 @@ function VerdictBadge({ verdict }: { verdict: AuditVerdict }) {
           flexShrink: 0,
         }}
       />
-      {m.label}
+      {verdict === "deferred_to_flow" ? (
+        <>
+          {t(m.labelKey)}
+          <span style={{ display: "inline-block", transform: rtl ? "scaleX(-1)" : undefined }}>→</span>
+          <bdi>/flow</bdi>
+        </>
+      ) : (
+        t(m.labelKey)
+      )}
     </span>
   );
-}
-
-// ─── Relative time ────────────────────────────────────────────────────────────
-
-function relTime(ts: string): string {
-  const diff = Date.now() - new Date(ts).getTime();
-  if (diff < 60_000) return "just now";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return new Date(ts).toLocaleDateString();
 }
 
 // ─── Employee avatar ──────────────────────────────────────────────────────────
@@ -125,7 +127,7 @@ function EmpAvatar({ employeeId, employeeName }: { employeeId: string; employeeN
 // ─── Args cell ────────────────────────────────────────────────────────────────
 
 function ArgsCell({ input }: { input: Record<string, unknown> }) {
-  const { locale } = useT();
+  const { t, locale } = useT();
   const rtl = locale === "he";
   const [open, setOpen] = useState(false);
   const keys = Object.keys(input);
@@ -166,9 +168,9 @@ function ArgsCell({ input }: { input: Record<string, unknown> }) {
             transition: "transform .12s",
           }}
         />
-        {preview}
+        <bdi>{preview}</bdi>
         {keys.length > 2 && (
-          <span style={{ color: "var(--text-subtle)" }}>+{keys.length - 2} more</span>
+          <span style={{ color: "var(--text-subtle)" }}>+<bdi>{keys.length - 2}</bdi> {t("audit.more")}</span>
         )}
       </button>
       {open && (
@@ -199,7 +201,8 @@ function ArgsCell({ input }: { input: Record<string, unknown> }) {
 const PAGE_SIZE = 100;
 
 export default function AuditPage() {
-  const { t } = useT();
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -294,7 +297,7 @@ export default function AuditPage() {
           <button
             className="btn ghost sm"
             onClick={() => load()}
-            title="Refresh"
+            title={t("audit.refresh")}
           >
             <Icons.Refresh size={13} style={loading ? { animation: "spin 1s linear infinite" } : undefined} />
           </button>
@@ -329,7 +332,7 @@ export default function AuditPage() {
             fontFamily: "inherit",
           }}
         >
-          <option value="">All employees</option>
+          <option value="">{t("audit.allEmployees")}</option>
           {useRoster().map((e) => (
             <option key={e.id} value={e.id}>
               {e.name}
@@ -353,7 +356,7 @@ export default function AuditPage() {
           <input
             value={filterTool}
             onChange={(e) => setFilterTool(e.target.value)}
-            placeholder="Filter by tool…"
+            placeholder={t("audit.filterTool")}
             style={{
               height: 30,
               paddingInlineStart: 26,
@@ -386,11 +389,11 @@ export default function AuditPage() {
             fontFamily: "inherit",
           }}
         >
-          <option value="">All verdicts</option>
-          <option value="auto_allow">Auto-read</option>
-          <option value="ceo_approved">CEO approved</option>
-          <option value="ceo_denied">CEO denied</option>
-          <option value="hard_blocked">Blocked</option>
+          <option value="">{t("audit.allVerdicts")}</option>
+          <option value="auto_allow">{t("audit.verdict.auto")}</option>
+          <option value="ceo_approved">{t("audit.verdict.approved")}</option>
+          <option value="ceo_denied">{t("audit.verdict.denied")}</option>
+          <option value="hard_blocked">{t("audit.verdict.blocked")}</option>
         </select>
 
         {/* Date range — both inputs are optional. Browser-native picker. */}
@@ -399,7 +402,7 @@ export default function AuditPage() {
             type="date"
             value={filterSince}
             onChange={(e) => setFilterSince(e.target.value)}
-            title="Show entries from this date"
+            title={t("audit.dateFrom")}
             style={{
               height: 30, padding: "0 8px",
               fontSize: "var(--fs-sm)",
@@ -408,12 +411,12 @@ export default function AuditPage() {
               fontFamily: "inherit",
             }}
           />
-          <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}>→</span>
+          <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)", display: "inline-block", transform: rtl ? "scaleX(-1)" : undefined }}>→</span>
           <input
             type="date"
             value={filterUntil}
             onChange={(e) => setFilterUntil(e.target.value)}
-            title="Show entries up to this date"
+            title={t("audit.dateUntil")}
             style={{
               height: 30, padding: "0 8px",
               fontSize: "var(--fs-sm)",
@@ -429,7 +432,7 @@ export default function AuditPage() {
           <select
             value={filterArchive}
             onChange={(e) => setFilterArchive(e.target.value)}
-            title="Browse an archived month"
+            title={t("audit.archiveTitle")}
             style={{
               height: 30, padding: "0 8px",
               fontSize: "var(--fs-sm)",
@@ -438,21 +441,30 @@ export default function AuditPage() {
               cursor: "pointer", fontFamily: "inherit",
             }}
           >
-            <option value="">Live log</option>
+            <option value="">{t("audit.live")}</option>
             {archives.map((m) => (
               <option key={m} value={m}>
-                Archive · {m}
+                {t("audit.archive")} {m}
               </option>
             ))}
           </select>
         )}
 
         <div style={{ marginInlineStart: "auto", fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}>
-          {loading
-            ? "Loading…"
-            : `${totalCount} entr${totalCount === 1 ? "y" : "ies"}${
-                totalPages > 1 ? ` · page ${page}/${totalPages}` : ""
-              }`}
+          {loading ? (
+            t("audit.loading")
+          ) : (
+            <>
+              <bdi>{totalCount}</bdi>{" "}
+              {totalCount === 1 ? t("audit.entryOne") : t("audit.entryMany")}
+              {totalPages > 1 && (
+                <>
+                  {" · "}
+                  {t("audit.page")} <bdi>{page}</bdi> {t("audit.of")} <bdi>{totalPages}</bdi>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -479,8 +491,8 @@ export default function AuditPage() {
             <Icons.Logs size={28} style={{ opacity: 0.3 }} />
             <div style={{ fontSize: "var(--fs-ui)" }}>
               {filterEmployee || filterTool || filterVerdict
-                ? "No entries match the current filters."
-                : "No tool calls recorded yet. Run a Team Meeting with Composio connected."}
+                ? t("audit.emptyFiltered")
+                : t("audit.emptyNone")}
             </div>
           </div>
           )
@@ -502,7 +514,13 @@ export default function AuditPage() {
                   zIndex: 1,
                 }}
               >
-                {["Time", "Employee", "Tool", "Args", "Verdict"].map((h) => (
+                {[
+                  t("audit.col.time"),
+                  t("audit.col.employee"),
+                  t("audit.col.tool"),
+                  t("audit.col.args"),
+                  t("audit.col.verdict"),
+                ].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -533,9 +551,9 @@ export default function AuditPage() {
                   {/* Time */}
                   <td
                     style={{ padding: "10px 16px", whiteSpace: "nowrap", color: "var(--text-muted)" }}
-                    title={new Date(entry.ts).toLocaleString()}
+                    title={formatDateTime(entry.ts, locale)}
                   >
-                    {relTime(entry.ts)}
+                    {formatRelativeTime(entry.ts, locale, { dateAfterMs: 86_400_000 })}
                   </td>
 
                   {/* Employee */}
@@ -562,10 +580,10 @@ export default function AuditPage() {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {entry.bareName}
+                        <bdi>{entry.bareName}</bdi>
                       </code>
                       {entry.inputEdited && (
-                        <span style={{ fontSize: "var(--fs-xs)", color: "#9333ea" }}>✎ args edited</span>
+                        <span style={{ fontSize: "var(--fs-xs)", color: "#9333ea" }}>✎ {t("audit.argsEdited")}</span>
                       )}
                       {entry.blockReason && (
                         <span
@@ -617,10 +635,10 @@ export default function AuditPage() {
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             style={{ opacity: page <= 1 ? 0.4 : 1 }}
           >
-            ← Prev
+            {rtl ? "→" : "←"} {t("audit.prev")}
           </button>
           <span style={{ color: "var(--text-subtle)" }}>
-            Page {page} of {totalPages}
+            {t("audit.page")} <bdi>{page}</bdi> {t("audit.of")} <bdi>{totalPages}</bdi>
           </span>
           <button
             className="btn ghost sm"
@@ -628,7 +646,7 @@ export default function AuditPage() {
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             style={{ opacity: page >= totalPages ? 0.4 : 1 }}
           >
-            Next →
+            {t("audit.next")} {rtl ? "←" : "→"}
           </button>
         </div>
       )}

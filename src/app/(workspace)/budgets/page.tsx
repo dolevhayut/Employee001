@@ -37,6 +37,7 @@ function EditableLimit({
   row: BudgetRow;
   onSaved: (id: string, usd: number) => void;
 }) {
+  const { t } = useT();
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(String(row.dailyBudgetUsd));
   const [saving, setSaving] = useState(false);
@@ -88,7 +89,7 @@ function EditableLimit({
             color: "var(--text)",
           }}
         />
-        {saving && <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>saving…</span>}
+        {saving && <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>{t("budgets.saving")}</span>}
       </span>
     );
   }
@@ -96,7 +97,7 @@ function EditableLimit({
   return (
     <button
       onClick={() => { setVal(String(row.dailyBudgetUsd)); setEditing(true); }}
-      title="Click to edit daily budget"
+      title={t("budgets.editTitle")}
       style={{
         background: "none",
         border: "none",
@@ -174,10 +175,10 @@ export default function BudgetsPage() {
                 textUnderlineOffset: 3,
               }}
             >
-              Workspace costs
+              {t("shell.cmd.workspaceCosts")}
             </Link>
             <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
-              Daily spend caps per twin — resets at midnight Israel time
+              {t("budgets.capsHint")}
             </span>
           </span>
         }
@@ -186,8 +187,8 @@ export default function BudgetsPage() {
       <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
         <PageHead
           icon="Zap"
-          title="Budgets"
-          subtitle="Set daily spend caps per twin and monitor today’s usage against limits."
+          title={t("budgets.title")}
+          subtitle={t("budgets.subtitle")}
           style={{ marginBottom: "var(--sp-16)", maxWidth: 1100 }}
         />
         {loadError && hasLoaded && <RefreshMiss />}
@@ -214,10 +215,10 @@ export default function BudgetsPage() {
           }}
         >
           <div>
-            <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", marginBottom: "var(--sp-4)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Org spend today</div>
+            <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", marginBottom: "var(--sp-4)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("budgets.orgSpend")}</div>
             <div style={{ fontSize: "var(--fs-h3)", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "var(--text)" }}>
               <bdi>${totalSpent.toFixed(4)}</bdi>
-              <span style={{ fontSize: "var(--fs-ui)", fontWeight: 400, color: "var(--text-muted)", marginInlineStart: "var(--sp-6)" }}><bdi>/ ${totalLimit.toFixed(2)}</bdi> limit</span>
+              <span style={{ fontSize: "var(--fs-ui)", fontWeight: 400, color: "var(--text-muted)", marginInlineStart: "var(--sp-6)" }}><bdi>/ ${totalLimit.toFixed(2)}</bdi> {t("budgets.limit")}</span>
             </div>
           </div>
           <div style={{ flex: 1, height: 8, background: "var(--bg-sunken)", borderRadius: 99, overflow: "hidden" }}>
@@ -232,15 +233,15 @@ export default function BudgetsPage() {
             />
           </div>
           <div style={{ fontSize: "var(--fs-ui)", color: "var(--text-muted)", minWidth: 40, textAlign: "end" }}>
-            {pct(totalSpent, totalLimit)}%
+            <bdi>{pct(totalSpent, totalLimit)}%</bdi>
           </div>
         </div>
 
         {/* Per-twin table */}
         {loading ? (
-          <div style={{ color: "var(--text-muted)", fontSize: "var(--fs-base)" }}>Loading…</div>
+          <div style={{ color: "var(--text-muted)", fontSize: "var(--fs-base)" }}>{t("budgets.loading")}</div>
         ) : rows.length === 0 ? (
-          <div style={{ color: "var(--text-muted)", fontSize: "var(--fs-base)" }}>No twins found.</div>
+          <div style={{ color: "var(--text-muted)", fontSize: "var(--fs-base)" }}>{t("budgets.none")}</div>
         ) : (
           <div
             style={{
@@ -253,7 +254,14 @@ export default function BudgetsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--hairline)" }}>
-                  {["Twin", "Role", "Daily limit", "Spent today", "Remaining", ""].map((h) => (
+                  {[
+                    t("budgets.col.twin"),
+                    t("budgets.col.role"),
+                    t("budgets.col.limit"),
+                    t("budgets.col.spent"),
+                    t("budgets.col.remaining"),
+                    "",
+                  ].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -300,7 +308,7 @@ export default function BudgetsPage() {
                               letterSpacing: "0.05em",
                             }}
                           >
-                            over
+                            {t("budgets.over")}
                           </span>
                         )}
                       </td>
@@ -331,7 +339,7 @@ export default function BudgetsPage() {
                         </div>
                       </td>
                       <td style={{ padding: "12px 16px", fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>
-                        resets {row.resetAt}
+                        {t("budgets.resets")} <bdi>{row.resetAt}</bdi>
                       </td>
                     </tr>
                   );

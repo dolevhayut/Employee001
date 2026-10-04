@@ -6,6 +6,7 @@ import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
 import { useRoster } from "@/components/ex/roster-context";
+import { useT } from "@/components/ex/i18n-context";
 import type { FocusPrefetch, FocusConfig } from "@/lib/twin-focus";
 
 const SUGGESTIONS: { slug: string; args: Record<string, unknown>; label: string }[] = [
@@ -19,6 +20,7 @@ const SUGGESTIONS: { slug: string; args: Record<string, unknown>; label: string 
 const MONO_FONT = "ui-monospace, SFMono-Regular, Menlo, monospace";
 
 export default function FocusPage() {
+  const { t } = useT();
   const roster = useRoster();
   const ready = roster.filter((e) => e.twinStatus === "ready");
   const [selectedId, setSelectedId] = useState<string>("");
@@ -72,7 +74,7 @@ export default function FocusPage() {
   }
 
   async function remove(idx: number) {
-    if (!confirm("Delete this prefetch?")) return;
+    if (!confirm(t("focus.deleteConfirm"))) return;
     const next = config.prefetches.filter((_, i) => i !== idx);
     await save(next);
   }
@@ -89,7 +91,7 @@ export default function FocusPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       <Topbar
-        crumbs={["Focus"]}
+        crumbs={[t("shell.cmd.focus")]}
         actions={
           employeeId ? (
             <button
@@ -97,7 +99,7 @@ export default function FocusPage() {
               onClick={() => setEditing({ index: null })}
               style={{ height: 28 }}
             >
-              <Icons.Plus size={12} /> Add prefetch
+              <Icons.Plus size={12} /> {t("focus.add")}
             </button>
           ) : null
         }
@@ -107,8 +109,8 @@ export default function FocusPage() {
         <div style={{ maxWidth: 880 }}>
           <PageHead
             icon="Eye"
-            title="Focus"
-            subtitle="Configure what each twin prefetches (PRs, Linear, Gmail, Slack) before every shift — so turn 1 starts with real world-state."
+            title={t("shell.cmd.focus")}
+            subtitle={t("focus.subtitle")}
             style={{ marginBottom: "var(--sp-16)" }}
           />
           {/* Twin selector */}
@@ -132,7 +134,9 @@ export default function FocusPage() {
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "var(--sp-8)",
-                    padding: "5px 12px 5px 5px",
+                    paddingBlock: 5,
+                    paddingInlineStart: 5,
+                    paddingInlineEnd: 12,
                     borderRadius: 999,
                     border: "1px solid var(--hairline)",
                     background: selected ? "var(--text)" : "var(--surface)",
@@ -166,12 +170,18 @@ export default function FocusPage() {
           {/* Intro / explainer */}
           <div style={{ marginBottom: "var(--sp-18)" }}>
             <h2 style={{ fontSize: "var(--fs-body)", fontWeight: 600, color: "var(--text)", margin: "0 0 4px" }}>
-              Pre-shift focus
+              {t("focus.heading")}
             </h2>
             <p style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", margin: 0, lineHeight: 1.55 }}>
-              Run Composio tool calls automatically before each shift to pre-load
-              {employee ? ` ${employee.firstName ?? employee.name}'s` : ""} world state.
-              Cached results feed straight into the agent&apos;s first turn.
+              {employee ? (
+                <>
+                  {t("focus.introNamedBefore")}
+                  <bdi>{employee.firstName ?? employee.name}</bdi>
+                  {t("focus.introNamedAfter")}
+                </>
+              ) : (
+                t("focus.intro")
+              )}
             </p>
           </div>
 
@@ -189,14 +199,13 @@ export default function FocusPage() {
             >
               <Icons.Refresh size={24} style={{ opacity: 0.3, marginBottom: "var(--sp-10)" }} />
               <h3 style={{ fontSize: "var(--fs-base)", fontWeight: 600, color: "var(--text)", margin: "0 0 6px" }}>
-                No prefetches yet
+                {t("focus.emptyTitle")}
               </h3>
               <p style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", margin: "0 0 14px", lineHeight: 1.55 }}>
-                Add a prefetch to load tool results before the shift starts. Pick one from the
-                suggestions below or build a custom one.
+                {t("focus.emptyBody")}
               </p>
               <button className="btn primary sm" onClick={() => setEditing({ index: null })}>
-                <Icons.Plus size={12} /> Add prefetch
+                <Icons.Plus size={12} /> {t("focus.add")}
               </button>
             </div>
           )}
@@ -230,7 +239,7 @@ export default function FocusPage() {
                           marginTop: "var(--sp-3)",
                         }}
                       >
-                        {p.toolSlug}
+                        <bdi>{p.toolSlug}</bdi>
                       </div>
                       <div
                         style={{
@@ -241,9 +250,9 @@ export default function FocusPage() {
                           gap: "var(--sp-10)",
                         }}
                       >
-                        <span>max {p.maxItems ?? 5}</span>
+                        <span>{t("focus.max")} <bdi>{p.maxItems ?? 5}</bdi></span>
                         <span>·</span>
-                        <span>cache {Math.round((p.cacheTtlMs ?? 300_000) / 60_000)}m</span>
+                        <span>{t("focus.cache")} <bdi>{Math.round((p.cacheTtlMs ?? 300_000) / 60_000)}</bdi> {t("routines.schedule.min")}</span>
                       </div>
                     </div>
                     <button
@@ -251,13 +260,13 @@ export default function FocusPage() {
                       className="btn sm"
                       style={{ height: 26 }}
                     >
-                      Edit
+                      {t("focus.edit")}
                     </button>
                     <button
                       onClick={() => remove(idx)}
                       className="btn ghost sm"
                       style={{ height: 26, color: "var(--danger)" }}
-                      title="Delete"
+                      title={t("focus.delete")}
                     >
                       <Icons.X size={11} />
                     </button>
@@ -289,7 +298,7 @@ export default function FocusPage() {
                   onClick={() => setEditing({ index: null })}
                   style={{ height: 28 }}
                 >
-                  <Icons.Plus size={11} /> Add prefetch
+                  <Icons.Plus size={11} /> {t("focus.add")}
                 </button>
               </div>
             </div>
@@ -315,7 +324,7 @@ export default function FocusPage() {
                   marginBottom: "var(--sp-10)",
                 }}
               >
-                💡 Common prefetches
+                💡 {t("focus.suggestions")}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-6)" }}>
                 {SUGGESTIONS.map((s) => (
@@ -338,7 +347,7 @@ export default function FocusPage() {
                       cursor: "pointer",
                     }}
                   >
-                    {s.slug}
+                    <bdi>{s.slug}</bdi>
                   </button>
                 ))}
               </div>
@@ -376,6 +385,7 @@ function PrefetchModal({
   onClose: () => void;
   onSave: (p: FocusPrefetch) => Promise<void>;
 }) {
+  const { t } = useT();
   const [label, setLabel] = useState(initial?.label ?? "");
   const [toolSlug, setToolSlug] = useState(initial?.toolSlug ?? "");
   const [argsText, setArgsText] = useState(
@@ -454,7 +464,7 @@ function PrefetchModal({
       >
         <div style={{ display: "flex", alignItems: "center", marginBottom: "var(--sp-18)" }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
-            {initial?.toolSlug && initial.label ? "Edit prefetch" : "New prefetch"}
+            {initial?.toolSlug && initial.label ? t("focus.modal.edit") : t("focus.modal.new")}
           </h2>
           <div style={{ flex: 1 }} />
           <button onClick={onClose} className="btn ghost sm" style={{ height: 26 }}>
@@ -463,40 +473,42 @@ function PrefetchModal({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-12)" }}>
-          <Field label="Label">
+          <Field label={t("focus.field.label")}>
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="My open PRs"
+              placeholder={t("focus.field.labelPh")}
               style={inputStyle}
             />
           </Field>
 
-          <Field label="Tool slug">
+          <Field label={t("focus.field.slug")}>
             <input
               value={toolSlug}
               onChange={(e) => setToolSlug(e.target.value)}
               placeholder="GITHUB_LIST_PULL_REQUESTS"
+              dir="ltr"
               style={{ ...inputStyle, fontFamily: MONO_FONT }}
             />
             <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)", marginTop: "var(--sp-4)" }}>
-              Composio action slug. Find at{" "}
+              {t("focus.field.slugHint")}{" "}
               <a
                 href="https://docs.composio.dev/toolkits"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: "var(--accent)" }}
               >
-                docs.composio.dev/toolkits
+                <bdi>docs.composio.dev/toolkits</bdi>
               </a>
             </div>
           </Field>
 
-          <Field label="Arguments (JSON)">
+          <Field label={t("focus.field.args")}>
             <textarea
               value={argsText}
               onChange={(e) => setArgsText(e.target.value)}
               placeholder='{ "state": "open" }'
+              dir="ltr"
               rows={5}
               style={{
                 ...inputStyle,
@@ -508,14 +520,14 @@ function PrefetchModal({
             />
             {!argsValid && (
               <div style={{ fontSize: "var(--fs-meta)", color: "var(--danger)", marginTop: "var(--sp-4)" }}>
-                Invalid JSON — must be a JSON object, e.g. {`{ "state": "open" }`}
+                {t("focus.field.argsInvalid")} <bdi>{`{ "state": "open" }`}</bdi>
               </div>
             )}
           </Field>
 
           <div style={{ display: "flex", gap: "var(--sp-12)" }}>
             <div style={{ flex: 1 }}>
-              <Field label="Max items">
+              <Field label={t("focus.field.max")}>
                 <input
                   type="number"
                   min={1}
@@ -526,7 +538,7 @@ function PrefetchModal({
               </Field>
             </div>
             <div style={{ flex: 1 }}>
-              <Field label="Cache TTL (minutes)">
+              <Field label={t("focus.field.cache")}>
                 <input
                   type="number"
                   min={1}
@@ -540,9 +552,9 @@ function PrefetchModal({
         </div>
 
         <div style={{ display: "flex", gap: "var(--sp-8)", justifyContent: "flex-end", marginTop: "var(--sp-20)" }}>
-          <button onClick={onClose} className="btn">Cancel</button>
+          <button onClick={onClose} className="btn">{t("focus.cancel")}</button>
           <button onClick={submit} disabled={!canSave || submitting} className="btn primary">
-            {submitting ? "Saving…" : "Save"}
+            {submitting ? t("focus.saving") : t("focus.save")}
           </button>
         </div>
       </motion.div>

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { PageHead } from "@/components/ex/page-head";
 import { CLAUDE_MODELS, type ClaudeModel } from "@/lib/employees";
 import { useRoster } from "@/components/ex/roster-context";
+import { useT } from "@/components/ex/i18n-context";
 
 // Per-employee budget/cost baselines. Originally seeded from demo data;
 // now driven entirely by the employee record (added by the CEO at runtime).
@@ -94,7 +95,15 @@ function formatCost(usd: number): string {
   return `$${usd.toFixed(2)}`;
 }
 
+function DirArrow() {
+  const { locale } = useT();
+  return (
+    <span style={{ display: "inline-block", transform: locale === "he" ? "scaleX(-1)" : undefined }}>→</span>
+  );
+}
+
 export default function WorkspaceOverviewPage() {
+  const { t } = useT();
   const roster = useRoster();
   const overrides = useSyncExternalStore(
     subscribeOverrides,
@@ -141,10 +150,10 @@ export default function WorkspaceOverviewPage() {
   return (
     <>
       <Topbar
-        crumbs={["Workspace", "Overview"]}
+        crumbs={[t("crumb.workspace"), t("workspace.overview")]}
         actions={
           <Link href="/budgets" className="btn ghost sm" style={{ textDecoration: "none" }}>
-            Daily caps
+            {t("workspace.dailyCaps")}
           </Link>
         }
       />
@@ -152,8 +161,8 @@ export default function WorkspaceOverviewPage() {
 
         <PageHead
           icon="Zap"
-          title="Workspace costs"
-          subtitle="Understand spend across the org: training (seed + refresh) and live execution (real tool runs). Adjust model choices per twin in the Profile pages to control cost."
+          title={t("shell.cmd.workspaceCosts")}
+          subtitle={t("workspace.subtitle")}
           style={{ marginBottom: "var(--sp-20)", maxWidth: 1100 }}
         />
 
@@ -162,10 +171,10 @@ export default function WorkspaceOverviewPage() {
           className="card"
           style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "var(--sp-28)" }}
         >
-          <SummaryCell label="Total seed cost"      value={fmt(totalSeed)}    sub="One-time, all employees"        tone="idle" />
-          <SummaryCell label="Monthly ongoing"      value={`~${fmt(totalMonthly)}/mo`} sub="Weekly refresh × all twins" tone="success" border />
-          <SummaryCell label="Total spent to date"  value={fmt(grandTotal)}   sub="Seed + all refresh runs"        tone="idle"    border />
-          <SummaryCell label="Active twins"         value={String(employees.length)} sub="Employees with twin running" tone="success" border />
+          <SummaryCell label={t("workspace.totalSeed")} value={<bdi>{fmt(totalSeed)}</bdi>} sub={t("workspace.totalSeedSub")} tone="idle" />
+          <SummaryCell label={t("workspace.monthly")} value={<><bdi>~{fmt(totalMonthly)}</bdi>{t("workspace.perMonth")}</>} sub={t("workspace.monthlySub")} tone="success" border />
+          <SummaryCell label={t("workspace.spentToDate")} value={<bdi>{fmt(grandTotal)}</bdi>} sub={t("workspace.spentSub")} tone="idle" border />
+          <SummaryCell label={t("workspace.activeTwins")} value={<bdi>{employees.length}</bdi>} sub={t("workspace.activeTwinsSub")} tone="success" border />
         </div>
 
         {/* Per-employee table */}
@@ -179,7 +188,14 @@ export default function WorkspaceOverviewPage() {
               gap: "var(--sp-12)",
             }}
           >
-            {["Employee", "Models", "Seed cost", "Monthly", "Total spent", "Status"].map((h) => (
+            {[
+              t("workspace.col.employee"),
+              t("workspace.col.models"),
+              t("workspace.col.seed"),
+              t("workspace.col.monthly"),
+              t("workspace.col.total"),
+              t("workspace.col.status"),
+            ].map((h) => (
               <div key={h} className="section-title" style={{ fontSize: "var(--fs-xs)" }}>{h}</div>
             ))}
           </div>
@@ -224,39 +240,39 @@ export default function WorkspaceOverviewPage() {
                 {/* Models */}
                 <div>
                   <div style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
-                    <span className="subtle">Seed: </span>
-                    <span className="mono" style={{ fontSize: "var(--fs-xs)", fontWeight: 600 }}>{modelLabel(seed)}</span>
+                    <span className="subtle">{t("workspace.seed")}: </span>
+                    <span className="mono" style={{ fontSize: "var(--fs-xs)", fontWeight: 600 }}><bdi>{modelLabel(seed)}</bdi></span>
                   </div>
                   <div style={{ fontSize: "var(--fs-xs)" }}>
-                    <span className="subtle">Refresh: </span>
-                    <span className="mono" style={{ fontSize: "var(--fs-xs)", fontWeight: 600 }}>{modelLabel(refresh)}</span>
+                    <span className="subtle">{t("workspace.refresh")}: </span>
+                    <span className="mono" style={{ fontSize: "var(--fs-xs)", fontWeight: 600 }}><bdi>{modelLabel(refresh)}</bdi></span>
                   </div>
                 </div>
 
                 {/* Seed cost */}
                 <div>
-                  <div className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>{fmt(seedCost)}</div>
-                  <div className="subtle" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-1)" }}>one-time</div>
+                  <div className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}><bdi>{fmt(seedCost)}</bdi></div>
+                  <div className="subtle" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-1)" }}>{t("workspace.oneTime")}</div>
                 </div>
 
                 {/* Monthly */}
                 <div>
-                  <div className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>~{fmt(monthly)}/mo</div>
+                  <div className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}><bdi>~{fmt(monthly)}</bdi>{t("workspace.perMonth")}</div>
                   <div className="subtle" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-1)" }}>
-                    {monthsActive(ONBOARD_DATE[emp.id])} mo active
+                    <bdi>{monthsActive(ONBOARD_DATE[emp.id])}</bdi> {t("workspace.monthsActive")}
                   </div>
                 </div>
 
                 {/* Total + bar */}
                 <div>
                   <div className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 700, marginBottom: "var(--sp-5)" }}>
-                    {fmt(total)}
+                    <bdi>{fmt(total)}</bdi>
                   </div>
                   <div style={{ height: 4, background: "var(--bg-sunken)", borderRadius: 2, overflow: "hidden" }}>
                     <div style={{ width: pct * 100 + "%", height: "100%", background: "var(--accent)", borderRadius: 2 }} />
                   </div>
                   <div className="subtle mono" style={{ fontSize: "var(--fs-2xs)", marginTop: "var(--sp-3)" }}>
-                    {Math.round(pct * 100)}% of total
+                    <bdi>{Math.round(pct * 100)}%</bdi> {t("workspace.ofTotal")}
                   </div>
                 </div>
 
@@ -264,16 +280,16 @@ export default function WorkspaceOverviewPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)", alignItems: "flex-start" }}>
                   {emp.twinStatus === "ready" ? (
                     <span className="badge success" style={{ fontSize: "var(--fs-xs)" }}>
-                      <span className="dot success" style={{ boxShadow: "none" }} /> Twin ready
+                      <span className="dot success" style={{ boxShadow: "none" }} /> {t("workspace.twinReady")}
                     </span>
                   ) : (
-                    <span className="badge" style={{ fontSize: "var(--fs-xs)" }}>Pending</span>
+                    <span className="badge" style={{ fontSize: "var(--fs-xs)" }}>{t("workspace.pending")}</span>
                   )}
                   <Link
                     href={`/profile?employee=${emp.id}`}
                     style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", textDecoration: "underline" }}
                   >
-                    Configure →
+                    {t("workspace.configure")} <DirArrow />
                   </Link>
                 </div>
               </div>
@@ -293,13 +309,14 @@ export default function WorkspaceOverviewPage() {
             }}
           >
             <div style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--text-muted)" }}>
-              Total · {employees.length} employees
+              {t("workspace.total")} · <bdi>{employees.length}</bdi>{" "}
+              {employees.length === 1 ? t("workspace.employeeOne") : t("workspace.employeeMany")}
             </div>
             <div />
-            <div className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 700 }}>{fmt(totalSeed)}</div>
-            <div className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 700 }}>~{fmt(totalMonthly)}/mo</div>
+            <div className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 700 }}><bdi>{fmt(totalSeed)}</bdi></div>
+            <div className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 700 }}><bdi>~{fmt(totalMonthly)}</bdi>{t("workspace.perMonth")}</div>
             <div className="mono" style={{ fontSize: "var(--fs-base)", fontWeight: 800, letterSpacing: "-0.02em" }}>
-              {fmt(grandTotal)}
+              <bdi>{fmt(grandTotal)}</bdi>
             </div>
             <div />
           </div>
@@ -323,10 +340,10 @@ export default function WorkspaceOverviewPage() {
                 margin: 0,
               }}
             >
-              Execution costs · this month
+              {t("workspace.executionTitle")}
             </h2>
             <span className="subtle" style={{ fontSize: "var(--fs-meta)" }}>
-              actual API spend on tasks (separate from training above)
+              {t("workspace.executionSub")}
             </span>
             <div className="spacer" />
             <Link
@@ -337,20 +354,20 @@ export default function WorkspaceOverviewPage() {
                 textDecoration: "underline",
               }}
             >
-              View tasks →
+              {t("workspace.viewTasks")} <DirArrow />
             </Link>
           </div>
 
           {!execCosts ? (
             <div className="card" style={{ padding: "20px 18px" }}>
               <span className="subtle" style={{ fontSize: "var(--fs-ui)" }}>
-                Loading…
+                {t("workspace.loading")}
               </span>
             </div>
           ) : execCosts.totalRuns === 0 ? (
             <div className="card" style={{ padding: "20px 18px" }}>
               <span className="subtle" style={{ fontSize: "var(--fs-ui)" }}>
-                No tasks executed this month yet.{" "}
+                {t("workspace.noTasks")}{" "}
                 <Link
                   href="/tasks"
                   style={{
@@ -358,7 +375,7 @@ export default function WorkspaceOverviewPage() {
                     textDecoration: "underline",
                   }}
                 >
-                  Assign one →
+                  {t("workspace.assign")} <DirArrow />
                 </Link>
               </span>
             </div>
@@ -374,33 +391,46 @@ export default function WorkspaceOverviewPage() {
                 }}
               >
                 <SummaryCell
-                  label="Total spend (MTD)"
-                  value={formatCost(execCosts.totalUsd)}
-                  sub={`${execCosts.totalRuns} task${
-                    execCosts.totalRuns !== 1 ? "s" : ""
-                  } executed`}
+                  label={t("workspace.mtd")}
+                  value={<bdi>{formatCost(execCosts.totalUsd)}</bdi>}
+                  sub={
+                    <>
+                      <bdi>{execCosts.totalRuns}</bdi>{" "}
+                      {execCosts.totalRuns === 1 ? t("workspace.taskOne") : t("workspace.taskMany")}
+                    </>
+                  }
                   tone="success"
                 />
                 <SummaryCell
-                  label="Avg per task"
-                  value={formatCost(
-                    execCosts.totalRuns > 0
-                      ? execCosts.totalUsd / execCosts.totalRuns
-                      : 0
-                  )}
-                  sub="across all employees"
+                  label={t("workspace.avg")}
+                  value={
+                    <bdi>
+                      {formatCost(
+                        execCosts.totalRuns > 0
+                          ? execCosts.totalUsd / execCosts.totalRuns
+                          : 0
+                      )}
+                    </bdi>
+                  }
+                  sub={t("workspace.avgSub")}
                   tone="idle"
                   border
                 />
                 <SummaryCell
-                  label="Budget cap hits"
-                  value={String(
-                    execCosts.byEmployee.reduce(
-                      (s, e) => s + e.budgetHits,
-                      0
-                    )
-                  )}
-                  sub="tasks stopped at $0.50 cap"
+                  label={t("workspace.capHits")}
+                  value={
+                    <bdi>
+                      {execCosts.byEmployee.reduce(
+                        (s, e) => s + e.budgetHits,
+                        0
+                      )}
+                    </bdi>
+                  }
+                  sub={
+                    <>
+                      {t("workspace.capHitsBefore")} <bdi>$0.50</bdi> {t("workspace.capHitsAfter")}
+                    </>
+                  }
                   tone={
                     execCosts.byEmployee.some((e) => e.budgetHits > 0)
                       ? "warn"
@@ -422,11 +452,11 @@ export default function WorkspaceOverviewPage() {
                   }}
                 >
                   {[
-                    "Employee",
-                    "Runs",
-                    "Avg / task",
-                    "Total",
-                    "% of spend",
+                    t("workspace.exec.employee"),
+                    t("workspace.exec.runs"),
+                    t("workspace.exec.avg"),
+                    t("workspace.exec.total"),
+                    t("workspace.exec.share"),
                   ].map((h) => (
                     <div
                       key={h}
@@ -495,8 +525,8 @@ export default function WorkspaceOverviewPage() {
                                 color: "var(--warn)",
                               }}
                             >
-                              {row.budgetHits} budget cap hit
-                              {row.budgetHits !== 1 ? "s" : ""}
+                              <bdi>{row.budgetHits}</bdi>{" "}
+                              {row.budgetHits === 1 ? t("workspace.capHitOne") : t("workspace.capHitMany")}
                             </div>
                           )}
                         </div>
@@ -505,19 +535,19 @@ export default function WorkspaceOverviewPage() {
                         className="mono"
                         style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}
                       >
-                        {row.runs}
+                        <bdi>{row.runs}</bdi>
                       </div>
                       <div
                         className="mono subtle"
                         style={{ fontSize: "var(--fs-sm)" }}
                       >
-                        {formatCost(row.avgUsd)}
+                        <bdi>{formatCost(row.avgUsd)}</bdi>
                       </div>
                       <div
                         className="mono"
                         style={{ fontSize: "var(--fs-ui)", fontWeight: 700 }}
                       >
-                        {formatCost(row.totalUsd)}
+                        <bdi>{formatCost(row.totalUsd)}</bdi>
                       </div>
                       <div>
                         <div
@@ -541,7 +571,7 @@ export default function WorkspaceOverviewPage() {
                           className="subtle mono"
                           style={{ fontSize: "var(--fs-2xs)", marginTop: "var(--sp-3)" }}
                         >
-                          {Math.round(pct * 100)}%
+                          <bdi>{Math.round(pct * 100)}%</bdi>
                         </div>
                       </div>
                     </div>
@@ -566,11 +596,11 @@ export default function WorkspaceOverviewPage() {
         >
           <div style={{ fontSize: "var(--fs-h4)", lineHeight: 1, marginTop: "var(--sp-1)" }}>ℹ</div>
           <p style={{ fontSize: "var(--fs-sm)", lineHeight: 1.6, margin: 0, color: "var(--text-muted)" }}>
-            Seed cost is a one-time charge per employee for the initial 180-day data pull.
-            Monthly refresh (~$8/week × 4) keeps each twin current — prompt caching reduces input costs by ~70%.
-            Per-employee model selection (Opus / Sonnet / Haiku) is configured on the{" "}
-            <Link href="/profile" style={{ color: "var(--accent-deep)" }}>Configure page</Link> and directly affects these estimates.
-            Costs shown may vary ±5% from actual billing.
+            {t("workspace.note.seedBefore")}<bdi>180</bdi>{t("workspace.note.seedAfter")}{" "}
+            {t("workspace.note.refreshBefore")}<bdi>$8</bdi>{t("workspace.note.refreshMid")}<bdi>4</bdi>{t("workspace.note.refreshAfter")}<bdi>70%</bdi>{t("workspace.note.refreshEnd")}{" "}
+            {t("workspace.note.modelsBefore")}<bdi>Opus / Sonnet / Haiku</bdi>{t("workspace.note.modelsMid")}
+            <Link href="/profile" style={{ color: "var(--accent-deep)" }}>{t("workspace.note.link")}</Link>
+            {t("workspace.note.modelsAfter")}<bdi>5%</bdi>{t("workspace.note.end")}
           </p>
         </div>
       </div>
@@ -581,11 +611,11 @@ export default function WorkspaceOverviewPage() {
 function SummaryCell({
   label, value, sub, tone, border,
 }: {
-  label: string; value: string; sub: string;
+  label: string; value: ReactNode; sub: ReactNode;
   tone: "success" | "warn" | "danger" | "idle"; border?: boolean;
 }) {
   return (
-    <div style={{ padding: "18px 20px", borderLeft: border ? "1px solid var(--hairline)" : "none" }}>
+    <div style={{ padding: "18px 20px", borderInlineStart: border ? "1px solid var(--hairline)" : "none" }}>
       <div className="row" style={{ gap: "var(--sp-8)", marginBottom: "var(--sp-6)" }}>
         <span className={"dot " + tone} />
         <div className="section-title" style={{ fontSize: "var(--fs-xs)" }}>{label}</div>

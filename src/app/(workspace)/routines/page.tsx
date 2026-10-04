@@ -12,38 +12,67 @@ import { EmployeePicker } from "@/components/ex/employee-picker";
 import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
 import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 import { useT } from "@/components/ex/i18n-context";
+import { bcp47, formatRelativeTime } from "@/lib/i18n/format";
+import type { MessageKey } from "@/lib/i18n/messages";
 import type { Routine, Schedule, RoutineRunStatus } from "@/lib/routines";
 import { isValidCron } from "@/lib/cron";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function describeSchedule(s: Schedule): string {
-  if (s.type === "interval") return `every ${s.minutes} min${s.minutes === 1 ? "" : "s"}`;
-  if (s.type === "daily") return `daily at ${s.time}`;
-  if (s.type === "cron") return `cron: ${s.expr}`;
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return `${days[s.day]} at ${s.time}`;
+function weekdayLabel(index: number, locale: "en" | "he", width: "long" | "short"): string {
+  return new Intl.DateTimeFormat(bcp47(locale), { weekday: width, timeZone: "UTC" }).format(
+    new Date(Date.UTC(2024, 0, 7 + index)),
+  );
 }
 
-function relTime(ts?: string): string {
-  if (!ts) return "—";
-  const diff = Date.now() - new Date(ts).getTime();
-  const abs = Math.abs(diff);
-  const sign = diff < 0 ? "in " : "";
-  const suffix = diff < 0 ? "" : " ago";
-  if (abs < 60_000) return diff < 0 ? "in <1 min" : "just now";
-  if (abs < 3_600_000) return `${sign}${Math.floor(abs / 60_000)}m${suffix}`;
-  if (abs < 86_400_000) return `${sign}${Math.floor(abs / 3_600_000)}h${suffix}`;
-  return new Date(ts).toLocaleString();
+function ScheduleText({ schedule }: { schedule: Schedule }) {
+  const { t, locale } = useT();
+  if (schedule.type === "interval") {
+    return (
+      <>
+        {t("routines.schedule.every")} <bdi>{schedule.minutes}</bdi>{" "}
+        {schedule.minutes === 1 ? t("routines.schedule.min") : t("routines.schedule.mins")}
+      </>
+    );
+  }
+  if (schedule.type === "daily") {
+    return (
+      <>
+        {t("routines.schedule.daily")}
+        <bdi>{schedule.time}</bdi>
+      </>
+    );
+  }
+  if (schedule.type === "cron") {
+    return (
+      <>
+        <bdi>{t("routines.schedule.cron")}</bdi> <bdi>{schedule.expr}</bdi>
+      </>
+    );
+  }
+  return (
+    <>
+      {weekdayLabel(schedule.day, locale, "short")}{" "}
+      {t("routines.schedule.at")}
+      <bdi>{schedule.time}</bdi>
+    </>
+  );
 }
 
-const STATUS_META: Record<RoutineRunStatus, { label: string; color: string; bg: string }> = {
-  ok:              { label: "Completed",       color: "#16a34a", bg: "#dcfce7" },
-  needs_approval:  { label: "Awaiting CEO",    color: "#b45309", bg: "#fef3c7" },
-  denied:          { label: "Declined",        color: "#9333ea", bg: "#f3e8ff" },
-  error:           { label: "Failed",           color: "#dc2626", bg: "#fee2e2" },
-  skipped:         { label: "Skipped",         color: "#64748b", bg: "#f1f5f9" },
+const STATUS_META: Record<RoutineRunStatus, { labelKey: MessageKey; color: string; bg: string }> = {
+  ok:              { labelKey: "routines.status.ok",       color: "#16a34a", bg: "#dcfce7" },
+  needs_approval:  { labelKey: "routines.status.approval", color: "#b45309", bg: "#fef3c7" },
+  denied:          { labelKey: "routines.status.denied",   color: "#9333ea", bg: "#f3e8ff" },
+  error:           { labelKey: "routines.status.failed",   color: "#dc2626", bg: "#fee2e2" },
+  skipped:         { labelKey: "routines.status.skipped",  color: "#64748b", bg: "#f1f5f9" },
 };
+
+function triggerLabel(trigger: string, t: (key: MessageKey) => string): string {
+  if (trigger === "scheduled") return t("routines.trigger.scheduled");
+  if (trigger === "manual") return t("routines.trigger.manual");
+  if (trigger === "wakeup") return t("routines.trigger.wakeup");
+  return trigger;
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -82,7 +111,7 @@ export default function RoutinesPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this routine?")) return;
+    if (!confirm(t("routines.deleteConfirm"))) return;
     await fetch(`/api/routines/${id}`, { method: "DELETE" });
     load();
   }
@@ -156,7 +185,7 @@ export default function RoutinesPage() {
             onClick={() => setShowCreate(true)}
             style={{ height: 28 }}
           >
-            <Icons.Plus size={12} /> New routine
+            <Icons.Plus size={12} /> {t("routines.new")}
           </button>
         }
       />
@@ -164,8 +193,8 @@ export default function RoutinesPage() {
       <div className="scrollbar" style={{ flex: 1, overflow: "auto", padding: "20px 24px 60px" }}>
         <PageHead
           icon="Refresh"
-          title="Routines"
-          subtitle="Schedule background work for a twin (tasks or autonomous shifts). Review last runs, statuses, and trigger a run now."
+          title={t("routines.title")}
+          subtitle={t("routines.subtitle")}
           style={{ marginBottom: "var(--sp-16)", maxWidth: 880 }}
         />
         <div
@@ -188,7 +217,7 @@ export default function RoutinesPage() {
               color: "var(--bg)",
             }}
           >
-            Schedules
+            {t("nav.schedules")}
           </span>
           <Link
             href="/focus"
@@ -203,7 +232,7 @@ export default function RoutinesPage() {
               textDecoration: "none",
             }}
           >
-            Focus
+            {t("shell.cmd.focus")}
           </Link>
         </div>
         {/* Empty / loading */}
@@ -224,14 +253,13 @@ export default function RoutinesPage() {
           >
             <Icons.Refresh size={28} style={{ opacity: 0.3, marginBottom: "var(--sp-12)" }} />
             <h2 style={{ fontSize: "var(--fs-lg)", fontWeight: 600, color: "var(--text)", margin: "0 0 6px" }}>
-              No routines yet
+              {t("routines.emptyTitle")}
             </h2>
             <p style={{ fontSize: "var(--fs-ui)", lineHeight: 1.55, margin: "0 0 16px" }}>
-              Routines run a twin in the background on a schedule. Free-form task — the agent figures out
-              which tools to use. Approvals are queued and surfaced as a global popup.
+              {t("routines.emptyBody")}
             </p>
             <button className="btn primary" onClick={() => setShowCreate(true)}>
-              <Icons.Plus size={13} /> Create your first routine
+              <Icons.Plus size={13} /> {t("routines.createFirst")}
             </button>
           </div>
           )
@@ -293,7 +321,7 @@ export default function RoutinesPage() {
                       >
                         <span>{employee?.firstName ?? r.employeeId}</span>
                         <span style={{ color: "var(--text-subtle)" }}>·</span>
-                        <span>{describeSchedule(r.schedule)}</span>
+                        <span><ScheduleText schedule={r.schedule} /></span>
                         {r.kind === "shift" && (
                           <span
                             style={{
@@ -307,11 +335,11 @@ export default function RoutinesPage() {
                               letterSpacing: "0.05em",
                             }}
                           >
-                            shift
+                            {t("routines.shift")}
                           </span>
                         )}
                         <span style={{ color: "var(--text-subtle)" }}>·</span>
-                        <span>next {relTime(r.nextRunAt)}</span>
+                        <span>{t("routines.next")} {formatRelativeTime(r.nextRunAt, locale)}</span>
                       </div>
                     </div>
                     {status && (
@@ -325,7 +353,7 @@ export default function RoutinesPage() {
                           color: status.color,
                         }}
                       >
-                        {status.label}
+                        {t(status.labelKey)}
                       </span>
                     )}
                   </div>
@@ -365,10 +393,10 @@ export default function RoutinesPage() {
                       onMouseLeave={(e) => { e.currentTarget.style.borderInlineStartColor = "var(--hairline)"; }}
                     >
                       <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", marginBottom: "var(--sp-3)", display: "flex", alignItems: "center", gap: "var(--sp-6)" }}>
-                        <strong style={{ color: "var(--text)" }}>Last run {relTime(r.lastRunAt)}</strong>
+                        <strong style={{ color: "var(--text)" }}>{t("routines.lastRun")} {formatRelativeTime(r.lastRunAt, locale)}</strong>
                         <span style={{ flex: 1 }} />
                         <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-3)", color: "var(--accent)" }}>
-                          View details <Icons.Chevron size={9} style={{ transform: rtl ? "rotate(180deg)" : undefined }} />
+                          {t("routines.viewDetails")} <Icons.Chevron size={9} style={{ transform: rtl ? "rotate(180deg)" : undefined }} />
                         </span>
                       </div>
                       <div
@@ -399,16 +427,16 @@ export default function RoutinesPage() {
                       {running.has(r.id) ? (
                         <Icons.Loader size={11} style={{ animation: "spin 1s linear infinite" }} />
                       ) : (
-                        <Icons.Arrow size={11} />
+                        <Icons.Arrow size={11} style={rtl ? { transform: "scaleX(-1)" } : undefined} />
                       )}
-                      {running.has(r.id) ? "Running…" : "Run now"}
+                      {running.has(r.id) ? t("routines.running") : t("routines.runNow")}
                     </button>
                     <button
                       onClick={() => toggle(r.id, !r.enabled)}
                       className="btn sm"
                       style={{ height: 26 }}
                     >
-                      {r.enabled ? "Pause" : "Resume"}
+                      {r.enabled ? t("routines.pause") : t("routines.resume")}
                     </button>
                     <div style={{ flex: 1 }} />
                     <button
@@ -417,7 +445,7 @@ export default function RoutinesPage() {
                       style={{ height: 26, color: "var(--danger)" }}
                     >
                       <Icons.X size={11} />
-                      Delete
+                      {t("routines.delete")}
                     </button>
                   </div>
                 </motion.div>
@@ -507,7 +535,7 @@ function RoutineDetailModal({
   onClose: () => void;
   onRunNow: () => Promise<void>;
 }) {
-  const { locale } = useT();
+  const { t, locale } = useT();
   const rtl = locale === "he";
   const employee = useRoster().find((e) => e.id === routine.employeeId);
   const status = routine.lastRunStatus ? STATUS_META[routine.lastRunStatus] : null;
@@ -655,9 +683,9 @@ function RoutineDetailModal({
             >
               <span>{employee?.name ?? routine.employeeId}</span>
               <span style={{ color: "var(--text-subtle)" }}>·</span>
-              <span>{describeSchedule(routine.schedule)}</span>
+              <span><ScheduleText schedule={routine.schedule} /></span>
               <span style={{ color: "var(--text-subtle)" }}>·</span>
-              <span>last run {relTime(routine.lastRunAt)}</span>
+              <span>{t("routines.detail.lastRun")} {formatRelativeTime(routine.lastRunAt, locale)}</span>
               {status && (
                 <span
                   style={{
@@ -669,7 +697,7 @@ function RoutineDetailModal({
                     color: status.color,
                   }}
                 >
-                  {status.label}
+                  {t(status.labelKey)}
                 </span>
               )}
             </div>
@@ -693,7 +721,7 @@ function RoutineDetailModal({
                 marginBottom: "var(--sp-6)",
               }}
             >
-              {routine.kind === "shift" ? "Mandate" : "Task"}
+              {routine.kind === "shift" ? t("routines.mandate") : t("routines.task")}
             </div>
             <div
               style={{
@@ -709,8 +737,14 @@ function RoutineDetailModal({
               {routine.task?.trim()
                 ? routine.task
                 : routine.kind === "shift"
-                  ? `Autonomous shift — no fixed task. ${employee?.firstName ?? "The twin"} reviews its shift memory (context, decisions, learnings, pending tasks) and its profile, then picks its own actions each run.`
-                  : "No task specified."}
+                  ? (
+                    <>
+                      {t("routines.autonomousLead")}{" "}
+                      <bdi>{employee?.firstName ?? t("routines.theTwin")}</bdi>{" "}
+                      {t("routines.autonomousTail")}
+                    </>
+                  )
+                  : t("routines.noTask")}
             </div>
           </div>
 
@@ -727,7 +761,7 @@ function RoutineDetailModal({
                   marginBottom: "var(--sp-6)",
                 }}
               >
-                Shift history
+                {t("routines.history")}
                 <span style={{ fontWeight: 400, textTransform: "none", marginInlineStart: 6, opacity: 0.6 }}>
                   <bdi>({history.length})</bdi>
                 </span>
@@ -735,9 +769,11 @@ function RoutineDetailModal({
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)", maxHeight: 200, overflowY: "auto" }} className="scrollbar">
                 {history.map((h) => {
                   const sel = h.runId === selectedRunId;
-                  const st = h.status === "complete" ? { c: "#22C55E", l: "done" }
-                    : h.status === "error" ? { c: "#EF4444", l: "error" }
-                    : { c: "#F59E0B", l: h.status ?? "running" };
+                  const st = h.status === "complete" ? { c: "#22C55E", l: t("routines.runStatus.done") }
+                    : h.status === "error" ? { c: "#EF4444", l: t("routines.runStatus.error") }
+                    : h.status === "running" || !h.status
+                      ? { c: "#F59E0B", l: t("routines.runStatus.running") }
+                      : { c: "#F59E0B", l: h.status };
                   return (
                     <button
                       key={h.runId}
@@ -763,16 +799,16 @@ function RoutineDetailModal({
                       <span style={{ width: 7, height: 7, borderRadius: "50%", background: st.c, flexShrink: 0 }} />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: "var(--fs-sm)", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {h.summary ?? "(no summary)"}
+                          {h.summary ?? t("routines.noSummary")}
                         </div>
                         <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>
-                          {relTime(h.startedAt)} · {st.l}
-                          {h.trigger ? ` · ${h.trigger}` : ""}
+                          {formatRelativeTime(h.startedAt, locale)} · {st.l}
+                          {h.trigger ? <> · {triggerLabel(h.trigger, t)}</> : null}
                         </div>
                       </div>
                       {(h.outputCount ?? 0) > 0 && (
                         <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", fontWeight: 600, flexShrink: 0 }}>
-                          {h.outputCount} 📎
+                          <bdi>{h.outputCount}</bdi> 📎
                         </span>
                       )}
                     </button>
@@ -798,10 +834,10 @@ function RoutineDetailModal({
                   gap: "var(--sp-8)",
                 }}
               >
-                {selectedManifest && history.length > 1 ? "Run summary" : "Latest response"}
+                {selectedManifest && history.length > 1 ? t("routines.runSummary") : t("routines.latest")}
                 {selectedManifest?.startedAt && (
                   <span style={{ fontWeight: 400, textTransform: "none", color: "var(--text-subtle)" }}>
-                    · {relTime(selectedManifest.startedAt)}
+                    · {formatRelativeTime(selectedManifest.startedAt, locale)}
                   </span>
                 )}
               </div>
@@ -834,7 +870,7 @@ function RoutineDetailModal({
                   marginBottom: "var(--sp-8)",
                 }}
               >
-                Deliverables
+                {t("routines.deliverables")}
                 <span style={{ fontWeight: 400, textTransform: "none", marginInlineStart: 6, opacity: 0.6 }}>
                   <bdi>({shiftData.outputs.length + shiftData.artifacts.length})</bdi>
                 </span>
@@ -866,14 +902,15 @@ function RoutineDetailModal({
                     <span style={{ fontSize: 16, flexShrink: 0 }}>📄</span>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--text)" }}>
-                        {a.name.replace(/\.md$/, "")}
+                        <bdi>{a.name.replace(/\.md$/, "")}</bdi>
                       </div>
                       <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
-                        Markdown document · {(a.sizeBytes / 1024).toFixed(1)} KB
+                        {t("routines.markdown")} · <bdi>{(a.sizeBytes / 1024).toFixed(1)} KB</bdi>
                       </div>
                     </div>
                     <span style={{ fontSize: "var(--fs-xs)", color: "var(--accent, var(--text-muted))", fontWeight: 600, flexShrink: 0 }}>
-                      View →
+                      {t("routines.view")}{" "}
+                      <span style={{ display: "inline-block", transform: rtl ? "scaleX(-1)" : undefined }}>→</span>
                     </span>
                   </button>
                 ))}
@@ -904,7 +941,7 @@ function RoutineDetailModal({
                           </div>
                           {(href ?? o.path) && (
                             <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {href ?? o.path}
+                              <bdi>{href ?? o.path}</bdi>
                             </div>
                           )}
                         </div>
@@ -915,7 +952,8 @@ function RoutineDetailModal({
                             rel="noopener noreferrer"
                             style={{ fontSize: "var(--fs-xs)", color: "var(--accent, var(--text-muted))", fontWeight: 600, flexShrink: 0, textDecoration: "none" }}
                           >
-                            Open →
+                            {t("routines.open")}{" "}
+                            <span style={{ display: "inline-block", transform: rtl ? "scaleX(-1)" : undefined }}>→</span>
                           </a>
                         )}
                       </div>
@@ -948,9 +986,9 @@ function RoutineDetailModal({
                 }}
               >
                 <Icons.Chevron size={10} style={{ transform: showLog ? "rotate(90deg)" : rtl ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
-                Activity log
+                {t("nav.activityLog")}
                 <span style={{ fontWeight: 400, textTransform: "none", opacity: 0.6 }}>
-                  — thinking, tools &amp; results
+                  — {t("routines.activityHint")}
                 </span>
               </button>
 
@@ -969,10 +1007,10 @@ function RoutineDetailModal({
                   }}
                 >
                   {events === null && (
-                    <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>Loading…</div>
+                    <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>{t("routines.loading")}</div>
                   )}
                   {events?.length === 0 && (
-                    <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>No activity recorded.</div>
+                    <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>{t("routines.noActivity")}</div>
                   )}
                   {events?.map((e, i) => <LogRow key={i} e={e} />)}
                 </div>
@@ -991,7 +1029,7 @@ function RoutineDetailModal({
                 onClick={(e) => e.stopPropagation()}
               >
                 <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--hairline)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>📄 {openArtifact.name.replace(/\.md$/, "")}</span>
+                  <span style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>📄 <bdi>{openArtifact.name.replace(/\.md$/, "")}</bdi></span>
                   <button onClick={() => setOpenArtifact(null)} className="btn ghost sm"><Icons.X size={12} /></button>
                 </div>
                 <div className="scrollbar md-body" style={{ flex: 1, overflow: "auto", padding: "16px 24px 20px" }}>
@@ -1003,7 +1041,7 @@ function RoutineDetailModal({
 
           {!routine.lastRunSummary && (
             <p style={{ fontSize: "var(--fs-ui)", color: "var(--text-subtle)", margin: 0 }}>
-              This routine hasn&apos;t produced a response yet. Click <strong>Run now</strong> to fire it.
+              {t("routines.notYet")}
             </p>
           )}
         </div>
@@ -1019,11 +1057,11 @@ function RoutineDetailModal({
           }}
         >
           <button onClick={onRunNow} className="btn primary sm">
-            <Icons.Arrow size={11} />
-            Run now
+            <Icons.Arrow size={11} style={rtl ? { transform: "scaleX(-1)" } : undefined} />
+            {t("routines.runNow")}
           </button>
           <div style={{ flex: 1 }} />
-          <button onClick={onClose} className="btn sm">Close</button>
+          <button onClick={onClose} className="btn sm">{t("routines.close")}</button>
         </div>
       </motion.div>
     </motion.div>
@@ -1033,7 +1071,8 @@ function RoutineDetailModal({
 // ─── Activity-log row ─────────────────────────────────────────────────────────
 
 function LogRow({ e }: { e: ArchiveEvent }) {
-  const meta = (label: string, color: string) => (
+  const { t } = useT();
+  const meta = (label: React.ReactNode, color: string) => (
     <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color }}>
       {label}
     </span>
@@ -1046,21 +1085,21 @@ function LogRow({ e }: { e: ArchiveEvent }) {
     case "thinking":
       return (
         <div style={wrap}>
-          {meta("💭 Thinking", "var(--text-subtle)")}
+          {meta(<>💭 {t("routines.log.thinking")}</>, "var(--text-subtle)")}
           <span style={{ ...subtle, fontStyle: "italic" }}>{e.text}</span>
         </div>
       );
     case "text":
       return (
         <div style={wrap}>
-          {meta("🗣 Twin", "var(--accent-deep, var(--text-muted))")}
+          {meta(<>🗣 {t("routines.log.twin")}</>, "var(--accent-deep, var(--text-muted))")}
           <span style={bodyText}>{e.text}</span>
         </div>
       );
     case "tool_use":
       return (
         <div style={wrap}>
-          {meta(`🔧 Tool · ${e.tool}`, "#3B82F6")}
+          {meta(<>🔧 {t("routines.log.tool")} · <bdi>{e.tool}</bdi></>, "#3B82F6")}
           {e.input && Object.keys(e.input).length > 0 && (
             <pre style={{ margin: 0, fontSize: "var(--fs-2xs)", color: "var(--text-muted)", background: "var(--bg-sunken)", padding: "6px 8px", borderRadius: 5, overflow: "auto", maxHeight: 120 }}>
               {JSON.stringify(e.input, null, 2)}
@@ -1071,25 +1110,32 @@ function LogRow({ e }: { e: ArchiveEvent }) {
     case "tool_result":
       return (
         <div style={wrap}>
-          {meta(`✓ Result · ${e.tool}`, "#22C55E")}
+          {meta(<>✓ {t("routines.log.result")} · <bdi>{e.tool}</bdi></>, "#22C55E")}
           {e.output && <span style={{ ...subtle, fontSize: "var(--fs-2xs)" }}>{e.output.slice(0, 600)}</span>}
         </div>
       );
     case "approval_request":
       return (
         <div style={wrap}>
-          {meta(`⏳ Approval requested · ${e.tool}`, "#F59E0B")}
+          {meta(<>⏳ {t("routines.log.approval")} · <bdi>{e.tool}</bdi></>, "#F59E0B")}
           {e.reason && <span style={subtle}>{e.reason}</span>}
         </div>
       );
     case "approval":
       return (
         <div style={wrap}>
-          {meta(`${e.decision === "allow" ? "✅ Approved" : "🚫 Declined"} · ${e.tool}`, e.decision === "allow" ? "#22C55E" : "#EF4444")}
+          {meta(
+            <>
+              {e.decision === "allow" ? `✅ ${t("routines.log.approved")}` : `🚫 ${t("routines.log.declined")}`}
+              {" · "}
+              <bdi>{e.tool}</bdi>
+            </>,
+            e.decision === "allow" ? "#22C55E" : "#EF4444",
+          )}
         </div>
       );
     case "done":
-      return <div style={wrap}>{meta("■ Shift ended", "var(--text-subtle)")}</div>;
+      return <div style={wrap}>{meta(`■ ${t("routines.log.ended")}`, "var(--text-subtle)")}</div>;
     case "meta":
     default:
       return <div style={wrap}><span style={{ ...subtle, fontSize: "var(--fs-2xs)" }}>{e.message ?? e.text}</span></div>;
@@ -1105,6 +1151,7 @@ function CreateRoutineModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { t, locale } = useT();
   const roster = useRoster();
   const ready = roster.filter((e) => e.twinStatus === "ready");
   const [employeeId, setEmployeeId] = useState<string>(ready[0]?.id ?? roster[0]?.id ?? "");
@@ -1131,11 +1178,11 @@ function CreateRoutineModal({
 
   async function submit() {
     if (!name.trim() || (kind === "task" && !task.trim())) {
-      setError("Name and task are required.");
+      setError(t("routines.form.required"));
       return;
     }
     if (scheduleType === "cron" && !isValidCron(cronExpr)) {
-      setError("Invalid cron expression. Use 5 fields: min hour dom month dow.");
+      setError(t("routines.form.cronError"));
       return;
     }
     setSubmitting(true);
@@ -1156,7 +1203,7 @@ function CreateRoutineModal({
       if (!res.ok) throw new Error(await res.text());
       onCreated();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create");
+      setError(e instanceof Error ? e.message : t("routines.form.failed"));
       setSubmitting(false);
     }
   }
@@ -1196,7 +1243,7 @@ function CreateRoutineModal({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", marginBottom: "var(--sp-18)" }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>New routine</h2>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{t("routines.form.title")}</h2>
           <div style={{ flex: 1 }} />
           <button onClick={onClose} className="btn ghost sm" style={{ height: 26 }}>
             <Icons.X size={12} />
@@ -1204,7 +1251,7 @@ function CreateRoutineModal({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-12)" }}>
-          <Field label="Kind">
+          <Field label={t("routines.form.kind")}>
             <div style={{ display: "flex", gap: "var(--sp-6)" }}>
               {(["task", "shift"] as const).map((k) => (
                 <button
@@ -1223,35 +1270,36 @@ function CreateRoutineModal({
                     cursor: "pointer",
                   }}
                 >
-                  {k === "task" ? "Task" : "Shift (autonomous)"}
+                  {k === "task" ? t("routines.form.taskKind") : t("routines.form.shiftKind")}
                 </button>
               ))}
             </div>
           </Field>
 
-          <Field label="Employee">
+          <Field label={t("routines.form.employee")}>
             <EmployeePicker
               value={employeeId}
               onSelect={setEmployeeId}
               navigate={false}
+              placeholder={t("routines.picker.none")}
             />
           </Field>
 
-          <Field label="Name">
+          <Field label={t("routines.form.name")}>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Daily GitHub digest"
+              placeholder={t("routines.form.namePh")}
               style={inputStyle}
             />
           </Field>
 
           {kind === "task" && (
-            <Field label="Task (free-form)">
+            <Field label={t("routines.form.task")}>
               <textarea
                 value={task}
                 onChange={(e) => setTask(e.target.value)}
-                placeholder="Send me a daily summary email with all open GitHub issues assigned to me."
+                placeholder={t("routines.form.taskPh")}
                 rows={3}
                 style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 }}
               />
@@ -1273,65 +1321,62 @@ function CreateRoutineModal({
               }}
             >
               <div>
-                Each scheduled fire is <strong>one autonomous run</strong> (typically
-                a few minutes — not a long-lived background process). The twin
-                opens its shift memory — context, decisions, learnings, pending
-                tasks from other twins — and picks its own actions.
+                {t("routines.form.shiftA")} <strong>{t("routines.form.shiftStrong")}</strong> {t("routines.form.shiftB")}
               </div>
               <div>
-                State <strong>accumulates across runs</strong>: today&apos;s decisions and
-                learnings are visible to tomorrow&apos;s shift. For continuous
-                autonomy, use <em>Every N min</em> with a small interval.
+                {t("routines.form.shiftC")} <strong>{t("routines.form.shiftAccum")}</strong>{t("routines.form.shiftD")} <em>{t("routines.form.shiftEvery")}</em> {t("routines.form.shiftE")}
               </div>
             </div>
           )}
 
-          <Field label="Schedule">
+          <Field label={t("routines.form.schedule")}>
             <div style={{ display: "flex", gap: "var(--sp-6)" }}>
-              {(["daily", "weekly", "interval", "cron"] as const).map((t) => (
+              {(["daily", "weekly", "interval", "cron"] as const).map((option) => (
                 <button
-                  key={t}
-                  onClick={() => setScheduleType(t)}
+                  key={option}
+                  onClick={() => setScheduleType(option)}
                   style={{
                     flex: 1,
                     padding: "7px 10px",
                     borderRadius: 5,
                     border: "1px solid var(--hairline)",
-                    background: scheduleType === t ? "var(--text)" : "var(--surface)",
-                    color: scheduleType === t ? "var(--bg)" : "var(--text-muted)",
+                    background: scheduleType === option ? "var(--text)" : "var(--surface)",
+                    color: scheduleType === option ? "var(--bg)" : "var(--text-muted)",
                     fontSize: "var(--fs-sm)",
                     fontWeight: 500,
                     cursor: "pointer",
                   }}
                 >
-                  {t === "interval"
-                    ? "Every N min"
-                    : t === "cron"
-                      ? "Cron"
-                      : t.charAt(0).toUpperCase() + t.slice(1)}
+                  {option === "interval"
+                    ? t("routines.form.interval")
+                    : option === "cron"
+                      ? t("routines.form.cron")
+                      : option === "daily"
+                        ? t("routines.form.daily")
+                        : t("routines.form.weekly")}
                 </button>
               ))}
             </div>
           </Field>
 
           {(scheduleType === "daily" || scheduleType === "weekly") && (
-            <Field label="Time">
+            <Field label={t("routines.form.time")}>
               <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={inputStyle} />
             </Field>
           )}
 
           {scheduleType === "weekly" && (
-            <Field label="Day">
+            <Field label={t("routines.form.day")}>
               <select value={day} onChange={(e) => setDay(parseInt(e.target.value, 10))} style={selectStyle}>
-                {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((d, i) => (
-                  <option key={d} value={i}>{d}</option>
+                {Array.from({ length: 7 }, (_, i) => (
+                  <option key={i} value={i}>{weekdayLabel(i, locale, "long")}</option>
                 ))}
               </select>
             </Field>
           )}
 
           {scheduleType === "interval" && (
-            <Field label="Every (minutes)">
+            <Field label={t("routines.form.everyMinutes")}>
               <input
                 type="number"
                 min={1}
@@ -1343,9 +1388,10 @@ function CreateRoutineModal({
           )}
 
           {scheduleType === "cron" && (
-            <Field label="Cron expression">
+            <Field label={t("routines.form.cronExpr")}>
               <input
                 type="text"
+                dir="ltr"
                 value={cronExpr}
                 onChange={(e) => setCronExpr(e.target.value)}
                 placeholder="0 9 * * 1-5"
@@ -1363,9 +1409,15 @@ function CreateRoutineModal({
                   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                 }}
               >
-                {cronValid
-                  ? "min hour dom month dow · supports *, N, N-M, N,M, */N"
-                  : "Invalid — use 5 fields, e.g. \"0 9 * * 1-5\""}
+                {cronValid ? (
+                  <>
+                    {t("routines.form.cronFields")} · <bdi>{t("routines.form.cronSyntax")}</bdi>
+                  </>
+                ) : (
+                  <>
+                    {t("routines.form.cronBad")} <bdi>0 9 * * 1-5</bdi>
+                  </>
+                )}
               </div>
             </Field>
           )}
@@ -1376,9 +1428,9 @@ function CreateRoutineModal({
         )}
 
         <div style={{ display: "flex", gap: "var(--sp-8)", justifyContent: "flex-end", marginTop: "var(--sp-20)" }}>
-          <button onClick={onClose} className="btn">Cancel</button>
+          <button onClick={onClose} className="btn">{t("routines.form.cancel")}</button>
           <button onClick={submit} disabled={submitting} className="btn primary">
-            {submitting ? "Creating…" : "Create routine"}
+            {submitting ? t("routines.form.creating") : t("routines.form.create")}
           </button>
         </div>
       </motion.div>
