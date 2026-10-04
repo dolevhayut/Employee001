@@ -178,6 +178,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Expanded the memory tokenizer's stopword list so question scaffolding
   ("how do we", "what is our") no longer counts as topical overlap.
 
+## [0.5.1] — 2026-09-21
+
+### Security
+- Cleared both critical and the runtime high advisories: Next.js, tar,
+  DOMPurify and the TipTap editor moved to patched releases (each at least
+  7 days old when adopted).
+
+### Changed
+- The unattended operation mode is now called **Autonomy** (sidebar switch).
+
+### Fixed
+- All React Compiler / react-hooks lint errors (89) fixed; CI lint is green.
+
 ## [0.5.0] — 2026-06-27
 
 ### Added
@@ -535,7 +548,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CLI commands: `setup`, `start`, `update`, `doctor`, `help`
 - Human-controlled autonomy — approval gate before any sensitive tool call executes
 
-[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/dolevhayut/Employee001/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/dolevhayut/Employee001/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/dolevhayut/Employee001/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dolevhayut/Employee001/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/dolevhayut/Employee001/compare/v0.3.0...v0.3.1
