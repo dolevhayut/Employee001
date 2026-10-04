@@ -25,33 +25,33 @@ const VERDICT_META: Record<
   },
   ceo_approved: {
     labelKey: "audit.verdict.approved",
-    color: "#16a34a",
-    bg: "#dcfce7",
-    dot: "#16a34a",
+    color: "var(--success)",
+    bg: "color-mix(in oklch, var(--success) 14%, transparent)",
+    dot: "var(--success)",
   },
   ceo_denied: {
     labelKey: "audit.verdict.denied",
-    color: "#b45309",
-    bg: "#fef3c7",
-    dot: "#b45309",
+    color: "var(--warn)",
+    bg: "color-mix(in oklch, var(--warn) 14%, transparent)",
+    dot: "var(--warn)",
   },
   hard_blocked: {
     labelKey: "audit.verdict.blocked",
-    color: "#dc2626",
-    bg: "#fee2e2",
-    dot: "#dc2626",
+    color: "var(--danger)",
+    bg: "color-mix(in oklch, var(--danger) 14%, transparent)",
+    dot: "var(--danger)",
   },
   executed: {
     labelKey: "audit.verdict.executed",
     color: "var(--text-muted)",
     bg: "var(--surface-soft)",
-    dot: "#0ea5e9",
+    dot: "var(--success)",
   },
   deferred_to_flow: {
     labelKey: "audit.verdict.deferred",
-    color: "#7c3aed",
-    bg: "#ede9fe",
-    dot: "#7c3aed",
+    color: "var(--warn)",
+    bg: "color-mix(in oklch, var(--warn) 14%, transparent)",
+    dot: "var(--warn)",
   },
 };
 
@@ -609,7 +609,7 @@ export default function AuditPage() {
                         <bdi>{entry.bareName}</bdi>
                       </code>
                       {entry.inputEdited && (
-                        <span style={{ fontSize: "var(--fs-xs)", color: "#9333ea" }}>✎ {t("audit.argsEdited")}</span>
+                        <span style={{ fontSize: "var(--fs-xs)", color: "var(--accent-deep)" }}>✎ {t("audit.argsEdited")}</span>
                       )}
                       {entry.blockReason && (
                         <span
