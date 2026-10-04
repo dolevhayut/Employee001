@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **Twins say they work at your company, not "Employee001".** The company
+  name and a one-line description are saved from Setup and
+  Settings → Workspace (they weren't saved before), and Team Meetings and
+  shifts use them.
 - Setup, Sources and Join pages follow the light, dark and cool themes
   (they used hard-coded colors). The setup wizard's theme previews each
   show their own theme.
