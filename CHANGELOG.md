@@ -67,7 +67,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Hebrew interface, first steps.** Settings → Workspace has an
   English / עברית switch. In Hebrew the app runs right-to-left in
   Niv Sans; the sidebar, command palette (search works in both languages),
-  page titles, empty states and Settings are translated. More screens
+  page titles, empty states, Settings, the Twins roster, the org chart and
+  Approvals are translated, with dates in the local format. More screens
   follow. English
   stays the default and doesn't load the Hebrew font.
 - **Knowledge files keep their history.** Editing or deleting a twin's
