@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
+import { useT } from "@/components/ex/i18n-context";
+import type { Locale } from "@/lib/i18n/messages";
 import { setOrgName } from "@/components/ex/use-org-name";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
@@ -285,8 +287,68 @@ function WorkspaceSection() {
                 : "Twins introduce themselves as working here."}
           </span>
         </div>
+        <LanguageControl />
       </div>
     </section>
+  );
+}
+
+const LANGUAGE_OPTIONS: { id: Locale; label: string }[] = [
+  { id: "en", label: "English" },
+  { id: "he", label: "עברית" },
+];
+
+function LanguageControl() {
+  const { t, locale, setLocale } = useT();
+  return (
+    <div
+      style={{
+        marginTop: "var(--sp-16)",
+        paddingTop: "var(--sp-16)",
+        borderTop: "1px solid var(--hairline)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "var(--sp-12)",
+      }}
+    >
+      <div style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>{t("settings.language")}</div>
+      <div
+        role="group"
+        aria-label={t("settings.language")}
+        style={{
+          display: "inline-flex",
+          border: "1px solid var(--hairline)",
+          borderRadius: "var(--radius)",
+          overflow: "hidden",
+        }}
+      >
+        {LANGUAGE_OPTIONS.map((option, index) => {
+          const active = locale === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setLocale(option.id)}
+              style={{
+                padding: "5px 12px",
+                fontSize: "var(--fs-ui)",
+                fontFamily: "inherit",
+                border: "none",
+                borderInlineStart: index === 0 ? "none" : "1px solid var(--hairline)",
+                background: active ? "var(--text)" : "transparent",
+                color: active ? "var(--bg)" : "var(--text-muted)",
+                fontWeight: active ? 600 : 500,
+                cursor: "pointer",
+              }}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

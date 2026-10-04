@@ -118,8 +118,10 @@
   --radius-lg: 6px;
   --radius-xl: 10px; /* floating shell panels (sidebar + content) */
 
-  /* Type — Geist + Geist Mono loaded via next/font in src/app/layout.tsx.
-     Instrument Serif stays the display serif. */
+  /* Type — Geist + Geist Mono + Niv Sans loaded via next/font in
+     src/app/layout.tsx. Instrument Serif stays the display serif.
+     Hebrew swaps the sans stack in the html[lang="he"] rule below.
+     font-synthesis is disabled so only the real Niv weights (300–700) draw. */
   --font: var(--font-geist), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
     monospace;
@@ -293,6 +295,11 @@
 
 * { box-sizing: border-box; }
 
+/* Niv Sans first, then the existing Geist chain. Monospace is unchanged. */
+html[lang="he"] {
+  --font: var(--font-niv), var(--font-geist), system-ui, sans-serif;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -300,6 +307,7 @@ html, body {
   color: var(--text);
   font-family: var(--font);
   font-size: var(--fs-ui);
+  font-synthesis: none;
   font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

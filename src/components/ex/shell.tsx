@@ -13,16 +13,18 @@ import { GlobalApprovalOverlay, NotificationBell, usePendingApprovalCount } from
 import { ActiveBuildsBanner } from "./active-builds-banner";
 import { RosterProvider, useRoster } from "./roster-context";
 import { WorkspaceModeProvider, useWorkspaceMode } from "./workspace-mode-context";
+import { useT } from "./i18n-context";
+import type { MessageKey } from "@/lib/i18n/messages";
 
 type NavItem = {
   href: string;
-  label: string;
+  labelKey: MessageKey;
   icon: IconName;
   badge?: "approvals";
 };
 
 type NavSection = {
-  label: string;
+  labelKey: MessageKey;
   items: NavItem[];
 };
 
@@ -43,39 +45,39 @@ type CommandItem = {
 // Autonomy is off. Settings lives in the pinned footer.
 const NAV_SECTIONS: NavSection[] = [
   {
-    label: "Work",
+    labelKey: "nav.section.work",
     items: [
-      { href: "/inbox", label: "Approvals", icon: "Bell", badge: "approvals" },
-      { href: "/tasks", label: "Tasks", icon: "Zap" },
-      { href: "/council", label: "Team Meeting", icon: "Team" },
+      { href: "/inbox", labelKey: "nav.approvals", icon: "Bell", badge: "approvals" },
+      { href: "/tasks", labelKey: "nav.tasks", icon: "Zap" },
+      { href: "/council", labelKey: "nav.teamMeeting", icon: "Team" },
     ],
   },
   {
-    label: "Twins",
+    labelKey: "nav.section.twins",
     items: [
-      { href: "/employees", label: "Twins", icon: "Home" },
-      { href: "/flow", label: "Chat", icon: "Bot" },
-      { href: "/marketplace", label: "Hire", icon: "Store" },
+      { href: "/employees", labelKey: "nav.twins", icon: "Home" },
+      { href: "/flow", labelKey: "nav.chat", icon: "Bot" },
+      { href: "/marketplace", labelKey: "nav.hire", icon: "Store" },
     ],
   },
   {
-    label: "Operations",
+    labelKey: "nav.section.operations",
     items: [
-      { href: "/cockpit", label: "Cockpit", icon: "Activity" },
-      { href: "/routines", label: "Schedules", icon: "Refresh" },
-      { href: "/audit", label: "Activity log", icon: "Logs" },
+      { href: "/cockpit", labelKey: "nav.cockpit", icon: "Activity" },
+      { href: "/routines", labelKey: "nav.schedules", icon: "Refresh" },
+      { href: "/audit", labelKey: "nav.activityLog", icon: "Logs" },
     ],
   },
   {
-    label: "Control",
+    labelKey: "nav.section.control",
     items: [
-      { href: "/budgets", label: "Spend", icon: "DollarSign" },
-      { href: "/connections", label: "Tools & MCP", icon: "Plug" },
+      { href: "/budgets", labelKey: "nav.spend", icon: "DollarSign" },
+      { href: "/connections", labelKey: "nav.tools", icon: "Plug" },
     ],
   },
   {
-    label: "Labs",
-    items: [{ href: "/handover", label: "Handover", icon: "Send" }],
+    labelKey: "nav.section.labs",
+    items: [{ href: "/handover", labelKey: "nav.handover", icon: "Send" }],
   },
 ];
 
@@ -879,8 +881,10 @@ function TwinSwitcher() {
 // firing unattended work within one tick (≤30s).
 function ModeToggle({ collapsed }: { collapsed: boolean }) {
   const { mode, loaded, setMode } = useWorkspaceMode();
+  const { t } = useT();
   const armed = mode === "x";
   const flip = () => setMode(armed ? "base" : "x");
+  const title = armed ? t("autonomy.titleArmed") : t("autonomy.titleOff");
 
   if (collapsed) {
     return (
@@ -888,7 +892,7 @@ function ModeToggle({ collapsed }: { collapsed: boolean }) {
         type="button"
         onClick={flip}
         disabled={!loaded}
-        title={armed ? "Autonomy armed — click to disarm" : "Autonomy off — click to arm"}
+        title={title}
         className="nav-item"
         style={{
           display: "flex",
@@ -924,16 +928,16 @@ function ModeToggle({ collapsed }: { collapsed: boolean }) {
         borderRadius: 6,
         cursor: loaded ? "pointer" : "default",
         width: "100%",
-        textAlign: "left",
+        textAlign: "start",
       }}
     >
       <span className={armed ? "dot success pulse" : "dot idle"} style={{ boxShadow: "none", flexShrink: 0 }} />
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block", fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--text)", letterSpacing: "-0.005em" }}>
-          Autonomy
+          {t("autonomy.label")}
         </span>
         <span style={{ display: "block", fontSize: "var(--fs-meta)", color: "var(--text-muted)", lineHeight: 1.3 }}>
-          {armed ? "Autonomy armed" : "Autonomy off"}
+          {armed ? t("autonomy.armed") : t("autonomy.off")}
         </span>
       </span>
       {/* Switch track */}
@@ -954,13 +958,13 @@ function ModeToggle({ collapsed }: { collapsed: boolean }) {
           style={{
             position: "absolute",
             top: 1,
-            left: armed ? 13 : 1,
+            insetInlineStart: armed ? 13 : 1,
             width: 12,
             height: 12,
             borderRadius: "50%",
             background: "var(--bg-elevated)",
             boxShadow: "var(--shadow-sm)",
-            transition: "left .15s ease",
+            transition: "inset-inline-start .15s ease",
           }}
         />
       </span>
@@ -1007,6 +1011,8 @@ function writeSidebarCollapsed(next: boolean): void {
 export function Sidebar() {
   const pathname = usePathname();
   const pendingApprovals = usePendingApprovalCount();
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   const collapsed = useSyncExternalStore(
     sidebarSubscribe,
     sidebarCollapsedSnapshot,
@@ -1060,7 +1066,7 @@ export function Sidebar() {
           <>
             <div style={{ fontWeight: 600, fontSize: "var(--fs-base)", letterSpacing: "-0.015em", whiteSpace: "nowrap" }}>
               Employee001{" "}
-              <em style={{ fontStyle: "normal", color: "var(--text-muted)", fontWeight: 400, marginLeft: "var(--sp-4)", fontSize: "var(--fs-meta)" }}>
+              <em style={{ fontStyle: "normal", color: "var(--text-muted)", fontWeight: 400, marginInlineStart: "var(--sp-4)", fontSize: "var(--fs-meta)" }}>
                 v{process.env.NEXT_PUBLIC_APP_VERSION}
               </em>
             </div>
@@ -1087,14 +1093,15 @@ export function Sidebar() {
         {/* Workspace nav */}
         <div style={{ display: "flex", flexDirection: "column", gap: collapsed ? 2 : 9 }}>
           {NAV_SECTIONS.map((section) => (
-            <div key={section.label} style={{ display: "flex", flexDirection: "column", gap: "var(--sp-1)" }}>
-              {!collapsed && <div className="nav-label">{section.label}</div>}
+            <div key={section.labelKey} style={{ display: "flex", flexDirection: "column", gap: "var(--sp-1)" }}>
+              {!collapsed && <div className="nav-label">{t(section.labelKey)}</div>}
               {collapsed && <div style={{ height: 6 }} />}
               {section.items.map((item) => {
                 const Icon = Icons[item.icon];
                 const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                 const badge = item.badge === "approvals" ? pendingApprovals : 0;
-                const label = badge > 0 ? `${item.label} (${badge} pending)` : item.label;
+                const itemLabel = t(item.labelKey);
+                const label = badge > 0 ? t("nav.pendingBadge", { label: itemLabel, count: badge }) : itemLabel;
                 return (
                   <Link
                     key={item.href}
@@ -1120,7 +1127,7 @@ export function Sidebar() {
                     }}
                   >
                     <Icon size={14} style={{ opacity: isActive ? 1 : 0.7, flexShrink: 0 }} />
-                    {!collapsed && <span>{item.label}</span>}
+                    {!collapsed && <span>{itemLabel}</span>}
                     {badge > 0 && (
                       <span
                         aria-hidden
@@ -1129,14 +1136,14 @@ export function Sidebar() {
                             ? {
                                 position: "absolute",
                                 top: 4,
-                                right: 8,
+                                insetInlineEnd: 8,
                                 width: 6,
                                 height: 6,
                                 borderRadius: "50%",
                                 background: "var(--warn)",
                               }
                             : {
-                                marginLeft: "auto",
+                                marginInlineStart: "auto",
                                 minWidth: 18,
                                 height: 18,
                                 padding: "0 5px",
@@ -1182,7 +1189,7 @@ export function Sidebar() {
         <ModeToggle collapsed={collapsed} />
         <Link
           href="/settings"
-          title={collapsed ? "Settings" : undefined}
+          title={collapsed ? t("nav.settings") : undefined}
           className="nav-item"
           style={{
             display: "flex",
@@ -1198,7 +1205,7 @@ export function Sidebar() {
           }}
         >
           <Icons.Settings size={14} style={{ opacity: 0.7 }} />
-          {!collapsed && <span>Settings</span>}
+          {!collapsed && <span>{t("nav.settings")}</span>}
         </Link>
 
         {/* Admin footer */}
@@ -1265,7 +1272,13 @@ export function Sidebar() {
             style={{
               flexShrink: 0,
               transition: "transform .18s ease",
-              transform: collapsed ? "rotate(180deg)" : "none",
+              transform: collapsed
+                ? rtl
+                  ? "none"
+                  : "rotate(180deg)"
+                : rtl
+                  ? "rotate(180deg)"
+                  : "none",
             }}
           />
           {!collapsed && <span>Collapse</span>}
@@ -1394,7 +1407,9 @@ export function Shell({ children }: { children: ReactNode }) {
     <RosterProvider>
       <WorkspaceModeProvider>
         {/* Floating shell: sidebar and content are separate rounded panels
-            inset from the window edges on a sunken frame. */}
+            inset from the window edges on a sunken frame. The first grid
+            track is the inline-start edge, so dir=rtl parks the sidebar
+            on the right without a physical left/right. */}
         <div
           style={{
             display: "grid",
