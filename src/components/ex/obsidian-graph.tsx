@@ -40,22 +40,8 @@ const HUB_DEPTH_BOOST = 1.3;
 
 // ─── Theme detection ─────────────────────────────────────────────────────────
 
-function isDarkTheme(): boolean {
-  if (typeof window === "undefined") return true;
-  const attr = document.documentElement.getAttribute("data-theme");
-  if (attr === "dark") return true;
-  if (attr === "light" || attr === "cool") return false;
-  // data-theme not set yet — check localStorage before falling back to OS
-  try {
-    const stored = localStorage.getItem("em001-theme");
-    if (stored === "dark") return true;
-    if (stored === "light") return false;
-  } catch {}
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-// Subscribe to both the `data-theme` attribute and the OS color-scheme so the
-// graph recolors live — the exact triggers the previous effect listened for.
+// Subscribe to the theme attribute and OS color scheme so resolved canvas
+// colors refresh without reloading the graph.
 function subscribeTheme(onChange: () => void): () => void {
   const obs = new MutationObserver(onChange);
   obs.observe(document.documentElement, {
@@ -70,14 +56,68 @@ function subscribeTheme(onChange: () => void): () => void {
   };
 }
 
-function useThemeIsDark(): boolean {
-  // External store: read the live theme on the client, `true` during SSR and
-  // hydration (matching the previous initial state) — no setState-in-effect.
-  return useSyncExternalStore(
-    subscribeTheme,
-    () => isDarkTheme(),
-    () => true,
-  );
+type ThemeColors = {
+  bg: string;
+  bgSunken: string;
+  surface: string;
+  hairline: string;
+  text: string;
+  textMuted: string;
+  accent: string;
+  accentSoft: string;
+  accentDeep: string;
+};
+
+const SERVER_THEME_COLORS: ThemeColors = {
+  bg: "var(--bg)",
+  bgSunken: "var(--bg-sunken)",
+  surface: "var(--surface)",
+  hairline: "var(--hairline)",
+  text: "var(--text)",
+  textMuted: "var(--text-muted)",
+  accent: "var(--accent)",
+  accentSoft: "var(--accent-soft)",
+  accentDeep: "var(--accent-deep)",
+};
+
+let cachedThemeColors: ThemeColors | null = null;
+let cachedThemeKey = "";
+
+function getThemeColors(): ThemeColors {
+  if (typeof window === "undefined") return SERVER_THEME_COLORS;
+
+  const styles = getComputedStyle(document.documentElement);
+  const values = [
+    "--bg",
+    "--bg-sunken",
+    "--surface",
+    "--hairline",
+    "--text",
+    "--text-muted",
+    "--accent",
+    "--accent-soft",
+    "--accent-deep",
+  ].map((name) => styles.getPropertyValue(name).trim());
+  const key = values.join(":");
+  if (cachedThemeColors && cachedThemeKey === key) return cachedThemeColors;
+
+  cachedThemeKey = key;
+  cachedThemeColors = {
+    bg: values[0],
+    bgSunken: values[1],
+    surface: values[2],
+    hairline: values[3],
+    text: values[4],
+    textMuted: values[5],
+    accent: values[6],
+    accentSoft: values[7],
+    accentDeep: values[8],
+  };
+  return cachedThemeColors;
+}
+
+function useThemeColors(): ThemeColors {
+  return useSyncExternalStore(subscribeTheme, getThemeColors, getThemeColors);
 }
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
@@ -153,31 +193,41 @@ function labelFor(node: LaidOutNode, memoryFallback: string): string {
   return node.name.replace(/\.md$/, "");
 }
 
-// Theme-aware base colors for nodes (returns hex for canvas use).
-function baseNodeColor(node: LaidOutNode, dark: boolean): string {
-  if (node.tags?.[0] === "scratch") return "#fde36b";
-  if (node.tags?.[0] === "memory") return "#f7d04a";
-  if (dark) {
-    if (node.confidence >= 0.85) return "#d4a574";
-    if (node.confidence >= 0.7) return "#b89070";
-    return "#9e7e64";
-  }
-  if (node.confidence >= 0.85) return "#9E6B47";
-  if (node.confidence >= 0.7) return "#B89070";
-  return "#C4A98A";
+const SCRATCH_NODE_COLOR = "#fde36b";
+const MEMORY_NODE_COLOR = "#f7d04a";
+
+// Scratch and memory retain distinct data-type hues; other nodes use theme tokens.
+function baseNodeColor(node: LaidOutNode, colors: ThemeColors): string {
+  if (node.tags?.[0] === "scratch") return SCRATCH_NODE_COLOR;
+  if (node.tags?.[0] === "memory") return MEMORY_NODE_COLOR;
+  if (node.confidence >= 0.85) return colors.accentDeep;
+  if (node.confidence >= 0.7) return colors.accent;
+  return colors.accentSoft;
 }
 
 // State color overrides (reading > cited > recentlyTouched > base).
 function nodeFill(
   node: LaidOutNode,
   state: GraphHighlightState,
-  dark: boolean,
-  accent: { soft: string; mid: string; deep: string }
+  colors: ThemeColors,
 ): string {
-  if (state.reading.has(node.name)) return accent.mid;
-  if (state.cited.has(node.name)) return accent.deep;
-  if (state.recentlyTouched.has(node.name)) return accent.soft;
-  return baseNodeColor(node, dark);
+  if (state.reading.has(node.name)) return colors.accent;
+  if (state.cited.has(node.name)) return colors.accentDeep;
+  if (state.recentlyTouched.has(node.name)) return colors.accentSoft;
+  return baseNodeColor(node, colors);
+}
+
+function colorToRgb(color: string): Float32Array {
+  const hex = color.trim().replace("#", "");
+  const normalized = hex.length === 3
+    ? hex.split("").map((channel) => channel + channel).join("")
+    : hex;
+  const value = Number.parseInt(normalized, 16);
+  return new Float32Array([
+    ((value >> 16) & 255) / 255,
+    ((value >> 8) & 255) / 255,
+    (value & 255) / 255,
+  ]);
 }
 
 // ─── Shader background ──────────────────────────────────────────────────────
@@ -192,7 +242,9 @@ precision highp float;
 out vec4 fragColor;
 uniform vec2 u_res;
 uniform float u_time;
-uniform float u_dark;
+uniform vec3 u_low;
+uniform vec3 u_high;
+uniform vec3 u_accent;
 
 // Hash + noise primitives
 float hash(vec2 p) {
@@ -231,33 +283,24 @@ void main() {
   );
   float f = fbm(uv * 1.7 + r);
 
-  // Dark: deep warm brown nebula with amber highlights
-  vec3 darkLow  = vec3(0.050, 0.035, 0.020);
-  vec3 darkHigh = vec3(0.160, 0.095, 0.045);
-  vec3 darkAccent = vec3(0.48, 0.28, 0.10) * smoothstep(0.55, 0.95, f);
-  vec3 darkCol = mix(darkLow, darkHigh, clamp(f * 1.5, 0.0, 1.0)) + darkAccent * 0.38;
+  vec3 col = mix(u_low, u_high, f * 0.45)
+    + u_accent * smoothstep(0.55, 0.95, f) * 0.12;
 
-  // Light: warm cream paper texture (very subtle)
-  vec3 lightLow  = vec3(0.961, 0.945, 0.918);
-  vec3 lightHigh = vec3(0.933, 0.910, 0.870);
-  vec3 lightCol = mix(lightLow, lightHigh, f * 0.45);
-
-  // Vignette — gentle, theme-aware
+  // Vignette — gentle across every tokenized theme
   float vig = smoothstep(1.1, 0.25, length(uv));
-  vec3 col = mix(lightCol, darkCol, u_dark);
   col *= mix(0.94, 1.0, vig);
 
   fragColor = vec4(col, 1.0);
 }
 `;
 
-function ShaderBackground({ isDark }: { isDark: boolean }) {
+function ShaderBackground({ colors }: { colors: ThemeColors }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const darkRef = useRef(isDark);
+  const colorsRef = useRef(colors);
   // Mirror the latest theme into a ref the animation loop reads each frame.
   useEffect(() => {
-    darkRef.current = isDark;
-  }, [isDark]);
+    colorsRef.current = colors;
+  }, [colors]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -296,9 +339,10 @@ function ShaderBackground({ isDark }: { isDark: boolean }) {
 
     const uRes = gl.getUniformLocation(prog, "u_res");
     const uTime = gl.getUniformLocation(prog, "u_time");
-    const uDark = gl.getUniformLocation(prog, "u_dark");
+    const uLow = gl.getUniformLocation(prog, "u_low");
+    const uHigh = gl.getUniformLocation(prog, "u_high");
+    const uAccent = gl.getUniformLocation(prog, "u_accent");
 
-    let darkBlend = darkRef.current ? 1.0 : 0.0;
     let raf = 0;
     const start = performance.now();
 
@@ -317,12 +361,16 @@ function ShaderBackground({ isDark }: { isDark: boolean }) {
     resize();
 
     const tick = () => {
-      const targetDark = darkRef.current ? 1.0 : 0.0;
-      darkBlend += (targetDark - darkBlend) * 0.08;
+      const theme = colorsRef.current;
+      const low = colorToRgb(theme.bg);
+      const high = colorToRgb(theme.bgSunken);
+      const accent = colorToRgb(theme.accent);
       const t = (performance.now() - start) / 1000;
       gl.uniform2f(uRes, canvas.width, canvas.height);
       gl.uniform1f(uTime, t);
-      gl.uniform1f(uDark, darkBlend);
+      gl.uniform3fv(uLow, low);
+      gl.uniform3fv(uHigh, high);
+      gl.uniform3fv(uAccent, accent);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       raf = requestAnimationFrame(tick);
     };
@@ -353,13 +401,13 @@ function ShaderBackground({ isDark }: { isDark: boolean }) {
 
 type Particle = { x: number; y: number; z: number };
 
-function AmbientNeurons({ isDark }: { isDark: boolean }) {
+function AmbientNeurons({ colors }: { colors: ThemeColors }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const darkRef = useRef(isDark);
+  const colorsRef = useRef(colors);
   // Mirror the latest theme into a ref the animation loop reads each frame.
   useEffect(() => {
-    darkRef.current = isDark;
-  }, [isDark]);
+    colorsRef.current = colors;
+  }, [colors]);
 
   // Stable random particles — generated once on mount inside the effect, since
   // they're only consumed by the draw loop below.
@@ -411,9 +459,7 @@ function AmbientNeurons({ isDark }: { isDark: boolean }) {
       autoRot += dt * 0.05;
       const t = (now - start) / 1000;
 
-      const dark = darkRef.current;
-      const lineCol = dark ? "rgba(232, 198, 144," : "rgba(106, 69, 40,";
-      const dotCol = dark ? "rgba(245, 220, 175," : "rgba(80, 50, 28,";
+      const theme = colorsRef.current;
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -464,7 +510,7 @@ function AmbientNeurons({ isDark }: { isDark: boolean }) {
           const depth = (a.scale + b.scale) * 0.5;
           const alpha = closeness * closeness * 0.18 * depth;
           if (alpha < 0.012) continue;
-          ctx.strokeStyle = lineCol + alpha.toFixed(3) + ")";
+          ctx.strokeStyle = hexToRgba(theme.accentDeep, alpha);
           ctx.lineWidth = 0.6 * dpr;
           ctx.beginPath();
           ctx.moveTo(a.px, a.py);
@@ -476,7 +522,7 @@ function AmbientNeurons({ isDark }: { isDark: boolean }) {
       // Tiny neuron dots
       for (const p of proj) {
         const a = 0.18 * p.scale;
-        ctx.fillStyle = dotCol + a.toFixed(3) + ")";
+        ctx.fillStyle = hexToRgba(theme.text, a);
         ctx.beginPath();
         ctx.arc(p.px, p.py, 1.2 * p.scale * dpr, 0, Math.PI * 2);
         ctx.fill();
@@ -535,7 +581,7 @@ type GraphCanvasProps = {
   graph: EmployeeGraph;
   layout: LaidOutNode[];
   state: GraphHighlightState;
-  isDark: boolean;
+  colors: ThemeColors;
   zoom: number;
   hoveredNode: string | null;
   memoryLabel: string;
@@ -547,7 +593,7 @@ function GraphCanvas({
   graph,
   layout,
   state,
-  isDark,
+  colors,
   zoom,
   hoveredNode,
   memoryLabel,
@@ -560,7 +606,7 @@ function GraphCanvas({
   const graphRef = useRef(graph);
   const hoverRef = useRef(hoveredNode);
   const zoomRef = useRef(zoom);
-  const darkRef = useRef(isDark);
+  const colorsRef = useRef(colors);
   const memoryLabelRef = useRef(memoryLabel);
 
   const nodeMap = useMemo(() => {
@@ -578,7 +624,7 @@ function GraphCanvas({
     graphRef.current = graph;
     hoverRef.current = hoveredNode;
     zoomRef.current = zoom;
-    darkRef.current = isDark;
+    colorsRef.current = colors;
     memoryLabelRef.current = memoryLabel;
     nodeMapRef.current = nodeMap;
   });
@@ -653,7 +699,7 @@ function GraphCanvas({
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
-      const dark = darkRef.current;
+      const theme = colorsRef.current;
       const z = zoomRef.current;
       const s = stateRef.current;
       const layoutNow = layoutRef.current;
@@ -682,15 +728,10 @@ function GraphCanvas({
       const sinX = Math.sin(rotX);
 
       // Theme-derived colors
-      const accent = dark
-        ? { soft: "#b89880", mid: "#e8c690", deep: "#f5d8a8" }
-        : { soft: "#C4A98A", mid: "#9E6B47", deep: "#7a4d2e" };
-      const synapseCol = dark ? "rgba(255, 240, 215, 1)" : "rgba(60, 35, 18, 1)";
-      const edgeBase = dark ? "rgba(220, 200, 170, " : "rgba(80, 50, 30, ";
-      const edgeReading = dark ? "rgba(245, 216, 168, " : "rgba(158, 107, 71, ";
-      const labelMuted = dark ? "rgba(232, 220, 200, 0.85)" : "rgba(40, 30, 20, 0.75)";
-      const labelStrong = dark ? "rgba(252, 245, 225, 1)" : "rgba(20, 15, 10, 0.98)";
-      const labelStroke = dark ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 252, 245, 0.9)";
+      const synapseCol = theme.surface;
+      const labelMuted = hexToRgba(theme.textMuted, 0.85);
+      const labelStrong = hexToRgba(theme.text, 0.98);
+      const labelStroke = hexToRgba(theme.bgSunken, 0.9);
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -786,7 +827,7 @@ function GraphCanvas({
         const cmy = my + ny * bow;
 
         ctx.strokeStyle =
-          (isReading ? edgeReading : edgeBase) + alpha.toFixed(3) + ")";
+          hexToRgba(isReading ? theme.accent : theme.hairline, alpha);
         ctx.lineWidth = (isReading ? 1.6 : 0.9) * dpr;
         ctx.beginPath();
         ctx.moveTo(pa.px, pa.py);
@@ -866,7 +907,7 @@ function GraphCanvas({
         const isCited = s.cited.has(n.name);
         const isHovered = hovered === n.name;
         const isActive = !neighborSet || neighborSet.has(n.name);
-        const fill = nodeFill(n, s, dark, accent);
+        const fill = nodeFill(n, s, theme);
         const r = n.r * p.scale * dpr;
 
         ctx.globalAlpha = isActive ? 1 : 0.22;
@@ -885,7 +926,7 @@ function GraphCanvas({
         if (isReading) {
           const phase = (t % 1.4) / 1.4;
           ctx.globalAlpha = (1 - phase) * 0.85 * (isActive ? 1 : 0.22);
-          ctx.strokeStyle = accent.mid;
+          ctx.strokeStyle = theme.accent;
           ctx.lineWidth = 1.8 * dpr;
           ctx.beginPath();
           ctx.arc(p.px, p.py, r + 4 * dpr + phase * 18 * dpr, 0, Math.PI * 2);
@@ -895,7 +936,7 @@ function GraphCanvas({
 
         // Cited static ring
         if (isCited && !isReading) {
-          ctx.strokeStyle = accent.deep;
+          ctx.strokeStyle = theme.accentDeep;
           ctx.lineWidth = 1.8 * dpr;
           ctx.beginPath();
           ctx.arc(p.px, p.py, r + 4 * dpr, 0, Math.PI * 2);
@@ -904,7 +945,7 @@ function GraphCanvas({
 
         // Hover ring
         if (isHovered) {
-          ctx.strokeStyle = dark ? "rgba(255,250,235,0.55)" : "rgba(20,15,10,0.55)";
+          ctx.strokeStyle = hexToRgba(theme.text, 0.55);
           ctx.lineWidth = 1.4 * dpr;
           ctx.beginPath();
           ctx.arc(p.px, p.py, r + 7 * dpr, 0, Math.PI * 2);
@@ -1011,7 +1052,7 @@ function GraphCanvas({
   );
 }
 
-// hex (#rgb / #rrggbb) → rgba(...)
+// Canvas needs concrete color strings, so alpha is applied to resolved token values.
 function hexToRgba(hex: string, alpha: number): string {
   if (!hex.startsWith("#")) return hex;
   let h = hex.slice(1);
@@ -1031,7 +1072,7 @@ const ZOOM_STEP = 0.12;
 
 export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
   const { t } = useT();
-  const isDark = useThemeIsDark();
+  const colors = useThemeColors();
   const memoryLabel = t("chat.graph.memory");
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -1125,13 +1166,13 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
         background: "var(--bg)",
       }}
     >
-      <ShaderBackground isDark={isDark} />
-      <AmbientNeurons isDark={isDark} />
+      <ShaderBackground colors={colors} />
+      <AmbientNeurons colors={colors} />
       <GraphCanvas
         graph={graph}
         layout={layout}
         state={state}
-        isDark={isDark}
+        colors={colors}
         zoom={zoom}
         hoveredNode={hoveredNode}
         memoryLabel={memoryLabel}
@@ -1172,19 +1213,19 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
           {t("chat.graph.title")}
         </div>
         <LegendDot
-          color={isDark ? "#e8c690" : "#9E6B47"}
+          color="var(--accent)"
           label={t("chat.graph.reading")}
           pulse
         />
         <LegendDot
-          color={isDark ? "#f5d8a8" : "#7a4d2e"}
+          color="var(--accent-deep)"
           label={t("chat.graph.cited")}
         />
         <LegendDot
-          color={isDark ? "#b89880" : "#C4A98A"}
+          color="var(--accent-soft)"
           label={t("chat.graph.touched")}
         />
-        <LegendDot color="#fde36b" label={t("chat.graph.working")} />
+        <LegendDot color={SCRATCH_NODE_COLOR} label={t("chat.graph.working")} />
       </div>
 
       {/* Zoom + stats */}
