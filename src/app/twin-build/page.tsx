@@ -912,9 +912,9 @@ function FileRow({
 }) {
   const dotColor =
     status === "done"
-      ? "var(--success, #2c8b54)"
+      ? "var(--success)"
       : status === "writing"
-      ? "var(--accent-deep, #2563eb)"
+      ? "var(--accent-deep)"
       : "var(--text-subtle)";
   return (
     <button
@@ -926,8 +926,8 @@ function FileRow({
         padding: "9px 10px",
         margin: "2px 0",
         borderRadius: 5,
-        border: "1px solid " + (isActive ? "var(--hairline-strong)" : "transparent"),
-        background: isActive ? "var(--surface)" : "transparent",
+        border: "1px solid " + (isActive ? "var(--hairline-strong)" : "color-mix(in oklch, var(--hairline) 0%, transparent)"),
+        background: isActive ? "var(--surface)" : "color-mix(in oklch, var(--surface) 0%, transparent)",
         color: "var(--text)",
         cursor: "pointer",
         fontFamily: "inherit",
@@ -979,8 +979,8 @@ function FileRow({
       <style jsx>{`
         @keyframes pulse {
           0%   { box-shadow: 0 0 0 0 ${dotColor}; }
-          70%  { box-shadow: 0 0 0 6px transparent; }
-          100% { box-shadow: 0 0 0 0 transparent; }
+          70%  { box-shadow: 0 0 0 6px color-mix(in oklch, ${dotColor} 0%, transparent); }
+          100% { box-shadow: 0 0 0 0 color-mix(in oklch, ${dotColor} 0%, transparent); }
         }
       `}</style>
     </button>
@@ -1208,34 +1208,34 @@ const KIND_THEME: Record<
   read: {
     label: "read",
     Icon: ({ size }) => <Icons.Eye size={size ?? 10} />,
-    fg: "#2563eb",
-    bgSoft: "rgba(37, 99, 235, 0.10)",
-    border: "rgba(37, 99, 235, 0.22)",
-    accent: "#2563eb",
+    fg: "var(--accent-deep)",
+    bgSoft: "color-mix(in oklch, var(--accent) 12%, transparent)",
+    border: "color-mix(in oklch, var(--accent) 22%, transparent)",
+    accent: "var(--accent)",
   },
   write: {
     label: "write",
     Icon: ({ size }) => <Icons.Pencil size={size ?? 10} />,
-    fg: "#7c3aed",
-    bgSoft: "rgba(124, 58, 237, 0.10)",
-    border: "rgba(124, 58, 237, 0.22)",
-    accent: "#7c3aed",
+    fg: "var(--twin)",
+    bgSoft: "color-mix(in oklch, var(--twin) 12%, transparent)",
+    border: "color-mix(in oklch, var(--twin) 22%, transparent)",
+    accent: "var(--twin)",
   },
   blocked: {
     label: "block",
     Icon: ({ size }) => <Icons.Lock size={size ?? 10} />,
-    fg: "var(--danger, #c2410c)",
-    bgSoft: "rgba(220, 80, 60, 0.10)",
-    border: "rgba(220, 80, 60, 0.28)",
-    accent: "#c2410c",
+    fg: "var(--danger)",
+    bgSoft: "color-mix(in oklch, var(--danger) 12%, transparent)",
+    border: "color-mix(in oklch, var(--danger) 28%, transparent)",
+    accent: "var(--danger)",
   },
   result: {
     label: "ok",
     Icon: ({ size }) => <Icons.CheckCircle size={size ?? 10} />,
-    fg: "#15803d",
-    bgSoft: "rgba(40, 160, 90, 0.10)",
-    border: "rgba(40, 160, 90, 0.28)",
-    accent: "#15803d",
+    fg: "var(--success)",
+    bgSoft: "color-mix(in oklch, var(--success) 12%, transparent)",
+    border: "color-mix(in oklch, var(--success) 28%, transparent)",
+    accent: "var(--success)",
   },
   info: {
     label: "info",
