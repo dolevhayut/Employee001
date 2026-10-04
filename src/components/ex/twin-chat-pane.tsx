@@ -1659,11 +1659,11 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       style={{
                         display: "inline-flex", alignItems: "center", gap: "var(--sp-5)",
                         padding: "4px 10px", fontSize: "var(--fs-sm)", borderRadius: 6,
-                        border: copiedId === m.id ? "1px solid var(--success, #4ade80)" : "1px solid var(--hairline)",
+                        border: copiedId === m.id ? "1px solid var(--success)" : "1px solid var(--hairline)",
                         background: copiedId === m.id
-                          ? "color-mix(in oklch, var(--success, #4ade80) 12%, var(--surface))"
+                          ? "color-mix(in oklch, var(--success) 12%, var(--surface))"
                           : "var(--surface)",
-                        color: copiedId === m.id ? "var(--success, #4ade80)" : "var(--text-subtle)",
+                        color: copiedId === m.id ? "var(--success)" : "var(--text-subtle)",
                         cursor: "pointer",
                         fontFamily: "var(--font)",
                         transition: "all .15s",

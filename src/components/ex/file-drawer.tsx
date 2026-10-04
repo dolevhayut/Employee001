@@ -141,7 +141,7 @@ export function FileDrawer({ fileName, onClose, onOpenFile }: Props) {
         style={{
           position: "absolute",
           inset: 0,
-          background: "rgba(26, 24, 22, 0.18)",
+          background: "color-mix(in srgb, var(--text) 18%, transparent)",
           opacity: open ? 1 : 0,
           pointerEvents: open ? "auto" : "none",
           transition: "opacity .18s",

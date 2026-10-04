@@ -226,7 +226,7 @@ export function GlobalApprovalOverlay() {
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(15, 18, 24, 0.55)",
+          background: "color-mix(in srgb, var(--text) 55%, transparent)",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
           zIndex: 1000,
@@ -245,12 +245,12 @@ export function GlobalApprovalOverlay() {
           style={{
             width: "100%",
             maxWidth: 520,
-            background: "var(--bg-elevated, #fff)",
+            background: "var(--bg-elevated)",
             border: "1.5px solid var(--warn)",
             borderRadius: 14,
             padding: "var(--sp-22)",
             boxShadow:
-              "0 20px 60px rgba(0,0,0,0.25), 0 0 0 6px color-mix(in srgb, var(--warn) 14%, transparent)",
+              "var(--shadow-dialog), 0 0 0 6px color-mix(in srgb, var(--warn) 14%, transparent)",
           }}
         >
           {pending.length > 1 && (
@@ -622,7 +622,7 @@ export function NotificationBell({ count }: { count: number }) {
             padding: "0 3px",
             borderRadius: 999,
             background: "var(--warn)",
-            color: "white",
+            color: "var(--bg-elevated)",
             fontSize: "var(--fs-2xs)",
             fontWeight: 700,
             display: "grid",

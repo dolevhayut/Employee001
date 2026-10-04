@@ -22,7 +22,7 @@ function buildSrcDoc(content: string, type: "html" | "svg", tooLarge: boolean, t
       ? `<div style="display:flex;justify-content:center;align-items:center;padding:"var(--sp-8)"px">${content}</div>`
       : content;
 
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><style>html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;color:#1a1a1a;background:transparent}*{box-sizing:border-box}</style></head><body>${body}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><style>html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;color:CanvasText;background:transparent}*{box-sizing:border-box}</style></head><body>${body}</body></html>`;
 }
 
 function CanvasFullscreenPortal({
@@ -47,7 +47,7 @@ function CanvasFullscreenPortal({
         position: "fixed",
         inset: 0,
         zIndex: 9999,
-        background: "rgba(0,0,0,0.6)",
+        background: "color-mix(in srgb, var(--text) 60%, transparent)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -66,7 +66,7 @@ function CanvasFullscreenPortal({
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.35)",
+          boxShadow: "var(--shadow-dialog)",
         }}
       >
         {/* header */}
@@ -124,7 +124,7 @@ function CanvasFullscreenPortal({
             width: "100%",
             border: "none",
             display: "block",
-            background: "#fff",
+            background: "var(--surface)",
           }}
         />
       </div>

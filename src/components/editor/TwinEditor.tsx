@@ -78,7 +78,7 @@ function btnStyle(active: boolean, disabled: boolean): CSSProperties {
     padding: "0 6px",
     border: "1px solid transparent",
     borderRadius: 5,
-    background: active ? "var(--accent-soft, rgba(0,0,0,0.06))" : "transparent",
+    background: active ? "var(--accent-soft)" : "transparent",
     color: active ? "var(--accent-deep, var(--accent))" : "var(--text)",
     fontSize: "var(--fs-ui, 13px)",
     fontFamily: "inherit",
@@ -344,7 +344,7 @@ export function TwinEditor(props: TwinEditorProps) {
         }
         .twin-editor-prosemirror p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);
-          color: var(--text-muted, rgba(0, 0, 0, 0.4));
+          color: var(--text-muted);
           float: left;
           height: 0;
           pointer-events: none;

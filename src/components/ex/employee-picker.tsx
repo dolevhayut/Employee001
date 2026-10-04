@@ -30,8 +30,8 @@ function statusKey(emp: EmployeeWithTwin): MessageKey {
 }
 
 function statusColor(emp: EmployeeWithTwin): string {
-  if (emp.twinStatus === "ready") return "#22C55E";
-  if (emp.twinStatus === "building") return "#F59E0B";
+  if (emp.twinStatus === "ready") return "var(--success)";
+  if (emp.twinStatus === "building") return "var(--warn)";
   return "var(--text-subtle)";
 }
 
@@ -255,7 +255,7 @@ function Avatar({ emp, size = 26 }: { emp: EmployeeWithTwin; size?: number }) {
         placeItems: "center",
         fontSize: size >= 28 ? "var(--fs-xs)" : "var(--fs-2xs)",
         fontWeight: 700,
-        color: "#0A0A0A",
+        color: "var(--text)",
         flexShrink: 0,
       }}
     >
