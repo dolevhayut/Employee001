@@ -60,11 +60,11 @@ function ScheduleText({ schedule }: { schedule: Schedule }) {
 }
 
 const STATUS_META: Record<RoutineRunStatus, { labelKey: MessageKey; color: string; bg: string }> = {
-  ok:              { labelKey: "routines.status.ok",       color: "#16a34a", bg: "#dcfce7" },
-  needs_approval:  { labelKey: "routines.status.approval", color: "#b45309", bg: "#fef3c7" },
-  denied:          { labelKey: "routines.status.denied",   color: "#9333ea", bg: "#f3e8ff" },
-  error:           { labelKey: "routines.status.failed",   color: "#dc2626", bg: "#fee2e2" },
-  skipped:         { labelKey: "routines.status.skipped",  color: "#64748b", bg: "#f1f5f9" },
+  ok:              { labelKey: "routines.status.ok",       color: "var(--success)", bg: "color-mix(in oklch, var(--success) 12%, transparent)" },
+  needs_approval:  { labelKey: "routines.status.approval", color: "var(--warn)", bg: "color-mix(in oklch, var(--warn) 12%, transparent)" },
+  denied:          { labelKey: "routines.status.denied",   color: "var(--twin)", bg: "color-mix(in oklch, var(--twin) 12%, transparent)" },
+  error:           { labelKey: "routines.status.failed",   color: "var(--danger)", bg: "color-mix(in oklch, var(--danger) 12%, transparent)" },
+  skipped:         { labelKey: "routines.status.skipped",  color: "var(--text-subtle)", bg: "color-mix(in oklch, var(--text-subtle) 12%, transparent)" },
 };
 
 function triggerLabel(trigger: string, t: (key: MessageKey) => string): string {
@@ -407,8 +407,8 @@ export default function RoutinesPage() {
                           lineHeight: 1.55,
                           maxHeight: 64,
                           overflow: "hidden",
-                          maskImage: "linear-gradient(to bottom, black 60%, transparent)",
-                          WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent)",
+                          maskImage: "linear-gradient(to bottom, var(--text) 60%, transparent)",
+                          WebkitMaskImage: "linear-gradient(to bottom, var(--text) 60%, transparent)",
                         }}
                       >
                         <Markdown>{r.lastRunSummary}</Markdown>
@@ -613,7 +613,7 @@ function RoutineDetailModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15,18,24,0.45)",
+        background: "color-mix(in oklch, var(--text) 45%, transparent)",
         backdropFilter: "blur(4px)",
         zIndex: 100,
         display: "grid",
@@ -634,7 +634,7 @@ function RoutineDetailModal({
           background: "var(--bg-elevated)",
           borderRadius: 12,
           border: "1px solid var(--hairline)",
-          boxShadow: "0 16px 48px rgba(0,0,0,0.18)",
+          boxShadow: "var(--shadow-lg)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -769,11 +769,11 @@ function RoutineDetailModal({
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)", maxHeight: 200, overflowY: "auto" }} className="scrollbar">
                 {history.map((h) => {
                   const sel = h.runId === selectedRunId;
-                  const st = h.status === "complete" ? { c: "#22C55E", l: t("routines.runStatus.done") }
-                    : h.status === "error" ? { c: "#EF4444", l: t("routines.runStatus.error") }
+                  const st = h.status === "complete" ? { c: "var(--success)", l: t("routines.runStatus.done") }
+                    : h.status === "error" ? { c: "var(--danger)", l: t("routines.runStatus.error") }
                     : h.status === "running" || !h.status
-                      ? { c: "#F59E0B", l: t("routines.runStatus.running") }
-                      : { c: "#F59E0B", l: h.status };
+                      ? { c: "var(--warn)", l: t("routines.runStatus.running") }
+                      : { c: "var(--warn)", l: h.status };
                   return (
                     <button
                       key={h.runId}
@@ -1021,7 +1021,7 @@ function RoutineDetailModal({
           {/* Artifact viewer overlay */}
           {openArtifact && (
             <div
-              style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(15,18,24,0.7)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: "var(--sp-24)" }}
+              style={{ position: "fixed", inset: 0, zIndex: 200, background: "color-mix(in oklch, var(--text) 70%, transparent)", backdropFilter: "blur(6px)", display: "grid", placeItems: "center", padding: "var(--sp-24)" }}
               onClick={() => setOpenArtifact(null)}
             >
               <div
@@ -1099,7 +1099,7 @@ function LogRow({ e }: { e: ArchiveEvent }) {
     case "tool_use":
       return (
         <div style={wrap}>
-          {meta(<>🔧 {t("routines.log.tool")} · <bdi>{e.tool}</bdi></>, "#3B82F6")}
+          {meta(<>🔧 {t("routines.log.tool")} · <bdi>{e.tool}</bdi></>, "var(--accent)")}
           {e.input && Object.keys(e.input).length > 0 && (
             <pre style={{ margin: 0, fontSize: "var(--fs-2xs)", color: "var(--text-muted)", background: "var(--bg-sunken)", padding: "6px 8px", borderRadius: 5, overflow: "auto", maxHeight: 120 }}>
               {JSON.stringify(e.input, null, 2)}
@@ -1110,14 +1110,14 @@ function LogRow({ e }: { e: ArchiveEvent }) {
     case "tool_result":
       return (
         <div style={wrap}>
-          {meta(<>✓ {t("routines.log.result")} · <bdi>{e.tool}</bdi></>, "#22C55E")}
+          {meta(<>✓ {t("routines.log.result")} · <bdi>{e.tool}</bdi></>, "var(--success)")}
           {e.output && <span style={{ ...subtle, fontSize: "var(--fs-2xs)" }}>{e.output.slice(0, 600)}</span>}
         </div>
       );
     case "approval_request":
       return (
         <div style={wrap}>
-          {meta(<>⏳ {t("routines.log.approval")} · <bdi>{e.tool}</bdi></>, "#F59E0B")}
+          {meta(<>⏳ {t("routines.log.approval")} · <bdi>{e.tool}</bdi></>, "var(--warn)")}
           {e.reason && <span style={subtle}>{e.reason}</span>}
         </div>
       );
@@ -1130,7 +1130,7 @@ function LogRow({ e }: { e: ArchiveEvent }) {
               {" · "}
               <bdi>{e.tool}</bdi>
             </>,
-            e.decision === "allow" ? "#22C55E" : "#EF4444",
+            e.decision === "allow" ? "var(--success)" : "var(--danger)",
           )}
         </div>
       );
@@ -1218,7 +1218,7 @@ function CreateRoutineModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15,18,24,0.45)",
+        background: "color-mix(in oklch, var(--text) 45%, transparent)",
         backdropFilter: "blur(4px)",
         zIndex: 100,
         display: "grid",
@@ -1238,7 +1238,7 @@ function CreateRoutineModal({
           background: "var(--bg-elevated)",
           borderRadius: 12,
           border: "1px solid var(--hairline)",
-          boxShadow: "0 16px 48px rgba(0,0,0,0.18)",
+          boxShadow: "var(--shadow-lg)",
           padding: "var(--sp-22)",
         }}
       >
