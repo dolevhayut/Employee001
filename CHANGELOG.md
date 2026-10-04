@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **Unattended work starts with the server.** Schedules, catch-up of missed
+  runs and recovery of approvals lost in a restart used to wait until someone
+  opened Schedules or Tasks.
+- **The Autonomy switch looks on when it is on** (it was grey in every theme).
 - **"Run routine again" is reachable.** The review popup now offers it
   (instead of Approve/Reject) when a routine run was skipped or lost in a
   restart; before, the popup covered the button in Approvals.
