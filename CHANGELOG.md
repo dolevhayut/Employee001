@@ -9,6 +9,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **"Run routine again" is reachable.** The review popup now offers it
+  (instead of Approve/Reject) when a routine run was skipped or lost in a
+  restart; before, the popup covered the button in Approvals.
+- **Suggested knowledge updates carry the meeting's real date.**
+- **Schedules no longer shows an empty box on shift routines.**
 - **Dark and cool themes on Settings, Team Meeting, Cockpit, Schedules,
   Tasks, Approvals, twin training, Live interview, Hire and the org chart.**
   Hire also used theme names that did not exist, so some of its text had no

@@ -155,6 +155,27 @@ export function GlobalApprovalOverlay() {
     []
   );
 
+  // A routine run that was skipped or lost can't be "approved" after the
+  // fact: the useful action is to start the routine again, then close the item.
+  const rerunRoutine = useCallback(
+    async (feedId: string, routineId: string) => {
+      setBusyId(feedId);
+      try {
+        const run = await fetch(`/api/routines/${routineId}/run`, { method: "POST" });
+        if (!run.ok) return;
+        await fetch(`/api/feed/${feedId}/resolve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resolution: "approved", note: t("inbox.routineStarted") }),
+        });
+        setPending((p) => p.filter((a) => itemKey(a) !== feedId));
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [t]
+  );
+
   if (!mounted) return null;
   if (pending.length === 0) return null;
 
@@ -184,6 +205,11 @@ export function GlobalApprovalOverlay() {
       : !isLive && (current as FeedReview).source.kind === "task-run"
         ? t("inbox.source.task")
         : null;
+
+  const rerunRoutineId =
+    !isLive && (current as FeedReview).source.kind === "routine"
+      ? (current as FeedReview & { source: { kind: "routine"; routineId: string } }).source.routineId
+      : null;
 
   const empLabel = isLive
     ? (current as LiveApproval).employeeName ?? employee?.name ?? empId
@@ -468,7 +494,9 @@ export function GlobalApprovalOverlay() {
 
               <div style={{ display: "flex", gap: "var(--sp-8)" }}>
                 <button
-                  onClick={() => resolveFeed(key, "approved")}
+                  onClick={() =>
+                    rerunRoutineId ? rerunRoutine(key, rerunRoutineId) : resolveFeed(key, "approved")
+                  }
                   disabled={busy}
                   style={{
                     flex: 1,
@@ -487,25 +515,27 @@ export function GlobalApprovalOverlay() {
                     gap: "var(--sp-6)",
                   }}
                 >
-                  <Icons.Check size={13} />
-                  {t("inbox.approve")}
+                  {rerunRoutineId ? <Icons.Arrow size={13} /> : <Icons.Check size={13} />}
+                  {rerunRoutineId ? t("inbox.runRoutineAgain") : t("inbox.approve")}
                 </button>
-                <button
-                  onClick={() => resolveFeed(key, "rejected")}
-                  disabled={busy}
-                  style={{
-                    padding: "8px 14px",
-                    background: "var(--surface)",
-                    color: "var(--text-muted)",
-                    border: "1px solid var(--hairline)",
-                    borderRadius: 6,
-                    fontSize: "var(--fs-ui)",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                  }}
-                >
-                  {t("inbox.reject")}
-                </button>
+                {!rerunRoutineId && (
+                  <button
+                    onClick={() => resolveFeed(key, "rejected")}
+                    disabled={busy}
+                    style={{
+                      padding: "8px 14px",
+                      background: "var(--surface)",
+                      color: "var(--text-muted)",
+                      border: "1px solid var(--hairline)",
+                      borderRadius: 6,
+                      fontSize: "var(--fs-ui)",
+                      fontWeight: 500,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {t("inbox.reject")}
+                  </button>
+                )}
                 <button
                   onClick={() => resolveFeed(key, "dismissed")}
                   disabled={busy}
