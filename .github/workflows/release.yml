@@ -4,9 +4,10 @@ name: Release
 # package.json#version matches the tag, publishes to npm, and creates a
 # GitHub Release with auto-generated notes.
 #
-# Required secrets:
-#   NPM_TOKEN   — Automation token with publish rights on the `employee001`
-#                 npm package. (Settings → Secrets → Actions)
+# Auth: npm Trusted Publishing (OIDC). No NPM_TOKEN secret: npmjs.com trusts
+# this workflow (dolevhayut/Employee001, release.yml) as a publisher, and the
+# job's `id-token: write` permission mints a short-lived credential. Needs
+# npm CLI >= 11.5.1, installed below.
 #   GITHUB_TOKEN is provided automatically by Actions; no setup needed.
 
 on:
@@ -16,7 +17,7 @@ on:
 
 permissions:
   contents: write    # needed for `gh release create`
-  id-token: write    # needed for npm provenance
+  id-token: write    # npm Trusted Publishing (OIDC) + provenance
 
 jobs:
   release:
@@ -89,10 +90,11 @@ jobs:
           echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
           echo "Will publish $PKG_VERSION under dist-tag: $DIST_TAG"
 
+      - name: Use npm with Trusted Publishing support
+        run: npm install -g npm@11.20.0
+
       - name: Publish to npm
         run: npm publish --provenance --access public --tag ${{ steps.npm_tag.outputs.dist_tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub release
         env:
