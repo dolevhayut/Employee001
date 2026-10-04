@@ -185,7 +185,7 @@ function LivePageInner() {
             <button
               onClick={start}
               disabled={!consent}
-              style={{ marginTop: 16, background: consent ? BRAND : "var(--bg-sunken)", color: "var(--text)", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 14, cursor: consent ? "pointer" : "not-allowed" }}
+              style={{ marginTop: 16, background: consent ? BRAND : "var(--bg-sunken)", color: consent ? "#fff" : "var(--text-muted)", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 14, cursor: consent ? "pointer" : "not-allowed" }}
             >
               {t("handover.start")}
             </button>
@@ -217,8 +217,8 @@ function LivePageInner() {
                 style={{ flex: 1, background: "var(--surface-soft)", color: "var(--text)", border: "1px solid var(--hairline)", borderRadius: 8, padding: 10, fontSize: 14, resize: "vertical", fontFamily: "inherit" }}
               />
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <button onClick={send} disabled={busy || !input.trim() || phase === "synthesizing"} style={{ background: BRAND, color: "var(--text)", border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 14, cursor: "pointer", opacity: busy || !input.trim() ? 0.5 : 1 }}>{t("handover.send")}</button>
-                <button onClick={finish} disabled={busy || answerCount < 1 || phase === "synthesizing"} title={answerCount < 1 ? "Answer at least one question" : "Synthesize the RCP from this conversation"} style={{ background: "color-mix(in oklch, var(--accent) 0%, transparent)", color: BRAND, border: `1px solid ${BRAND}`, borderRadius: 8, padding: "10px 18px", fontSize: 13, cursor: "pointer", opacity: answerCount < 1 || busy ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                <button onClick={send} disabled={busy || !input.trim() || phase === "synthesizing"} style={{ background: BRAND, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 14, cursor: "pointer", opacity: busy || !input.trim() ? 0.5 : 1 }}>{t("handover.send")}</button>
+                <button onClick={finish} disabled={busy || answerCount < 1 || phase === "synthesizing"} title={answerCount < 1 ? "Answer at least one question" : "Synthesize the RCP from this conversation"} style={{ background: "transparent", color: BRAND, border: `1px solid ${BRAND}`, borderRadius: 8, padding: "10px 18px", fontSize: 13, cursor: "pointer", opacity: answerCount < 1 || busy ? 0.5 : 1, whiteSpace: "nowrap" }}>
                   {phase === "synthesizing" ? t("handover.synthesizing") : t("handover.finish")}
                 </button>
               </div>
@@ -278,7 +278,7 @@ function SynthesizingOverlay() {
           {/* outer rotating ring */}
           <div style={{
             position: "absolute", inset: 0, borderRadius: "50%",
-            background: `conic-gradient(from 0deg, ${BRAND}, color-mix(in oklch, var(--accent) 0%, transparent) 72%)`,
+            background: `conic-gradient(from 0deg, ${BRAND}, transparent 72%)`,
             animation: "relay-spin 1.15s linear infinite",
             WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0)",
             mask: "radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0)",
@@ -286,7 +286,7 @@ function SynthesizingOverlay() {
           {/* inner counter-rotating thin ring */}
           <div style={{
             position: "absolute", inset: 16, borderRadius: "50%",
-            background: "conic-gradient(from 180deg, color-mix(in oklch, var(--accent) 55%, transparent), color-mix(in oklch, var(--accent) 0%, transparent) 60%)",
+            background: "conic-gradient(from 180deg, color-mix(in oklch, var(--accent) 55%, transparent), transparent 60%)",
             animation: "relay-spin-rev 1.9s linear infinite",
             WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
             mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
