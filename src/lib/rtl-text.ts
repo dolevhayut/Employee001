@@ -36,6 +36,20 @@ function directionOfToken(token: string): "ltr" | "rtl" | null {
 }
 
 /**
+ * A token that mixes Hebrew with digits, Latin text or punctuation, like
+ * "ב-10:30" or "ה-Q4", arrives visually as "10:30-ב". Split it into Hebrew,
+ * LTR and neutral runs and reverse the run order; each run stays intact.
+ */
+function restoreMixedToken(token: string): string {
+  // Pure Hebrew (letters already logical within the item) or no Hebrew: as is.
+  if (!/[֐-׿]/.test(token) || /^[֐-׿]+$/.test(token)) return token;
+  // pdf.js hands the pieces of a mixed token over in visual order: "10:30-ב",
+  // ",מוכן", 'ל"צה'. Reverse the runs; each run keeps its own order.
+  const runs = token.match(/[֐-׿]+|[A-Za-z0-9À-ʯ.,:%]+|[^֐-׿A-Za-z0-9À-ʯ.,:%]+/g);
+  return runs ? runs.reverse().join("") : token;
+}
+
+/**
  * Turn a visually ordered RTL line into logical order without reversing the
  * contents of embedded LTR runs. PDF.js has already kept characters within
  * an item logical; only the geometrically positioned items need reordering.
@@ -75,7 +89,9 @@ export function restoreHebrewLogicalOrder(
 
   const renderGroup = (group: (typeof groups)[number]): string => {
     const groupWords = group.direction === "rtl" ? [...group.words].reverse() : group.words;
-    return groupWords.map((word) => word.value).join(" ");
+    return groupWords
+      .map((word) => (group.direction === "rtl" ? restoreMixedToken(word.value) : word.value))
+      .join(" ");
   };
 
   // Neutral punctuation belongs between directional runs. Retaining the text
