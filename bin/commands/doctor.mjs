@@ -115,9 +115,10 @@ function modelHosts(get) {
         on: Boolean(host),
         when: `twin runs (local Anthropic-compatible endpoint${isLocalhost(host) ? "; stays on this machine" : ""})`,
       },
+      // Direct SDK features stay off unless EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1.
       direct,
-      directOn: false,
-      directAllowed: false,
+      directOn,
+      directAllowed,
     };
   }
 
