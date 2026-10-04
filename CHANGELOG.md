@@ -17,6 +17,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   similar proxy, list the public name in `EMPLOYEE001_ALLOWED_HOSTS`.
 
 ### Added
+- **Ask your org's twins from Claude Code, Cursor and other MCP clients.**
+  `claude mcp add employee001 -- npx -y employee001 mcp` connects your editor
+  to the running app: list twins, read a profile, search the org brain, see
+  pending approvals and live Team Meetings, or ask a twin a question
+  (answer-only, read-only tools, at most $0.50 per call, counted against the
+  twin's daily budget, 20 per hour). Local-only, and every call is in the
+  Activity log. See `docs/mcp.md`.
 - **Anonymous usage counts, off unless you turn them on.** Settings shows
   exactly what would be sent (counts only: twins, meetings, approvals,
   version, OS) and `setup` asks once, defaulting to No. Nothing is ever sent
