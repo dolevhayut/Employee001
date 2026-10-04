@@ -137,9 +137,9 @@ function ApiKeysSection() {
           <div key={key}>
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", marginBottom: "var(--sp-6)" }}>
               <span className="section-title" style={{ fontSize: "var(--fs-xs)" }}>{label}</span>
-              {required && <span style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase" }}>{t("settings.api.required")}</span>}
+              {required && <span style={{ fontSize: 10, color: "var(--text-subtle)", textTransform: "uppercase" }}>{t("settings.api.required")}</span>}
               {status[statusKey] && (
-                <span style={{ fontSize: 10, color: "var(--green, #4caf7d)", textTransform: "uppercase" }}>
+                <span style={{ fontSize: 10, color: "var(--success)", textTransform: "uppercase" }}>
                   {saved === key ? t("settings.api.saved") : t("settings.api.configured")}
                 </span>
               )}
@@ -167,8 +167,8 @@ function ApiKeysSection() {
                 style={{
                   padding: "8px 16px",
                   fontSize: "var(--fs-ui)",
-                  background: value.trim() ? "var(--brand)" : "var(--bg-elevated)",
-                  color: value.trim() ? "#fff" : "var(--text-3)",
+                  background: value.trim() ? "var(--accent)" : "var(--bg-elevated)",
+                  color: value.trim() ? "var(--bg)" : "var(--text-subtle)",
                   border: "1px solid var(--hairline)",
                   borderRadius: 4,
                   cursor: value.trim() ? "pointer" : "not-allowed",
@@ -181,7 +181,7 @@ function ApiKeysSection() {
             </div>
           </div>
         ))}
-        <p style={{ fontSize: "var(--fs-xs)", color: "var(--text-3)", margin: 0 }}>
+        <p style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", margin: 0 }}>
           {t("settings.api.restartBefore")} <code dir="ltr" style={{ fontFamily: "var(--font-mono)" }}>npx employee001 start</code> {t("settings.api.restartAfter")}
         </p>
       </div>
@@ -491,7 +491,7 @@ function OrgSkillsSection() {
             style={{
               padding: "var(--sp-10)",
               fontSize: "var(--fs-sm)",
-              background: "rgba(88, 160, 112, 0.10)",
+              background: "color-mix(in oklch, var(--success) 12%, transparent)",
               color: "var(--success)",
               borderRadius: 6,
               marginBottom: "var(--sp-12)",
@@ -506,7 +506,7 @@ function OrgSkillsSection() {
             style={{
               padding: "var(--sp-10)",
               fontSize: "var(--fs-sm)",
-              background: "rgba(220, 80, 60, 0.08)",
+              background: "color-mix(in oklch, var(--danger) 12%, transparent)",
               color: "var(--danger)",
               borderRadius: 6,
               marginBottom: "var(--sp-12)",
@@ -662,7 +662,7 @@ function OrgSkillModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 12, 8, 0.45)",
+        background: "color-mix(in oklch, var(--text) 45%, transparent)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -681,7 +681,7 @@ function OrgSkillModal({
           overflowY: "auto",
           padding: "var(--sp-24)",
           background: "var(--bg-elevated)",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
+          boxShadow: "var(--shadow-dialog)",
         }}
       >
         <div style={{ marginBottom: "var(--sp-20)" }}>
@@ -728,7 +728,7 @@ function OrgSkillModal({
               style={{
                 padding: "var(--sp-10)",
                 fontSize: "var(--fs-sm)",
-                background: "rgba(220, 80, 60, 0.08)",
+                background: "color-mix(in oklch, var(--danger) 12%, transparent)",
                 color: "var(--danger)",
                 borderRadius: 6,
               }}
@@ -785,14 +785,14 @@ const BRAIN_TYPES: OrgBrainNodeType[] = [
 ];
 
 const BRAIN_TYPE_TINT: Record<OrgBrainNodeType, string> = {
-  document: "rgba(95, 130, 210, 0.18)",
-  decision: "rgba(180, 110, 200, 0.18)",
-  incident: "rgba(220, 90, 80, 0.18)",
-  policy: "rgba(220, 160, 80, 0.18)",
-  customer: "rgba(110, 180, 130, 0.18)",
-  product: "rgba(80, 170, 200, 0.18)",
-  process: "rgba(180, 180, 180, 0.18)",
-  note: "rgba(150, 150, 150, 0.14)",
+  document: "color-mix(in oklch, var(--twin) 18%, transparent)",
+  decision: "color-mix(in oklch, var(--accent) 18%, transparent)",
+  incident: "color-mix(in oklch, var(--danger) 18%, transparent)",
+  policy: "color-mix(in oklch, var(--warn) 18%, transparent)",
+  customer: "color-mix(in oklch, var(--success) 18%, transparent)",
+  product: "color-mix(in oklch, var(--accent-deep) 18%, transparent)",
+  process: "color-mix(in oklch, var(--text-muted) 18%, transparent)",
+  note: "color-mix(in oklch, var(--text-subtle) 14%, transparent)",
 };
 
 type BrainEditState =
@@ -894,7 +894,7 @@ function OrgBrainSection() {
             style={{
               padding: "var(--sp-10)",
               fontSize: "var(--fs-sm)",
-              background: "rgba(220, 80, 60, 0.08)",
+              background: "color-mix(in oklch, var(--danger) 12%, transparent)",
               color: "var(--danger)",
               borderRadius: 6,
               marginBottom: "var(--sp-12)",
@@ -1017,7 +1017,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 12, 8, 0.55)",
+        background: "color-mix(in oklch, var(--text) 55%, transparent)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -1033,13 +1033,13 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
           width: "min(96vw, 1200px)",
           height: "92vh",
           padding: 0,
-          background: view === "3d" ? "#0a0908" : "var(--bg-elevated)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+          background: view === "3d" ? "var(--bg-sunken)" : "var(--bg-elevated)",
+          boxShadow: "var(--shadow-dialog)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
           borderRadius: 12,
-          border: view === "3d" ? "1px solid #2a2624" : undefined,
+          border: view === "3d" ? "1px solid var(--hairline)" : undefined,
         }}
       >
         <div
@@ -1047,12 +1047,12 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
             padding: "14px 20px",
             borderBottom:
               view === "3d"
-                ? "1px solid rgba(255,255,255,0.08)"
+                ? "1px solid color-mix(in oklch, var(--text) 8%, transparent)"
                 : "1px solid var(--hairline)",
             display: "flex",
             alignItems: "center",
             gap: "var(--sp-16)",
-            color: view === "3d" ? "#f0e8d8" : undefined,
+            color: view === "3d" ? "var(--text)" : undefined,
           }}
         >
           <div style={{ flex: 1 }}>
@@ -1061,7 +1061,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
                 fontSize: "var(--fs-body)",
                 fontWeight: 600,
                 margin: 0,
-                color: view === "3d" ? "#f5edd9" : undefined,
+                color: view === "3d" ? "var(--text)" : undefined,
               }}
             >
               {t("settings.brain.graphHeading")}
@@ -1071,7 +1071,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
                 fontSize: "var(--fs-meta)",
                 marginTop: "var(--sp-2)",
                 marginBottom: 0,
-                color: view === "3d" ? "rgba(245,237,217,0.6)" : "var(--text-subtle)",
+                color: view === "3d" ? "var(--text-muted)" : "var(--text-subtle)",
               }}
             >
               {stats
@@ -1099,7 +1099,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
               padding: "var(--sp-3)",
               borderRadius: 6,
               background:
-                view === "3d" ? "rgba(255,255,255,0.06)" : "var(--surface)",
+                view === "3d" ? "var(--surface-soft)" : "var(--surface)",
             }}
           >
             {(["3d", "2d"] as const).map((mode) => (
@@ -1113,16 +1113,16 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
                   background:
                     view === mode
                       ? view === "3d"
-                        ? "#e8c87a"
+                        ? "var(--accent)"
                         : "var(--text)"
                       : "transparent",
                   color:
                     view === mode
                       ? view === "3d"
-                        ? "#1a1612"
+                        ? "var(--bg)"
                         : "var(--bg)"
                       : view === "3d"
-                      ? "rgba(245,237,217,0.7)"
+                      ? "var(--text-muted)"
                       : undefined,
                   borderColor: "transparent",
                   textTransform: "uppercase",
@@ -1138,9 +1138,9 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
             className="btn ghost sm"
             onClick={onClose}
             style={{
-              color: view === "3d" ? "rgba(245,237,217,0.85)" : undefined,
+              color: view === "3d" ? "var(--text)" : undefined,
               borderColor:
-                view === "3d" ? "rgba(245,237,217,0.18)" : undefined,
+                view === "3d" ? "color-mix(in oklch, var(--text) 18%, transparent)" : undefined,
             }}
           >
             {t("settings.action.close")}
@@ -1154,7 +1154,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
             position: "relative",
             background:
               view === "3d"
-                ? "radial-gradient(circle at 50% 35%, rgba(232,200,122,0.06), transparent 60%), #0a0908"
+                ? "radial-gradient(circle at 50% 35%, color-mix(in oklch, var(--accent) 12%, transparent), transparent 60%), var(--bg-sunken)"
                 : undefined,
           }}
         >
@@ -1287,7 +1287,7 @@ function BrainBuilderModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 12, 8, 0.45)",
+        background: "color-mix(in oklch, var(--text) 45%, transparent)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -1306,7 +1306,7 @@ function BrainBuilderModal({
           overflowY: "auto",
           padding: "var(--sp-24)",
           background: "var(--bg-elevated)",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
+          boxShadow: "var(--shadow-dialog)",
         }}
       >
         <div style={{ marginBottom: "var(--sp-20)" }}>
@@ -1355,7 +1355,7 @@ function BrainBuilderModal({
                 style={{
                   padding: "var(--sp-10)",
                   fontSize: "var(--fs-sm)",
-                  background: "rgba(220, 80, 60, 0.08)",
+                  background: "color-mix(in oklch, var(--danger) 12%, transparent)",
                   color: "var(--danger)",
                   borderRadius: 6,
                 }}
@@ -1373,7 +1373,7 @@ function BrainBuilderModal({
                 style={{
                   padding: "var(--sp-10)",
                   fontSize: "var(--fs-sm)",
-                  background: "rgba(95, 130, 210, 0.08)",
+                  background: "color-mix(in oklch, var(--twin) 12%, transparent)",
                   borderRadius: 6,
                   color: "var(--text-muted)",
                 }}
@@ -1495,7 +1495,7 @@ function BrainBuilderModal({
                 style={{
                   padding: "var(--sp-10)",
                   fontSize: "var(--fs-sm)",
-                  background: "rgba(220, 80, 60, 0.08)",
+                  background: "color-mix(in oklch, var(--danger) 12%, transparent)",
                   color: "var(--danger)",
                   borderRadius: 6,
                 }}
@@ -1645,7 +1645,7 @@ function OrgBrainRow({
                 fontSize: "var(--fs-xs)",
                 padding: "2px 5px",
                 borderRadius: 3,
-                background: "rgba(95, 130, 210, 0.10)",
+                background: "color-mix(in oklch, var(--twin) 12%, transparent)",
                 color: "var(--text-muted)",
               }}
               title={node.linkedNodes.join(", ")}
@@ -1755,7 +1755,7 @@ function OrgBrainModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 12, 8, 0.45)",
+        background: "color-mix(in oklch, var(--text) 45%, transparent)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -1774,7 +1774,7 @@ function OrgBrainModal({
           overflowY: "auto",
           padding: "var(--sp-24)",
           background: "var(--bg-elevated)",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
+          boxShadow: "var(--shadow-dialog)",
         }}
       >
         <div style={{ marginBottom: "var(--sp-20)" }}>
@@ -1887,7 +1887,7 @@ function OrgBrainModal({
               style={{
                 padding: "var(--sp-10)",
                 fontSize: "var(--fs-sm)",
-                background: "rgba(220, 80, 60, 0.08)",
+                background: "color-mix(in oklch, var(--danger) 12%, transparent)",
                 color: "var(--danger)",
                 borderRadius: 6,
               }}
@@ -2163,7 +2163,7 @@ function CustomMcpSection() {
             style={{
               padding: "var(--sp-10)",
               fontSize: "var(--fs-sm)",
-              background: "rgba(220, 80, 60, 0.08)",
+              background: "color-mix(in oklch, var(--danger) 12%, transparent)",
               color: "var(--danger)",
               borderRadius: 6,
               marginBottom: "var(--sp-12)",
@@ -2178,7 +2178,7 @@ function CustomMcpSection() {
             style={{
               padding: "var(--sp-10)",
               fontSize: "var(--fs-sm)",
-              background: "rgba(220, 80, 60, 0.08)",
+              background: "color-mix(in oklch, var(--danger) 12%, transparent)",
               color: "var(--danger)",
               borderRadius: 6,
               marginBottom: "var(--sp-12)",
@@ -2431,7 +2431,7 @@ function McpModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 12, 8, 0.45)",
+        background: "color-mix(in oklch, var(--text) 45%, transparent)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -2450,7 +2450,7 @@ function McpModal({
           overflowY: "auto",
           padding: "var(--sp-24)",
           background: "var(--bg-elevated)",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
+          boxShadow: "var(--shadow-dialog)",
         }}
       >
         <div style={{ marginBottom: "var(--sp-20)" }}>
@@ -2648,7 +2648,7 @@ function McpModal({
               style={{
                 padding: "var(--sp-10)",
                 fontSize: "var(--fs-sm)",
-                background: "rgba(220, 80, 60, 0.08)",
+                background: "color-mix(in oklch, var(--danger) 12%, transparent)",
                 color: "var(--danger)",
                 borderRadius: 6,
               }}
