@@ -4,7 +4,7 @@
 
 ### Your organizational brain.
 
-**AI twins of your real team, on your own machine.** Each twin is trained on one real person's own work, the twins debate your hard questions in a Team Meeting, and external actions are approval-gated.
+**AI twins of your real team, on your own machine.** Each twin is trained on one real person's own work, the twins debate your hard questions in a Team Meeting, and nothing they change in the outside world happens without your approval.
 
 [![npm version](https://img.shields.io/npm/v/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
 [![npm downloads](https://img.shields.io/npm/dm/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
@@ -145,7 +145,7 @@ As of October 2026:
 |  | ChatGPT Teams / Copilot | Cabinet[^1] | Paperclip[^2] | ZooWork[^3] | **Employee001** |
 |---|---|---|---|---|---|
 | Who the agent represents | A generic assistant | Agent teams | Configurable AI "employees" | Agents that engineers build and deliver | **A twin of a real, named person, trained on their own work** |
-| Where it runs | OpenAI / Microsoft cloud | Self-hosted, markdown on disk (cloud on a waitlist) | Self-hosted or managed | Managed cloud | **Your machine, or your own single-tenant cloud. Data stays local; configured services receive model prompts and tool calls. [See where.](SECURITY.md#what-leaves-your-machine)** |
+| Where it runs | OpenAI / Microsoft cloud | Self-hosted, markdown on disk (cloud on a waitlist) | Self-hosted or managed | Managed cloud | **Your machine, or your own single-tenant cloud. [What leaves it](SECURITY.md#what-leaves-your-machine)** |
 | External actions | Depends on the connector | Human approval queue | Its own approvals; Claude/Codex runs default to full auto since v2026.1001.0 | Approval gates | **Approval gate on every external action, on by default** |
 | Several agents on one question | — | Agent teams | Task routing between agents | Agent workflows | **Team Meeting: twins debate and converge on a verdict** |
 | Shared knowledge | Conversation history | Knowledge base | Company skills learned from finished tasks | Packaged agent skills | **Org Brain: what one twin learns, the others can use** |
