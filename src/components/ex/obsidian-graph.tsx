@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { EmployeeGraph, RealNode } from "@/lib/profile-graph-real";
+import { useT } from "@/components/ex/i18n-context";
 
 export type GraphHighlightState = {
   reading: Set<string>;
@@ -140,13 +141,13 @@ function nodeRadiusFor(node: RealNode, degree: number): number {
   return base + bonus;
 }
 
-function labelFor(node: LaidOutNode): string {
+function labelFor(node: LaidOutNode, memoryFallback: string): string {
   if (node.name.startsWith("scratch:")) {
     const fname = node.name.slice("scratch:".length).replace(/\.md$/, "");
     return fname.length > 22 ? `📝 ${fname.slice(0, 22)}…` : `📝 ${fname}`;
   }
   if (node.name.startsWith("memory:")) {
-    const preview = node.tags?.[1] ?? "memory";
+    const preview = node.tags?.[1] ?? memoryFallback;
     return preview.length > 26 ? preview.slice(0, 26) + "…" : preview;
   }
   return node.name.replace(/\.md$/, "");
@@ -537,6 +538,7 @@ type GraphCanvasProps = {
   isDark: boolean;
   zoom: number;
   hoveredNode: string | null;
+  memoryLabel: string;
   onHover: (name: string | null) => void;
   onClick: (name: string) => void;
 };
@@ -548,6 +550,7 @@ function GraphCanvas({
   isDark,
   zoom,
   hoveredNode,
+  memoryLabel,
   onHover,
   onClick,
 }: GraphCanvasProps) {
@@ -558,6 +561,7 @@ function GraphCanvas({
   const hoverRef = useRef(hoveredNode);
   const zoomRef = useRef(zoom);
   const darkRef = useRef(isDark);
+  const memoryLabelRef = useRef(memoryLabel);
 
   const nodeMap = useMemo(() => {
     const m = new Map<string, LaidOutNode>();
@@ -575,6 +579,7 @@ function GraphCanvas({
     hoverRef.current = hoveredNode;
     zoomRef.current = zoom;
     darkRef.current = isDark;
+    memoryLabelRef.current = memoryLabel;
     nodeMapRef.current = nodeMap;
   });
 
@@ -940,7 +945,7 @@ function GraphCanvas({
         ctx.globalAlpha = (isActive ? 1 : 0.35) * (strong ? 1 : depthFade);
         // Canvas font strings can't use CSS variables — they silently fail and keep the previous font
         ctx.font = `${strong ? 700 : 600} ${size}px "Stack Sans Notch", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        const text = labelFor(n);
+        const text = labelFor(n, memoryLabelRef.current);
 
         // Stronger halo so labels read clearly against any background — scales with text size
         ctx.lineWidth = Math.max(4, size * 0.18) * 0.7;
@@ -1025,7 +1030,9 @@ const ZOOM_MAX = 3;
 const ZOOM_STEP = 0.12;
 
 export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
+  const { t } = useT();
   const isDark = useThemeIsDark();
+  const memoryLabel = t("chat.graph.memory");
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1083,7 +1090,7 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
         }}
       >
         <span style={{ animation: "pulse 1.6s ease-in-out infinite" }}>
-          Loading memory graph…
+          {t("chat.graph.loading")}
         </span>
       </div>
     );
@@ -1101,7 +1108,7 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
           background: "var(--bg)",
         }}
       >
-        No profile files found.
+        {t("chat.graph.empty")}
       </div>
     );
   }
@@ -1127,6 +1134,7 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
         isDark={isDark}
         zoom={zoom}
         hoveredNode={hoveredNode}
+        memoryLabel={memoryLabel}
         onHover={setHoveredNode}
         onClick={onOpenFile}
       />
@@ -1136,7 +1144,7 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
         style={{
           position: "absolute",
           bottom: 16,
-          left: 16,
+          insetInlineStart: 16,
           display: "flex",
           flexDirection: "column",
           gap: 5,
@@ -1161,22 +1169,22 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
             marginBottom: 1,
           }}
         >
-          Memory Graph
+          {t("chat.graph.title")}
         </div>
         <LegendDot
           color={isDark ? "#e8c690" : "#9E6B47"}
-          label="Reading now"
+          label={t("chat.graph.reading")}
           pulse
         />
         <LegendDot
           color={isDark ? "#f5d8a8" : "#7a4d2e"}
-          label="Cited in answer"
+          label={t("chat.graph.cited")}
         />
         <LegendDot
           color={isDark ? "#b89880" : "#C4A98A"}
-          label="Recently touched"
+          label={t("chat.graph.touched")}
         />
-        <LegendDot color="#fde36b" label="Working memory" />
+        <LegendDot color="#fde36b" label={t("chat.graph.working")} />
       </div>
 
       {/* Zoom + stats */}
@@ -1184,7 +1192,7 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
         style={{
           position: "absolute",
           top: 16,
-          right: 16,
+          insetInlineEnd: 16,
           display: "flex",
           alignItems: "center",
           gap: 14,
@@ -1197,8 +1205,8 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
           WebkitBackdropFilter: "blur(10px)",
         }}
       >
-        <StatChip label="Files" value={graph.nodes.length} />
-        <StatChip label="Links" value={graph.edges.length} />
+        <StatChip label={t("chat.graph.files")} value={graph.nodes.length} />
+        <StatChip label={t("chat.graph.links")} value={graph.edges.length} />
         <div
           style={{
             width: 1,
@@ -1211,7 +1219,7 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
           <ZoomBtn label="−" onClick={() => zoomBy(1 / (1 + ZOOM_STEP * 2))} />
           <button
             onClick={zoomReset}
-            title="Reset zoom"
+            title={t("chat.graph.resetZoom")}
             style={{
               minWidth: 42,
               padding: "3px 6px",
@@ -1224,7 +1232,7 @@ export function ObsidianGraph({ graph, state, onOpenFile, loading }: Props) {
               cursor: "pointer",
             }}
           >
-            {Math.round(zoom * 100)}%
+            <bdi>{Math.round(zoom * 100)}%</bdi>
           </button>
           <ZoomBtn label="+" onClick={() => zoomBy(1 + ZOOM_STEP * 2)} />
         </div>
@@ -1305,7 +1313,7 @@ function StatChip({ label, value }: { label: string; value: number }) {
         {label}
       </div>
       <div style={{ fontSize: "var(--fs-base)", fontWeight: 600, color: "var(--text)" }}>
-        {value}
+        <bdi>{value}</bdi>
       </div>
     </div>
   );

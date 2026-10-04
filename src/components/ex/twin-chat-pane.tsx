@@ -21,6 +21,8 @@ import {
   type EmployeeWithTwin,
 } from "@/lib/employees";
 import { useRoster } from "@/components/ex/roster-context";
+import { useT } from "@/components/ex/i18n-context";
+import { bcp47, isolate } from "@/lib/i18n/format";
 
 // Web Speech API type declarations (not in default TS lib)
 interface SpeechRecognitionEvent extends Event {
@@ -56,11 +58,13 @@ declare global {
   }
 }
 
-const SUGGESTED: string[] = [
-  "What are you working on this quarter?",
-  "Who do you defer to on this kind of question?",
-  "Walk me through your decision framework.",
-];
+const SUGGESTED_KEYS = [
+  "chat.suggest.quarter",
+  "chat.suggest.defer",
+  "chat.suggest.framework",
+] as const;
+
+const UNREACHABLE = "Couldn't reach the twin.";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -196,6 +200,7 @@ function ApprovalCard({
   approval: PendingApproval;
   onResolve: (id: string, action: "allow" | "deny", edited?: Record<string, unknown>) => void;
 }) {
+  const { t } = useT();
   const [editing, setEditing] = useState(false);
   const [editedJson, setEditedJson] = useState(JSON.stringify(approval.input, null, 2));
   const [jsonError, setJsonError] = useState("");
@@ -208,7 +213,7 @@ function ApprovalCard({
       try {
         updatedInput = JSON.parse(editedJson);
       } catch {
-        setJsonError("Invalid JSON");
+        setJsonError(t("inbox.overlay.badJson"));
         setBusy(false);
         return;
       }
@@ -234,11 +239,11 @@ function ApprovalCard({
       <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-7)", marginBottom: "var(--sp-6)" }}>
         <Icons.Lock size={12} style={{ color: "var(--warn)", flexShrink: 0 }} />
         <span style={{ fontSize: "var(--fs-sm)", fontWeight: 700, color: "var(--text)" }}>
-          {approval.label}
+          <bdi>{approval.label}</bdi>
         </span>
       </div>
 
-      <p style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", margin: "0 0 8px", lineHeight: 1.45 }}>
+      <p dir="auto" style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", margin: "0 0 8px", lineHeight: 1.45 }}>
         {approval.reason}
       </p>
 
@@ -302,8 +307,8 @@ function ApprovalCard({
             cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.6 : 1,
           }}
         >
-          <Icons.Check size={11} style={{ display: "inline", verticalAlign: "middle", marginRight: "var(--sp-4)" }} />
-          Approve
+          <Icons.Check size={11} style={{ display: "inline", verticalAlign: "middle", marginInlineEnd: "var(--sp-4)" }} />
+          {t("inbox.approve")}
         </button>
         <button
           onClick={() => setEditing((v) => !v)}
@@ -314,7 +319,7 @@ function ApprovalCard({
             borderRadius: 5, fontSize: "var(--fs-meta)", fontWeight: 500, cursor: "pointer",
           }}
         >
-          {editing ? "Cancel" : "Edit args"}
+          {editing ? t("settings.action.cancel") : t("inbox.overlay.edit")}
         </button>
         <button
           onClick={() => resolve("deny")}
@@ -326,7 +331,7 @@ function ApprovalCard({
             cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.6 : 1,
           }}
         >
-          Skip
+          {t("inbox.overlay.skip")}
         </button>
       </div>
     </motion.div>
@@ -336,7 +341,10 @@ function ApprovalCard({
 // ─── BlockedNotice ────────────────────────────────────────────────────────────
 
 function BlockedNotice({ tool, reason }: { tool: string; reason: string }) {
-  const bare = tool.replace(/^mcp__[a-z0-9_]+__/i, "");
+  const { t } = useT();
+  const bare = tool === "Write (scratch denied)"
+    ? t("chat.blocked.scratch")
+    : tool.replace(/^mcp__[a-z0-9_]+__/i, "");
   return (
     <div
       style={{
@@ -348,7 +356,7 @@ function BlockedNotice({ tool, reason }: { tool: string; reason: string }) {
       }}
     >
       <Icons.Lock size={11} style={{ flexShrink: 0, marginTop: "var(--sp-1)" }} />
-      <span><strong>{bare}</strong> — {reason}</span>
+      <span dir="auto"><strong><bdi>{bare}</bdi></strong> — {reason}</span>
     </div>
   );
 }
@@ -356,6 +364,7 @@ function BlockedNotice({ tool, reason }: { tool: string; reason: string }) {
 // ─── Collapsible trace row ────────────────────────────────────────────────────
 
 function TraceRow({ trace, onOpenFile }: { trace: TraceItem[]; onOpenFile: (name: string) => void }) {
+  const { t: tr } = useT();
   const [open, setOpen] = useState(false);
 
   if (trace.length === 0) return null;
@@ -378,7 +387,10 @@ function TraceRow({ trace, onOpenFile }: { trace: TraceItem[]; onOpenFile: (name
         }}
       >
         <Icons.Eye size={9} />
-        <span>{fileCount} {fileCount === 1 ? "file" : "files"} read</span>
+        <span>
+          <bdi>{fileCount}</bdi>{" "}
+          {tr(fileCount === 1 ? "chat.trace.fileReadOne" : "chat.trace.fileReadMany")}
+        </span>
         <motion.span
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ duration: 0.18 }}
@@ -427,10 +439,10 @@ function TraceRow({ trace, onOpenFile }: { trace: TraceItem[]; onOpenFile: (name
                       onMouseLeave={(e) => { e.currentTarget.style.background = "var(--surface)"; }}
                     >
                       {isRead ? <Icons.Eye size={9} /> : <Icons.Search size={9} />}
-                      <span>{isRead ? "read" : t.name.replace(/_/g, " ")}</span>
+                      <span>{isRead ? tr("chat.trace.read") : t.name.replace(/_/g, " ")}</span>
                       {fileName && (
                         <span style={{ color: "var(--text)", fontFamily: "var(--font-mono, monospace)" }}>
-                          {fileName}
+                          <bdi>{fileName}</bdi>
                         </span>
                       )}
                       {!fileName && t.args.query != null && (
@@ -459,7 +471,7 @@ function TraceRow({ trace, onOpenFile }: { trace: TraceItem[]; onOpenFile: (name
                       }}
                     >
                       <Icons.Sparkle2 size={9} />
-                      <span>skill</span>
+                      <span>{tr("chat.trace.skill")}</span>
                       <span style={{ color: "var(--text)" }}>{t.label}</span>
                     </motion.span>
                   );
@@ -482,9 +494,9 @@ function TraceRow({ trace, onOpenFile }: { trace: TraceItem[]; onOpenFile: (name
                       }}
                     >
                       <Icons.Check size={9} />
-                      <span>cite</span>
+                      <span>{tr("chat.trace.cite")}</span>
                       <span style={{ fontFamily: "var(--font-mono, monospace)", color: "var(--text)" }}>
-                        {t.file}
+                        <bdi>{t.file}</bdi>
                       </span>
                     </motion.button>
                   );
@@ -503,7 +515,7 @@ function TraceRow({ trace, onOpenFile }: { trace: TraceItem[]; onOpenFile: (name
 
 function TypingDots() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginLeft: "var(--sp-2)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginInlineStart: "var(--sp-2)" }}>
       {[0, 1, 2].map((i) => (
         <motion.div
           key={i}
@@ -681,7 +693,7 @@ function speechSupportedServerSnapshot(): boolean {
   return false;
 }
 
-function useVoiceMode(onTranscript: (text: string) => void) {
+function useVoiceMode(onTranscript: (text: string) => void, lang: string) {
   const [voiceState, setVoiceState] = useState<VoiceModeState>("idle");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const supported = useSyncExternalStore(
@@ -696,7 +708,7 @@ function useVoiceMode(onTranscript: (text: string) => void) {
     const rec = new SR();
     rec.continuous = false;
     rec.interimResults = false;
-    rec.lang = navigator.language || "en-US";
+    rec.lang = lang;
     recognitionRef.current = rec;
     rec.onstart = () => setVoiceState("listening");
     rec.onresult = (e: SpeechRecognitionEvent) => {
@@ -711,7 +723,7 @@ function useVoiceMode(onTranscript: (text: string) => void) {
       setVoiceState((s) => s === "listening" ? "idle" : s);
     };
     rec.start();
-  }, [supported, onTranscript]);
+  }, [supported, onTranscript, lang]);
 
   const stop = useCallback(() => {
     recognitionRef.current?.stop();
@@ -732,6 +744,8 @@ function useVoiceMode(onTranscript: (text: string) => void) {
 // ─── TwinChatPane ─────────────────────────────────────────────────────────────
 
 export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -784,7 +798,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       const data = (await res.json()) as Attachment;
       setAttachments((prev) => [...prev, data]);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload failed");
+      setUploadError(err instanceof Error ? err.message : t("chat.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -887,7 +901,8 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
   const initials = employee?.initials ?? "AI";
 
   const { voiceState, toggle: toggleMic, doneProcessing, supported: micSupported } = useVoiceMode(
-    useCallback((transcript: string) => { submitRef.current(transcript); }, [])
+    useCallback((transcript: string) => { submitRef.current(transcript); }, []),
+    bcp47(locale),
   );
 
   useEffect(() => {
@@ -1134,7 +1149,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
         if ((err as { name?: string }).name !== "AbortError") {
           setMessages((curr) =>
             curr.map((m) => m.id === twinId && m.role === "twin"
-              ? { ...m, streaming: false, text: m.text || "Couldn't reach the twin." }
+              ? { ...m, streaming: false, text: m.text || UNREACHABLE }
               : m
             )
           );
@@ -1163,7 +1178,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       style={{
         display: "flex", flexDirection: "column", height: "100%",
         background: "var(--bg-elevated)",
-        borderLeft: "1px solid var(--hairline)",
+        borderInlineStart: "1px solid var(--hairline)",
         overflow: "hidden", position: "relative",
       }}
     >
@@ -1171,7 +1186,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
         <div
           style={{
-            position: "absolute", top: "-80px", right: "-40px",
+            position: "absolute", top: "-80px", insetInlineEnd: "-40px",
             width: 240, height: 240, borderRadius: "50%",
             background: `radial-gradient(circle, ${avatarColor}18 0%, transparent 70%)`,
             filter: "blur(40px)",
@@ -1191,7 +1206,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
       >
         <Icons.Bot size={13} style={{ color: "var(--twin)" }} />
         <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600, letterSpacing: "-0.01em", color: "var(--text-muted)" }}>
-          Twin chat
+          {t("chat.header")}
         </span>
         <div className="spacer" />
 
@@ -1199,7 +1214,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
         {messages.length > 0 && !isStreaming && employeeId && (
           <button
             onClick={() => {
-              if (!confirm("Clear all chat history? This deletes the JSONL file on disk and cannot be undone.")) return;
+              if (!confirm(t("chat.clearConfirm"))) return;
               void fetch(`/api/employees/${employeeId}/chat-history`, { method: "DELETE" })
                 .then(() => setMessages([]));
             }}
@@ -1222,7 +1237,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
             }}
           >
             <Icons.Trash size={10} />
-            Clear
+            {t("chat.clear")}
           </button>
         )}
 
@@ -1238,7 +1253,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
             />
           )}
           <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>
-            {historyLoading ? "loading" : isStreaming ? "thinking" : "live"}
+            {historyLoading ? t("chat.status.loading") : isStreaming ? t("chat.status.thinking") : t("chat.status.live")}
           </span>
         </div>
       </div>
@@ -1293,22 +1308,22 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
             {/* Name + tagline */}
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: "var(--fs-body)", fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text)", marginBottom: "var(--sp-4)" }}>
-                {employee ? `Chat with ${employee.firstName}'s twin` : "Ask the twin"}
+                {employee ? t("chat.withTwin", { name: isolate(employee.firstName) }) : t("chat.askTwin")}
               </div>
               <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)", lineHeight: 1.5 }}>
-                Watch the graph light up as the agent reads files
+                {t("chat.watchLight")}
               </div>
             </div>
 
             {/* Suggested questions */}
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-6)", width: "100%", maxWidth: 280 }}>
-              {SUGGESTED.map((q, i) => (
+              {SUGGESTED_KEYS.map((key, i) => (
                 <motion.button
-                  key={q}
+                  key={key}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.15 + i * 0.08 }}
-                  onClick={() => submit(q)}
+                  onClick={() => submit(t(key))}
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                   style={{
@@ -1316,7 +1331,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                     background: "var(--surface)",
                     border: "1px solid var(--hairline)",
                     borderRadius: 8,
-                    cursor: "pointer", textAlign: "left",
+                    cursor: "pointer", textAlign: "start",
                     fontSize: "var(--fs-sm)", color: "var(--text-muted)",
                     fontFamily: "inherit", lineHeight: 1.4,
                     transition: "all 0.15s",
@@ -1332,8 +1347,8 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                     e.currentTarget.style.color = "var(--text-muted)";
                   }}
                 >
-                  <span style={{ marginRight: "var(--sp-6)", color: "var(--text-subtle)" }}>↗</span>
-                  {q}
+                  <span style={{ marginInlineEnd: "var(--sp-6)", color: "var(--text-subtle)", display: "inline-block", transform: rtl ? "scaleX(-1)" : undefined }}>↗</span>
+                  {t(key)}
                 </motion.button>
               ))}
             </div>
@@ -1349,7 +1364,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
               return (
                 <motion.div
                   key={m.id}
-                  initial={{ opacity: 0, x: 10 }}
+                  initial={{ opacity: 0, x: rtl ? -10 : 10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.2 }}
                   style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "var(--sp-5)" }}
@@ -1359,7 +1374,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       {parsed.attachments.map((a) => (
                         <span
                           key={a.path}
-                          title={`${a.filename} · ${(a.size / 1024).toFixed(1)} KB`}
+                          title={`${isolate(a.filename)} · ${isolate(`${(a.size / 1024).toFixed(1)} KB`)}`}
                           style={{
                             display: "inline-flex", alignItems: "center", gap: "var(--sp-5)",
                             padding: "3px 8px",
@@ -1386,7 +1401,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                             <path d="M21 12.5L12.5 21a5 5 0 0 1-7-7L14 5.5a3.5 3.5 0 0 1 5 5L10 19" />
                           </svg>
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {a.filename}
+                            <bdi>{a.filename}</bdi>
                           </span>
                         </span>
                       ))}
@@ -1397,24 +1412,27 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       background: "var(--text)",
                       color: "var(--bg)",
                       padding: "8px 12px",
-                      borderRadius: "12px 12px 3px 12px",
+                      borderStartStartRadius: 12,
+                      borderStartEndRadius: 12,
+                      borderEndEndRadius: 3,
+                      borderEndStartRadius: 12,
                       maxWidth: "80%",
                       fontSize: "var(--fs-ui)", lineHeight: 1.5, letterSpacing: "-0.005em", fontWeight: 500,
                       boxShadow: "var(--shadow)",
                       whiteSpace: "pre-wrap",
                     }}
                   >
-                    {parsed.visibleText}
+                    <span dir="auto">{parsed.visibleText}</span>
                   </div>
                   {unanswered && (
                     <div style={{ display: "flex", gap: "var(--sp-6)", alignItems: "center" }}>
                       <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)", fontStyle: "italic" }}>
-                        No reply — the run ended early.
+                        {t("chat.noReply")}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleRetry(m.text, m.id)}
-                        title="Retry — re-run with the same message"
+                        title={t("chat.retryTitle")}
                         style={{
                           display: "inline-flex", alignItems: "center", gap: "var(--sp-4)",
                           padding: "3px 9px", fontSize: "var(--fs-xs)", borderRadius: 6,
@@ -1450,12 +1468,12 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                           <path d="M21 12a9 9 0 1 1-3-6.7" />
                           <path d="M21 4v5h-5" />
                         </svg>
-                        retry
+                        {t("chat.retry")}
                       </button>
                       <button
                         type="button"
                         onClick={() => editMessageAt(msgIdx)}
-                        title="Edit the message and send again"
+                        title={t("chat.editTitle")}
                         style={{
                           display: "inline-flex", alignItems: "center", gap: "var(--sp-4)",
                           padding: "3px 9px", fontSize: "var(--fs-xs)", borderRadius: 6,
@@ -1491,7 +1509,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                           <path d="M12 20h9" />
                           <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
                         </svg>
-                        edit
+                        {t("chat.edit")}
                       </button>
                     </div>
                   )}
@@ -1501,7 +1519,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
           ) : (
             <motion.div
               key={m.id}
-              initial={{ opacity: 0, x: -8 }}
+              initial={{ opacity: 0, x: rtl ? 8 : -8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.2 }}
               style={{ display: "flex", gap: "var(--sp-9)", alignItems: "flex-start" }}
@@ -1545,24 +1563,27 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                   style={{
                     background: "var(--surface)",
                     border: "1px solid var(--hairline)",
-                    borderLeft: `2.5px solid ${avatarColor}`,
+                    borderInlineStart: `2.5px solid ${avatarColor}`,
                     color: "var(--text)",
                     padding: "9px 12px",
-                    borderRadius: "4px 10px 10px 4px",
+                    borderStartStartRadius: 4,
+                    borderStartEndRadius: 10,
+                    borderEndEndRadius: 10,
+                    borderEndStartRadius: 4,
                     fontSize: "var(--fs-ui)", lineHeight: 1.6, letterSpacing: "-0.005em",
                     boxShadow: "var(--shadow-sm)",
                   }}
                 >
                   {m.text ? (
-                    <Markdown>{m.text}</Markdown>
+                    <Markdown>{m.text === UNREACHABLE ? t("chat.unreachable") : m.text}</Markdown>
                   ) : m.streaming ? null : (
-                    <span style={{ color: "var(--text-subtle)" }}>(no response)</span>
+                    <span style={{ color: "var(--text-subtle)" }}>{t("chat.noResponse")}</span>
                   )}
                   {m.streaming && (
                     <motion.span
                       animate={{ opacity: [1, 0.2, 1] }}
                       transition={{ duration: 0.9, repeat: Infinity }}
-                      style={{ display: "inline-block", marginLeft: "var(--sp-2)", color: avatarColor, fontWeight: 700 }}
+                      style={{ display: "inline-block", marginInlineStart: "var(--sp-2)", color: avatarColor, fontWeight: 700 }}
                     >
                       ▍
                     </motion.span>
@@ -1598,7 +1619,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                   <div style={{ marginTop: "var(--sp-8)", display: "flex", alignItems: "center", gap: "var(--sp-8)" }}>
                     {m.confidence != null && (
                       <span className={confidenceBadgeClass(m.confidence)} style={{ fontSize: "var(--fs-xs)", padding: "4px 10px" }}>
-                        {(m.confidence * 100).toFixed(0)}% confident
+                        <bdi>{(m.confidence * 100).toFixed(0)}%</bdi> {t("chat.confident")}
                       </span>
                     )}
                     <button
@@ -1607,7 +1628,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                         else { play(m.id, m.text, resolveVoiceId(employeeId ?? "", roster)); }
                       }}
                       disabled={loadingId === m.id}
-                      title={playingId === m.id ? "Stop" : "Listen"}
+                      title={playingId === m.id ? t("chat.stopTitle") : t("chat.listenTitle")}
                       style={{
                         display: "inline-flex", alignItems: "center", gap: "var(--sp-5)",
                         padding: "4px 10px", fontSize: "var(--fs-sm)", borderRadius: 6,
@@ -1629,12 +1650,12 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       ) : (
                         <Icons.Volume size={12} />
                       )}
-                      <span>{loadingId === m.id ? "loading…" : playingId === m.id ? "stop" : "listen"}</span>
+                      <span>{loadingId === m.id ? t("chat.loading") : playingId === m.id ? t("chat.stop") : t("chat.listen")}</span>
                     </button>
 
                     <button
                       onClick={() => copyMessage(m.id, m.text)}
-                      title={copiedId === m.id ? "Copied" : "Copy message"}
+                      title={copiedId === m.id ? t("chat.copiedTitle") : t("chat.copyTitle")}
                       style={{
                         display: "inline-flex", alignItems: "center", gap: "var(--sp-5)",
                         padding: "4px 10px", fontSize: "var(--fs-sm)", borderRadius: 6,
@@ -1667,7 +1688,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                           <path d="M4 16V6a2 2 0 0 1 2-2h10" />
                         </svg>
                       )}
-                      <span>{copiedId === m.id ? "copied" : "copy"}</span>
+                      <span>{copiedId === m.id ? t("chat.copied") : t("chat.copy")}</span>
                     </button>
                   </div>
                 )}
@@ -1688,6 +1709,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                       <button
                         key={s}
                         type="button"
+                        dir="auto"
                         onClick={() => handleFollowup(s)}
                         disabled={isStreaming}
                         style={{
@@ -1752,7 +1774,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
               >
                 {initials}
               </div>
-              <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>Thinking</span>
+              <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>{t("chat.thinking")}</span>
               <TypingDots />
             </motion.div>
           )}
@@ -1777,7 +1799,10 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                 key={a.path}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: "var(--sp-6)",
-                  padding: "4px 6px 4px 10px",
+                  paddingTop: 4,
+                  paddingBottom: 4,
+                  paddingInlineStart: 10,
+                  paddingInlineEnd: 6,
                   fontSize: "var(--fs-xs)",
                   background: "var(--surface)",
                   border: "1px solid var(--hairline)",
@@ -1785,7 +1810,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                   color: "var(--text)",
                   maxWidth: 240,
                 }}
-                title={`${a.filename} · ${(a.size / 1024).toFixed(1)} KB`}
+                title={`${isolate(a.filename)} · ${isolate(`${(a.size / 1024).toFixed(1)} KB`)}`}
               >
                 <svg
                   width={11}
@@ -1802,12 +1827,12 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                   <path d="M21 12.5L12.5 21a5 5 0 0 1-7-7L14 5.5a3.5 3.5 0 0 1 5 5L10 19" />
                 </svg>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {a.filename}
+                  <bdi>{a.filename}</bdi>
                 </span>
                 <button
                   type="button"
                   onClick={() => removeAttachment(a.path)}
-                  title="Remove"
+                  title={t("chat.remove")}
                   style={{
                     flexShrink: 0, width: 16, height: 16, borderRadius: 8,
                     border: "none", background: "transparent",
@@ -1821,7 +1846,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
             ))}
             {uploading && (
               <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", padding: "4px 10px" }}>
-                uploading…
+                {t("chat.uploading")}
               </span>
             )}
             {uploadError && (
@@ -1850,7 +1875,10 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
             background: "var(--surface)",
             border: `1px solid ${inputFocused ? avatarColor : "var(--hairline-strong)"}`,
             borderRadius: 12,
-            padding: "6px 6px 6px 12px",
+            paddingTop: 6,
+            paddingBottom: 6,
+            paddingInlineStart: 12,
+            paddingInlineEnd: 6,
             transition: "border-color 0.2s",
             boxShadow: inputFocused ? `0 0 0 3px color-mix(in oklch, ${avatarColor} 15%, transparent)` : "none",
           }}
@@ -1863,11 +1891,12 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(input); }
             }}
+            dir="auto"
             placeholder={
-              voiceState === "listening" ? "Listening…"
-              : voiceState === "processing" ? "Processing…"
-              : isStreaming ? "Twin is responding…"
-              : "Ask the twin…"
+              voiceState === "listening" ? t("chat.placeholder.listening")
+              : voiceState === "processing" ? t("chat.placeholder.processing")
+              : isStreaming ? t("chat.placeholder.responding")
+              : t("chat.placeholder.ask")
             }
             disabled={isStreaming || voiceState === "listening" || voiceState === "processing"}
             rows={1}
@@ -1885,7 +1914,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
             onClick={() => fileInputRef.current?.click()}
             disabled={isStreaming || uploading || !employeeId}
             whileTap={{ scale: 0.92 }}
-            title="Attach a file"
+            title={t("chat.attach")}
             style={{
               flexShrink: 0, width: 30, height: 30, borderRadius: 8,
               border: "1px solid var(--hairline)",
@@ -1918,7 +1947,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
               onClick={toggleMic}
               disabled={isStreaming && voiceState !== "listening"}
               whileTap={{ scale: 0.9 }}
-              title={voiceState === "listening" ? "Stop recording" : "Speak"}
+              title={voiceState === "listening" ? t("chat.stopRecording") : t("chat.speak")}
               style={{
                 flexShrink: 0, width: 30, height: 30, borderRadius: 8,
                 border: voiceState === "listening"
@@ -1954,14 +1983,14 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
               boxShadow: input.trim().length > 0 ? "var(--shadow)" : "none",
             }}
           >
-            <Icons.Arrow size={11} />
-            Ask
+            <Icons.Arrow size={11} style={rtl ? { transform: "scaleX(-1)" } : undefined} />
+            {t("chat.ask")}
           </motion.button>
         </div>
 
         <div style={{ marginTop: "var(--sp-5)", textAlign: "center" }}>
           <span style={{ fontSize: "var(--fs-2xs)", color: "var(--text-subtle)", opacity: 0.6 }}>
-            Shift + Enter for new line
+            <bdi>Shift+Enter</bdi> {t("chat.newLine")}
           </span>
         </div>
       </div>

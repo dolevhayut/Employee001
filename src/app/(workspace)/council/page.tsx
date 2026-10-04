@@ -25,6 +25,11 @@ import { type EmployeeWithTwin } from "@/lib/employees";
 import { useRoster } from "@/components/ex/roster-context";
 import type { CouncilEvent, ClarificationQuestion } from "@/lib/council-runner";
 import { humanizeToolAction } from "@/lib/tool-humanize";
+import { useT } from "@/components/ex/i18n-context";
+import { isolate } from "@/lib/i18n/format";
+import type { MessageKey, MessageVars } from "@/lib/i18n/messages";
+
+type TFn = (key: MessageKey, vars?: MessageVars) => string;
 
 // Event-time unique id for a chat thread. Lives at module scope because it is a
 // side-effecting utility invoked from event handlers, not part of render.
@@ -132,12 +137,33 @@ function Avatar({ emp, size = 32 }: { emp: EmployeeWithTwin; size?: number }) {
   );
 }
 
-const CHIPS = [
-  "We're missing Q2 targets. What should we do?",
-  "We're considering hiring a new VP Sales. Thoughts?",
-  "A big enterprise deal needs a feature that's not on the roadmap. How do we handle it?",
-  "Platform is slow — customers are complaining. What's the priority?",
-];
+const CHIP_KEYS = [
+  "meeting.chip.targets",
+  "meeting.chip.hire",
+  "meeting.chip.deal",
+  "meeting.chip.slow",
+] as const;
+
+const VERB_KEYS: Record<string, MessageKey> = {
+  Listing: "meeting.verb.listing",
+  Fetching: "meeting.verb.fetching",
+  Searching: "meeting.verb.searching",
+  Sending: "meeting.verb.sending",
+  Posting: "meeting.verb.posting",
+  Creating: "meeting.verb.creating",
+  Updating: "meeting.verb.updating",
+  Deleting: "meeting.verb.deleting",
+  Uploading: "meeting.verb.uploading",
+  Downloading: "meeting.verb.downloading",
+  Starring: "meeting.verb.starring",
+  Merging: "meeting.verb.merging",
+  Approving: "meeting.verb.approving",
+};
+
+function displayVerb(verb: string, translate: TFn): string {
+  const key = VERB_KEYS[verb];
+  return key ? translate(key) : verb;
+}
 
 // ─── Participants bar ─────────────────────────────────────────────────────────
 
@@ -148,6 +174,7 @@ function ParticipantsBar({
   active: Set<string>;
   onToggle: (id: string) => void;
 }) {
+  const { t } = useT();
   const readyEmployees = useRoster().filter(
     (e) => e.twinStatus === "ready"
   );
@@ -172,10 +199,10 @@ function ParticipantsBar({
           letterSpacing: "0.06em",
           textTransform: "uppercase",
           color: "var(--text-subtle)",
-          marginRight: "var(--sp-4)",
+          marginInlineEnd: "var(--sp-4)",
         }}
       >
-        In the room
+        {t("meeting.inRoom")}
       </span>
       {readyEmployees.map((emp) => {
         const isActive = active.has(emp.id);
@@ -183,12 +210,15 @@ function ParticipantsBar({
           <button
             key={emp.id}
             onClick={() => onToggle(emp.id)}
-            title={`${isActive ? "Exclude" : "Include"} ${emp.firstName}`}
+            title={t(isActive ? "meeting.exclude" : "meeting.include", { name: isolate(emp.firstName) })}
             style={{
               display: "flex",
               alignItems: "center",
               gap: "var(--sp-7)",
-              padding: "4px 10px 4px 6px",
+              paddingTop: 4,
+              paddingBottom: 4,
+              paddingInlineStart: 6,
+              paddingInlineEnd: 10,
               background: isActive ? "var(--surface)" : "transparent",
               border: `1px solid ${isActive ? "var(--accent-soft)" : "transparent"}`,
               borderRadius: 20,
@@ -205,7 +235,7 @@ function ParticipantsBar({
                   style={{
                     position: "absolute",
                     bottom: 0,
-                    right: 0,
+                    insetInlineEnd: 0,
                     width: 7,
                     height: 7,
                     borderRadius: "50%",
@@ -222,10 +252,10 @@ function ParticipantsBar({
                 color: isActive ? "var(--text)" : "var(--text-muted)",
               }}
             >
-              {emp.firstName}
+              <bdi>{emp.firstName}</bdi>
             </span>
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>
-              {emp.role}
+              <bdi>{emp.role}</bdi>
             </span>
           </button>
         );
@@ -238,6 +268,7 @@ function ParticipantsBar({
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 function EmptyState({ onChip }: { onChip: (text: string) => void }) {
+  const { t } = useT();
   return (
     <div
       style={{
@@ -259,11 +290,10 @@ function EmptyState({ onChip }: { onChip: (text: string) => void }) {
             marginBottom: "var(--sp-8)",
           }}
         >
-          Raise a problem. The team will respond.
+          {t("meeting.emptyTitle")}
         </div>
         <div style={{ fontSize: "var(--fs-ui)", color: "var(--text-muted)", lineHeight: 1.6 }}>
-          Each twin is powered by Claude SDK and responds in real time
-          based on the employee&apos;s actual profile files.
+          {t("meeting.emptyBody")}
         </div>
       </div>
 
@@ -276,10 +306,11 @@ function EmptyState({ onChip }: { onChip: (text: string) => void }) {
           maxWidth: 480,
         }}
       >
-        {CHIPS.map((chip) => (
+        {CHIP_KEYS.map((key) => (
           <button
-            key={chip}
-            onClick={() => onChip(chip)}
+            key={key}
+            dir="auto"
+            onClick={() => onChip(t(key))}
             style={{
               padding: "10px 16px",
               background: "var(--surface)",
@@ -289,7 +320,7 @@ function EmptyState({ onChip }: { onChip: (text: string) => void }) {
               color: "var(--text-muted)",
               cursor: "pointer",
               fontFamily: "inherit",
-              textAlign: "left",
+              textAlign: "start",
               transition: "background .12s, border-color .12s, color .12s",
             }}
             onMouseEnter={(e) => {
@@ -303,7 +334,7 @@ function EmptyState({ onChip }: { onChip: (text: string) => void }) {
               e.currentTarget.style.color = "var(--text-muted)";
             }}
           >
-            {chip}
+            {t(key)}
           </button>
         ))}
       </div>
@@ -326,12 +357,16 @@ function UserBubble({ text }: { text: string }) {
       }}
     >
       <div
+        dir="auto"
         style={{
           maxWidth: 520,
           padding: "10px 14px",
           background: "var(--text)",
           color: "var(--bg)",
-          borderRadius: "12px 12px 3px 12px",
+          borderStartStartRadius: 12,
+          borderStartEndRadius: 12,
+          borderEndEndRadius: 3,
+          borderEndStartRadius: 12,
           fontSize: "var(--fs-base)",
           lineHeight: 1.6,
           fontWeight: 450,
@@ -359,10 +394,10 @@ function ConfidencePill({ value }: { value: number }) {
         background: `${color}18`,
         padding: "1px 5px",
         borderRadius: 4,
-        marginLeft: "var(--sp-6)",
+        marginInlineStart: "var(--sp-6)",
       }}
     >
-      {Math.round(value * 100)}%
+      <bdi>{Math.round(value * 100)}%</bdi>
     </span>
   );
 }
@@ -376,6 +411,7 @@ function ApprovalCard({
   onApprove: (updatedInput?: Record<string, unknown>) => void;
   onDeny: (message?: string) => void;
 }) {
+  const { t } = useT();
   const [editing, setEditing] = useState(false);
   const [edited, setEdited] = useState(
     JSON.stringify(approval.input, null, 2)
@@ -392,7 +428,7 @@ function ApprovalCard({
         try {
           updatedInput = JSON.parse(edited) as Record<string, unknown>;
         } catch {
-          setError("Edit is not valid JSON");
+          setError(t("meeting.badJson"));
           setSubmitting(false);
           return;
         }
@@ -454,7 +490,7 @@ function ApprovalCard({
             color: "var(--warn)",
           }}
         >
-          Approval needed
+          {t("meeting.approvalNeeded")}
         </div>
         <div
           style={{
@@ -463,14 +499,14 @@ function ApprovalCard({
             color: "var(--text)",
             fontFamily:
               "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-            marginLeft: "auto",
+            marginInlineStart: "auto",
           }}
         >
-          {approval.label}
+          <bdi>{approval.label}</bdi>
         </div>
       </div>
 
-      <div style={{ fontSize: "var(--fs-sm)", color: "var(--text)", lineHeight: 1.5 }}>
+      <div dir="auto" style={{ fontSize: "var(--fs-sm)", color: "var(--text)", lineHeight: 1.5 }}>
         {approval.reason}
       </div>
 
@@ -540,7 +576,7 @@ function ApprovalCard({
             fontFamily: "inherit",
           }}
         >
-          ✓ Approve
+          ✓ {t("inbox.approve")}
         </button>
         <button
           onClick={() => setEditing((v) => !v)}
@@ -557,13 +593,13 @@ function ApprovalCard({
             fontFamily: "inherit",
           }}
         >
-          {editing ? "Cancel edit" : "Edit args"}
+          {editing ? t("inbox.overlay.cancelEdit") : t("inbox.overlay.edit")}
         </button>
         <button
           onClick={deny}
           disabled={submitting}
           style={{
-            marginLeft: "auto",
+            marginInlineStart: "auto",
             padding: "6px 12px",
             background: "transparent",
             color: "var(--danger)",
@@ -575,7 +611,7 @@ function ApprovalCard({
             fontFamily: "inherit",
           }}
         >
-          Skip
+          {t("inbox.overlay.skip")}
         </button>
       </div>
     </motion.div>
@@ -583,6 +619,7 @@ function ApprovalCard({
 }
 
 function BlockedNotice({ tool, reason }: { tool: string; reason: string }) {
+  const { t } = useT();
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
@@ -607,9 +644,9 @@ function BlockedNotice({ tool, reason }: { tool: string; reason: string }) {
           marginBottom: "var(--sp-2)",
         }}
       >
-        Blocked · {tool}
+        {t("meeting.blocked")} · <bdi>{tool}</bdi>
       </div>
-      {reason}
+      <span dir="auto">{reason}</span>
     </motion.div>
   );
 }
@@ -662,53 +699,54 @@ function builtinGlyph(toolName: string): BuiltinGlyph | null {
 function builtinDescriptor(
   toolName: string,
   input: unknown,
+  translate: TFn,
 ): { verb: string; noun: string; detail?: string } | null {
   const args = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const t = toolName.toLowerCase();
   const str = (k: string) => (typeof args[k] === "string" ? (args[k] as string) : undefined);
 
   if (t === "read" && str("file_path")) {
-    return { verb: "Read", noun: str("file_path")!.split("/").pop() ?? "file" };
+    return { verb: translate("meeting.trace.read"), noun: str("file_path")!.split("/").pop() ?? translate("meeting.trace.file") };
   }
   if (t === "write" && str("file_path")) {
-    return { verb: "Wrote", noun: str("file_path")!.split("/").pop() ?? "file" };
+    return { verb: translate("meeting.trace.wrote"), noun: str("file_path")!.split("/").pop() ?? translate("meeting.trace.file") };
   }
   if (t === "edit" && str("file_path")) {
-    return { verb: "Edited", noun: str("file_path")!.split("/").pop() ?? "file" };
+    return { verb: translate("meeting.trace.edited"), noun: str("file_path")!.split("/").pop() ?? translate("meeting.trace.file") };
   }
   if (t === "bash") {
     const cmd = str("command") ?? "";
     const head = cmd.split("\n")[0].slice(0, 80);
-    return { verb: "Ran", noun: "shell", detail: head ? ` ${head}` : undefined };
+    return { verb: translate("meeting.trace.ran"), noun: translate("meeting.trace.shell"), detail: head ? ` ${head}` : undefined };
   }
   if (t === "grep" && str("pattern")) {
-    return { verb: "Searched", noun: "files", detail: `for "${str("pattern")}"` };
+    return { verb: translate("meeting.trace.searched"), noun: translate("meeting.trace.files"), detail: translate("meeting.trace.forPattern", { pattern: str("pattern")! }) };
   }
   if (t === "glob" && str("pattern")) {
-    return { verb: "Listed", noun: "files", detail: `matching ${str("pattern")}` };
+    return { verb: translate("meeting.trace.listed"), noun: translate("meeting.trace.files"), detail: translate("meeting.trace.matching", { pattern: str("pattern")! }) };
   }
   if (t.startsWith("toolsearch") && str("query")) {
-    return { verb: "Looked up", noun: "tools", detail: `"${str("query")}"` };
+    return { verb: translate("meeting.trace.lookedUp"), noun: translate("meeting.trace.tools"), detail: `"${str("query")}"` };
   }
   if (t.startsWith("webfetch") && str("url")) {
     let host = str("url")!;
     try { host = new URL(host).hostname; } catch { /* keep raw */ }
-    return { verb: "Fetched", noun: host };
+    return { verb: translate("meeting.trace.fetched"), noun: host };
   }
   if (t.startsWith("websearch") && str("query")) {
-    return { verb: "Searched", noun: "web", detail: `"${str("query")}"` };
+    return { verb: translate("meeting.trace.searched"), noun: translate("meeting.trace.web"), detail: `"${str("query")}"` };
   }
   if (t.startsWith("subagent:")) {
     const subType = toolName.split(":")[1] ?? "";
     const label =
       subType === "web-researcher"
-        ? "🌐 web research"
+        ? `🌐 ${translate("meeting.trace.webResearch")}`
         : subType === "brain-explorer"
-          ? "🧠 brain explorer"
+          ? `🧠 ${translate("meeting.trace.brainExplorer")}`
           : subType;
     const desc = str("description");
     return {
-      verb: "Spawned",
+      verb: translate("meeting.trace.spawned"),
       noun: label,
       detail: desc ? `— ${desc}` : undefined,
     };
@@ -716,12 +754,13 @@ function builtinDescriptor(
   return null;
 }
 
-function describeTrace(trace: ToolTrace) {
-  const builtin = builtinDescriptor(trace.tool, trace.input);
+function describeTrace(trace: ToolTrace, translate: TFn) {
+  const builtin = builtinDescriptor(trace.tool, trace.input, translate);
   if (builtin) {
     return { ...builtin, toolkit: "" };
   }
-  return humanizeToolAction(trace.tool, trace.input);
+  const human = humanizeToolAction(trace.tool, trace.input);
+  return { ...human, verb: displayVerb(human.verb, translate) };
 }
 
 const FADE_OPACITY = [1, 0.72, 0.48];
@@ -733,7 +772,8 @@ function ToolFeedRow({
   trace: ToolTrace;
   ageIndex: number;
 }) {
-  const desc = describeTrace(trace);
+  const { t } = useT();
+  const desc = describeTrace(trace, t);
   const composioSlug = desc.toolkit ? normalizeComposioSlug(desc.toolkit) : "";
   const glyph = composioSlug ? null : builtinGlyph(trace.tool);
   const opacity = ageIndex < FADE_OPACITY.length
@@ -752,9 +792,15 @@ function ToolFeedRow({
         display: "flex",
         alignItems: "center",
         gap: "var(--sp-8)",
-        padding: "4px 8px 4px 6px",
-        borderLeft: `2px solid ${isHead ? "var(--accent-deep)" : "var(--hairline)"}`,
-        borderRadius: "0 6px 6px 0",
+        paddingTop: 4,
+        paddingBottom: 4,
+        paddingInlineStart: 6,
+        paddingInlineEnd: 8,
+        borderInlineStart: `2px solid ${isHead ? "var(--accent-deep)" : "var(--hairline)"}`,
+        borderStartStartRadius: 0,
+        borderStartEndRadius: 6,
+        borderEndEndRadius: 6,
+        borderEndStartRadius: 0,
         background: isHead ? "var(--accent-soft)" : "transparent",
         minHeight: 22,
         transition: "background .2s, border-color .2s",
@@ -792,9 +838,9 @@ function ToolFeedRow({
         <span style={{ fontWeight: 600, color: "var(--accent-deep)" }}>
           {desc.verb}
         </span>{" "}
-        <span>{desc.noun}</span>
+        <bdi>{desc.noun}</bdi>
         {desc.detail && (
-          <span style={{ color: "var(--text-muted)" }}>{" "}{desc.detail}</span>
+          <span style={{ color: "var(--text-muted)" }}>{" "}<bdi>{desc.detail}</bdi></span>
         )}
       </span>
     </motion.div>
@@ -802,6 +848,7 @@ function ToolFeedRow({
 }
 
 function ToolFeed({ traces }: { traces: ToolTrace[] }) {
+  const { t } = useT();
   const [expanded, setExpanded] = useState(false);
   if (traces.length === 0) return null;
 
@@ -818,7 +865,7 @@ function ToolFeed({ traces }: { traces: ToolTrace[] }) {
         flexDirection: "column",
         gap: "var(--sp-2)",
         marginBottom: "var(--sp-8)",
-        paddingLeft: "var(--sp-2)",
+        paddingInlineStart: "var(--sp-2)",
       }}
     >
       <AnimatePresence initial={false}>
@@ -849,7 +896,7 @@ function ToolFeed({ traces }: { traces: ToolTrace[] }) {
             letterSpacing: "0.02em",
           }}
         >
-          + {hidden} earlier
+          + <bdi>{hidden}</bdi> {t("meeting.earlier")}
         </button>
       )}
       {expanded && traces.length > HEAD && (
@@ -870,7 +917,7 @@ function ToolFeed({ traces }: { traces: ToolTrace[] }) {
             fontFamily: "inherit",
           }}
         >
-          collapse
+          {t("shell.collapse")}
         </button>
       )}
     </div>
@@ -878,6 +925,7 @@ function ToolFeed({ traces }: { traces: ToolTrace[] }) {
 }
 
 function BlockedDelegationNote({ fromName, toName }: { fromName: string; toName: string }) {
+  const { t, locale } = useT();
   return (
     <motion.div
       initial={{ opacity: 0, y: -4 }}
@@ -888,7 +936,9 @@ function BlockedDelegationNote({ fromName, toName }: { fromName: string; toName:
         alignItems: "center",
         gap: "var(--sp-5)",
         padding: "3px 9px",
-        margin: "2px 0 8px 40px",
+        marginTop: 2,
+        marginBottom: 8,
+        marginInlineStart: 40,
         background: "transparent",
         border: "1px dashed var(--hairline-strong)",
         borderRadius: 16,
@@ -898,12 +948,12 @@ function BlockedDelegationNote({ fromName, toName }: { fromName: string; toName:
         color: "var(--text-subtle)",
         fontStyle: "italic",
       }}
-      title={`${fromName} tagged ${toName}, but ${toName} was already called in this meeting (each twin can be delegated to once).`}
+      title={t("meeting.taggedTitle", { from: isolate(fromName), to: isolate(toName) })}
     >
-      <span style={{ opacity: 0.6 }}>↳</span>
+      <span style={{ opacity: 0.6, display: "inline-block", transform: locale === "he" ? "scaleX(-1)" : undefined }}>↳</span>
       <span>
-        <strong style={{ fontWeight: 600 }}>{fromName}</strong> tagged{" "}
-        <strong style={{ fontWeight: 600 }}>{toName}</strong> · already in conversation
+        <strong style={{ fontWeight: 600 }}><bdi>{fromName}</bdi></strong> {t("meeting.tagged")}{" "}
+        <strong style={{ fontWeight: 600 }}><bdi>{toName}</bdi></strong> · {t("meeting.alreadyIn")}
       </span>
     </motion.div>
   );
@@ -983,6 +1033,7 @@ function FileShareChip({
   meetingId: string | null;
   onOpen: () => void;
 }) {
+  const { t } = useT();
   const sizeLabel =
     chip.sizeBytes >= 1024 * 1024
       ? `${(chip.sizeBytes / (1024 * 1024)).toFixed(1)} MB`
@@ -1005,8 +1056,13 @@ function FileShareChip({
         display: "flex",
         alignItems: "center",
         gap: "var(--sp-10)",
-        padding: isImage ? "6px 12px 6px 6px" : "6px 12px 6px 8px",
-        margin: "2px 0 8px 40px",
+        paddingTop: 6,
+        paddingBottom: 6,
+        paddingInlineEnd: 12,
+        paddingInlineStart: isImage ? 6 : 8,
+        marginTop: 2,
+        marginBottom: 8,
+        marginInlineStart: 40,
         background: "var(--accent-soft)",
         border: "1px solid var(--hairline-strong)",
         borderRadius: 14,
@@ -1015,10 +1071,10 @@ function FileShareChip({
         fontWeight: 500,
         color: "var(--text)",
         cursor: "pointer",
-        textAlign: "left",
+        textAlign: "start",
         maxWidth: 460,
       }}
-      title={`Shared by ${chip.sharedByName} — click to view`}
+      title={t("meeting.sharedByTitle", { name: isolate(chip.sharedByName) })}
     >
       {imageUrl ? (
         <img
@@ -1038,10 +1094,10 @@ function FileShareChip({
       )}
       <span style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)", minWidth: 0 }}>
         <span style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {chip.sharedByName} shared <code style={{ background: "var(--surface)", padding: "1px 5px", borderRadius: 4, fontSize: "var(--fs-xs)" }}>{chip.filename}</code>
+          <bdi>{chip.sharedByName}</bdi> {t("meeting.shared")} <code style={{ background: "var(--surface)", padding: "1px 5px", borderRadius: 4, fontSize: "var(--fs-xs)" }}><bdi>{chip.filename}</bdi></code>
         </span>
-        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {chip.summary} · {sizeLabel}
+        <span dir="auto" style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {chip.summary} · <bdi>{sizeLabel}</bdi>
         </span>
       </span>
     </motion.button>
@@ -1057,6 +1113,8 @@ function FileDrawer({
   chip: SharedFileChip | null;
   onClose: () => void;
 }) {
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   const [content, setContent] = useState<string | null>(null);
   // Start in the loading state when a JSON fetch is pending on mount, so the
   // effect doesn't need a synchronous setState to enter it. Image chips (and
@@ -1081,7 +1139,7 @@ function FileDrawer({
         if (!cancelled) setContent(data.content);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "fetch failed");
+        if (!cancelled) setError(err instanceof Error ? err.message : "fetch_failed");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -1112,20 +1170,20 @@ function FileDrawer({
         }}
       />
       <motion.aside
-        initial={{ x: 480 }}
+        initial={{ x: rtl ? -480 : 480 }}
         animate={{ x: 0 }}
-        exit={{ x: 480 }}
+        exit={{ x: rtl ? -480 : 480 }}
         transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
         style={{
           position: "fixed",
           top: 0,
-          right: 0,
+          insetInlineEnd: 0,
           bottom: 0,
           width: 480,
           maxWidth: "90vw",
           background: "var(--bg-elevated)",
-          borderLeft: "1px solid var(--hairline-strong)",
-          boxShadow: "-12px 0 40px rgba(0,0,0,0.18)",
+          borderInlineStart: "1px solid var(--hairline-strong)",
+          boxShadow: rtl ? "12px 0 40px rgba(0,0,0,0.18)" : "-12px 0 40px rgba(0,0,0,0.18)",
           zIndex: 101,
           display: "flex",
           flexDirection: "column",
@@ -1142,13 +1200,13 @@ function FileDrawer({
         >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: "var(--fs-ui)", fontWeight: 700, fontFamily: "monospace", wordBreak: "break-all" }}>
-              {chip.filename}
+              <bdi>{chip.filename}</bdi>
             </div>
             <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)", marginTop: "var(--sp-4)" }}>
               {chip.summary}
             </div>
             <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", marginTop: "var(--sp-6)" }}>
-              shared by <strong>{chip.sharedByName}</strong> · {chip.contentType}
+              {t("meeting.sharedBy")} <strong><bdi>{chip.sharedByName}</bdi></strong> · <bdi>{chip.contentType}</bdi>
             </div>
           </div>
           <button
@@ -1163,7 +1221,7 @@ function FileDrawer({
               cursor: "pointer",
               color: "var(--text)",
             }}
-            aria-label="Close"
+            aria-label={t("settings.action.close")}
           >
             ✕
           </button>
@@ -1182,7 +1240,7 @@ function FileDrawer({
               textDecoration: "none",
             }}
           >
-            ⬇ Download
+            ⬇ {t("meeting.file.download")}
           </a>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "var(--sp-16)" }}>
@@ -1206,17 +1264,18 @@ function FileDrawer({
                   objectFit: "contain",
                   display: "block",
                 }}
-                onError={() => setError("could not load image")}
+                onError={() => setError(t("meeting.file.imageFailed"))}
               />
             </div>
           ) : (
             <>
               {loading && (
-                <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>Loading…</div>
+                <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>{t("settings.status.loading")}</div>
               )}
               {error && (
                 <div style={{ fontSize: "var(--fs-sm)", color: "var(--danger, #c33)" }}>
-                  Could not load file: {error}
+                  {t("meeting.file.loadFailed")}{" "}
+                  <bdi>{error === "fetch_failed" ? t("meeting.file.fetchFailed") : error}</bdi>
                 </div>
               )}
               {content !== null && !loading && !error && (
@@ -1245,9 +1304,10 @@ function FileDrawer({
 /* eslint-enable @next/next/no-img-element */
 
 function DelegationArrow({ fromName, toName }: { fromName: string; toName: string }) {
+  const { t, locale } = useT();
   return (
     <motion.div
-      initial={{ opacity: 0, x: -6 }}
+      initial={{ opacity: 0, x: locale === "he" ? 6 : -6 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.2 }}
       style={{
@@ -1255,7 +1315,9 @@ function DelegationArrow({ fromName, toName }: { fromName: string; toName: strin
         alignItems: "center",
         gap: "var(--sp-6)",
         padding: "5px 10px",
-        margin: "2px 0 10px 40px",
+        marginTop: 2,
+        marginBottom: 10,
+        marginInlineStart: 40,
         background: "var(--accent-soft)",
         border: "1px solid var(--hairline)",
         borderRadius: 20,
@@ -1265,9 +1327,9 @@ function DelegationArrow({ fromName, toName }: { fromName: string; toName: strin
         color: "var(--accent-deep)",
       }}
     >
-      <Icons.Arrow size={10} />
+      <Icons.Arrow size={10} style={locale === "he" ? { transform: "scaleX(-1)" } : undefined} />
       <span>
-        <strong>{fromName}</strong> called in <strong>{toName}</strong>
+        <strong><bdi>{fromName}</bdi></strong> {t("meeting.calledIn")} <strong><bdi>{toName}</bdi></strong>
       </span>
     </motion.div>
   );
@@ -1304,6 +1366,7 @@ function TwinBubble({
   delay: number;
   delegatedFrom?: { id: string; name: string };
 }) {
+  const { t, locale } = useT();
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -1331,9 +1394,9 @@ function TwinBubble({
             gap: "var(--sp-4)",
           }}
         >
-          {emp.name}
-          <span style={{ fontWeight: 400, color: "var(--text-subtle)", marginLeft: "var(--sp-4)" }}>
-            {emp.role}
+          <bdi>{emp.name}</bdi>
+          <span style={{ fontWeight: 400, color: "var(--text-subtle)", marginInlineStart: "var(--sp-4)" }}>
+            <bdi>{emp.role}</bdi>
           </span>
           {delegatedFrom && (
             <span
@@ -1344,10 +1407,11 @@ function TwinBubble({
                 background: "var(--accent-soft)",
                 padding: "1px 6px",
                 borderRadius: 10,
-                marginLeft: "var(--sp-4)",
+                marginInlineStart: "var(--sp-4)",
               }}
             >
-              ↳ called in by {delegatedFrom.name}
+              <span style={{ display: "inline-block", transform: locale === "he" ? "scaleX(-1)" : undefined }}>↳</span>{" "}
+              {t("meeting.calledInBy")} <bdi>{delegatedFrom.name}</bdi>
             </span>
           )}
           {!streaming && confidence !== undefined && (
@@ -1383,7 +1447,10 @@ function TwinBubble({
               padding: "10px 14px",
               background: "var(--surface)",
               border: `1px solid ${streaming ? "var(--accent-soft)" : "var(--hairline)"}`,
-              borderRadius: "3px 12px 12px 12px",
+              borderStartStartRadius: 3,
+              borderStartEndRadius: 12,
+              borderEndEndRadius: 12,
+              borderEndStartRadius: 12,
               fontSize: "var(--fs-base)",
               color: "var(--text)",
               boxShadow: "var(--shadow-sm)",
@@ -1398,7 +1465,7 @@ function TwinBubble({
                   width: 2,
                   height: "1em",
                   background: "var(--accent)",
-                  marginLeft: "var(--sp-2)",
+                  marginInlineStart: "var(--sp-2)",
                   verticalAlign: "text-bottom",
                   animation: "blink 1s step-end infinite",
                 }}
@@ -1412,6 +1479,7 @@ function TwinBubble({
 }
 
 function TypingIndicator({ emp }: { emp: EmployeeWithTwin }) {
+  const { t } = useT();
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -1451,7 +1519,7 @@ function TypingIndicator({ emp }: { emp: EmployeeWithTwin }) {
         ))}
       </div>
       <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}>
-        {emp.firstName} is thinking…
+        <bdi>{emp.firstName}</bdi> {t("meeting.thinking")}
       </span>
     </motion.div>
   );
@@ -1460,6 +1528,8 @@ function TypingIndicator({ emp }: { emp: EmployeeWithTwin }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CouncilPage() {
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   const roster = useRoster();
   // `null` means "not customized yet" — the active set defaults to every ready
   // twin, derived during render. Once the CEO toggles a participant it holds a
@@ -2233,7 +2303,7 @@ export default function CouncilPage() {
         }
       `}</style>
 
-      <Topbar crumbs={["Team Meeting"]} />
+      <Topbar crumbs={[t("nav.teamMeeting")]} />
       <ParticipantsBar active={activeIds} onToggle={toggleParticipant} />
 
       {/* Messages area */}
@@ -2352,8 +2422,8 @@ export default function CouncilPage() {
             style={{
               position: "absolute",
               bottom: "100%",
-              left: 24,
-              right: 24,
+              insetInlineStart: 24,
+              insetInlineEnd: 24,
               marginBottom: "var(--sp-4)",
               background: "var(--surface)",
               border: "1px solid var(--hairline-strong)",
@@ -2374,7 +2444,7 @@ export default function CouncilPage() {
                 padding: "8px 12px 4px",
               }}
             >
-              Address a specific twin
+              {t("meeting.address")}
             </div>
             {mentionMatches.map((emp, i) => (
               <button
@@ -2394,7 +2464,7 @@ export default function CouncilPage() {
                     i === mentionIndex ? "var(--bg-sunken)" : "transparent",
                   border: "none",
                   cursor: "pointer",
-                  textAlign: "left",
+                  textAlign: "start",
                   fontFamily: "inherit",
                   transition: "background .1s",
                 }}
@@ -2402,20 +2472,20 @@ export default function CouncilPage() {
                 <Avatar emp={emp} size={24} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600, color: "var(--text)" }}>
-                    {emp.firstName}
+                    <bdi>{emp.firstName}</bdi>
                     <span
                       style={{
                         fontWeight: 400,
                         color: "var(--text-subtle)",
-                        marginLeft: "var(--sp-6)",
+                        marginInlineStart: "var(--sp-6)",
                         fontSize: "var(--fs-meta)",
                       }}
                     >
-                      @{emp.firstName.toLowerCase()}
+                      <bdi>@{emp.firstName.toLowerCase()}</bdi>
                     </span>
                   </div>
                   <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>
-                    {emp.role}
+                    <bdi>{emp.role}</bdi>
                   </div>
                 </div>
               </button>
@@ -2430,7 +2500,10 @@ export default function CouncilPage() {
             background: "var(--surface)",
             border: "1px solid var(--hairline-strong)",
             borderRadius: 10,
-            padding: "6px 6px 6px 14px",
+            paddingTop: 6,
+            paddingBottom: 6,
+            paddingInlineStart: 14,
+            paddingInlineEnd: 6,
             alignItems: "center",
           }}
         >
@@ -2440,7 +2513,8 @@ export default function CouncilPage() {
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Raise a problem… mention @twin-name to address a specific twin"
+            dir="auto"
+            placeholder={t("meeting.placeholder")}
             style={{
               flex: 1,
               border: "none",
@@ -2472,8 +2546,8 @@ export default function CouncilPage() {
               height: 32,
             }}
           >
-            <Icons.Arrow size={13} />
-            Ask
+            <Icons.Arrow size={13} style={rtl ? { transform: "scaleX(-1)" } : undefined} />
+            {t("meeting.ask")}
           </button>
         </div>
         <div
@@ -2481,15 +2555,18 @@ export default function CouncilPage() {
             fontSize: "var(--fs-meta)",
             color: "var(--text-subtle)",
             marginTop: "var(--sp-7)",
-            paddingLeft: "var(--sp-2)",
+            paddingInlineStart: "var(--sp-2)",
             display: "flex",
             alignItems: "center",
             gap: "var(--sp-6)",
           }}
         >
-          <span>{readyCount} twins connected ·</span>
           <span>
-            Type{" "}
+            <bdi>{readyCount}</bdi>{" "}
+            {t(readyCount === 1 ? "meeting.twinsConnectedOne" : "meeting.twinsConnectedMany")} ·
+          </span>
+          <span>
+            {t("meeting.mentionBefore")}{" "}
             <code
               style={{
                 fontFamily: "inherit",
@@ -2498,9 +2575,9 @@ export default function CouncilPage() {
                 borderRadius: 3,
               }}
             >
-              @
+              <bdi>@</bdi>
             </code>{" "}
-            to address one specific twin
+            {t("meeting.mentionAfter")}
           </span>
         </div>
       </div>

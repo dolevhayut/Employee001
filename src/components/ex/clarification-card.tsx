@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import DOMPurify from "dompurify";
 import { motion } from "framer-motion";
 import type { ClarificationQuestion } from "@/lib/council-runner";
+import { useT } from "@/components/ex/i18n-context";
 
 type ClarificationCardProps = {
   approvalId: string;
@@ -22,6 +23,7 @@ export function ClarificationCard({
   onSubmit,
 }: ClarificationCardProps) {
   // Pick state — keyed by question text. Multi-select stores comma-joined labels.
+  const { t } = useT();
   const [picks, setPicks] = useState<Record<string, string[]>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -64,7 +66,9 @@ export function ClarificationCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22 }}
       style={{
-        margin: "8px 0 12px 40px",
+        marginTop: 8,
+        marginBottom: 12,
+        marginInlineStart: 40,
         padding: "var(--sp-14)",
         border: "1.5px solid var(--accent-deep)",
         borderRadius: 12,
@@ -87,9 +91,10 @@ export function ClarificationCard({
           color: "var(--accent-deep)",
         }}
       >
-        <span>🤔 Quick clarifications</span>
+        <span>🤔 {t("chat.clarify.title")}</span>
         <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
-          {questions.length === 1 ? "1 question" : `${questions.length} questions`}
+          <bdi>{questions.length}</bdi>{" "}
+          {t(questions.length === 1 ? "chat.clarify.questionOne" : "chat.clarify.questionMany")}
         </span>
       </div>
 
@@ -109,14 +114,14 @@ export function ClarificationCard({
                 flexShrink: 0,
               }}
             >
-              {q.header}
+              <bdi>{q.header}</bdi>
             </span>
-            <span style={{ fontSize: "var(--fs-base)", fontWeight: 600, color: "var(--text)" }}>
+            <span dir="auto" style={{ fontSize: "var(--fs-base)", fontWeight: 600, color: "var(--text)" }}>
               {q.question}
             </span>
             {q.multiSelect && (
               <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>
-                (pick any)
+                {t("chat.clarify.pickAny")}
               </span>
             )}
           </div>
@@ -164,7 +169,7 @@ export function ClarificationCard({
             transition: "background .2s, opacity .2s",
           }}
         >
-          {submitting ? "Sending…" : "Continue"}
+          {submitting ? t("chat.clarify.sending") : t("chat.clarify.continue")}
         </button>
       </div>
     </motion.div>
@@ -203,7 +208,7 @@ function OptionCard({
         flexDirection: "column",
         gap: "var(--sp-6)",
         padding: "var(--sp-10)",
-        textAlign: "left",
+        textAlign: "start",
         background: selected ? "var(--accent-deep)" : "var(--bg)",
         color: selected ? "white" : "var(--text)",
         border: `1.5px solid ${selected ? "var(--accent-deep)" : "var(--hairline)"}`,
@@ -217,9 +222,10 @@ function OptionCard({
       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
       onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
-      <div style={{ fontSize: "var(--fs-ui)", fontWeight: 700 }}>{label}</div>
+      <div dir="auto" style={{ fontSize: "var(--fs-ui)", fontWeight: 700 }}>{label}</div>
       {description && (
         <div
+          dir="auto"
           style={{
             fontSize: "var(--fs-meta)",
             lineHeight: 1.4,

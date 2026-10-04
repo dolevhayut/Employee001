@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
+import { useT } from "@/components/ex/i18n-context";
 
 export type EmployeeCanvas = {
   artifactId: string;
@@ -14,9 +15,9 @@ export type EmployeeCanvas = {
 
 const MAX_CANVAS_CHARS = 120_000;
 
-function buildSrcDoc(content: string, type: "html" | "svg", tooLarge: boolean) {
+function buildSrcDoc(content: string, type: "html" | "svg", tooLarge: boolean, tooLargeBody: string) {
   const body = tooLarge
-    ? `<div style="padding:"var(--sp-16)"px;font-size:13px;line-height:1.5">This canvas is too large to preview safely.</div>`
+    ? `<div dir="auto" style="padding:"var(--sp-16)"px;font-size:13px;line-height:1.5">${tooLargeBody}</div>`
     : type === "svg"
       ? `<div style="display:flex;justify-content:center;align-items:center;padding:"var(--sp-8)"px">${content}</div>`
       : content;
@@ -33,6 +34,7 @@ function CanvasFullscreenPortal({
   srcDoc: string;
   onClose: () => void;
 }) {
+  const { t } = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -79,7 +81,7 @@ function CanvasFullscreenPortal({
           }}
         >
           <Icons.Sparkle2 size={12} style={{ color: "var(--accent)", flexShrink: 0 }} />
-          <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", flex: 1 }}>
+          <span dir="auto" style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", flex: 1 }}>
             {canvas.title}
           </span>
           <span
@@ -93,11 +95,11 @@ function CanvasFullscreenPortal({
               letterSpacing: "0.05em",
             }}
           >
-            {canvas.type}
+            <bdi>{canvas.type}</bdi>
           </span>
           <button
             onClick={onClose}
-            title="Close (Esc)"
+            title={t("chat.canvas.closeEsc")}
             style={{
               background: "transparent",
               border: "none",
@@ -106,10 +108,10 @@ function CanvasFullscreenPortal({
               fontSize: 10,
               padding: "2px 8px",
               fontFamily: "inherit",
-              marginLeft: "var(--sp-4)",
+              marginInlineStart: "var(--sp-4)",
             }}
           >
-            Close
+            {t("settings.action.close")}
           </button>
         </div>
         {/* content */}
@@ -137,15 +139,17 @@ function CanvasFullscreenPortal({
  * the host app, while still allowing best-effort height measurement.
  */
 export function EmployeeCanvasPanel({ canvas }: { canvas: EmployeeCanvas }) {
+  const { t } = useT();
   const [collapsed, setCollapsed] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [height, setHeight] = useState(220);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const tooLarge = canvas.content.length > MAX_CANVAS_CHARS;
 
+  const tooLargeBody = t("chat.canvas.tooLargeBody");
   const srcDoc = useMemo(
-    () => buildSrcDoc(canvas.content, canvas.type, tooLarge),
-    [canvas.content, canvas.type, tooLarge],
+    () => buildSrcDoc(canvas.content, canvas.type, tooLarge, tooLargeBody),
+    [canvas.content, canvas.type, tooLarge, tooLargeBody],
   );
 
   const onLoad = () => {
@@ -182,7 +186,7 @@ export function EmployeeCanvasPanel({ canvas }: { canvas: EmployeeCanvas }) {
           }}
         >
           <Icons.Sparkle2 size={11} style={{ color: "var(--accent)", flexShrink: 0 }} />
-          <span style={{ fontWeight: 600, color: "var(--text)" }}>{canvas.title}</span>
+          <span dir="auto" style={{ fontWeight: 600, color: "var(--text)" }}>{canvas.title}</span>
           <span
             style={{
               fontSize: 9,
@@ -194,13 +198,13 @@ export function EmployeeCanvasPanel({ canvas }: { canvas: EmployeeCanvas }) {
               letterSpacing: "0.05em",
             }}
           >
-            {tooLarge ? "too large" : canvas.type}
+            {tooLarge ? t("chat.canvas.tooLarge") : <bdi>{canvas.type}</bdi>}
           </span>
           <div className="spacer" style={{ flex: 1 }} />
           {!tooLarge && (
             <button
               onClick={() => setFullscreen(true)}
-              title="Open fullscreen"
+              title={t("chat.canvas.fullscreenTitle")}
               style={{
                 background: "transparent",
                 border: "none",
@@ -211,7 +215,7 @@ export function EmployeeCanvasPanel({ canvas }: { canvas: EmployeeCanvas }) {
                 fontFamily: "inherit",
               }}
             >
-              Fullscreen
+              {t("chat.canvas.fullscreen")}
             </button>
           )}
           <button
@@ -226,7 +230,7 @@ export function EmployeeCanvasPanel({ canvas }: { canvas: EmployeeCanvas }) {
               fontFamily: "inherit",
             }}
           >
-            {collapsed ? "Expand" : "Collapse"}
+            {collapsed ? t("chat.canvas.expand") : t("shell.collapse")}
           </button>
         </div>
         {!collapsed && (

@@ -11,6 +11,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
 import { useT } from "@/components/ex/i18n-context";
+import { isolate } from "@/lib/i18n/format";
 import {
   ObsidianGraph,
   type GraphHighlightState,
@@ -127,8 +128,9 @@ export default function FlowPage() {
       const el = splitContainerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const fromRight = rect.right - e.clientX;
-      const pct = (fromRight / rect.width) * 100;
+      const rtl = document.documentElement.dir === "rtl";
+      const fromChatEdge = rtl ? e.clientX - rect.left : rect.right - e.clientX;
+      const pct = (fromChatEdge / rect.width) * 100;
       // Clamp 22% – 70%
       writeChatWidth(Math.max(22, Math.min(70, pct)));
     }
@@ -320,7 +322,7 @@ export default function FlowPage() {
         <div
           onMouseDown={() => setIsResizing(true)}
           onDoubleClick={() => writeChatWidth(CHAT_WIDTH_DEFAULT)}
-          title="Drag to resize · double-click to reset"
+          title={t("chat.resizeHint")}
           style={{
             flex: "0 0 5px",
             cursor: "col-resize",
@@ -394,6 +396,7 @@ function EmployeePickerBar({
   activeId: string;
   onSelect: (id: string) => void;
 }) {
+  const { t } = useT();
   const readyEmployees = useRoster().filter((e) => e.twinStatus === "ready");
   return (
     <div
@@ -418,7 +421,7 @@ function EmployeePickerBar({
           marginInlineEnd: "var(--sp-4)",
         }}
       >
-        Twin brain
+        {t("chat.twinBrain")}
       </span>
       {readyEmployees.map((emp) => {
         const isActive = emp.id === activeId;
@@ -471,10 +474,10 @@ function EmployeePickerBar({
                   lineHeight: 1.2,
                 }}
               >
-                {emp.firstName}
+                <bdi>{emp.firstName}</bdi>
               </span>
               <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", lineHeight: 1.2 }}>
-                {emp.role}
+                <bdi>{emp.role}</bdi>
               </span>
             </div>
           </motion.button>
@@ -487,6 +490,7 @@ function EmployeePickerBar({
 // ─── Chat header (active employee context) ───────────────────────────────────
 
 function ChatHeader({ employee }: { employee: EmployeeWithTwin }) {
+  const { t } = useT();
   return (
     <motion.div
       key={employee.id}
@@ -520,10 +524,10 @@ function ChatHeader({ employee }: { employee: EmployeeWithTwin }) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600, color: "var(--text)" }}>
-          Chat with {employee.firstName}&apos;s twin
+          {t("chat.withTwin", { name: isolate(employee.firstName) })}
         </div>
         <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)" }}>
-          Watch the graph as the agent reads files in real time
+          {t("chat.watchLive")}
         </div>
       </div>
       <div
@@ -550,7 +554,7 @@ function ChatHeader({ employee }: { employee: EmployeeWithTwin }) {
             background: "var(--success)",
           }}
         />
-        Live
+        {t("chat.live")}
       </div>
     </motion.div>
   );
