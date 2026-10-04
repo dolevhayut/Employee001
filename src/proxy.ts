@@ -196,6 +196,17 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Composio's signed email webhook can't hold the LAN cookie. Let only that
+  // POST through; the route verifies its signature itself and refuses
+  // everything when COMPOSIO_WEBHOOK_SECRET is unset.
+  if (
+    request.method === "POST" &&
+    request.nextUrl.pathname === "/api/email/composio" &&
+    request.headers.has("webhook-signature")
+  ) {
+    return NextResponse.next();
+  }
+
   const expected = process.env.EMPLOYEE001_TOKEN;
   // If exposure is enabled but no token is configured, refuse every request.
   // Better to fail closed than to serve an unauthenticated app on the LAN.
