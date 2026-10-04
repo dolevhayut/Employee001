@@ -62,14 +62,14 @@ function StepOrg({
           fontSize: "clamp(26px, 3.5vw, 36px)",
           fontWeight: 300,
           letterSpacing: "-0.025em",
-          color: "#0A0A0A",
+          color: "var(--text)",
           margin: "0 0 10px",
           lineHeight: 1.2,
         }}
       >
         Set up your workspace.
       </h1>
-      <p style={{ fontSize: "var(--fs-body)", color: "#9A9490", margin: "0 0 48px", fontWeight: 400 }}>
+      <p style={{ fontSize: "var(--fs-body)", color: "var(--text-subtle)", margin: "0 0 48px", fontWeight: 400 }}>
         A few details and you&apos;re in.
       </p>
 
@@ -81,7 +81,7 @@ function StepOrg({
             fontWeight: 600,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "#9A9490",
+            color: "var(--text-subtle)",
             marginBottom: "var(--sp-10)",
           }}
         >
@@ -99,16 +99,16 @@ function StepOrg({
             fontSize: "var(--fs-lg)",
             fontFamily: 'var(--font-geist), sans-serif',
             fontWeight: 400,
-            color: "#0A0A0A",
-            background: "#FFFFFF",
-            border: "1.5px solid #DDD8D0",
+            color: "var(--text)",
+            background: "var(--surface)",
+            border: "1.5px solid var(--hairline-strong)",
             borderRadius: 8,
             outline: "none",
             boxSizing: "border-box",
             transition: "border-color .15s",
           }}
-          onFocus={(e) => (e.currentTarget.style.borderColor = "#0A0A0A")}
-          onBlur={(e) => (e.currentTarget.style.borderColor = "#DDD8D0")}
+          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--text)")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--hairline-strong)")}
         />
       </div>
 
@@ -120,7 +120,7 @@ function StepOrg({
             fontWeight: 600,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "#9A9490",
+            color: "var(--text-subtle)",
             marginBottom: "var(--sp-10)",
           }}
         >
@@ -137,9 +137,9 @@ function StepOrg({
                 fontSize: "var(--fs-ui)",
                 fontWeight: 500,
                 fontFamily: 'var(--font-geist), sans-serif',
-                background: size === s ? "#0A0A0A" : "#FFFFFF",
-                color: size === s ? "#F5F2ED" : "#0A0A0A",
-                border: `1.5px solid ${size === s ? "#0A0A0A" : "#DDD8D0"}`,
+                background: size === s ? "var(--text)" : "var(--surface)",
+                color: size === s ? "var(--bg)" : "var(--text)",
+                border: `1.5px solid ${size === s ? "var(--text)" : "var(--hairline-strong)"}`,
                 borderRadius: 8,
                 cursor: "pointer",
                 transition: "all .15s",
@@ -176,14 +176,14 @@ function StepReason({
           fontSize: "clamp(26px, 3.5vw, 36px)",
           fontWeight: 300,
           letterSpacing: "-0.025em",
-          color: "#0A0A0A",
+          color: "var(--text)",
           margin: "0 0 10px",
           lineHeight: 1.2,
         }}
       >
         What&apos;s the main goal?
       </h1>
-      <p style={{ fontSize: "var(--fs-body)", color: "#9A9490", margin: "0 0 40px", fontWeight: 400 }}>
+      <p style={{ fontSize: "var(--fs-body)", color: "var(--text-subtle)", margin: "0 0 40px", fontWeight: 400 }}>
         We&apos;ll tailor your workspace accordingly.
       </p>
 
@@ -197,8 +197,8 @@ function StepReason({
               style={{
                 padding: "20px 18px",
                 textAlign: "left",
-                background: active ? "#0A0A0A" : "#FFFFFF",
-                border: `1.5px solid ${active ? "#0A0A0A" : "#DDD8D0"}`,
+                background: active ? "var(--text)" : "var(--surface)",
+                border: `1.5px solid ${active ? "var(--text)" : "var(--hairline-strong)"}`,
                 borderRadius: 12,
                 cursor: "pointer",
                 display: "flex",
@@ -212,7 +212,7 @@ function StepReason({
                 style={{
                   fontSize: "var(--fs-base)",
                   fontWeight: 600,
-                  color: active ? "#F5F2ED" : "#0A0A0A",
+                  color: active ? "var(--bg)" : "var(--text)",
                   letterSpacing: "-0.01em",
                 }}
               >
@@ -222,7 +222,7 @@ function StepReason({
                 style={{
                   fontSize: "var(--fs-sm)",
                   fontWeight: 400,
-                  color: active ? "rgba(245,242,237,0.55)" : "#9A9490",
+                  color: active ? "color-mix(in oklch, var(--bg) 55%, transparent)" : "var(--text-subtle)",
                   lineHeight: 1.5,
                 }}
               >
@@ -242,37 +242,21 @@ const THEMES: ReadonlyArray<{
   id: ThemeId;
   name: string;
   tagline: string;
-  surface: string;
-  ink: string;
-  accent: string;
-  border: string;
 }> = [
   {
     id: "light",
     name: "Cream",
     tagline: "Museum-quiet. Warm. The brand surface.",
-    surface: "#F2EBE0",
-    ink: "#1A1612",
-    accent: "#9E6B47",
-    border: "#DDD1C4",
   },
   {
     id: "dark",
     name: "Studio",
     tagline: "Cinematic. Focused. The workspace at night.",
-    surface: "#0F0E0D",
-    ink: "#F3EDE6",
-    accent: "#C68B5F",
-    border: "#2A2520",
   },
   {
     id: "cool",
     name: "Cool",
     tagline: "Crisp. Cool grays. Clarity over warmth.",
-    surface: "#EEF1F4",
-    ink: "#13171C",
-    accent: "#5E7896",
-    border: "#D1D8DF",
   },
 ];
 
@@ -298,7 +282,7 @@ function StepTheme({
           fontSize: "clamp(26px, 3.5vw, 36px)",
           fontWeight: 300,
           letterSpacing: "-0.025em",
-          color: "#0A0A0A",
+          color: "var(--text)",
           margin: "0 0 10px",
           lineHeight: 1.2,
         }}
@@ -308,7 +292,7 @@ function StepTheme({
       <p
         style={{
           fontSize: "var(--fs-body)",
-          color: "#9A9490",
+          color: "var(--text-subtle)",
           margin: "0 0 40px",
           fontWeight: 400,
         }}
@@ -329,8 +313,8 @@ function StepTheme({
               key={t.id}
               onClick={() => setTheme(t.id)}
               style={{
-                background: selected ? "#0A0A0A" : "#FFFFFF",
-                border: `1.5px solid ${selected ? "#0A0A0A" : "#DDD8D0"}`,
+                background: selected ? "var(--text)" : "var(--surface)",
+                border: `1.5px solid ${selected ? "var(--text)" : "var(--hairline-strong)"}`,
                 borderRadius: 14,
                 padding: 14,
                 cursor: "pointer",
@@ -344,12 +328,13 @@ function StepTheme({
             >
               {/* Preview window */}
               <div
+                data-theme={t.id}
                 style={{
                   position: "relative",
                   borderRadius: 8,
                   overflow: "hidden",
-                  background: t.surface,
-                  border: `1px solid ${t.border}`,
+                  background: "var(--bg)",
+                  border: "1px solid var(--hairline)",
                   aspectRatio: "16 / 10",
                 }}
               >
@@ -364,8 +349,8 @@ function StepTheme({
                 >
                   <div
                     style={{
-                      background: t.surface,
-                      borderRight: `1px solid ${t.border}`,
+                      background: "var(--bg)",
+                      borderRight: "1px solid var(--hairline)",
                       padding: 8,
                       display: "flex",
                       flexDirection: "column",
@@ -377,7 +362,7 @@ function StepTheme({
                         width: 18,
                         height: 4,
                         borderRadius: 2,
-                        background: t.accent,
+                        background: "var(--accent)",
                       }}
                     />
                     <div
@@ -385,7 +370,7 @@ function StepTheme({
                         width: "70%",
                         height: 3,
                         borderRadius: 2,
-                        background: t.ink,
+                        background: "var(--text)",
                         opacity: 0.35,
                       }}
                     />
@@ -394,7 +379,7 @@ function StepTheme({
                         width: "55%",
                         height: 3,
                         borderRadius: 2,
-                        background: t.ink,
+                        background: "var(--text)",
                         opacity: 0.22,
                       }}
                     />
@@ -403,7 +388,7 @@ function StepTheme({
                         width: "62%",
                         height: 3,
                         borderRadius: 2,
-                        background: t.ink,
+                        background: "var(--text)",
                         opacity: 0.22,
                       }}
                     />
@@ -414,7 +399,7 @@ function StepTheme({
                         width: "60%",
                         height: 4,
                         borderRadius: 2,
-                        background: t.ink,
+                        background: "var(--text)",
                         opacity: 0.6,
                         marginBottom: 6,
                       }}
@@ -424,7 +409,7 @@ function StepTheme({
                         width: "85%",
                         height: 3,
                         borderRadius: 2,
-                        background: t.ink,
+                        background: "var(--text)",
                         opacity: 0.28,
                         marginBottom: 3,
                       }}
@@ -434,7 +419,7 @@ function StepTheme({
                         width: "70%",
                         height: 3,
                         borderRadius: 2,
-                        background: t.ink,
+                        background: "var(--text)",
                         opacity: 0.28,
                         marginBottom: 10,
                       }}
@@ -442,8 +427,8 @@ function StepTheme({
                     <div
                       style={{
                         display: "inline-block",
-                        background: t.accent,
-                        color: t.surface,
+                        background: "var(--accent)",
+                        color: "var(--bg)",
                         fontSize: 7,
                         padding: "2px 6px",
                         borderRadius: 999,
@@ -462,7 +447,7 @@ function StepTheme({
                   style={{
                     fontSize: "var(--fs-base)",
                     fontWeight: 600,
-                    color: selected ? "#F5F2ED" : "#0A0A0A",
+                    color: selected ? "var(--bg)" : "var(--text)",
                     letterSpacing: "-0.01em",
                   }}
                 >
@@ -472,7 +457,7 @@ function StepTheme({
                   style={{
                     fontSize: "var(--fs-sm)",
                     fontWeight: 400,
-                    color: selected ? "rgba(245,242,237,0.55)" : "#9A9490",
+                    color: selected ? "color-mix(in oklch, var(--bg) 55%, transparent)" : "var(--text-subtle)",
                     lineHeight: 1.5,
                   }}
                 >
@@ -505,13 +490,13 @@ function StepReady({ company, reason }: { company: string; reason: string | null
           width: 52,
           height: 52,
           borderRadius: "50%",
-          background: "#0A0A0A",
+          background: "var(--text)",
           display: "grid",
           placeItems: "center",
           margin: "0 auto 28px",
         }}
       >
-        <Check width={22} height={22} strokeWidth={1.8} color="#F5F2ED" />
+        <Check width={22} height={22} strokeWidth={1.8} color="var(--bg)" />
       </div>
 
       <h1
@@ -519,14 +504,14 @@ function StepReady({ company, reason }: { company: string; reason: string | null
           fontSize: "clamp(26px, 3.5vw, 36px)",
           fontWeight: 300,
           letterSpacing: "-0.025em",
-          color: "#0A0A0A",
+          color: "var(--text)",
           margin: "0 0 10px",
           lineHeight: 1.2,
         }}
       >
         {company ? `${company} is ready.` : "You're all set."}
       </h1>
-      <p style={{ fontSize: "var(--fs-body)", color: "#9A9490", margin: "0 0 40px", fontWeight: 400 }}>
+      <p style={{ fontSize: "var(--fs-body)", color: "var(--text-subtle)", margin: "0 0 40px", fontWeight: 400 }}>
         Your workspace is configured. Time to clone your first employee.
       </p>
 
@@ -536,8 +521,8 @@ function StepReady({ company, reason }: { company: string; reason: string | null
             display: "inline-flex",
             flexDirection: "column",
             gap: "var(--sp-10)",
-            background: "#FFFFFF",
-            border: "1px solid #DDD8D0",
+            background: "var(--surface)",
+            border: "1px solid var(--hairline-strong)",
             borderRadius: 10,
             padding: "16px 24px",
             textAlign: "left",
@@ -546,14 +531,14 @@ function StepReady({ company, reason }: { company: string; reason: string | null
         >
           {company && (
             <div style={{ display: "flex", gap: "var(--sp-10)", alignItems: "center" }}>
-              <span style={{ fontSize: "var(--fs-meta)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#9A9490", width: 64 }}>Company</span>
-              <span style={{ fontSize: "var(--fs-ui)", fontWeight: 500, color: "#0A0A0A" }}>{company}</span>
+              <span style={{ fontSize: "var(--fs-meta)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-subtle)", width: 64 }}>Company</span>
+              <span style={{ fontSize: "var(--fs-ui)", fontWeight: 500, color: "var(--text)" }}>{company}</span>
             </div>
           )}
           {label && (
             <div style={{ display: "flex", gap: "var(--sp-10)", alignItems: "center" }}>
-              <span style={{ fontSize: "var(--fs-meta)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#9A9490", width: 64 }}>Goal</span>
-              <span style={{ fontSize: "var(--fs-ui)", fontWeight: 500, color: "#0A0A0A" }}>{label}</span>
+              <span style={{ fontSize: "var(--fs-meta)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-subtle)", width: 64 }}>Goal</span>
+              <span style={{ fontSize: "var(--fs-ui)", fontWeight: 500, color: "var(--text)" }}>{label}</span>
             </div>
           )}
         </div>
@@ -610,7 +595,7 @@ export default function SetupPage() {
       transition={{ duration: 0.4 }}
       style={{
         minHeight: "100vh",
-        background: "#F5F2ED",
+        background: "var(--bg)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -628,7 +613,7 @@ export default function SetupPage() {
           fontSize: "var(--fs-ui)",
           fontWeight: 600,
           letterSpacing: "0.12em",
-          color: "#0A0A0A",
+          color: "var(--text)",
           textTransform: "uppercase",
         }}
       >
@@ -640,7 +625,7 @@ export default function SetupPage() {
         {[0, 1, 2, 3].map((i) => (
           <motion.div
             key={i}
-            animate={{ background: i <= step ? "#0A0A0A" : "#DDD8D0" }}
+            animate={{ background: i <= step ? "var(--text)" : "var(--hairline-strong)" }}
             transition={{ duration: 0.2 }}
             style={{ width: 6, height: 6, borderRadius: "50%" }}
           />
@@ -680,7 +665,7 @@ export default function SetupPage() {
             onClick={back}
             style={{
               fontSize: "var(--fs-ui)",
-              color: "#9A9490",
+              color: "var(--text-subtle)",
               background: "none",
               border: "none",
               cursor: "pointer",
@@ -698,8 +683,8 @@ export default function SetupPage() {
           whileTap={canContinue ? { scale: 0.97 } : {}}
           style={{
             padding: step === 3 ? "16px 52px" : "14px 44px",
-            background: canContinue ? "#0A0A0A" : "#E8E4DC",
-            color: canContinue ? "#F5F2ED" : "#B8B0A8",
+            background: canContinue ? "var(--text)" : "var(--bg-sunken)",
+            color: canContinue ? "var(--bg)" : "var(--text-subtle)",
             border: "none",
             borderRadius: 100,
             fontSize: "var(--fs-ui)",

@@ -19,16 +19,16 @@ function SourceRow({ source, index }: { source: ProfileSource["sources"][0]; ind
         alignItems: "flex-start",
         gap: "var(--sp-14)",
         padding: "14px 20px",
-        borderBottom: "1px solid #F5F2ED",
-        background: index % 2 === 0 ? "#FFFFFF" : "#FAFAF8",
+        borderBottom: "1px solid var(--bg)",
+        background: index % 2 === 0 ? "var(--surface)" : "var(--surface-soft)",
       }}
     >
       {/* Type badge */}
       <div
         style={{
           flexShrink: 0,
-          background: cfg.bg,
-          color: cfg.text,
+          background: isHuman ? "var(--text)" : "var(--bg-sunken)",
+          color: isHuman ? "var(--bg)" : "var(--text-muted)",
           fontSize: "var(--fs-xs)",
           fontWeight: 700,
           letterSpacing: "0.06em",
@@ -37,7 +37,7 @@ function SourceRow({ source, index }: { source: ProfileSource["sources"][0]; ind
           marginTop: "var(--sp-1)",
           fontFamily: 'var(--font-geist), sans-serif',
           textTransform: "uppercase" as const,
-          border: isHuman ? "none" : "1px solid #DDD8D0",
+          border: isHuman ? "none" : "1px solid var(--hairline-strong)",
         }}
       >
         {cfg.label}
@@ -49,7 +49,7 @@ function SourceRow({ source, index }: { source: ProfileSource["sources"][0]; ind
           style={{
             fontWeight: 600,
             fontSize: "var(--fs-ui)",
-            color: "#0A0A0A",
+            color: "var(--text)",
             marginBottom: "var(--sp-4)",
             letterSpacing: "-0.01em",
           }}
@@ -59,7 +59,7 @@ function SourceRow({ source, index }: { source: ProfileSource["sources"][0]; ind
         <div
           style={{
             fontSize: "var(--fs-sm)",
-            color: "#9A9490",
+            color: "var(--text-subtle)",
             lineHeight: 1.6,
             fontStyle: isHuman ? "italic" : "normal",
           }}
@@ -79,8 +79,8 @@ function ProfileCard({ profile }: { profile: ProfileSource }) {
   return (
     <div
       style={{
-        background: "#FFFFFF",
-        border: `1.5px solid ${isOpen ? profile.accentColor + "44" : "#EDE8E1"}`,
+        background: "var(--surface)",
+        border: `1.5px solid ${isOpen ? `color-mix(in oklch, ${profile.accentColor} 27%, transparent)` : "var(--hairline)"}`,
         borderRadius: 14,
         overflow: "hidden",
         transition: "border-color 0.2s",
@@ -119,7 +119,7 @@ function ProfileCard({ profile }: { profile: ProfileSource }) {
               style={{
                 fontWeight: 600,
                 fontSize: "var(--fs-base)",
-                color: "#0A0A0A",
+                color: "var(--text)",
                 letterSpacing: "-0.01em",
                 marginBottom: "var(--sp-3)",
               }}
@@ -145,13 +145,13 @@ function ProfileCard({ profile }: { profile: ProfileSource }) {
             {Array.from({ length: systemCount }).map((_, i) => (
               <div
                 key={`s${i}`}
-                style={{ width: 7, height: 7, borderRadius: "50%", background: "#B09080", opacity: 0.7 }}
+                style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", opacity: 0.7 }}
               />
             ))}
             {Array.from({ length: humanCount }).map((_, i) => (
               <div
                 key={`h${i}`}
-                style={{ width: 7, height: 7, borderRadius: "50%", background: "#0A0A0A" }}
+                style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--text)" }}
               />
             ))}
           </div>
@@ -161,7 +161,7 @@ function ProfileCard({ profile }: { profile: ProfileSource }) {
             animate={{ rotate: isOpen ? 180 : 0 }}
             transition={{ duration: 0.2 }}
           >
-            <NavArrowDown width={14} height={14} strokeWidth={2} color="#B09080" />
+            <NavArrowDown width={14} height={14} strokeWidth={2} color="var(--accent)" />
           </motion.div>
         </div>
       </button>
@@ -176,7 +176,7 @@ function ProfileCard({ profile }: { profile: ProfileSource }) {
             transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
             style={{ overflow: "hidden" }}
           >
-            <div style={{ borderTop: "1px solid #EDE8E1" }}>
+            <div style={{ borderTop: "1px solid var(--hairline)" }}>
               {profile.sources.map((source, i) => (
                 <SourceRow key={i} source={source} index={i} />
               ))}
@@ -202,7 +202,7 @@ export default function SourcesPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#F5F2ED",
+        background: "var(--bg)",
         fontFamily: 'var(--font-geist), sans-serif',
       }}
     >
@@ -210,11 +210,11 @@ export default function SourcesPage() {
       <div
         style={{
           padding: "24px 32px",
-          borderBottom: "1px solid #EDE8E1",
+          borderBottom: "1px solid var(--hairline)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          background: "#F5F2ED",
+          background: "var(--bg)",
           position: "sticky",
           top: 0,
           zIndex: 10,
@@ -228,7 +228,7 @@ export default function SourcesPage() {
               alignItems: "center",
               gap: "var(--sp-6)",
               fontSize: "var(--fs-sm)",
-              color: "#9A9490",
+              color: "var(--text-subtle)",
               textDecoration: "none",
               letterSpacing: "0.01em",
             }}
@@ -236,14 +236,14 @@ export default function SourcesPage() {
             <NavArrowRight width={14} height={14} strokeWidth={2} />
             Back to Twin
           </a>
-          <span style={{ color: "#DDD8D0" }}>·</span>
+          <span style={{ color: "var(--hairline-strong)" }}>·</span>
           <span
             style={{
               fontSize: "var(--fs-ui)",
               fontWeight: 600,
               letterSpacing: "0.08em",
               textTransform: "uppercase" as const,
-              color: "#0A0A0A",
+              color: "var(--text)",
             }}
           >
             Employee001
@@ -253,12 +253,12 @@ export default function SourcesPage() {
         {/* Legend */}
         <div style={{ display: "flex", gap: "var(--sp-20)", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-7)" }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#B09080" }} />
-            <span style={{ fontSize: "var(--fs-sm)", color: "#9A9490" }}>System sources</span>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />
+            <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>System sources</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-7)" }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#0A0A0A" }} />
-            <span style={{ fontSize: "var(--fs-sm)", color: "#9A9490" }}>Human questions</span>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--text)" }} />
+            <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>Human questions</span>
           </div>
         </div>
       </div>
@@ -275,14 +275,14 @@ export default function SourcesPage() {
             style={{
               fontSize: "clamp(22px, 3vw, 32px)",
               fontWeight: 300,
-              color: "#0A0A0A",
+              color: "var(--text)",
               letterSpacing: "-0.02em",
               marginBottom: "var(--sp-8)",
             }}
           >
             Twin Data Sources
           </h1>
-          <p style={{ fontSize: "var(--fs-base)", color: "#9A9490", lineHeight: 1.6 }}>
+          <p style={{ fontSize: "var(--fs-base)", color: "var(--text-subtle)", lineHeight: 1.6 }}>
             Each profile file is built from a combination of automatic data from work systems and targeted questions asked directly to the employee.
           </p>
         </motion.div>
@@ -300,15 +300,15 @@ export default function SourcesPage() {
           }}
         >
           {[
-            { label: "Profile files", value: PROFILE_SOURCES.length, color: "#0A0A0A" },
-            { label: "System sources", value: totalSystem, color: "#B09080" },
-            { label: "Human questions", value: totalHuman, color: "#0A0A0A" },
+            { label: "Profile files", value: PROFILE_SOURCES.length, color: "var(--text)" },
+            { label: "System sources", value: totalSystem, color: "var(--accent)" },
+            { label: "Human questions", value: totalHuman, color: "var(--text)" },
           ].map((stat, i) => (
             <div
               key={i}
               style={{
-                background: "#FFFFFF",
-                border: "1.5px solid #EDE8E1",
+                background: "var(--surface)",
+                border: "1.5px solid var(--hairline)",
                 borderRadius: 12,
                 padding: "20px 16px",
                 textAlign: "center" as const,
@@ -325,7 +325,7 @@ export default function SourcesPage() {
               >
                 {stat.value}
               </div>
-              <div style={{ fontSize: "var(--fs-sm)", color: "#9A9490", marginTop: "var(--sp-4)" }}>
+              <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)", marginTop: "var(--sp-4)" }}>
                 {stat.label}
               </div>
             </div>

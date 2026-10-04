@@ -43,12 +43,12 @@ const SANS_FONT =
 const SERIF_FONT =
   'var(--font-instrument-serif), "Instrument Serif", ui-serif, Georgia, serif';
 
-const BRAND_ORANGE = "#9E6B47";
-const BG_DARK = "#0A0A0A";
-const TEXT_LIGHT = "#F5F1EA";
-const TEXT_MUTED = "#9A9490";
-const PANEL_BG = "#141414";
-const PANEL_BORDER = "#262626";
+const BRAND_ORANGE = "var(--accent)";
+const BG_DARK = "var(--bg)";
+const TEXT_LIGHT = "var(--text)";
+const TEXT_MUTED = "var(--text-subtle)";
+const PANEL_BG = "var(--surface)";
+const PANEL_BORDER = "var(--hairline)";
 
 const TWIN_FILE_NAMES = [
   "CONTEXT.md",
@@ -313,7 +313,7 @@ function Card({ children }: { children: React.ReactNode }) {
         border: `1px solid ${PANEL_BORDER}`,
         borderRadius: 14,
         padding: "44px 36px",
-        boxShadow: "0 24px 60px -28px rgba(0,0,0,0.6)",
+        boxShadow: "0 24px 60px -28px color-mix(in oklch, var(--text) 60%, transparent)",
       }}
     >
       {children}
@@ -392,9 +392,9 @@ function ModeTraining({
           style={{
             display: "inline-block",
             padding: "4px 10px",
-            background: "rgba(158,107,71,0.12)",
+            background: "color-mix(in oklch, var(--accent) 12%, transparent)",
             color: BRAND_ORANGE,
-            border: `1px solid rgba(158,107,71,0.3)`,
+            border: "1px solid color-mix(in oklch, var(--accent) 30%, transparent)",
             borderRadius: 999,
             fontSize: 12,
             letterSpacing: "0.02em",
@@ -410,10 +410,10 @@ function ModeTraining({
           style={{
             marginTop: 8,
             padding: "14px 16px",
-            border: "1px solid #5a2a2a",
+            border: "1px solid color-mix(in oklch, var(--danger) 40%, transparent)",
             borderRadius: 10,
-            background: "#1d0f0f",
-            color: "#f1c2c2",
+            background: "color-mix(in oklch, var(--danger) 12%, transparent)",
+            color: "var(--danger)",
             fontSize: 14,
             lineHeight: 1.5,
           }}
@@ -424,7 +424,7 @@ function ModeTraining({
             onClick={onRetry}
             style={{
               background: BRAND_ORANGE,
-              color: TEXT_LIGHT,
+              color: "var(--bg)",
               border: "none",
               padding: "8px 14px",
               borderRadius: 999,
@@ -495,7 +495,7 @@ function ModeTraining({
                       width: 16,
                       display: "inline-block",
                       textAlign: "center",
-                      color: done ? BRAND_ORANGE : writing ? BRAND_ORANGE : "#404040",
+                      color: done ? BRAND_ORANGE : writing ? BRAND_ORANGE : "var(--hairline-strong)",
                     }}
                   >
                     {done ? "✓" : writing ? "•" : "·"}
@@ -890,8 +890,8 @@ function Page() {
     <main
       style={{
         minHeight: "100vh",
-        background: "#F5F1EA",
-        color: "#1A1816",
+        background: "var(--bg)",
+        color: "var(--text)",
         display: "grid",
         placeItems: "center",
         padding: "48px 24px",
@@ -902,11 +902,11 @@ function Page() {
         <div
           className="card"
           style={{
-            background: "#FFFFFF",
-            border: "1px solid #E5DDD0",
+            background: "var(--surface)",
+            border: "1px solid var(--hairline)",
             borderRadius: 14,
             padding: "44px 36px",
-            boxShadow: "0 8px 24px -16px rgba(0,0,0,0.08)",
+            boxShadow: "0 8px 24px -16px color-mix(in oklch, var(--text) 8%, transparent)",
           }}
         >
           <div
@@ -914,7 +914,7 @@ function Page() {
               fontSize: 12,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "#8F8678",
+              color: "var(--text-subtle)",
               marginBottom: 14,
             }}
           >
@@ -922,7 +922,7 @@ function Page() {
           </div>
 
           {state.kind === "loading" && (
-            <div style={{ color: "#6B6359", fontSize: 14 }}>
+            <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
               Checking your invite…
             </div>
           )}
@@ -932,7 +932,7 @@ function Page() {
               <h1 style={{ fontFamily: SERIF_FONT, fontSize: 32, margin: "0 0 12px" }}>
                 Invite link required.
               </h1>
-              <p style={{ color: "#6B6359", fontSize: 15, lineHeight: 1.55 }}>
+              <p style={{ color: "var(--text-muted)", fontSize: 15, lineHeight: 1.55 }}>
                 This page expects an invitation token. Ask your CEO for the
                 /join link they generated.
               </p>
@@ -948,7 +948,7 @@ function Page() {
                     ? "This invite expired."
                     : "Invite not found."}
               </h1>
-              <p style={{ color: "#6B6359", fontSize: 15, lineHeight: 1.55 }}>
+              <p style={{ color: "var(--text-muted)", fontSize: 15, lineHeight: 1.55 }}>
                 Ask your CEO to send a fresh link.
               </p>
             </>
@@ -961,7 +961,7 @@ function Page() {
               </h1>
               <p
                 style={{
-                  color: "#6B6359",
+                  color: "var(--text-muted)",
                   fontSize: 15,
                   lineHeight: 1.55,
                   marginBottom: 28,
@@ -976,8 +976,8 @@ function Page() {
                 type="button"
                 onClick={go}
                 style={{
-                  background: "#1A1816",
-                  color: "#F5F1EA",
+                  background: "var(--text)",
+                  color: "var(--bg)",
                   border: "none",
                   padding: "12px 22px",
                   borderRadius: 999,
