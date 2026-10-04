@@ -57,6 +57,27 @@ for (const p of FORBIDDEN) {
   }
 }
 
+// The standalone server needs only its generated entry point, the package
+// metadata/module tree it resolves, Next's generated output, and public
+// assets. Dynamic filesystem tracing can otherwise copy the whole project
+// root into this directory, which would make npm consumers download sources,
+// tests, tooling, and internal project files.
+const STANDALONE_ALLOWLIST = new Set([
+  ".next", // generated server output; server.js loads it at runtime
+  "node_modules", // production dependencies resolved by server.js
+  "package.json", // package metadata used by generated/runtime modules
+  "public", // static assets served by the standalone server
+  "server.js", // generated standalone HTTP server entry point
+]);
+for (const entry of readdirSync(STANDALONE, { withFileTypes: true })) {
+  if (STANDALONE_ALLOWLIST.has(entry.name)) continue;
+  const target = join(STANDALONE, entry.name);
+  rmSync(target, { recursive: true, force: true });
+  console.warn(
+    `[post-build] removed ${entry.isDirectory() ? "directory" : "file"} ${target} from standalone bundle — not on runtime allowlist`,
+  );
+}
+
 // SECURITY: Final assertion — re-scan the standalone tree and abort the
 // build if anything resembling data/* or .env* survived. This makes the
 // build fail loudly rather than silently producing a leaky tarball.
