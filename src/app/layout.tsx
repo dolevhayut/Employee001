@@ -31,6 +31,7 @@ const nivSans = localFont({
     { path: "../../public/fonts/niv/NivSans-Medium.woff2", weight: "500", style: "normal" },
     { path: "../../public/fonts/niv/NivSans-SemiBold.woff2", weight: "600", style: "normal" },
     { path: "../../public/fonts/niv/NivSans-Bold.woff2", weight: "700", style: "normal" },
+    { path: "../../public/fonts/niv/NivSans-Black.woff2", weight: "900", style: "normal" },
   ],
   display: "swap",
   variable: "--font-niv",
