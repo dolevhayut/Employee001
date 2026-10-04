@@ -16,6 +16,7 @@ import {
   ObsidianGraph,
   type GraphHighlightState,
 } from "@/components/ex/obsidian-graph";
+import { BrainCosmos, canRenderCosmos } from "@/components/ex/brain-cosmos";
 import { RealFileDrawer } from "@/components/ex/real-file-drawer";
 import { TwinChatPane } from "@/components/ex/twin-chat-pane";
 import { type EmployeeWithTwin } from "@/lib/employees";
@@ -56,6 +57,55 @@ function chatWidthSnapshot(): number {
 
 function chatWidthServerSnapshot(): number {
   return CHAT_WIDTH_DEFAULT;
+}
+
+// Graph view: the 3D Brain Cosmos by default, the classic graph without
+// WebGL2, with reduced motion, or when the user picks it. Same store pattern.
+type GraphView = "cosmos" | "classic";
+const GRAPH_VIEW_KEY = "flow.graphView";
+const graphViewListeners = new Set<() => void>();
+let cosmosSupported: boolean | null = null;
+
+function graphViewSubscribe(cb: () => void): () => void {
+  graphViewListeners.add(cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    graphViewListeners.delete(cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+function graphViewSnapshot(): GraphView {
+  cosmosSupported ??= canRenderCosmos();
+  if (!cosmosSupported) return "classic";
+  try {
+    if (localStorage.getItem(GRAPH_VIEW_KEY) === "classic") return "classic";
+  } catch {
+    // ignore
+  }
+  return "cosmos";
+}
+
+function graphViewServerSnapshot(): GraphView {
+  return "classic";
+}
+
+function cosmosSupportSnapshot(): boolean {
+  cosmosSupported ??= canRenderCosmos();
+  return cosmosSupported;
+}
+
+function noopSubscribe(): () => void {
+  return () => {};
+}
+
+function writeGraphView(view: GraphView): void {
+  try {
+    localStorage.setItem(GRAPH_VIEW_KEY, view);
+  } catch {
+    // ignore
+  }
+  for (const cb of graphViewListeners) cb();
 }
 
 function writeChatWidth(pct: number): void {
@@ -119,6 +169,8 @@ export default function FlowPage() {
     chatWidthSnapshot,
     chatWidthServerSnapshot,
   );
+  const graphView = useSyncExternalStore(graphViewSubscribe, graphViewSnapshot, graphViewServerSnapshot);
+  const canCosmos = useSyncExternalStore(noopSubscribe, cosmosSupportSnapshot, () => false);
   const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
@@ -308,14 +360,63 @@ export default function FlowPage() {
               transition={{ duration: 0.25 }}
               style={{ flex: 1, display: "flex", flexDirection: "column" }}
             >
-              <ObsidianGraph
-                graph={graph}
-                state={highlightState}
-                onOpenFile={handleOpenFile}
-                loading={graphLoading}
-              />
+              {graphView === "cosmos" ? (
+                <BrainCosmos
+                  graph={graph}
+                  state={highlightState}
+                  onOpenFile={handleOpenFile}
+                  loading={graphLoading}
+                />
+              ) : (
+                <ObsidianGraph
+                  graph={graph}
+                  state={highlightState}
+                  onOpenFile={handleOpenFile}
+                  loading={graphLoading}
+                />
+              )}
             </motion.div>
           </AnimatePresence>
+
+          {canCosmos && (
+            <div
+              role="group"
+              aria-label={t("chat.graph.title")}
+              style={{
+                position: "absolute",
+                bottom: "var(--sp-16)",
+                insetInlineEnd: "var(--sp-16)",
+                display: "flex",
+                padding: 3,
+                gap: 2,
+                borderRadius: 999,
+                background: "color-mix(in oklch, var(--bg-elevated) 80%, transparent)",
+                border: "1px solid var(--hairline)",
+                backdropFilter: "blur(10px)",
+                zIndex: 2,
+              }}
+            >
+              {(["cosmos", "classic"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => writeGraphView(v)}
+                  aria-pressed={graphView === v}
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: 999,
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "var(--fs-xs)",
+                    fontWeight: 600,
+                    background: graphView === v ? "var(--text)" : "transparent",
+                    color: graphView === v ? "var(--bg)" : "var(--text-muted)",
+                  }}
+                >
+                  {v === "cosmos" ? t("chat.graph.viewCosmos") : t("chat.graph.viewClassic")}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Drag handle */}

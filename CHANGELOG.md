@@ -79,6 +79,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
+- **Brain Cosmos.** The memory graph in Chat is now a living 3D brain:
+  the twin's knowledge files are neurons inside a particle brain, and you
+  watch it think — impulses travel along synapses to the file being read,
+  the neuron blooms, cited files send a shockwave, and the camera follows the
+  thought. Built with three.js and anime.js. "Classic" switches back; it
+  falls back automatically without WebGL2 or with reduced motion.
 - **Tamper-evident audit log.** Every new approval-gate entry is hash-chained
   to the one before it, `GET /api/audit/verify` checks the whole chain across
   rotated archives, and the Activity log shows the result. Entries written

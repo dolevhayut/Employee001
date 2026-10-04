@@ -72,6 +72,7 @@
     "@tiptap/starter-kit": "3.31.3",
     "@types/dompurify": "^3.0.5",
     "@types/papaparse": "^5.5.2",
+    "animejs": "4.5.0",
     "clsx": "^2.1.1",
     "dompurify": "^3.4.15",
     "framer-motion": "^12.38.0",
