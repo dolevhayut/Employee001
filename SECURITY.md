@@ -4,8 +4,32 @@
 
 | Version | Supported |
 |---|---|
-| 0.1.x (latest rc) | ✅ |
-| < 0.1.0 | ❌ |
+| The latest minor release (currently 0.6.x) | ✅ |
+| The minor release before it (currently 0.5.x) | ✅ Security fixes only |
+| Older releases | ❌ |
+
+We support the latest minor release and the one before it as weekly releases continue.
+
+## What leaves your machine
+
+Employee001 keeps profiles, memory, audit logs, and org knowledge in `./data/` on the machine where you run it. The following outbound routes are configuration- or action-dependent. Run `npx employee001 doctor --egress` from your install to see the exact hosts active in your current configuration. Use `npx employee001 start --strict` to set the Claude Agent SDK's nonessential-traffic flag when starting the server.
+
+| Destination | What is sent | When / which setting turns it on | How to turn it off |
+|---|---|---|---|
+| `api.anthropic.com` (or `ANTHROPIC_BASE_URL`) | Prompts and profile context | Twin chat, training, and memory distillation when `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` is set | Remove the Anthropic credential; stop the server when it is not in use |
+| Your own Claude cloud endpoint: Amazon Bedrock, Google Vertex AI, or Azure AI Foundry | Prompts and profile context | A twin runs with `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, or `CLAUDE_CODE_USE_FOUNDRY` set | Unset the selected provider flag and its credentials/configuration |
+| Direct Anthropic endpoint (`api.anthropic.com` or `ANTHROPIC_BASE_URL`) | Prompts for direct Anthropic SDK calls (rerank, dreamer, relay) | Memory distillation, relay interview, or follow-ups when an Anthropic credential is set, including alongside a cloud endpoint | Remove the Anthropic credential or do not use those features |
+| `backend.composio.dev` (or `COMPOSIO_BASE_URL`) | Tool calls and OAuth data | `COMPOSIO_API_KEY` is set | Remove `COMPOSIO_API_KEY` and disconnect connected accounts |
+| `api.openai.com` | Embeddings for semantic memory | `OPENAI_API_KEY` is set and `TWIN_MEMORY_ENABLED` is not `false` | Remove `OPENAI_API_KEY` or set `TWIN_MEMORY_ENABLED=false` |
+| `api.elevenlabs.io` | Text submitted for text-to-speech | `ELEVENLABS_API_KEY` is set | Remove `ELEVENLABS_API_KEY` |
+| Each enabled custom MCP server | MCP tool calls | The server is enabled in `data/org/custom-mcp.json` | Disable or remove that server from `data/org/custom-mcp.json` |
+| Any public host | Search queries and fetched pages | A twin uses `WebSearch` or `WebFetch` while a model endpoint is configured | Do not use web research; remove model credentials to prevent twin runs |
+| `api.github.com` | Release metadata | Only when you run `employee001 update` | Do not run `employee001 update` |
+| `registry.npmjs.org` (or `npm_config_registry`) | Package tarball | Only when you run `employee001 update` | Do not run `employee001 update` |
+
+## Your compliance scope
+
+You host Employee001, so it runs inside your environment and within your compliance scope. We make no SOC 2 or ISO claims. Assess the deployment, connected services, access controls, and data handling against the requirements that apply to your organization, as you would with other self-hosted software.
 
 ## Reporting a Vulnerability
 

@@ -4,7 +4,7 @@
 
 ### Your organizational brain.
 
-**AI twins of your real team, on your own machine.** Each twin is trained on one real person's own work, the twins debate your hard questions in a Team Meeting, and nothing they do in the outside world happens without your approval.
+**AI twins of your real team, on your own machine.** Each twin is trained on one real person's own work, the twins debate your hard questions in a Team Meeting, and external actions are approval-gated.
 
 [![npm version](https://img.shields.io/npm/v/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
 [![npm downloads](https://img.shields.io/npm/dm/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
@@ -39,7 +39,7 @@ npx employee001 start     # opens http://localhost:3000
 > Requires **Node.js 22+** and an [Anthropic API key](https://console.anthropic.com). A [Composio API key](https://app.composio.dev) is needed when you invite a real employee for training — marketplace agents work without it. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop the server.
 
 > [!IMPORTANT]
-> **Your data never leaves your machine.** Only the prompts a twin generates are sent to the Anthropic API. Employee profiles, audit logs, org knowledge — all of it stays in `./data/` on your hardware. No telemetry, no analytics, no "phone home".
+> **Your data stays on your machine.** Profiles, memory, audit log, and org knowledge live in `./data/` on your hardware. Twins send prompts (with the profile context they need) to Anthropic, or to your own cloud's Claude endpoint. Tool calls go to the services you connect. See [exactly which hosts](SECURITY.md#what-leaves-your-machine) with `npx employee001 doctor --egress`. No telemetry, no analytics.
 
 ## Why it's different
 
@@ -58,7 +58,7 @@ npx employee001 start     # opens http://localhost:3000
 | 💬 | **Team Meeting (council).** Ask one question and the right twins debate, challenge each other, and converge on a shared answer. |
 | 🔌 | **Connected to how people actually work.** Email, calendar, docs, Slack, Linear, GitHub, CRM — through [Composio MCP](https://composio.dev), the same tools your people already use. |
 | ⚡ | **Knowledge → execution.** Twins draft Slack messages, file Linear tickets, send emails, follow up — each action gated by your approval. |
-| 🏠 | **Local-first by default.** Runs on your Mac mini (or any Node 22 machine). Bound to `127.0.0.1`. Only prompts leave, only to Anthropic. |
+| 🏠 | **Local-first by default.** Runs on your Mac mini (or any Node 22 machine). Bound to `127.0.0.1`. Data stays local; model prompts and connected-tool calls can leave. [See where.](SECURITY.md#what-leaves-your-machine) |
 
 ## A Team Meeting (council), in 30 seconds
 
@@ -91,7 +91,7 @@ flowchart LR
 
     CEO -->|invite link| Server
     CEO -->|ask| Server
-    Server -.->|prompts only| Anthropic
+    Server -.->|prompts + profile context| Anthropic
     Anthropic -.->|twin response| Server
     Server -->|tool call| Composio
     Composio -->|Slack · Linear · email · code| Server
@@ -145,7 +145,7 @@ As of October 2026:
 |  | ChatGPT Teams / Copilot | Cabinet[^1] | Paperclip[^2] | ZooWork[^3] | **Employee001** |
 |---|---|---|---|---|---|
 | Who the agent represents | A generic assistant | Agent teams | Configurable AI "employees" | Agents that engineers build and deliver | **A twin of a real, named person, trained on their own work** |
-| Where it runs | OpenAI / Microsoft cloud | Self-hosted, markdown on disk (cloud on a waitlist) | Self-hosted or managed | Managed cloud | **Your machine, or your own single-tenant cloud. Prompts go to Anthropic** |
+| Where it runs | OpenAI / Microsoft cloud | Self-hosted, markdown on disk (cloud on a waitlist) | Self-hosted or managed | Managed cloud | **Your machine, or your own single-tenant cloud. Data stays local; configured services receive model prompts and tool calls. [See where.](SECURITY.md#what-leaves-your-machine)** |
 | External actions | Depends on the connector | Human approval queue | Its own approvals; Claude/Codex runs default to full auto since v2026.1001.0 | Approval gates | **Approval gate on every external action, on by default** |
 | Several agents on one question | — | Agent teams | Task routing between agents | Agent workflows | **Team Meeting: twins debate and converge on a verdict** |
 | Shared knowledge | Conversation history | Knowledge base | Company skills learned from finished tasks | Packaged agent skills | **Org Brain: what one twin learns, the others can use** |
