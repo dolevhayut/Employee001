@@ -3,6 +3,7 @@ import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 import { spawnDetachedRelay } from "@/lib/relay/runner";
 import { exportRCP, type SynthMode } from "@/lib/relay";
+import { directAnthropicAllowed } from "@/lib/model-provider";
 
 export const runtime = "nodejs";
 // The route returns immediately after kicking off the runner; the runner
@@ -57,6 +58,12 @@ export async function POST(
 
   // The key is ONLY required for the model-synthesis path. Fixture mode (the
   // demo default) produces a complete rcp.json with zero model calls.
+  if (synthMode === "model" && !directAnthropicAllowed()) {
+    return Response.json(
+      { error: "Relay model mode is disabled in boundary mode. Re-run setup with Anthropic API or set EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1 explicitly." },
+      { status: 403 },
+    );
+  }
   if (synthMode === "model" && !process.env.ANTHROPIC_API_KEY) {
     return Response.json(
       {

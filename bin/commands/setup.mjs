@@ -111,29 +111,49 @@ export default async function setup() {
     }
   }
 
-  const anthropicKey = await p.password({
-    message:
-      "Anthropic API key (required) — get one from https://console.anthropic.com",
-    mask: "•",
-    validate(value) {
-      if (!value) return "An Anthropic API key is required";
-      if (!value.startsWith("sk-ant-"))
-        return "Key should start with sk-ant-";
-    },
+  const provider = await p.select({
+    message: "Where should Claude run?",
+    initialValue: existing.EMPLOYEE001_MODEL_PROVIDER ?? "anthropic",
+    options: [
+      { value: "anthropic", label: "Anthropic API", hint: "Default" },
+      { value: "bedrock", label: "AWS Bedrock" },
+      { value: "vertex", label: "Google Vertex AI" },
+      { value: "foundry", label: "Azure AI Foundry" },
+    ],
   });
-  if (p.isCancel(anthropicKey)) {
+  if (p.isCancel(provider)) {
     p.cancel("Setup cancelled");
     return;
   }
 
-  const spin = p.spinner();
-  spin.start("Validating Anthropic key against api.anthropic.com…");
-  const valid = await validateAnthropicKey(anthropicKey);
-  if (valid) {
-    spin.stop("Key looks good.");
+  let anthropicKey = "";
+  let awsRegion = "";
+  let vertexRegion = "";
+  let vertexProject = "";
+  let foundryResource = "";
+  if (provider === "anthropic") {
+    anthropicKey = await p.password({
+      message: "Anthropic API key (required) — get one from https://console.anthropic.com",
+      mask: "•",
+      validate(value) {
+        if (!value) return "An Anthropic API key is required";
+        if (!value.startsWith("sk-ant-")) return "Key should start with sk-ant-";
+      },
+    });
+    if (p.isCancel(anthropicKey)) { p.cancel("Setup cancelled"); return; }
+    const spin = p.spinner();
+    spin.start("Validating Anthropic key against api.anthropic.com…");
+    const valid = await validateAnthropicKey(anthropicKey);
+    spin.stop(valid ? "Key looks good." : "Key did not authenticate (saving anyway — you can fix it later).");
+  } else if (provider === "bedrock") {
+    awsRegion = await p.text({ message: "AWS region", initialValue: existing.AWS_REGION ?? "", validate: (v) => v.trim() ? undefined : "AWS region is required" });
+  } else if (provider === "vertex") {
+    vertexRegion = await p.text({ message: "Google Cloud ML region", initialValue: existing.CLOUD_ML_REGION ?? "", validate: (v) => v.trim() ? undefined : "Google Cloud ML region is required" });
+    if (!p.isCancel(vertexRegion)) vertexProject = await p.text({ message: "Google Cloud project ID", initialValue: existing.ANTHROPIC_VERTEX_PROJECT_ID ?? "", validate: (v) => v.trim() ? undefined : "Project ID is required" });
   } else {
-    spin.stop("Key did not authenticate (saving anyway — you can fix it later).");
+    foundryResource = await p.text({ message: "Azure AI Foundry resource name", initialValue: existing.ANTHROPIC_FOUNDRY_RESOURCE ?? "", validate: (v) => v.trim() ? undefined : "Foundry resource is required" });
   }
+  if (p.isCancel(awsRegion) || p.isCancel(vertexRegion) || p.isCancel(vertexProject) || p.isCancel(foundryResource)) { p.cancel("Setup cancelled"); return; }
 
   // Composio is optional at setup time. The Anthropic key alone gets you
   // a working install — you can already hire marketplace agents (Alex
@@ -226,8 +246,18 @@ export default async function setup() {
     "# Employee001 — local configuration",
     "# This file is read at startup. Edits take effect on the next `employee001 start`.",
     "",
-    "# Required. Get one from https://console.anthropic.com",
+    "# Claude provider. Use your own cloud account for boundary mode.",
+    `EMPLOYEE001_MODEL_PROVIDER=${provider}`,
+    "",
+    "# Required only for the Anthropic API provider. Get one from https://console.anthropic.com",
     `ANTHROPIC_API_KEY=${anthropicKey}`,
+    "# AWS Bedrock: configure standard AWS credentials outside this file.",
+    `AWS_REGION=${awsRegion}`,
+    "# Google Vertex AI: configure Google Cloud credentials outside this file.",
+    `CLOUD_ML_REGION=${vertexRegion}`,
+    `ANTHROPIC_VERTEX_PROJECT_ID=${vertexProject}`,
+    "# Azure AI Foundry: configure Azure credentials outside this file.",
+    `ANTHROPIC_FOUNDRY_RESOURCE=${foundryResource}`,
     "",
     "# Optional. Composio MCP powers the autonomous training loop for",
     "# inviting real employees: a Claude agent studies the CEO-chosen",

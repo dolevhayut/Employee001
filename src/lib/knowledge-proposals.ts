@@ -17,6 +17,7 @@ import { knowledgeEmployeeSegment, sanitizeKnowledgeSegment } from "@/lib/knowle
 import { listKnowledgeFiles, readKnowledgeFile, writeKnowledgeFile } from "@/lib/knowledge-files";
 import type { MeetingTurn } from "@/lib/meeting-store";
 import { isUnderBudget } from "@/lib/twin-budget";
+import { directAnthropicAllowed } from "@/lib/model-provider";
 
 export type KnowledgeProposalStatus = "pending" | "accepted" | "dismissed";
 
@@ -51,7 +52,7 @@ const TRANSCRIPT_CHARS = 12_000;
 const DEFAULT_FILE = "team-meeting-decisions.md";
 
 export function proposalsEnabled(): boolean {
-  return process.env.TWIN_KNOWLEDGE_PROPOSALS !== "0" && Boolean(process.env.ANTHROPIC_API_KEY);
+  return process.env.TWIN_KNOWLEDGE_PROPOSALS !== "0" && directAnthropicAllowed() && Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
 function proposalsPath(employeeId: string): string {

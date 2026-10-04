@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { streamInterviewerTurn, hasApiKey, type ChatMessage } from "@/lib/relay/live-interview";
+import { directAnthropicAllowed } from "@/lib/model-provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -37,7 +38,7 @@ export async function POST(
       };
 
       if (!hasApiKey()) {
-        send({ type: "error", message: "ANTHROPIC_API_KEY is not configured (live interview needs a key)." });
+        send({ type: "error", message: directAnthropicAllowed() ? "ANTHROPIC_API_KEY is not configured (live interview needs a key)." : "Live Relay is disabled in boundary mode because it calls the Direct Anthropic endpoint." });
         send({ type: "done", text: "" });
         try { controller.close(); } catch { /* noop */ }
         return;

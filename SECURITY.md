@@ -27,6 +27,12 @@ Employee001 keeps profiles, memory, audit logs, and org knowledge in `./data/` o
 | `api.github.com` | Release metadata | Only when you run `employee001 update` | Do not run `employee001 update` |
 | `registry.npmjs.org` (or `npm_config_registry`) | Package tarball | Only when you run `employee001 update` | Do not run `employee001 update` |
 
+### Run Claude in your own cloud
+
+Set up AWS Bedrock, Google Vertex AI, or Azure AI Foundry with `employee001 setup` to send Agent SDK twin traffic to the provider selected in your own cloud account. Employee001 uses `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, or `CLAUDE_CODE_USE_FOUNDRY`; it does not use `CLAUDE_CODE_USE_ANTHROPIC_AWS`, which is Anthropic-operated.
+
+In this boundary mode, the direct Anthropic endpoint is disabled by default. That disables memory rerank, follow-up suggestions, knowledge proposals, and live Relay because those features use the direct Anthropic SDK. `EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1` is an explicit egress opt-in; `employee001 doctor --egress` reports its effective state. This changes where Agent SDK model prompts go, not the egress behavior of enabled Composio, OpenAI embeddings, ElevenLabs, web research, or custom MCP services.
+
 ## Your compliance scope
 
 You host Employee001, so it runs inside your environment and within your compliance scope. We make no SOC 2 or ISO claims. Assess the deployment, connected services, access controls, and data handling against the requirements that apply to your organization, as you would with other self-hosted software.

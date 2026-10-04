@@ -99,29 +99,31 @@ function safeToken(value, fallback) {
  */
 function modelHosts(get) {
   const direct = hostnameOnly(get("ANTHROPIC_BASE_URL")) || "api.anthropic.com";
-  const directOn = Boolean(get("ANTHROPIC_API_KEY") || get("ANTHROPIC_AUTH_TOKEN"));
+  const provider = (get("EMPLOYEE001_MODEL_PROVIDER") || "anthropic").toLowerCase();
+  const directAllowed = provider === "anthropic" || get("EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC") === "1";
+  const directOn = directAllowed && Boolean(get("ANTHROPIC_API_KEY") || get("ANTHROPIC_AUTH_TOKEN"));
 
   if (flagOn(get("CLAUDE_CODE_USE_BEDROCK"))) {
     const region = safeToken(get("AWS_REGION") || get("AWS_DEFAULT_REGION"), "<region>");
     const host = hostnameOnly(get("ANTHROPIC_BEDROCK_BASE_URL")) || `bedrock-runtime.${region}.amazonaws.com`;
-    return { agent: { host, on: true, when: "twin runs (CLAUDE_CODE_USE_BEDROCK)" }, direct, directOn };
+    return { agent: { host, on: true, when: "twin runs (AWS Bedrock)" }, direct, directOn, directAllowed };
   }
   if (flagOn(get("CLAUDE_CODE_USE_VERTEX"))) {
     const region = safeToken(get("CLOUD_ML_REGION"), "global");
     const fallback = region === "global" ? "aiplatform.googleapis.com" : `${region}-aiplatform.googleapis.com`;
     const host = hostnameOnly(get("ANTHROPIC_VERTEX_BASE_URL")) || fallback;
-    return { agent: { host, on: true, when: "twin runs (CLAUDE_CODE_USE_VERTEX)" }, direct, directOn };
+    return { agent: { host, on: true, when: "twin runs (Google Vertex AI)" }, direct, directOn, directAllowed };
   }
   if (flagOn(get("CLAUDE_CODE_USE_FOUNDRY"))) {
     const resource = safeToken(get("ANTHROPIC_FOUNDRY_RESOURCE"), "<resource>");
     const host =
       hostnameOnly(get("ANTHROPIC_FOUNDRY_BASE_URL")) || `${resource}.services.ai.azure.com`;
-    return { agent: { host, on: true, when: "twin runs (CLAUDE_CODE_USE_FOUNDRY)" }, direct, directOn };
+    return { agent: { host, on: true, when: "twin runs (Azure AI Foundry)" }, direct, directOn, directAllowed };
   }
   return {
     agent: { host: direct, on: directOn, when: "twin chat, training, and memory distillation" },
     direct,
-    directOn,
+    directOn, directAllowed,
   };
 }
 
@@ -152,9 +154,9 @@ function printEgress() {
   });
   if (model.agent.host !== model.direct) {
     rows.push({
-      host: model.direct,
+      host: "Direct Anthropic endpoint",
       sends: "prompts (direct Anthropic SDK: rerank, dreamer, relay)",
-      when: "memory distillation, relay interview, follow-ups",
+      when: model.directAllowed ? `memory rerank, Relay, follow-ups → ${model.direct}` : "disabled in boundary mode (set EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1 to opt in)",
       enabled: model.directOn,
     });
   }
@@ -269,9 +271,18 @@ export default async function doctor(argv = []) {
     issues++;
   }
 
-  // Anthropic key
+  // Provider (settings presence only; doctor never validates customer-cloud credentials).
+  const provider = (env.EMPLOYEE001_MODEL_PROVIDER || process.env.EMPLOYEE001_MODEL_PROVIDER || "anthropic").toLowerCase();
+  if (["anthropic", "bedrock", "vertex", "foundry"].includes(provider)) ok("Claude provider", provider);
+  else { fail("Claude provider", `${provider} is invalid — run \`employee001 setup\``); issues++; }
+
+  // Anthropic key is only required and checked for direct Anthropic API mode.
   const aKey = env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
-  if (!aKey) {
+  if (provider !== "anthropic") {
+    const configured = provider === "bedrock" ? env.AWS_REGION || process.env.AWS_REGION : provider === "vertex" ? (env.CLOUD_ML_REGION || process.env.CLOUD_ML_REGION) && (env.ANTHROPIC_VERTEX_PROJECT_ID || process.env.ANTHROPIC_VERTEX_PROJECT_ID) : env.ANTHROPIC_FOUNDRY_RESOURCE || process.env.ANTHROPIC_FOUNDRY_RESOURCE;
+    if (configured) ok("Customer-cloud settings", "present (credentials are not checked)");
+    else { fail("Customer-cloud settings", "missing — run `employee001 setup`"); issues++; }
+  } else if (!aKey) {
     fail("ANTHROPIC_API_KEY", "not set — required");
     issues++;
   } else {

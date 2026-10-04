@@ -36,7 +36,7 @@ npx employee001 start     # opens http://localhost:3000
 ```
 
 > [!NOTE]
-> Requires **Node.js 22+** and an [Anthropic API key](https://console.anthropic.com). A [Composio API key](https://app.composio.dev) is needed when you invite a real employee for training — marketplace agents work without it. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop the server.
+> Requires **Node.js 22+** and either an [Anthropic API key](https://console.anthropic.com) or customer-cloud credentials for Bedrock, Vertex AI, or Azure AI Foundry. A [Composio API key](https://app.composio.dev) is needed when you invite a real employee for training — marketplace agents work without it. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop the server.
 
 > [!IMPORTANT]
 > **Your data stays on your machine.** Profiles, memory, audit log, and org knowledge live in `./data/` on your hardware. Twins send prompts (with the profile context they need) to Anthropic, or to your own cloud's Claude endpoint. Tool calls go to the services you connect. See [exactly which hosts](SECURITY.md#what-leaves-your-machine) with `npx employee001 doctor --egress`. No telemetry, no analytics.
@@ -227,6 +227,12 @@ No twin runs shell commands on your machine. Enforced in two places at once (the
 </details>
 
 ## Where your data lives
+
+### Run Claude in your own cloud
+
+`employee001 setup` can route every twin Agent SDK run through your AWS Bedrock, Google Vertex AI, or Azure AI Foundry account. The wizard writes only the selected provider's non-secret settings; standard cloud credentials remain managed by that cloud's normal credential chain. Provider model IDs differ, so set `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, or `ANTHROPIC_DEFAULT_HAIKU_MODEL` yourself when needed—Employee001 never guesses them.
+
+This boundary mode does not by itself make every optional integration local: direct Anthropic API features (memory rerank, follow-up suggestions, knowledge proposals, and live Relay) are disabled unless `EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1` is explicitly set. Inspect the effective routes with `employee001 doctor --egress`.
 
 ```
 ./

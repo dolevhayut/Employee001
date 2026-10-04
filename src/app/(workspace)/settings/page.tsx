@@ -195,6 +195,7 @@ function WorkspaceSection() {
   const [description, setDescription] = useState("");
   const [saved, setSaved] = useState<{ name: string; description: string } | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [provider, setProvider] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -213,6 +214,13 @@ function WorkspaceSection() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/model-provider", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((data: { label: string }) => setProvider(data.label))
+      .catch(() => setProvider(null));
   }, []);
 
   const dirty = saved !== null && (name !== saved.name || description !== saved.description);
@@ -294,6 +302,16 @@ function WorkspaceSection() {
           </span>
         </div>
         <LanguageControl />
+        <div
+          style={{ marginTop: "var(--sp-16)", paddingTop: "var(--sp-16)", borderTop: "1px solid var(--hairline)" }}
+        >
+          <div style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>
+            {t("profile.provider.label")} {provider ?? "…"}
+          </div>
+          <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
+            {t("profile.provider.note")}
+          </div>
+        </div>
       </div>
     </section>
   );

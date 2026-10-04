@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { synthesizeFromConversation, hasApiKey, type ChatMessage } from "@/lib/relay/live-interview";
+import { directAnthropicAllowed } from "@/lib/model-provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 600;
@@ -20,7 +21,7 @@ export async function POST(
 
   if (!hasApiKey()) {
     return Response.json(
-      { error: "ANTHROPIC_API_KEY is not configured (live synthesis needs a key)." },
+      { error: directAnthropicAllowed() ? "ANTHROPIC_API_KEY is not configured (live synthesis needs a key)." : "Live Relay is disabled in boundary mode because it calls the Direct Anthropic endpoint." },
       { status: 500 },
     );
   }

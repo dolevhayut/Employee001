@@ -20,6 +20,7 @@ import fsp from "fs/promises";
 import path from "path";
 import Anthropic from "@anthropic-ai/sdk";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
+import { directAnthropicAllowed } from "@/lib/model-provider";
 
 import { INTERVIEWER_SYSTEM_PROMPT, buildInterviewerPrompt } from "./interviewer";
 import { scoreCoverage, type CoverageResult } from "./coverage";
@@ -50,15 +51,15 @@ const PROFILE_FILES = [
 
 let _client: Anthropic | null = null;
 function getClient(): Anthropic {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured");
+  if (!hasApiKey()) {
+    throw new Error("Direct Anthropic endpoint is disabled for this provider");
   }
   if (!_client) _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   return _client;
 }
 
 export function hasApiKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return directAnthropicAllowed() && Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
 /** Read the twin's profile files as a single text block for interviewer context. */

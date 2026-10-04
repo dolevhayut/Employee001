@@ -7,6 +7,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { TWIN_MODEL_HAIKU } from "@/lib/sdk-defaults";
+import { directAnthropicAllowed } from "@/lib/model-provider";
 
 const MODEL = TWIN_MODEL_HAIKU;
 const MAX_TOKENS = 200;
@@ -16,7 +17,7 @@ type SuggestionsShape = { suggestions: string[] };
 
 let client: Anthropic | null = null;
 function getClient(): Anthropic | null {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
+  if (!directAnthropicAllowed() || !process.env.ANTHROPIC_API_KEY) return null;
   if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   return client;
 }

@@ -15,6 +15,7 @@ import type {
   NotificationHookInput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { appendAuditEntry } from "@/lib/audit-log";
+import { modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
 
 const PKG_VERSION = "Employee001/0.2.0";
 
@@ -96,14 +97,15 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
     : undefined;
 
   return {
-    model: args.modelOverride ?? TWIN_MODEL_PRIMARY,
-    fallbackModel: TWIN_MODEL_FALLBACK,
+    model: modelForProvider(args.modelOverride ?? TWIN_MODEL_PRIMARY),
+    fallbackModel: modelForProvider(TWIN_MODEL_FALLBACK),
     effort,
     thinking,
     disallowedTools: TWIN_HARD_DISALLOWED,
     betas,
     env: {
       ...process.env,
+      ...providerEnvForAgentSdk(),
       CLAUDE_AGENT_SDK_CLIENT_APP: PKG_VERSION,
     },
     abortController: args.abortController,

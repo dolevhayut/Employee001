@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { TWIN_MODEL_FALLBACK, TWIN_MODEL_HAIKU } from "@/lib/sdk-defaults";
+import { currentProvider, directAnthropicAllowed, modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
 
 const MEMORY_ROOT = path.join(process.cwd(), "data", "memory");
 const DEFAULT_LIMIT = 5;
@@ -544,7 +545,7 @@ const DEFAULT_RERANK_CANDIDATES = 12;
 
 function agenticRerankEnabled(): boolean {
   return (
-    process.env.TWIN_MEMORY_AGENTIC_RERANK === "1" && !!process.env.ANTHROPIC_API_KEY
+    process.env.TWIN_MEMORY_AGENTIC_RERANK === "1" && directAnthropicAllowed() && !!process.env.ANTHROPIC_API_KEY
   );
 }
 
@@ -1064,7 +1065,8 @@ const DREAMER_SYSTEM = [
 
 function dreamerLlmEnabled(): boolean {
   return (
-    !!process.env.ANTHROPIC_API_KEY && process.env.TWIN_MEMORY_DREAMER_LLM !== "0"
+    (currentProvider() !== "anthropic" || !!process.env.ANTHROPIC_API_KEY) &&
+    process.env.TWIN_MEMORY_DREAMER_LLM !== "0"
   );
 }
 
@@ -1108,7 +1110,7 @@ async function extractFactsViaLLM(
     // Dynamic import keeps the heavy Agent SDK off the recall hot path — it only
     // loads when extraction actually runs.
     const { query } = await import("@anthropic-ai/claude-agent-sdk");
-    const model = process.env.TWIN_MEMORY_DREAMER_MODEL ?? DREAMER_MODEL_DEFAULT;
+    const model = modelForProvider(process.env.TWIN_MEMORY_DREAMER_MODEL ?? DREAMER_MODEL_DEFAULT);
     const prompt = JSON.stringify({
       user: truncate(question, 2000),
       agent: truncate(answer.slice(0, STRUCTURED_ANSWER_SCAN), STRUCTURED_ANSWER_SCAN),
@@ -1119,7 +1121,7 @@ async function extractFactsViaLLM(
       prompt,
       options: {
         model,
-        fallbackModel: DREAMER_FALLBACK_MODEL,
+        fallbackModel: modelForProvider(DREAMER_FALLBACK_MODEL),
         systemPrompt: DREAMER_SYSTEM,
         allowedTools: [],
         // Structured-output extraction needs a couple of internal turns (the
@@ -1130,7 +1132,7 @@ async function extractFactsViaLLM(
         outputFormat: { type: "json_schema", schema: DREAMER_SCHEMA },
         permissionMode: "bypassPermissions",
         settingSources: [],
-        env: { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY },
+        env: { ...process.env, ...providerEnvForAgentSdk() },
       },
     });
 
