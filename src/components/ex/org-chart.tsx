@@ -13,6 +13,8 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import type { EmployeeWithTwin } from "@/lib/employees";
+import { useT } from "@/components/ex/i18n-context";
+import { isolate } from "@/lib/i18n/format";
 import { useOrgName } from "./use-org-name";
 
 const MARKETPLACE_ID_PREFIX = "marketplace-";
@@ -92,7 +94,7 @@ function PersonNode({ data }: NodeProps<NodeData>) {
             maxWidth: 160,
           }}
         >
-          {data.label}
+          <bdi>{data.label}</bdi>
         </div>
         {data.sub && (
           <div
@@ -105,7 +107,7 @@ function PersonNode({ data }: NodeProps<NodeData>) {
               maxWidth: 160,
             }}
           >
-            {data.sub}
+            <bdi>{data.sub}</bdi>
           </div>
         )}
       </div>
@@ -135,6 +137,7 @@ function EmployeePopover({
   onClose: () => void;
 }) {
   const orgName = useOrgName();
+  const { t } = useT();
   const { employee, isCEO, x, y } = popover;
   if (isCEO) {
     return (
@@ -147,10 +150,16 @@ function EmployeePopover({
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ fontWeight: 650, color: "var(--fg)", fontSize: 14 }}>
-          You (CEO)
+          {t("twins.org.you")}
         </div>
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-          {orgName ? `Founder · ${orgName}` : "Founder"}
+          {orgName ? (
+            <>
+              {t("twins.org.founder")} · <bdi>{orgName}</bdi>
+            </>
+          ) : (
+            t("twins.org.founder")
+          )}
         </div>
         <div
           style={{
@@ -160,7 +169,7 @@ function EmployeePopover({
             lineHeight: 1.5,
           }}
         >
-          Every onboarded employee and hired agent reports up to you.
+          {t("twins.org.reportsUp")}
         </div>
       </motion.div>
     );
@@ -169,10 +178,10 @@ function EmployeePopover({
 
   const statusLabel =
     employee.twinStatus === "ready"
-      ? "Twin ready"
+      ? t("twins.status.ready")
       : employee.twinStatus === "building"
-        ? "Twin building"
-        : "Pending";
+        ? t("twins.org.building")
+        : t("twins.filter.pending");
   const statusColor =
     employee.twinStatus === "ready"
       ? "var(--success, #4ade80)"
@@ -218,7 +227,7 @@ function EmployeePopover({
               textOverflow: "ellipsis",
             }}
           >
-            {employee.name}
+            <bdi>{employee.name}</bdi>
           </div>
           <div
             style={{
@@ -229,7 +238,7 @@ function EmployeePopover({
               textOverflow: "ellipsis",
             }}
           >
-            {employee.role}
+            <bdi>{employee.role}</bdi>
           </div>
         </div>
         {isAgent && (
@@ -246,7 +255,7 @@ function EmployeePopover({
               letterSpacing: "0.04em",
             }}
           >
-            Agent
+            {t("twins.org.agent")}
           </span>
         )}
       </div>
@@ -260,10 +269,10 @@ function EmployeePopover({
           fontSize: 12,
         }}
       >
-        <span style={{ color: "var(--muted)" }}>Department</span>
-        <span style={{ color: "var(--fg)" }}>{employee.department}</span>
+        <span style={{ color: "var(--muted)" }}>{t("twins.org.department")}</span>
+        <span style={{ color: "var(--fg)" }}><bdi>{employee.department}</bdi></span>
 
-        <span style={{ color: "var(--muted)" }}>Status</span>
+        <span style={{ color: "var(--muted)" }}>{t("twins.org.status")}</span>
         <span style={{ color: "var(--fg)", display: "flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
@@ -277,27 +286,27 @@ function EmployeePopover({
           {statusLabel}
           {employee.twinStatus === "ready" && (
             <span style={{ color: "var(--muted)" }}>
-              · {(employee.twinConfidence * 100).toFixed(0)}% conf.
+              · <bdi>{(employee.twinConfidence * 100).toFixed(0)}%</bdi> {t("twins.org.conf")}
             </span>
           )}
         </span>
 
-        <span style={{ color: "var(--muted)" }}>Profile</span>
+        <span style={{ color: "var(--muted)" }}>{t("twins.org.profile")}</span>
         <span style={{ color: "var(--fg)" }}>
-          {employee.profileFilesComplete}/9 files
+          <bdi>{employee.profileFilesComplete}/9</bdi> {t("twins.profile.files")}
         </span>
 
         {employee.placement?.responsibleEmployeeName && (
           <>
-            <span style={{ color: "var(--muted)" }}>Reports to</span>
+            <span style={{ color: "var(--muted)" }}>{t("twins.org.reportsTo")}</span>
             <span style={{ color: "var(--fg)" }}>
-              {employee.placement.responsibleEmployeeName}
+              <bdi>{employee.placement.responsibleEmployeeName}</bdi>
             </span>
           </>
         )}
 
-        <span style={{ color: "var(--muted)" }}>Questions / wk</span>
-        <span style={{ color: "var(--fg)" }}>{employee.questionsThisWeek}</span>
+        <span style={{ color: "var(--muted)" }}>{t("twins.org.questions")}</span>
+        <span style={{ color: "var(--fg)" }}><bdi>{employee.questionsThisWeek}</bdi></span>
       </div>
 
       {employee.skills.length > 0 && (
@@ -321,7 +330,7 @@ function EmployeePopover({
                 color: "var(--muted)",
               }}
             >
-              {s.label}
+              <bdi>{s.label}</bdi>
             </span>
           ))}
         </div>
@@ -342,11 +351,11 @@ function EmployeePopover({
             textDecoration: "none",
           }}
         >
-          Open profile →
+          {t("twins.org.openProfile")}
         </a>
         <button
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t("settings.action.close")}
           style={{
             width: 32,
             borderRadius: 8,
@@ -381,7 +390,10 @@ function popoverShell(x: number, y: number) {
   };
 }
 
-export function OrgChart({ employees, ceoName = "You (CEO)" }: Props) {
+export function OrgChart({ employees, ceoName }: Props) {
+  const { t, locale } = useT();
+  const rtl = locale === "he";
+  const rootLabel = ceoName ?? t("twins.org.you");
   const [popover, setPopover] = useState<Popover | null>(null);
   const { nodes, edges } = useMemo(() => {
     const NODE_W = 220;
@@ -423,8 +435,8 @@ export function OrgChart({ employees, ceoName = "You (CEO)" }: Props) {
       type: "person",
       position: { x: -NODE_W / 2 + NODE_W / 2, y: 0 },
       data: {
-        label: ceoName,
-        sub: "Founder",
+        label: rootLabel,
+        sub: t("twins.org.founder"),
         initials: "CEO",
         color: "#111",
         kind: "ceo",
@@ -439,7 +451,7 @@ export function OrgChart({ employees, ceoName = "You (CEO)" }: Props) {
         position: { x, y: ROW_H },
         data: {
           label: emp.name,
-          sub: `${emp.role} · ${emp.department}`,
+          sub: `${isolate(emp.role)} · ${isolate(emp.department)}`,
           initials: emp.initials,
           color: emp.avatarColor,
           kind: isAgent(emp) ? "agent" : "employee",
@@ -467,7 +479,7 @@ export function OrgChart({ employees, ceoName = "You (CEO)" }: Props) {
             position: { x: subStartX + j * NODE_W, y: ROW_H * 2 },
             data: {
               label: rep.name,
-              sub: `${rep.role} · agent`,
+              sub: `${isolate(rep.role)} · ${t("twins.org.agent")}`,
               initials: rep.initials,
               color: rep.avatarColor,
               kind: "agent",
@@ -490,7 +502,7 @@ export function OrgChart({ employees, ceoName = "You (CEO)" }: Props) {
     });
 
     return { nodes: ns, edges: es };
-  }, [employees, ceoName]);
+  }, [employees, rootLabel, t]);
 
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node<NodeData>) => {
@@ -525,7 +537,7 @@ export function OrgChart({ employees, ceoName = "You (CEO)" }: Props) {
           fontSize: "var(--fs-ui)",
         }}
       >
-        Onboard your first employee to see the org chart.
+        {t("twins.org.empty")}
       </div>
     );
   }
@@ -558,7 +570,7 @@ export function OrgChart({ employees, ceoName = "You (CEO)" }: Props) {
         onMove={() => setPopover(null)}
       >
         <Background gap={20} size={1} color="var(--hairline)" />
-        <Controls showInteractive={false} position="bottom-right" />
+        <Controls showInteractive={false} position={rtl ? "bottom-left" : "bottom-right"} />
       </ReactFlow>
       <AnimatePresence>
         {popover && (

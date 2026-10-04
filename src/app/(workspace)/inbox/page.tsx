@@ -10,6 +10,8 @@ import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
 import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 import { LoadErrorPanel, RefreshMiss } from "@/components/ex/load-error";
 import { useT } from "@/components/ex/i18n-context";
+import { formatDateTime, formatRelativeTime } from "@/lib/i18n/format";
+import type { Locale, MessageKey } from "@/lib/i18n/messages";
 
 type FeedSource =
   | { kind: "shift"; employeeId: string; runId: string }
@@ -37,35 +39,27 @@ type FeedItem = {
 
 type FilterKey = "all" | FeedType;
 
-const TYPE_META: Record<FeedType, { label: string; color: string; bg: string }> = {
-  "update":        { label: "Update",       color: "#64748b", bg: "#f1f5f9" },
-  "alert":         { label: "Alert",        color: "#dc2626", bg: "#fee2e2" },
-  "needs-review":  { label: "Needs review", color: "#b45309", bg: "#fef3c7" },
-  "task-handoff":  { label: "Task handoff", color: "#6366f1", bg: "#e0e7ff" },
+const TYPE_META: Record<FeedType, { label: MessageKey; color: string; bg: string }> = {
+  "update":        { label: "inbox.type.update", color: "#64748b", bg: "#f1f5f9" },
+  "alert":         { label: "inbox.type.alert",  color: "#dc2626", bg: "#fee2e2" },
+  "needs-review":  { label: "inbox.type.review", color: "#b45309", bg: "#fef3c7" },
+  "task-handoff":  { label: "inbox.type.handoff", color: "#6366f1", bg: "#e0e7ff" },
 };
 
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "update", label: "Updates" },
-  { key: "alert", label: "Alerts" },
-  { key: "needs-review", label: "Needs review" },
-  { key: "task-handoff", label: "Task handoffs" },
+const FILTERS: { key: FilterKey; label: MessageKey }[] = [
+  { key: "all", label: "inbox.filter.all" },
+  { key: "update", label: "inbox.filter.updates" },
+  { key: "alert", label: "inbox.filter.alerts" },
+  { key: "needs-review", label: "inbox.filter.review" },
+  { key: "task-handoff", label: "inbox.filter.handoffs" },
 ];
 
-function relTime(ts?: string): string {
-  if (!ts) return "—";
-  const diff = Date.now() - new Date(ts).getTime();
-  const abs = Math.abs(diff);
-  const sign = diff < 0 ? "in " : "";
-  const suffix = diff < 0 ? "" : " ago";
-  if (abs < 60_000) return diff < 0 ? "in <1 min" : "just now";
-  if (abs < 3_600_000) return `${sign}${Math.floor(abs / 60_000)}m${suffix}`;
-  if (abs < 86_400_000) return `${sign}${Math.floor(abs / 3_600_000)}h${suffix}`;
-  if (abs < 7 * 86_400_000) return `${sign}${Math.floor(abs / 86_400_000)}d${suffix}`;
-  return new Date(ts).toLocaleDateString();
+function relTime(ts: string | undefined, locale: Locale): string {
+  return formatRelativeTime(ts, locale, { dateAfterMs: 7 * 86_400_000 });
 }
 
 function TypeBadge({ type }: { type: FeedType }) {
+  const { t } = useT();
   const m = TYPE_META[type];
   return (
     <span
@@ -83,7 +77,7 @@ function TypeBadge({ type }: { type: FeedType }) {
         letterSpacing: "0.04em",
       }}
     >
-      {m.label}
+      {t(m.label)}
     </span>
   );
 }
@@ -116,15 +110,17 @@ function EmpAvatar({ employeeId, size = 22 }: { employeeId: string; size?: numbe
 
 function SourceLine({ source }: { source: FeedSource }) {
   const roster = useRoster();
+  const { t, locale } = useT();
+  const rtl = locale === "he";
   if (source.kind === "shift") {
     const emp = roster.find((e) => e.id === source.employeeId);
     return (
       <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-6)" }}>
         <EmpAvatar employeeId={source.employeeId} size={18} />
         <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", fontWeight: 500 }}>
-          {emp?.firstName ?? source.employeeId}
+          <bdi>{emp?.firstName ?? source.employeeId}</bdi>
         </span>
-        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>· shift</span>
+        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>· {t("inbox.source.shift")}</span>
       </div>
     );
   }
@@ -134,10 +130,10 @@ function SourceLine({ source }: { source: FeedSource }) {
       <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-6)" }}>
         <EmpAvatar employeeId={source.employeeId} size={18} />
         <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", fontWeight: 500 }}>
-          {emp?.firstName ?? source.employeeId}
+          <bdi>{emp?.firstName ?? source.employeeId}</bdi>
         </span>
         <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>
-          · routine · {source.routineName}
+          · {t("inbox.source.routine")} · <bdi>{source.routineName}</bdi>
         </span>
       </div>
     );
@@ -148,9 +144,9 @@ function SourceLine({ source }: { source: FeedSource }) {
       <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-6)" }}>
         <EmpAvatar employeeId={source.employeeId} size={18} />
         <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", fontWeight: 500 }}>
-          {emp?.firstName ?? source.employeeId}
+          <bdi>{emp?.firstName ?? source.employeeId}</bdi>
         </span>
-        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>· task</span>
+        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>· {t("inbox.source.task")}</span>
       </div>
     );
   }
@@ -159,9 +155,12 @@ function SourceLine({ source }: { source: FeedSource }) {
     const toEmp = roster.find((e) => e.id === source.toId);
     return (
       <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-5)", fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>
-        <span style={{ fontWeight: 500 }}>{fromEmp?.firstName ?? source.fromId}</span>
-        <Icons.Arrow size={10} style={{ color: "var(--text-subtle)" }} />
-        <span style={{ fontWeight: 500 }}>{toEmp?.firstName ?? source.toId}</span>
+        <span style={{ fontWeight: 500 }}><bdi>{fromEmp?.firstName ?? source.fromId}</bdi></span>
+        <Icons.Arrow
+          size={10}
+          style={{ color: "var(--text-subtle)", transform: rtl ? "scaleX(-1)" : undefined }}
+        />
+        <span style={{ fontWeight: 500 }}><bdi>{toEmp?.firstName ?? source.toId}</bdi></span>
       </div>
     );
   }
@@ -171,7 +170,7 @@ function SourceLine({ source }: { source: FeedSource }) {
       <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-6)" }}>
         <EmpAvatar employeeId={source.employeeId} size={18} />
         <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", fontWeight: 500 }}>
-          {emp?.firstName ?? source.employeeId}
+          <bdi>{emp?.firstName ?? source.employeeId}</bdi>
         </span>
         <code
           style={{
@@ -183,25 +182,36 @@ function SourceLine({ source }: { source: FeedSource }) {
             color: "var(--text-muted)",
           }}
         >
-          {source.toolName}
+          <bdi>{source.toolName}</bdi>
         </code>
       </div>
     );
   }
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-5)", fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>
-      <span style={{ fontWeight: 500 }}>{source.departmentId}</span>
+      <span style={{ fontWeight: 500 }}><bdi>{source.departmentId}</bdi></span>
       <span style={{ color: "var(--text-subtle)" }}>·</span>
-      <span>{source.metric}</span>
+      <span><bdi>{source.metric}</bdi></span>
     </div>
   );
 }
 
 function ResolutionChip({ resolution, resolvedAt }: { resolution: string; resolvedAt?: string }) {
+  const { t, locale } = useT();
   const lower = resolution.toLowerCase();
   const isNegative = lower.includes("reject") || lower.includes("dismiss") || lower.includes("denied");
   const symbol = isNegative ? "✗" : "✓";
   const color = isNegative ? "var(--text-muted)" : "#16a34a";
+  const label =
+    lower === "approved"
+      ? t("inbox.resolution.approved")
+      : lower.includes("reject")
+        ? t("inbox.resolution.rejected")
+        : lower.includes("dismiss")
+          ? t("inbox.resolution.dismissed")
+          : lower.includes("denied")
+            ? t("inbox.resolution.denied")
+            : resolution;
   return (
     <span
       style={{
@@ -214,14 +224,14 @@ function ResolutionChip({ resolution, resolvedAt }: { resolution: string; resolv
       }}
     >
       <span style={{ color }}>{symbol}</span>
-      <span>{resolution}</span>
-      {resolvedAt && <span style={{ color: "var(--text-subtle)" }}>· {relTime(resolvedAt)}</span>}
+      <span>{label === resolution ? <bdi>{resolution}</bdi> : label}</span>
+      {resolvedAt && <span style={{ color: "var(--text-subtle)" }}>· <bdi>{relTime(resolvedAt, locale)}</bdi></span>}
     </span>
   );
 }
 
 export default function InboxPage() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const { mode, loaded: modeLoaded } = useWorkspaceMode();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -309,7 +319,7 @@ export default function InboxPage() {
       <Topbar
         crumbs={[t("nav.approvals")]}
         actions={
-          <button className="btn ghost sm" onClick={load} title="Refresh" style={{ height: 28 }}>
+          <button className="btn ghost sm" onClick={load} title={t("inbox.refresh")} style={{ height: 28 }}>
             <Icons.Refresh
               size={13}
               style={loading ? { animation: "spin 1s linear infinite" } : undefined}
@@ -353,7 +363,7 @@ export default function InboxPage() {
                 transition: "background .12s, color .12s",
               }}
             >
-              {f.label}
+              {t(f.label)}
             </button>
           );
         })}
@@ -380,14 +390,19 @@ export default function InboxPage() {
             alignItems: "center",
             gap: "var(--sp-5)",
           }}
-          title={hideResolved ? "Showing only open items" : "Showing all items"}
+          title={hideResolved ? t("inbox.onlyOpen") : t("inbox.showingAllTitle")}
         >
           {hideResolved ? <Icons.Eye size={11} /> : <Icons.Check size={11} />}
-          {hideResolved ? "Hide resolved" : "Showing all"}
+          {hideResolved ? t("inbox.hideResolved") : t("inbox.showingAll")}
         </button>
 
         <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-subtle)", flexShrink: 0 }}>
-          {loading ? "…" : `${filteredItems.length} item${filteredItems.length === 1 ? "" : "s"}`}
+          {loading ? "…" : (
+            <>
+              <bdi>{filteredItems.length}</bdi>{" "}
+              {t(filteredItems.length === 1 ? "inbox.itemOne" : "inbox.itemMany")}
+            </>
+          )}
         </span>
       </div>
 
@@ -395,8 +410,8 @@ export default function InboxPage() {
       <div className="scrollbar" style={{ flex: 1, overflow: "auto", padding: "20px 24px 60px" }}>
         <PageHead
           icon="Inbox"
-          title="Inbox"
-          subtitle="A single feed for updates, alerts, task handoffs, and approvals across all twins."
+          title={t("inbox.title")}
+          subtitle={t("inbox.subtitle")}
           style={{ marginBottom: "var(--sp-16)", maxWidth: 880 }}
         />
         {loadError && hasLoaded && <RefreshMiss />}
@@ -427,11 +442,11 @@ export default function InboxPage() {
             />
             <h2 style={{ fontSize: "var(--fs-lg)", fontWeight: 600, color: "var(--text)", margin: "0 0 6px" }}>
               {filter === "all" && hideResolved
-                ? "No items in your inbox yet"
-                : "Nothing matches the current filter"}
+                ? t("inbox.empty.title")
+                : t("inbox.empty.filter")}
             </h2>
             <p style={{ fontSize: "var(--fs-ui)", lineHeight: 1.55, margin: 0 }}>
-              Twins post updates and flags here when they run shifts.
+              {t("inbox.empty.hint")}
             </p>
           </div>
           )
@@ -471,7 +486,7 @@ export default function InboxPage() {
                           lineHeight: 1.4,
                         }}
                       >
-                        {item.title}
+                        <bdi>{item.title}</bdi>
                       </div>
                       <span
                         style={{
@@ -480,9 +495,9 @@ export default function InboxPage() {
                           flexShrink: 0,
                           whiteSpace: "nowrap",
                         }}
-                        title={new Date(item.ts).toLocaleString()}
+                        title={formatDateTime(item.ts, locale)}
                       >
-                        {relTime(item.ts)}
+                        <bdi>{relTime(item.ts, locale)}</bdi>
                       </span>
                     </div>
 
@@ -497,7 +512,7 @@ export default function InboxPage() {
                           paddingInlineStart: "var(--sp-2)",
                         }}
                       >
-                        {item.detail}
+                        <bdi>{item.detail}</bdi>
                       </p>
                     )}
 
@@ -542,7 +557,7 @@ export default function InboxPage() {
                             color: "white",
                           }}
                         >
-                          <Icons.Check size={11} /> Approve
+                          <Icons.Check size={11} /> {t("inbox.approve")}
                         </button>
                         <button
                           onClick={() => resolve(item.id, "rejected")}
@@ -555,7 +570,7 @@ export default function InboxPage() {
                             color: "#b45309",
                           }}
                         >
-                          <Icons.X size={11} /> Reject
+                          <Icons.X size={11} /> {t("inbox.reject")}
                         </button>
                         <button
                           onClick={() => resolve(item.id, "dismissed")}
@@ -563,7 +578,7 @@ export default function InboxPage() {
                           className="btn ghost sm"
                           style={{ height: 26 }}
                         >
-                          Dismiss
+                          {t("inbox.dismiss")}
                         </button>
                       </div>
                     )}

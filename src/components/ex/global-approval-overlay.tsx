@@ -80,6 +80,7 @@ function useMounted(): boolean {
 // ─── Overlay ─────────────────────────────────────────────────────────────────
 
 export function GlobalApprovalOverlay() {
+  const { t } = useT();
   const roster = useRoster();
   const [pending, setPending] = useState<PendingItem[]>([]);
   const [editing, setEditing] = useState<Record<string, boolean>>({});
@@ -169,17 +170,20 @@ export function GlobalApprovalOverlay() {
     ? editedJson[key] ?? JSON.stringify((current as LiveApproval).input, null, 2)
     : "";
 
-  const title = isLive ? "Approval needed" : "Needs review";
-  const subContext =
+  const title = isLive ? t("inbox.overlay.needed") : t("inbox.overlay.review");
+  const routineName =
     isLive && (current as LiveApproval).context?.type === "routine"
       ? (current as LiveApproval).context!.routineName
       : !isLive && (current as FeedReview).source.kind === "routine"
         ? (current as FeedReview & { source: { kind: "routine"; routineName: string } }).source.routineName
-        : !isLive && (current as FeedReview).source.kind === "shift"
-          ? "shift"
-          : !isLive && (current as FeedReview).source.kind === "task-run"
-            ? "task"
-            : null;
+        : null;
+  const subContext = routineName
+    ? routineName
+    : !isLive && (current as FeedReview).source.kind === "shift"
+      ? t("inbox.source.shift")
+      : !isLive && (current as FeedReview).source.kind === "task-run"
+        ? t("inbox.source.task")
+        : null;
 
   const empLabel = isLive
     ? (current as LiveApproval).employeeName ?? employee?.name ?? empId
@@ -237,7 +241,15 @@ export function GlobalApprovalOverlay() {
                 marginBottom: "var(--sp-10)",
               }}
             >
-              <span>{pending.length - 1} more pending</span>
+              <span>
+                {pending.length - 1 === 1
+                  ? t("inbox.overlay.moreOne")
+                  : (
+                    <>
+                      <bdi>{pending.length - 1}</bdi> {t("inbox.overlay.moreMany")}
+                    </>
+                  )}
+              </span>
             </div>
           )}
 
@@ -277,13 +289,13 @@ export function GlobalApprovalOverlay() {
                   {employee.initials}
                 </span>
               )}
-              {empLabel && <span>{empLabel}</span>}
+              {empLabel && <span><bdi>{empLabel}</bdi></span>}
               {subContext && (
                 <>
                   <span style={{ color: "var(--text-subtle)" }}>·</span>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-4)" }}>
                     <Icons.Refresh size={11} />
-                    {subContext}
+                    {routineName ? <bdi>{routineName}</bdi> : subContext}
                   </span>
                 </>
               )}
@@ -300,7 +312,7 @@ export function GlobalApprovalOverlay() {
                   marginBottom: "var(--sp-6)",
                 }}
               >
-                {describeTool((current as LiveApproval).toolName)}
+                <bdi>{describeTool((current as LiveApproval).toolName)}</bdi>
               </div>
               <p
                 style={{
@@ -366,7 +378,7 @@ export function GlobalApprovalOverlay() {
                         const parsed = JSON.parse(editedText);
                         resolveLive(key, "allow", parsed);
                       } catch {
-                        alert("Invalid JSON");
+                        alert(t("inbox.overlay.badJson"));
                       }
                     } else {
                       resolveLive(key, "allow");
@@ -391,7 +403,7 @@ export function GlobalApprovalOverlay() {
                   }}
                 >
                   <Icons.Check size={13} />
-                  Approve
+                  {t("inbox.approve")}
                 </button>
                 <button
                   onClick={() => setEditing((m) => ({ ...m, [key]: !m[key] }))}
@@ -407,7 +419,7 @@ export function GlobalApprovalOverlay() {
                     cursor: "pointer",
                   }}
                 >
-                  {isEditing ? "Cancel edit" : "Edit args"}
+                  {isEditing ? t("inbox.overlay.cancelEdit") : t("inbox.overlay.edit")}
                 </button>
                 <button
                   onClick={() => resolveLive(key, "deny")}
@@ -424,7 +436,7 @@ export function GlobalApprovalOverlay() {
                     opacity: busy ? 0.6 : 1,
                   }}
                 >
-                  Skip
+                  {t("inbox.overlay.skip")}
                 </button>
               </div>
             </>
@@ -439,7 +451,7 @@ export function GlobalApprovalOverlay() {
                   lineHeight: 1.4,
                 }}
               >
-                {(current as FeedReview).title}
+                <bdi>{(current as FeedReview).title}</bdi>
               </div>
               {(current as FeedReview).detail && (
                 <p
@@ -450,7 +462,7 @@ export function GlobalApprovalOverlay() {
                     lineHeight: 1.5,
                   }}
                 >
-                  {(current as FeedReview).detail}
+                  <bdi>{(current as FeedReview).detail}</bdi>
                 </p>
               )}
 
@@ -476,7 +488,7 @@ export function GlobalApprovalOverlay() {
                   }}
                 >
                   <Icons.Check size={13} />
-                  Approve
+                  {t("inbox.approve")}
                 </button>
                 <button
                   onClick={() => resolveFeed(key, "rejected")}
@@ -492,7 +504,7 @@ export function GlobalApprovalOverlay() {
                     cursor: "pointer",
                   }}
                 >
-                  Reject
+                  {t("inbox.reject")}
                 </button>
                 <button
                   onClick={() => resolveFeed(key, "dismissed")}
@@ -509,7 +521,7 @@ export function GlobalApprovalOverlay() {
                     opacity: busy ? 0.6 : 1,
                   }}
                 >
-                  Dismiss
+                  {t("inbox.dismiss")}
                 </button>
               </div>
             </>

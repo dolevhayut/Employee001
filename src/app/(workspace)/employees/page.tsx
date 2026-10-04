@@ -7,12 +7,15 @@ import {
   useEffect,
   useCallback,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import { Star } from "iconoir-react";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
 import { Topbar } from "@/components/ex/shell";
 import { useT } from "@/components/ex/i18n-context";
+import { formatRelativeTime } from "@/lib/i18n/format";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { INTEGRATIONS as INTEGRATION_META } from "@/lib/demo";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { OrgChart } from "@/components/ex/org-chart";
@@ -79,17 +82,6 @@ function writeFavorites(next: Set<string>): void {
   favoritesListeners.forEach((cb) => cb());
 }
 
-function relativeTime(iso?: string): string {
-  if (!iso) return "—";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.max(1, Math.round(diffMs / 60000));
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.round(hrs / 24);
-  return `${days}d ago`;
-}
-
 function SourceLogo({ id, size = 16 }: { id: string; size?: number }) {
   const meta = INTEGRATION_META[id];
   const slug = meta?.simpleIconSlug ?? id;
@@ -122,11 +114,12 @@ function StarButton({
   active: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useT();
   return (
     <button
       onClick={onToggle}
-      title={active ? "Remove from favorites" : "Add to favorites"}
-      aria-label={active ? "Remove favorite" : "Add favorite"}
+      title={active ? t("twins.fav.remove") : t("twins.fav.add")}
+      aria-label={active ? t("twins.fav.removeAria") : t("twins.fav.addAria")}
       style={{
         width: 28,
         height: 28,
@@ -187,7 +180,7 @@ function Stat({
           lineHeight: 1.1,
         }}
       >
-        {value}
+        <bdi>{value}</bdi>
       </div>
       <div className="subtle" style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-2)" }}>
         {hint}
@@ -197,12 +190,13 @@ function Stat({
 }
 
 function ConfidencePill({ value }: { value: number }) {
+  const { t } = useT();
   const pct = Math.round(value * 100);
   const tone = value >= 0.85 ? "success" : value >= 0.7 ? "warn" : "danger";
   return (
     <span className={"badge " + tone} style={{ fontSize: "var(--fs-xs)" }}>
       <span className={"dot " + tone} style={{ boxShadow: "none" }} />
-      {pct}% confidence
+      <bdi>{t("twins.confidence", { pct })}</bdi>
     </span>
   );
 }
@@ -215,7 +209,7 @@ function ConfidencePill({ value }: { value: number }) {
 
 const TWIN_PROFILE_FILE_TARGET = 9;
 
-type QualityBreakdown = { label: string; weight: number; value01: number };
+type QualityBreakdown = { labelKey: MessageKey; weight: number; value01: number };
 
 function recencyTo01(iso?: string): number {
   if (!iso) return 0.5;
@@ -237,14 +231,14 @@ function computeTwinQuality(emp: EmployeeWithTwin): {
   }
 
   const breakdown: QualityBreakdown[] = [
-    { label: "Model confidence", weight: 50, value01: emp.twinConfidence },
+    { labelKey: "twins.quality.model", weight: 50, value01: emp.twinConfidence },
     {
-      label: "Profile coverage",
+      labelKey: "twins.quality.profile",
       weight: 30,
       value01: Math.min(emp.profileFilesComplete, TWIN_PROFILE_FILE_TARGET) / TWIN_PROFILE_FILE_TARGET,
     },
-    { label: "Consent on file", weight: 10, value01: emp.consent ? 1 : 0 },
-    { label: "Recent activity", weight: 10, value01: recencyTo01(emp.lastActiveAt) },
+    { labelKey: "twins.quality.consent", weight: 10, value01: emp.consent ? 1 : 0 },
+    { labelKey: "twins.quality.activity", weight: 10, value01: recencyTo01(emp.lastActiveAt) },
   ];
 
   const score = Math.round(
@@ -256,28 +250,28 @@ function computeTwinQuality(emp: EmployeeWithTwin): {
 
 const QUALITY_THEME: Record<
   "high" | "medium" | "low" | "empty",
-  { label: string; fg: string; bgSoft: string; track: string }
+  { labelKey: MessageKey; fg: string; bgSoft: string; track: string }
 > = {
   high: {
-    label: "human-grade",
+    labelKey: "twins.quality.human",
     fg: "var(--success)",
     bgSoft: "color-mix(in oklch, var(--success) 12%, transparent)",
     track: "color-mix(in oklch, var(--success) 20%, transparent)",
   },
   medium: {
-    label: "developing",
+    labelKey: "twins.quality.developing",
     fg: "var(--warn)",
     bgSoft: "color-mix(in oklch, var(--warn) 12%, transparent)",
     track: "color-mix(in oklch, var(--warn) 20%, transparent)",
   },
   low: {
-    label: "needs work",
+    labelKey: "twins.quality.low",
     fg: "var(--danger)",
     bgSoft: "color-mix(in oklch, var(--danger) 12%, transparent)",
     track: "color-mix(in oklch, var(--danger) 20%, transparent)",
   },
   empty: {
-    label: "not built",
+    labelKey: "twins.quality.empty",
     fg: "var(--text-subtle)",
     bgSoft: "var(--bg-sunken)",
     track: "var(--hairline)",
@@ -285,20 +279,25 @@ const QUALITY_THEME: Record<
 };
 
 function TwinQualityBar({ emp }: { emp: EmployeeWithTwin }) {
+  const { t } = useT();
   const { score, grade, breakdown } = computeTwinQuality(emp);
   const theme = QUALITY_THEME[grade];
+  const gradeLabel = t(theme.labelKey);
 
   // Compact tooltip listing each component's contribution.
   const tooltip =
     breakdown.length > 0
-      ? `Twin quality — proximity to the human ${emp.name.split(" ")[0]}.\n\n` +
+      ? `${t("twins.quality.tooltip", { name: emp.name.split(" ")[0] })}\n\n` +
         breakdown
-          .map(
-            (b) =>
-              `${b.label}: ${Math.round(b.value01 * 100)}% (weight ${b.weight}%)`
+          .map((b) =>
+            t("twins.quality.part", {
+              label: t(b.labelKey),
+              pct: Math.round(b.value01 * 100),
+              weight: b.weight,
+            }),
           )
           .join("\n")
-      : "Twin not built yet — run Build twin to score.";
+      : t("twins.quality.unbuilt");
 
   return (
     <div
@@ -324,7 +323,7 @@ function TwinQualityBar({ emp }: { emp: EmployeeWithTwin }) {
           lineHeight: 1,
         }}
       >
-        {score === null ? "—" : score}
+        <bdi>{score === null ? "—" : score}</bdi>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
@@ -337,7 +336,7 @@ function TwinQualityBar({ emp }: { emp: EmployeeWithTwin }) {
             marginBottom: "var(--sp-4)",
           }}
         >
-          Twin quality · {theme.label}
+          {t("twins.quality.heading", { grade: gradeLabel })}
         </div>
         <div
           style={{
@@ -362,14 +361,15 @@ function TwinQualityBar({ emp }: { emp: EmployeeWithTwin }) {
 }
 
 function ConsentPill({ consented }: { consented: boolean }) {
+  const { t } = useT();
   if (consented) {
     return (
       <span
         className="badge"
         style={{ fontSize: "var(--fs-xs)" }}
-        title="Employee consent on file"
+        title={t("twins.consent.yesTitle")}
       >
-        <Icons.Check size={9} /> Consented
+        <Icons.Check size={9} /> {t("twins.consent.yes")}
       </span>
     );
   }
@@ -377,15 +377,16 @@ function ConsentPill({ consented }: { consented: boolean }) {
     <span
       className="badge warn"
       style={{ fontSize: "var(--fs-xs)" }}
-      title="No consent on file — twin cannot ingest data until granted"
+      title={t("twins.consent.noTitle")}
     >
       <span className="dot warn" style={{ boxShadow: "none" }} />
-      No consent
+      {t("twins.consent.no")}
     </span>
   );
 }
 
 function ProfileBar({ complete }: { complete: number }) {
+  const { t } = useT();
   // Matches the canonical TWIN_FILE_NAMES count in twin-builder-types.ts.
   // The earlier 12 was a placeholder from the original mockup.
   const total = TWIN_PROFILE_FILE_TARGET;
@@ -406,30 +407,31 @@ function ProfileBar({ complete }: { complete: number }) {
         ))}
       </div>
       <div className="subtle mono" style={{ fontSize: "var(--fs-xs)" }}>
-        {clamped} / {total} files
+        <bdi>{clamped} / {total}</bdi> {t("twins.profile.files")}
       </div>
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: TwinStatus }) {
+  const { t } = useT();
   if (status === "ready") {
     return (
       <span className="badge success">
-        <span className="dot success" style={{ boxShadow: "none" }} /> Twin ready
+        <span className="dot success" style={{ boxShadow: "none" }} /> {t("twins.status.ready")}
       </span>
     );
   }
   if (status === "building") {
     return (
       <span className="badge warn">
-        <Icons.Refresh size={10} className="spin" /> Building twin
+        <Icons.Refresh size={10} className="spin" /> {t("twins.status.building")}
       </span>
     );
   }
   return (
     <span className="badge">
-      <span className="dot idle" /> Not started
+      <span className="dot idle" /> {t("twins.status.notStarted")}
     </span>
   );
 }
@@ -437,6 +439,7 @@ function StatusBadge({ status }: { status: TwinStatus }) {
 const ORG_SKILL_MAP = Object.fromEntries(ORG_SKILLS.map((s) => [s.id, s.label]));
 
 function SkillsRow({ emp }: { emp: EmployeeWithTwin }) {
+  const { t } = useT();
   // Build combined list: org skills first (tagged), then personal skills
   const orgPills = emp.orgSkillIds.map((id) => ({
     id,
@@ -452,14 +455,14 @@ function SkillsRow({ emp }: { emp: EmployeeWithTwin }) {
   return (
     <div>
       <div className="section-title" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-6)" }}>
-        Skills
+        {t("twins.skills.title")}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-4)" }}>
         {visible.map((pill) =>
           pill.isOrg ? (
             <span
               key={"org-" + pill.id}
-              title="Org-authoritative skill"
+              title={t("twins.skills.orgTitle")}
               style={{
                 fontSize: "var(--fs-xs)",
                 padding: "2px 7px",
@@ -475,7 +478,7 @@ function SkillsRow({ emp }: { emp: EmployeeWithTwin }) {
               }}
             >
               <span aria-hidden style={{ fontSize: "var(--fs-2xs)", lineHeight: 1 }}>○</span>
-              {pill.label}
+              <bdi>{pill.label}</bdi>
             </span>
           ) : (
             <span
@@ -493,7 +496,7 @@ function SkillsRow({ emp }: { emp: EmployeeWithTwin }) {
                 whiteSpace: "nowrap",
               }}
             >
-              {pill.label}
+              <bdi>{pill.label}</bdi>
             </span>
           )
         )}
@@ -508,7 +511,7 @@ function SkillsRow({ emp }: { emp: EmployeeWithTwin }) {
               color: "var(--text-subtle)",
             }}
           >
-            +{overflow} more
+            <bdi>+{overflow}</bdi> {t("twins.skills.more")}
           </span>
         )}
       </div>
@@ -525,6 +528,7 @@ function EmployeeCard({
   isFavorite: boolean;
   onToggleFavorite: () => void;
 }) {
+  const { t, locale } = useT();
   const dimmed = emp.twinStatus === "pending";
   const visibleIntegrations = emp.integrations.slice(0, 5);
   const overflow = emp.integrations.length - visibleIntegrations.length;
@@ -561,10 +565,10 @@ function EmployeeCard({
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: "var(--fs-base)", fontWeight: 600, letterSpacing: "-0.01em" }}>
-            {emp.name}
+            <bdi>{emp.name}</bdi>
           </div>
           <div className="subtle" style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-2)" }}>
-            {emp.role} · {emp.department}
+            <bdi>{emp.role}</bdi> · <bdi>{emp.department}</bdi>
           </div>
         </div>
         <StarButton active={isFavorite} onToggle={onToggleFavorite} />
@@ -590,7 +594,7 @@ function EmployeeCard({
               gap: "var(--sp-3)",
             }}
           >
-            <Icons.Store size={9} /> Marketplace
+            <Icons.Store size={9} /> {t("twins.action.marketplace")}
           </span>
         )}
       </div>
@@ -613,11 +617,11 @@ function EmployeeCard({
         }}
       >
         <span>
-          <span className="mono">{emp.questionsThisWeek}</span> questions this week
+          <span className="mono"><bdi>{emp.questionsThisWeek}</bdi></span> {t("twins.card.questions")}
         </span>
         <div className="spacer" />
         <span>
-          Last active <span className="mono">{relativeTime(emp.lastActiveAt)}</span>
+          {t("twins.card.lastActive")} <span className="mono"><bdi>{formatRelativeTime(emp.lastActiveAt, locale)}</bdi></span>
         </span>
       </div>
 
@@ -627,7 +631,7 @@ function EmployeeCard({
           <button
             className="btn primary sm"
             disabled
-            title="Twin not ready yet"
+            title={t("twins.card.notReady")}
             style={{
               flex: 1,
               justifyContent: "center",
@@ -635,7 +639,7 @@ function EmployeeCard({
               cursor: "not-allowed",
             }}
           >
-            Open chat
+            {t("twins.card.chat")}
           </button>
         ) : (
           <Link
@@ -643,7 +647,7 @@ function EmployeeCard({
             className="btn primary sm"
             style={{ flex: 1, justifyContent: "center", textDecoration: "none" }}
           >
-            Open chat
+            {t("twins.card.chat")}
           </Link>
         )}
         <Link
@@ -651,7 +655,7 @@ function EmployeeCard({
           className="btn ghost sm"
           style={{ justifyContent: "center", textDecoration: "none" }}
         >
-          Configure
+          {t("twins.card.configure")}
         </Link>
       </div>
 
@@ -677,7 +681,7 @@ function EmployeeCard({
               textDecoration: "none",
             }}
           >
-            <Icons.Plus size={13} /> Start onboarding
+            <Icons.Plus size={13} /> {t("twins.card.onboarding")}
           </Link>
         </div>
       )}
@@ -710,6 +714,7 @@ function MissingKeysCard({
   config: SystemConfig;
   onSaved: () => void;
 }) {
+  const { t } = useT();
   const [anthropicVal, setAnthropicVal] = useState("");
   const [composioVal, setComposioVal] = useState("");
   const [saving, setSaving] = useState<null | "anthropic" | "composio">(null);
@@ -728,13 +733,13 @@ function MissingKeysCard({
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `Save failed (${res.status})`);
+        throw new Error(data.error ?? t("twins.keys.saveFailed", { status: res.status }));
       }
       if (key === "ANTHROPIC_API_KEY") setAnthropicVal("");
       else setComposioVal("");
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("settings.status.saveFailed"));
     } finally {
       setSaving(null);
     }
@@ -754,18 +759,25 @@ function MissingKeysCard({
       }}
     >
       <div style={{ fontWeight: 600, marginBottom: 4, fontSize: "var(--fs-sm)" }}>
-        One more thing before inviting a real employee
+        {t("twins.keys.title")}
       </div>
       <div style={{ color: "var(--text-subtle)", marginBottom: 12 }}>
-        Inviting a teammate kicks off an autonomous training pass that needs
-        both keys. Paste them below — saved straight to{" "}
-        <span className="mono">.env</span>, no restart needed.
+        {t("twins.keys.bodyBefore")}{" "}
+        <span className="mono"><bdi>.env</bdi></span>
+        {t("twins.keys.bodyAfter")}
       </div>
 
       {!config.anthropic && (
         <KeyRow
-          label="Anthropic API key"
-          hint="https://console.anthropic.com — starts with sk-ant-"
+          label={t("twins.keys.anthropic")}
+          hint={
+            <>
+              <bdi>https://console.anthropic.com</bdi>
+              {" — "}
+              {t("twins.keys.anthropicRest")}
+              <bdi>sk-ant-</bdi>
+            </>
+          }
           placeholder="sk-ant-…"
           value={anthropicVal}
           onChange={setAnthropicVal}
@@ -777,9 +789,15 @@ function MissingKeysCard({
 
       {!config.composio && (
         <KeyRow
-          label="Composio API key"
-          hint="https://app.composio.dev — only used when training new twins"
-          placeholder="paste your Composio key"
+          label={t("twins.keys.composio")}
+          hint={
+            <>
+              <bdi>https://app.composio.dev</bdi>
+              {" — "}
+              {t("twins.keys.composioRest")}
+            </>
+          }
+          placeholder={t("twins.keys.composioPh")}
           value={composioVal}
           onChange={setComposioVal}
           onSave={() => save("COMPOSIO_API_KEY", composioVal)}
@@ -808,7 +826,7 @@ function KeyRow({
   disabled,
 }: {
   label: string;
-  hint: string;
+  hint: ReactNode;
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
@@ -816,6 +834,7 @@ function KeyRow({
   saving: boolean;
   disabled: boolean;
 }) {
+  const { t } = useT();
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
@@ -854,7 +873,7 @@ function KeyRow({
             cursor: !value.trim() ? "not-allowed" : "pointer",
           }}
         >
-          {saving ? "Saving…" : "Save"}
+          {saving ? t("settings.action.saving") : t("settings.action.save")}
         </button>
       </div>
     </div>
@@ -868,6 +887,7 @@ function InvitePanel({
   invites: Invite[];
   onInvitesChanged: () => void;
 }) {
+  const { t } = useT();
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [lookbackDays, setLookbackDays] = useState(90);
@@ -928,9 +948,17 @@ function InvitePanel({
 
   async function bulkRevoke(scope: "expired" | "unused", count: number) {
     if (count === 0) return;
-    const noun = scope === "expired" ? "expired invite" : "unused invite";
     const ok = window.confirm(
-      `Revoke ${count} ${noun}${count === 1 ? "" : "s"}? The link${count === 1 ? "" : "s"} will stop working immediately.`,
+      t(
+        scope === "expired"
+          ? count === 1
+            ? "twins.invite.confirmExpiredOne"
+            : "twins.invite.confirmExpiredMany"
+          : count === 1
+            ? "twins.invite.confirmUnusedOne"
+            : "twins.invite.confirmUnusedMany",
+        { count },
+      ),
     );
     if (!ok) return;
     try {
@@ -955,7 +983,7 @@ function InvitePanel({
         1800,
       );
     } catch {
-      window.prompt("Copy this link:", url);
+      window.prompt(t("twins.invite.copyPrompt"), url);
     }
   }
 
@@ -976,12 +1004,12 @@ function InvitePanel({
   // Human label for the lookback window so the raw number has meaning.
   const tier =
     lookbackDays <= 30
-      ? "Light touch"
+      ? t("twins.invite.tier.light")
       : lookbackDays <= 90
-        ? "Standard"
+        ? t("twins.invite.tier.standard")
         : lookbackDays <= 180
-          ? "Deep"
-          : "Full history";
+          ? t("twins.invite.tier.deep")
+          : t("twins.invite.tier.full");
   const cost = (0.005 * lookbackDays).toFixed(2);
   const totalSec = 2 * lookbackDays;
   const estMins = Math.floor(totalSec / 60);
@@ -989,9 +1017,9 @@ function InvitePanel({
   const timeStr =
     estMins > 0
       ? estSecs > 0
-        ? `${estMins}min ${estSecs}s`
-        : `${estMins}min`
-      : `${estSecs}s`;
+        ? t("twins.invite.timeMinSec", { min: estMins, sec: estSecs })
+        : t("twins.invite.timeMin", { min: estMins })
+      : t("twins.invite.timeSec", { sec: estSecs });
 
   return (
     <div style={{ display: "grid", gap: "var(--sp-20)" }}>
@@ -1028,7 +1056,7 @@ function InvitePanel({
                 letterSpacing: "var(--ls-snug)",
               }}
             >
-              Invite a real employee
+              {t("twins.invite.title")}
             </h2>
             <p
               style={{
@@ -1039,11 +1067,7 @@ function InvitePanel({
                 maxWidth: 640,
               }}
             >
-              Generate a one-time link and share it yourself — Slack, WhatsApp,
-              wherever you normally reach the person. Nothing is sent
-              automatically. When they open it, an autonomous pass studies their
-              work and builds their twin. The link works on this local network
-              only.
+              {t("twins.invite.leadBefore")} <bdi>Slack</bdi>, <bdi>WhatsApp</bdi>{t("twins.invite.leadAfter")}
             </p>
           </div>
         </div>
@@ -1078,7 +1102,7 @@ function InvitePanel({
             }}
           >
             <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>
-              Name{" "}
+              {t("twins.invite.name")}{" "}
               <span
                 style={{
                   fontWeight: 500,
@@ -1086,13 +1110,13 @@ function InvitePanel({
                   fontSize: "var(--fs-xs)",
                 }}
               >
-                optional
+                {t("twins.invite.optional")}
               </span>
             </span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Maya Cohen"
+              placeholder={t("twins.invite.namePh")}
               disabled={!ready}
               style={inputStyle}
             />
@@ -1105,7 +1129,7 @@ function InvitePanel({
             }}
           >
             <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>
-              Role{" "}
+              {t("twins.invite.role")}{" "}
               <span
                 style={{
                   fontWeight: 500,
@@ -1113,13 +1137,13 @@ function InvitePanel({
                   fontSize: "var(--fs-xs)",
                 }}
               >
-                optional
+                {t("twins.invite.optional")}
               </span>
             </span>
             <input
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              placeholder="e.g. Product Designer"
+              placeholder={t("twins.invite.rolePh")}
               disabled={!ready}
               style={inputStyle}
             />
@@ -1148,7 +1172,7 @@ function InvitePanel({
           >
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>
-                Lookback window
+                {t("twins.invite.lookback")}
               </div>
               <div
                 style={{
@@ -1159,11 +1183,10 @@ function InvitePanel({
                   lineHeight: 1.5,
                 }}
               >
-                How far back the twin studies their work across connected tools.
-                Longer is more accurate but costs more.
+                {t("twins.invite.lookbackHint")}
               </div>
             </div>
-            <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ textAlign: "end", flexShrink: 0 }}>
               <div
                 style={{
                   fontSize: "var(--fs-h3)",
@@ -1172,7 +1195,7 @@ function InvitePanel({
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
-                {lookbackDays}
+                <bdi>{lookbackDays}</bdi>
                 <span
                   style={{
                     fontSize: "var(--fs-sm)",
@@ -1181,7 +1204,7 @@ function InvitePanel({
                   }}
                 >
                   {" "}
-                  days
+                  {t("twins.invite.days")}
                 </span>
               </div>
               <div
@@ -1207,11 +1230,11 @@ function InvitePanel({
             }}
           >
             {([
-              [30, "30d"],
-              [90, "90d"],
-              [180, "180d"],
-              [360, "1 year"],
-            ] as [number, string][]).map(([val, lbl]) => {
+              [30, "twins.invite.preset30"],
+              [90, "twins.invite.preset90"],
+              [180, "twins.invite.preset180"],
+              [360, "twins.invite.presetYear"],
+            ] as [number, MessageKey][]).map(([val, lbl]) => {
               const on = lookbackDays === val;
               return (
                 <button
@@ -1232,7 +1255,7 @@ function InvitePanel({
                     cursor: ready ? "pointer" : "not-allowed",
                   }}
                 >
-                  {lbl}
+                  <bdi>{t(lbl)}</bdi>
                 </button>
               );
             })}
@@ -1266,13 +1289,13 @@ function InvitePanel({
             {[
               {
                 icon: <Icons.DollarSign size={14} />,
-                label: "Est. cost",
-                val: `~ $${cost}`,
+                label: t("twins.invite.cost"),
+                val: <bdi>{`~ $${cost}`}</bdi>,
               },
               {
                 icon: <Icons.Clock size={14} />,
-                label: "Est. time",
-                val: timeStr,
+                label: t("twins.invite.time"),
+                val: <bdi>{timeStr}</bdi>,
               },
             ].map((s) => (
               <div
@@ -1323,7 +1346,7 @@ function InvitePanel({
               marginTop: "var(--sp-8)",
             }}
           >
-            Estimates only — actual cost and time vary with signal density.
+            {t("twins.invite.estimateNote")}
           </div>
         </div>
 
@@ -1335,17 +1358,17 @@ function InvitePanel({
           style={{ width: "100%", justifyContent: "center" }}
           title={
             !ready
-              ? "Configure ANTHROPIC_API_KEY and COMPOSIO_API_KEY first"
+              ? t("twins.invite.needKeys")
               : undefined
           }
         >
           {creating ? (
             <>
-              <Icons.Loader size={14} /> Creating…
+              <Icons.Loader size={14} /> {t("twins.invite.creating")}
             </>
           ) : (
             <>
-              <Icons.Plus size={14} /> Create invite link
+              <Icons.Plus size={14} /> {t("twins.invite.create")}
             </>
           )}
         </button>
@@ -1381,7 +1404,7 @@ function InvitePanel({
                     gap: "var(--sp-8)",
                   }}
                 >
-                  Pending invites
+                  {t("twins.invite.pending")}
                   <span
                     className="mono"
                     style={{
@@ -1392,7 +1415,7 @@ function InvitePanel({
                       color: "var(--text-subtle)",
                     }}
                   >
-                    {pending.length}
+                    <bdi>{pending.length}</bdi>
                   </span>
                 </h3>
                 {showBulk && (
@@ -1409,9 +1432,14 @@ function InvitePanel({
                         onClick={() => bulkRevoke("expired", expiredCount)}
                         className="btn ghost sm"
                         style={{ color: "var(--danger)" }}
-                        title={`Revoke ${expiredCount} expired invite${expiredCount === 1 ? "" : "s"}`}
+                        title={t(
+                          expiredCount === 1
+                            ? "twins.invite.clearExpiredTitleOne"
+                            : "twins.invite.clearExpiredTitleMany",
+                          { count: expiredCount },
+                        )}
                       >
-                        Clear expired ({expiredCount})
+                        {t("twins.invite.clearExpired")} (<bdi>{expiredCount}</bdi>)
                       </button>
                     )}
                     {unusedCount > 0 && (
@@ -1420,9 +1448,14 @@ function InvitePanel({
                         onClick={() => bulkRevoke("unused", unusedCount)}
                         className="btn ghost sm"
                         style={{ color: "var(--danger)" }}
-                        title={`Revoke ${unusedCount} invite${unusedCount === 1 ? "" : "s"} no employee has started — includes expired ones`}
+                        title={t(
+                          unusedCount === 1
+                            ? "twins.invite.clearUnusedTitleOne"
+                            : "twins.invite.clearUnusedTitleMany",
+                          { count: unusedCount },
+                        )}
                       >
-                        Clear unused ({unusedCount})
+                        {t("twins.invite.clearUnused")} (<bdi>{unusedCount}</bdi>)
                       </button>
                     )}
                   </div>
@@ -1438,10 +1471,10 @@ function InvitePanel({
               const started = !!inv.employeeId;
               const expired = new Date(inv.expiresAt).getTime() < now;
               const status = started
-                ? { cls: "success", label: "In progress", color: "var(--success)" }
+                ? { cls: "success", label: t("twins.invite.inProgress"), color: "var(--success)" }
                 : expired
-                  ? { cls: "danger", label: "Expired", color: "var(--danger)" }
-                  : { cls: "idle", label: "Waiting", color: "var(--text-subtle)" };
+                  ? { cls: "danger", label: t("twins.invite.expired"), color: "var(--danger)" }
+                  : { cls: "idle", label: t("twins.invite.waiting"), color: "var(--text-subtle)" };
               return (
                 <div
                   key={inv.token}
@@ -1458,10 +1491,10 @@ function InvitePanel({
                   <span
                     title={
                       started
-                        ? "Employee started onboarding"
+                        ? t("twins.invite.startedTitle")
                         : expired
-                          ? "Link expired"
-                          : "Waiting for employee to open link"
+                          ? t("twins.invite.expiredTitle")
+                          : t("twins.invite.waitingTitle")
                     }
                     style={{ flexShrink: 0, display: "grid" }}
                   >
@@ -1495,7 +1528,7 @@ function InvitePanel({
                           color: "var(--text)",
                         }}
                       >
-                        {inv.name || "Unnamed invite"}
+                        <bdi>{inv.name || t("twins.invite.unnamed")}</bdi>
                         {inv.role ? (
                           <span
                             style={{
@@ -1504,7 +1537,7 @@ function InvitePanel({
                             }}
                           >
                             {" "}
-                            · {inv.role}
+                            · <bdi>{inv.role}</bdi>
                           </span>
                         ) : null}
                       </span>
@@ -1534,7 +1567,7 @@ function InvitePanel({
                         fontSize: "var(--fs-xs)",
                       }}
                     >
-                      {url}
+                      <bdi>{url}</bdi>
                     </div>
                   </div>
 
@@ -1543,14 +1576,14 @@ function InvitePanel({
                     onClick={() => copy(inv.token)}
                     className="btn sm"
                     style={{ flexShrink: 0 }}
-                    title="Copy the link to share with the employee"
+                    title={t("twins.invite.shareTitle")}
                   >
                     {copied ? (
                       <Icons.Check size={12} />
                     ) : (
                       <Icons.Send size={12} />
                     )}
-                    {copied ? "Copied" : "Share link"}
+                    {copied ? t("twins.invite.copied") : t("twins.invite.share")}
                   </button>
 
                   {started && (
@@ -1560,9 +1593,9 @@ function InvitePanel({
                       rel="noopener noreferrer"
                       className="btn ghost sm"
                       style={{ textDecoration: "none", flexShrink: 0 }}
-                      title="Watch the twin training progress in real time"
+                      title={t("twins.invite.watchTitle")}
                     >
-                      <Icons.Eye size={12} /> Watch
+                      <Icons.Eye size={12} /> {t("twins.invite.watch")}
                     </a>
                   )}
 
@@ -1571,9 +1604,9 @@ function InvitePanel({
                     onClick={() => revoke(inv.token)}
                     className="btn ghost sm"
                     style={{ color: "var(--danger)", flexShrink: 0 }}
-                    title="Revoke this invite — link stops working immediately"
+                    title={t("twins.invite.revokeTitle")}
                   >
-                    <Icons.Trash size={12} /> Revoke
+                    <Icons.Trash size={12} /> {t("twins.invite.revoke")}
                   </button>
                 </div>
               );
@@ -1610,10 +1643,10 @@ function InvitePanel({
                 color: "var(--text-muted)",
               }}
             >
-              No pending invites
+              {t("twins.invite.none")}
             </div>
             <div style={{ fontSize: "var(--fs-xs)", marginTop: 2 }}>
-              Links you create will show up here until they&apos;re opened.
+              {t("twins.invite.noneHint")}
             </div>
           </div>
         )
@@ -1705,7 +1738,7 @@ export default function EmployeesPage() {
         actions={
           <div style={{ display: "flex", gap: "var(--sp-8)" }}>
             <Link href="/marketplace" className="btn ghost" style={{ textDecoration: "none" }}>
-              <Icons.Store size={13} /> Marketplace
+              <Icons.Store size={13} /> {t("twins.action.marketplace")}
             </Link>
             <button
               type="button"
@@ -1713,7 +1746,7 @@ export default function EmployeesPage() {
               style={{ textDecoration: "none" }}
               onClick={() => setTab("invites")}
             >
-              <Icons.Plus size={13} /> Invite employee
+              <Icons.Plus size={13} /> {t("twins.action.invite")}
             </button>
           </div>
         }
@@ -1724,8 +1757,8 @@ export default function EmployeesPage() {
       >
         <PageHead
           icon="Home"
-          title="Employees"
-          subtitle="Browse twins in the workspace, check readiness, and jump into chat, profile, or onboarding."
+          title={t("twins.page.title")}
+          subtitle={t("twins.page.subtitle")}
           style={{ marginBottom: "var(--sp-28)" }}
         />
 
@@ -1739,29 +1772,29 @@ export default function EmployeesPage() {
           }}
         >
           <Stat
-            label="Total employees"
+            label={t("twins.stat.total")}
             value={stats.total}
-            hint="In workspace"
+            hint={t("twins.stat.totalHint")}
             tone="idle"
           />
           <Stat
-            label="Twins ready"
+            label={t("twins.stat.ready")}
             value={stats.ready}
-            hint="Answering live"
+            hint={t("twins.stat.readyHint")}
             tone="success"
             border
           />
           <Stat
-            label="Twins building"
+            label={t("twins.stat.building")}
             value={stats.building}
-            hint="Profile in progress"
+            hint={t("twins.stat.buildingHint")}
             tone="warn"
             border
           />
           <Stat
-            label="Questions this week"
+            label={t("twins.stat.questions")}
             value={stats.questions}
-            hint="Across all twins"
+            hint={t("twins.stat.questionsHint")}
             tone="idle"
             border
           />
@@ -1770,7 +1803,7 @@ export default function EmployeesPage() {
         {/* Tabs */}
         <div
           role="tablist"
-          aria-label="Employees sections"
+          aria-label={t("twins.tabs.aria")}
           style={{
             display: "flex",
             gap: "var(--sp-2)",
@@ -1780,9 +1813,9 @@ export default function EmployeesPage() {
         >
           {(
             [
-              ["people", "People", allEmployees.length],
-              ["org", "Org chart", null],
-              ["invites", "Invites", pendingInvites || null],
+              ["people", t("twins.tab.people"), allEmployees.length],
+              ["org", t("twins.tab.org"), null],
+              ["invites", t("twins.tab.invites"), pendingInvites || null],
             ] as [typeof tab, string, number | null][]
           ).map(([key, label, count]) => {
             const active = tab === key;
@@ -1820,7 +1853,7 @@ export default function EmployeesPage() {
                       color: "var(--text-subtle)",
                     }}
                   >
-                    {count}
+                    <bdi>{count}</bdi>
                   </span>
                 )}
               </button>
@@ -1864,7 +1897,7 @@ export default function EmployeesPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, role, or department"
+              placeholder={t("twins.search.placeholder")}
               style={{
                 flex: 1,
                 border: "none",
@@ -1879,7 +1912,7 @@ export default function EmployeesPage() {
             {query && (
               <button
                 onClick={() => setQuery("")}
-                title="Clear"
+                title={t("twins.search.clear")}
                 style={{
                   background: "none",
                   border: "none",
@@ -1899,11 +1932,11 @@ export default function EmployeesPage() {
           <div className="row" style={{ gap: "var(--sp-6)" }}>
             {(
               [
-                ["all", "All"],
-                ["favorites", "★ Favorites"],
-                ["ready", "Ready"],
-                ["building", "Building"],
-                ["pending", "Pending"],
+                ["all", t("twins.filter.all")],
+                ["favorites", t("twins.filter.favorites")],
+                ["ready", t("twins.filter.ready")],
+                ["building", t("twins.filter.building")],
+                ["pending", t("twins.filter.pending")],
               ] as [FilterKey, string][]
             ).map(([k, l]) => {
               const isFav = k === "favorites";
@@ -1933,7 +1966,7 @@ export default function EmployeesPage() {
                         opacity: 0.7,
                       }}
                     >
-                      {favorites.size}
+                      <bdi>{favorites.size}</bdi>
                     </span>
                   )}
                 </button>
@@ -1943,7 +1976,8 @@ export default function EmployeesPage() {
 
           <div className="spacer" />
           <span className="subtle mono" style={{ fontSize: "var(--fs-meta)" }}>
-            {visible.length} employees
+            <bdi>{visible.length}</bdi>{" "}
+            {t(visible.length === 1 ? "twins.countOne" : "twins.countMany")}
           </span>
         </div>
 
@@ -1960,8 +1994,10 @@ export default function EmployeesPage() {
             <Icons.Search size={20} style={{ marginBottom: "var(--sp-10)", opacity: 0.5 }} />
             <div style={{ fontSize: "var(--fs-ui)" }}>
               {allEmployees.length === 0
-                ? "No employees onboarded yet. Create an invite above and share the link with the first person you want a twin of."
-                : `No employees match ${query ? `"${query}"` : "this filter"}.`}
+                ? t("twins.empty.none")
+                : query
+                  ? <>{t("twins.empty.noMatchBefore")} <bdi>&quot;{query}&quot;</bdi>.</>
+                  : t("twins.empty.noMatchFilter")}
             </div>
           </div>
         ) : (
