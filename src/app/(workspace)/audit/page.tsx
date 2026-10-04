@@ -221,9 +221,10 @@ export default function AuditPage() {
 
   useEffect(() => {
     void fetch("/api/audit/verify", { cache: "no-store" })
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
       .then((result: { ok: boolean; checked: number; firstBadId?: string }) => setIntegrity(result))
-      .catch(() => setIntegrity({ ok: false, checked: 0 }));
+      // A failed request is not evidence of tampering: show nothing.
+      .catch(() => setIntegrity(undefined));
   }, []);
 
   const load = useCallback(async () => {
@@ -312,7 +313,7 @@ export default function AuditPage() {
         }
       />
 
-      {integrity && (
+      {integrity && (!integrity.ok || integrity.checked > 0) && (
         <div
           style={{
             padding: "var(--sp-7) 24px",
