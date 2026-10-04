@@ -16,6 +16,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Hebrew lines run right-to-left and mixed Hebrew/English text no longer
   scrambles punctuation. Lists and quotes use logical (start/end) spacing.
 
+### Changed
+- **New sidebar.** One navigation for both modes: Work (Approvals with a
+  pending-count badge, Tasks, Team Meeting), Twins (Twins, Chat, Hire),
+  Operations (Cockpit, Schedules, Activity log), Control (Spend, Tools & MCP)
+  and Labs (Handover). Operator pages no longer disappear when Autonomy is
+  off; Autonomy now only arms or disarms unattended work. The command palette
+  uses the same names and still finds the old ones (Employees, Routines,
+  Audit, Budgets, Inbox, Marketplace).
+- **Twins default to Claude Sonnet 5.5** (`claude-sonnet-5-5`), with Sonnet 5
+  as the fallback. Existing twins keep the model they were built with.
+
 ### Added
 - **Twins write natural Hebrew.** A shared language section in every twin
   prompt (chat, Team Meeting, shifts) asks for idiomatic Israeli workplace
