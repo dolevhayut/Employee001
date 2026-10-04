@@ -293,7 +293,26 @@ This is the DIY version of our **Professional onboarding** — [we can deploy an
 | `npx employee001 update` | Checks GitHub releases for a newer version. |
 | `npx employee001 export <path>` | Snapshot `data/` to a tar.gz (excludes secrets). |
 | `npx employee001 import <path>` | Restore `data/` from a tar.gz. `--force` overwrites. |
+| `npx employee001 mcp` | Connect Claude Code, Cursor, or another MCP client to the running local Employee001 app. Use `--url <url>` to choose a different local app URL. |
 | `npx employee001 help` | Show help. |
+
+## Use Employee001 from Claude Code, Cursor and other MCP clients
+
+Ask your org's twins from the editor where you build. Employee001 exposes your local organizational brain as an MCP server: find who owns a decision, search profile knowledge, inspect pending approvals and active Team Meetings, or ask a ready twin a focused question.
+
+Start Employee001 first:
+
+```bash
+npx employee001 start
+```
+
+Then add it to Claude Code:
+
+```bash
+claude mcp add employee001 -- npx employee001 mcp
+```
+
+The default connection is your local app at `http://127.0.0.1:3000/api/mcp`. No cloud account or separate service is required. Read the complete setup, tool reference, limits, and security model in [docs/mcp.md](./docs/mcp.md).
 
 ## Status
 
