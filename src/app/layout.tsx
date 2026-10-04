@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
-import localFont from "next/font/local";
+import { Geist, Geist_Mono, Instrument_Serif, Open_Sans } from "next/font/google";
 import { I18nProvider } from "@/components/ex/i18n-context";
 import "./globals.css";
 
@@ -10,12 +9,12 @@ import "./globals.css";
 // (or the --font / --font-mono / --font-serif tokens) rather than re-importing.
 // Geist and Geist Mono are variable fonts, so every weight is available.
 //
-// Niv Sans (Hebrew, SIL OFL) follows the same next/font variable pattern.
-// The woff2 files and OFL.txt stay in public/fonts/niv/; next/font emits
-// the @font-face (woff2, font-display: swap) and exposes --font-niv.
-// globals.css puts that variable first in --font only when html[lang="he"].
+// Hebrew uses Open Sans (SIL OFL), Hebrew subset only, self-hosted by
+// next/font at build time and exposed as --font-he. It's a variable font
+// (300–800). globals.css puts it first in --font only when html[lang="he"];
+// Latin characters in Hebrew text still fall through to Geist.
 // preload is off so English sessions don't fetch the Hebrew faces.
-// adjustFontFallback is off so the Hebrew stack stays Niv, then Geist,
+// adjustFontFallback is off so the Hebrew stack stays Open Sans, then Geist,
 // then system-ui — not an Arial metric override in front of Geist.
 
 const geist = Geist({
@@ -24,17 +23,10 @@ const geist = Geist({
   variable: "--font-geist",
 });
 
-const nivSans = localFont({
-  src: [
-    { path: "../../public/fonts/niv/NivSans-Light.woff2", weight: "300", style: "normal" },
-    { path: "../../public/fonts/niv/NivSans-Regular.woff2", weight: "400", style: "normal" },
-    { path: "../../public/fonts/niv/NivSans-Medium.woff2", weight: "500", style: "normal" },
-    { path: "../../public/fonts/niv/NivSans-SemiBold.woff2", weight: "600", style: "normal" },
-    { path: "../../public/fonts/niv/NivSans-Bold.woff2", weight: "700", style: "normal" },
-    { path: "../../public/fonts/niv/NivSans-Black.woff2", weight: "900", style: "normal" },
-  ],
+const openSansHebrew = Open_Sans({
+  subsets: ["hebrew"],
   display: "swap",
-  variable: "--font-niv",
+  variable: "--font-he",
   preload: false,
   adjustFontFallback: false,
 });
@@ -65,14 +57,14 @@ export default function RootLayout({
 }) {
   // Blocking, before paint — same idea as the theme script. Default is English.
   // Hebrew sets lang=he and dir=rtl so the sidebar mirrors and --font picks
-  // up Niv Sans with no flash of LTR/Geist.
+  // up Open Sans Hebrew with no flash of LTR/Geist.
   const bootScript = `(function(){try{var s=localStorage.getItem('em001-theme');var t=(s==='dark'||s==='light'||s==='cool')?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}try{var l=localStorage.getItem('em001-lang');var lang=l==='he'?'he':'en';var el=document.documentElement;el.lang=lang;el.dir=lang==='he'?'rtl':'ltr';}catch(e){}})();`;
   return (
     <html
       lang="en"
       dir="ltr"
       suppressHydrationWarning
-      className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable} ${nivSans.variable}`}
+      className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable} ${openSansHebrew.variable}`}
       style={{ height: "100%" }}
     >
       <head>
