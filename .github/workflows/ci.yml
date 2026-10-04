@@ -22,11 +22,10 @@ jobs:
 
       - run: npm ci
 
-      # Lint is informational while we clean up legacy warnings.
-      # Build is the real gate.
-      - name: Lint (non-blocking)
+      # Errors fail the run (0 today); warnings are still allowed while the
+      # remaining legacy ones get cleaned up.
+      - name: Lint
         run: npm run lint
-        continue-on-error: true
 
       - name: Test
         run: npm test
