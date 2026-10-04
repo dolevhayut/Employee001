@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
 import { useOrgName } from "@/components/ex/use-org-name";
@@ -20,6 +20,7 @@ import {
   type ClaudeModel,
 } from "@/lib/employees";
 import type { OrgSkillPlaybook } from "@/lib/org-skills";
+import { DIFF_TOO_LARGE_TEXT, diffLines, isCollapsedUnchanged } from "@/lib/text-diff";
 
 const MODELS_STORAGE_KEY = "employee001.models.v1";
 
@@ -2591,6 +2592,91 @@ function FileEditorPane({
   );
 }
 
+// Live profile reads strip YAML frontmatter. Snapshots store the raw file,
+// so comparisons use the same markdown body the file endpoint returns.
+const PROFILE_FRONTMATTER_RE = /^---\s*\n[\s\S]*?\n---\s*\n/;
+
+function profileMarkdown(raw: string): string {
+  const match = raw.match(PROFILE_FRONTMATTER_RE);
+  return match ? raw.slice(match[0].length) : raw;
+}
+
+function VersionDiff({ lines }: { lines: ReturnType<typeof diffLines> }) {
+  if (lines.length === 1 && lines[0].text === DIFF_TOO_LARGE_TEXT) {
+    return (
+      <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, lineHeight: 1.55 }}>
+        This file is too large to diff.
+      </p>
+    );
+  }
+  if (!lines.some((line) => line.type !== "same")) {
+    return (
+      <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, lineHeight: 1.55 }}>
+        No changes.
+      </p>
+    );
+  }
+  return (
+    <div
+      aria-label="Line changes"
+      style={{
+        fontFamily: "var(--font-mono, monospace)",
+        fontSize: "var(--fs-sm)",
+        lineHeight: 1.5,
+        border: "1px solid var(--hairline)",
+        borderRadius: 5,
+        overflow: "hidden",
+      }}
+    >
+      {lines.map((line, index) => {
+        const collapsed = line.type === "same" && isCollapsedUnchanged(line.text);
+        const background =
+          line.type === "add"
+            ? "color-mix(in oklch, var(--success) 14%, transparent)"
+            : line.type === "del"
+              ? "color-mix(in oklch, var(--danger) 14%, transparent)"
+              : "transparent";
+        return (
+          <div
+            key={`${line.type}-${index}`}
+            dir="auto"
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              background,
+              color: collapsed ? "var(--text-muted)" : "var(--text)",
+            }}
+          >
+            <span
+              style={{
+                flex: "0 0 auto",
+                width: "1.75em",
+                textAlign: "center",
+                color: "var(--text-muted)",
+                userSelect: "none",
+                padding: "1px 0",
+              }}
+            >
+              {line.type === "add" ? "+" : line.type === "del" ? "−" : " "}
+            </span>
+            <span
+              style={{
+                flex: 1,
+                minWidth: 0,
+                whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere",
+                padding: "1px var(--sp-8) 1px 0",
+              }}
+            >
+              {line.text.length === 0 ? "\u00a0" : line.text}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Versions Tab ────────────────────────────────────────────────────────────
 
 type BuildSummary = {
@@ -2625,6 +2711,19 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
   } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showChanges, setShowChanges] = useState(false);
+  const [diffBaseline, setDiffBaseline] = useState<"current" | "previous">("current");
+  const [changeLoad, setChangeLoad] = useState<
+    | { status: "idle" }
+    | { status: "error"; key: string }
+    | {
+        status: "ready";
+        key: string;
+        currentBody: string;
+        previousBody: string | null;
+        previousTs: string | null;
+      }
+  >({ status: "idle" });
 
   // Callers that want the full-list loading state (the post-restore refreshes)
   // set `loading` themselves before awaiting; on mount it is already true via
@@ -2649,6 +2748,83 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
     })();
   }, [loadBuilds]);
 
+  useEffect(() => {
+    if (!showChanges || !previewing) return;
+    const filename = previewing.filename;
+    const snapshotTs = previewing.snapshotTs;
+    const key = `${filename}\0${snapshotTs}`;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [curRes, listRes] = await Promise.all([
+          fetch(`/api/employees/${employeeId}/file/${encodeURIComponent(filename)}`, {
+            cache: "no-store",
+          }),
+          fetch(
+            `/api/employees/${employeeId}/versions/file/${encodeURIComponent(filename)}`,
+            { cache: "no-store" },
+          ),
+        ]);
+        let currentBody = "";
+        if (curRes.ok) {
+          const data = (await curRes.json()) as { body?: string };
+          currentBody = data.body ?? "";
+        } else if (curRes.status !== 404) {
+          throw new Error("could not load current file");
+        }
+        let previousTs: string | null = null;
+        let previousBody: string | null = null;
+        if (listRes.ok) {
+          const data = (await listRes.json()) as { versions?: Array<{ ts: string }> };
+          const versions = [...(data.versions ?? [])].sort((a, b) =>
+            b.ts.localeCompare(a.ts),
+          );
+          const idx = versions.findIndex((v) => v.ts === snapshotTs);
+          if (idx >= 0 && idx + 1 < versions.length) previousTs = versions[idx + 1].ts;
+        }
+        if (previousTs) {
+          const prevRes = await fetch(
+            `/api/employees/${employeeId}/versions/file/${encodeURIComponent(filename)}/${encodeURIComponent(previousTs)}`,
+            { cache: "no-store" },
+          );
+          if (prevRes.ok) {
+            const data = (await prevRes.json()) as { body?: string };
+            if (typeof data.body === "string") previousBody = data.body;
+          }
+        }
+        if (!cancelled) {
+          setChangeLoad({ status: "ready", key, currentBody, previousBody, previousTs });
+        }
+      } catch {
+        if (!cancelled) setChangeLoad({ status: "error", key });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showChanges, employeeId, previewing]);
+
+  const previewKey = previewing
+    ? `${previewing.filename}\0${previewing.snapshotTs}`
+    : "";
+  const matchedLoad =
+    changeLoad.status !== "idle" && changeLoad.key === previewKey ? changeLoad : null;
+
+  const changeLines = useMemo(() => {
+    if (!showChanges || !previewing || matchedLoad?.status !== "ready") return null;
+    if (diffBaseline === "previous") {
+      if (matchedLoad.previousBody === null) return null;
+      return diffLines(
+        profileMarkdown(matchedLoad.previousBody),
+        profileMarkdown(previewing.body),
+      );
+    }
+    return diffLines(profileMarkdown(previewing.body), matchedLoad.currentBody);
+  }, [showChanges, previewing, matchedLoad, diffBaseline]);
+
+  const previousReady =
+    matchedLoad?.status === "ready" && matchedLoad.previousBody !== null;
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2400);
@@ -2668,6 +2844,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
       if (!r.ok || typeof data.body !== "string") {
         throw new Error(data.error ?? "could not load version");
       }
+      setDiffBaseline("current");
       setPreviewing({ buildId, filename, snapshotTs, body: data.body });
     } catch (err) {
       showToast(`Preview failed: ${(err as Error).message}`);
@@ -3008,6 +3185,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                 display: "flex",
                 alignItems: "center",
                 gap: "var(--sp-10)",
+                flexWrap: "wrap",
               }}
             >
               <span className="mono" style={{ fontSize: "var(--fs-ui)", fontWeight: 700 }}>
@@ -3019,6 +3197,20 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
               >
                 snapshot {previewing.snapshotTs}
               </span>
+              <button
+                type="button"
+                className="btn"
+                aria-pressed={showChanges}
+                onClick={() => setShowChanges((on) => !on)}
+                style={{
+                  fontSize: "var(--fs-xs)",
+                  height: "auto",
+                  padding: "3px 8px",
+                  ...(showChanges ? { background: "var(--bg-sunken)" } : {}),
+                }}
+              >
+                Show changes
+              </button>
               <div className="spacer" />
               <button
                 className="btn"
@@ -3032,11 +3224,80 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
                 <Icons.X size={11} /> Close
               </button>
             </div>
+            {showChanges && (
+              <div
+                style={{
+                  padding: "8px 18px",
+                  borderBottom: "1px solid var(--hairline)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--sp-6)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {diffBaseline === "previous"
+                    ? "From the previous snapshot to this version"
+                    : "From this version to the current file"}
+                </span>
+                <button
+                  type="button"
+                  className="btn"
+                  aria-pressed={diffBaseline === "current"}
+                  onClick={() => setDiffBaseline("current")}
+                  style={{
+                    fontSize: "var(--fs-xs)",
+                    height: "auto",
+                    padding: "3px 8px",
+                    ...(diffBaseline === "current" ? { background: "var(--bg-sunken)" } : {}),
+                  }}
+                >
+                  Current file
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  aria-pressed={diffBaseline === "previous"}
+                  disabled={!previousReady}
+                  title={
+                    matchedLoad?.status === "ready" && !previousReady
+                      ? "No earlier snapshot of this file"
+                      : undefined
+                  }
+                  onClick={() => setDiffBaseline("previous")}
+                  style={{
+                    fontSize: "var(--fs-xs)",
+                    height: "auto",
+                    padding: "3px 8px",
+                    ...(diffBaseline === "previous" ? { background: "var(--bg-sunken)" } : {}),
+                    ...(!previousReady ? { color: "var(--text-muted)" } : {}),
+                  }}
+                >
+                  Previous snapshot
+                </button>
+              </div>
+            )}
             <div
               className="scrollbar"
               style={{ overflow: "auto", padding: "20px 24px" }}
             >
-              <Markdown>{previewing.body}</Markdown>
+              {showChanges ? (
+                matchedLoad?.status === "error" ? (
+                  <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, lineHeight: 1.55 }}>
+                    Could not load this comparison.
+                  </p>
+                ) : matchedLoad?.status !== "ready" || changeLines === null ? (
+                  <p className="muted" style={{ fontSize: "var(--fs-ui)", margin: 0, lineHeight: 1.55 }}>
+                    {diffBaseline === "previous" && matchedLoad?.status === "ready"
+                      ? "No earlier snapshot of this file."
+                      : "Loading changes…"}
+                  </p>
+                ) : (
+                  <VersionDiff lines={changeLines} />
+                )
+              ) : (
+                <Markdown>{previewing.body}</Markdown>
+              )}
             </div>
           </div>
         </div>
