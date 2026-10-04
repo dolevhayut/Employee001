@@ -1,0 +1,12 @@
+{
+  "id": "marcus-reed",
+  "name": "Marcus Reed",
+  "role": "VP Engineering",
+  "department": "Engineering",
+  "integrations": ["GitHub", "Linear"],
+  "lastActiveAt": "2026-10-02T09:10:00.000Z",
+  "questionsThisWeek": 7,
+  "weekOf": "2026-W40",
+  "seedModel": "claude-opus-5-5",
+  "refreshModel": "claude-sonnet-5-5"
+}

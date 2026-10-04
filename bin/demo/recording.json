@@ -1,0 +1,1208 @@
+{
+  "version": 1,
+  "question": "Should Lumen Labs move the Lumen Insights Q4 launch from November 12 to December 3 to finish SSO?",
+  "participantIds": [
+    "amara-vale",
+    "marcus-reed",
+    "priya-nair",
+    "elise-moreno",
+    "yael-ben-ami"
+  ],
+  "events": [
+    {
+      "dtMs": 0,
+      "event": {
+        "type": "employee_start",
+        "employeeId": "amara-vale",
+        "employeeName": "Amara Vale"
+      }
+    },
+    {
+      "dtMs": 55,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "I want a recommendation, not a ",
+        "ts": 55
+      }
+    },
+    {
+      "dtMs": 34,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "status report. The November ",
+        "ts": 89
+      }
+    },
+    {
+      "dtMs": 48,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "12 date was chosen so ",
+        "ts": 137
+      }
+    },
+    {
+      "dtMs": 46,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "our early-access customers could use ",
+        "ts": 183
+      }
+    },
+    {
+      "dtMs": 32,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "Insights in their December board packs. ",
+        "ts": 215
+      }
+    },
+    {
+      "dtMs": 36,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "But the SSO work ",
+        "ts": 251
+      }
+    },
+    {
+      "dtMs": 40,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "is not a ",
+        "ts": 291
+      }
+    },
+    {
+      "dtMs": 58,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "cosmetic checkbox: Marcus says the SCIM ",
+        "ts": 349
+      }
+    },
+    {
+      "dtMs": 55,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "edge cases are ",
+        "ts": 404
+      }
+    },
+    {
+      "dtMs": 46,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "still open, and Priya ",
+        "ts": 450
+      }
+    },
+    {
+      "dtMs": 55,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "has not signed ",
+        "ts": 505
+      }
+    },
+    {
+      "dtMs": 57,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "the tenant-isolation review. If we ",
+        "ts": 562
+      }
+    },
+    {
+      "dtMs": 42,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "hold November 12, what exactly are ",
+        "ts": 604
+      }
+    },
+    {
+      "dtMs": 58,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "we asking customers and support ",
+        "ts": 662
+      }
+    },
+    {
+      "dtMs": 31,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "to absorb? Please ",
+        "ts": 693
+      }
+    },
+    {
+      "dtMs": 54,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "weigh the launch promise ",
+        "ts": 747
+      }
+    },
+    {
+      "dtMs": 57,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "against the risk ",
+        "ts": 804
+      }
+    },
+    {
+      "dtMs": 30,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "of teaching the market that ",
+        "ts": 834
+      }
+    },
+    {
+      "dtMs": 52,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "our enterprise product ",
+        "ts": 886
+      }
+    },
+    {
+      "dtMs": 32,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "has a workaround on ",
+        "ts": 918
+      }
+    },
+    {
+      "dtMs": 45,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "amara-vale",
+        "delta": "day one.",
+        "ts": 963
+      }
+    },
+    {
+      "dtMs": 180,
+      "event": {
+        "type": "employee_done",
+        "employeeId": "amara-vale",
+        "confidence": 0.88,
+        "turns": 1,
+        "costUsd": 0,
+        "stoppedReason": "natural",
+        "ts": 1143
+      }
+    },
+    {
+      "dtMs": 850,
+      "event": {
+        "type": "employee_start",
+        "employeeId": "marcus-reed",
+        "employeeName": "Marcus Reed"
+      }
+    },
+    {
+      "dtMs": 42,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "I recommend moving ",
+        "ts": 2035
+      }
+    },
+    {
+      "dtMs": 57,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "the public launch to December ",
+        "ts": 2092
+      }
+    },
+    {
+      "dtMs": 45,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "3. The core Insights pipeline is ",
+        "ts": 2137
+      }
+    },
+    {
+      "dtMs": 56,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "stable, and we could technically ",
+        "ts": 2193
+      }
+    },
+    {
+      "dtMs": 50,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "ship November 12 with ",
+        "ts": 2243
+      }
+    },
+    {
+      "dtMs": 32,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "password login, but ",
+        "ts": 2275
+      }
+    },
+    {
+      "dtMs": 46,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "that creates two code paths for ",
+        "ts": 2321
+      }
+    },
+    {
+      "dtMs": 60,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "provisioning and support. The risky part ",
+        "ts": 2381
+      }
+    },
+    {
+      "dtMs": 50,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "is not the SAML ",
+        "ts": 2431
+      }
+    },
+    {
+      "dtMs": 39,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "happy path; it ",
+        "ts": 2470
+      }
+    },
+    {
+      "dtMs": 33,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "is deprovisioning and JIT role ",
+        "ts": 2503
+      }
+    },
+    {
+      "dtMs": 56,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "mapping when an analyst changes teams. ",
+        "ts": 2559
+      }
+    },
+    {
+      "dtMs": 45,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "We found two ",
+        "ts": 2604
+      }
+    },
+    {
+      "dtMs": 34,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "stale-session cases in the September ",
+        "ts": 2638
+      }
+    },
+    {
+      "dtMs": 34,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "29 Orbit migration rehearsal. I can ",
+        "ts": 2672
+      }
+    },
+    {
+      "dtMs": 45,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "finish them by November 21, then ",
+        "ts": 2717
+      }
+    },
+    {
+      "dtMs": 57,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "give Priya a clean week ",
+        "ts": 2774
+      }
+    },
+    {
+      "dtMs": 44,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "for adversarial testing. ",
+        "ts": 2818
+      }
+    },
+    {
+      "dtMs": 55,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "A short private ",
+        "ts": 2873
+      }
+    },
+    {
+      "dtMs": 31,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "preview for the three design ",
+        "ts": 2904
+      }
+    },
+    {
+      "dtMs": 56,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "partners is feasible, but I ",
+        "ts": 2960
+      }
+    },
+    {
+      "dtMs": 59,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "would not call ",
+        "ts": 3019
+      }
+    },
+    {
+      "dtMs": 44,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "marcus-reed",
+        "delta": "that general availability.",
+        "ts": 3063
+      }
+    },
+    {
+      "dtMs": 180,
+      "event": {
+        "type": "employee_done",
+        "employeeId": "marcus-reed",
+        "confidence": 0.88,
+        "turns": 1,
+        "costUsd": 0,
+        "stoppedReason": "natural",
+        "ts": 3243
+      }
+    },
+    {
+      "dtMs": 850,
+      "event": {
+        "type": "employee_start",
+        "employeeId": "priya-nair",
+        "employeeName": "Priya Nair"
+      }
+    },
+    {
+      "dtMs": 60,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "I agree with Marcus on the ",
+        "ts": 4153
+      }
+    },
+    {
+      "dtMs": 47,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "public date, and ",
+        "ts": 4200
+      }
+    },
+    {
+      "dtMs": 39,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "I want to be ",
+        "ts": 4239
+      }
+    },
+    {
+      "dtMs": 58,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "precise about why. The ",
+        "ts": 4297
+      }
+    },
+    {
+      "dtMs": 36,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "current fallback lets ",
+        "ts": 4333
+      }
+    },
+    {
+      "dtMs": 54,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "an administrator invite a user after ",
+        "ts": 4387
+      }
+    },
+    {
+      "dtMs": 41,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "SSO is enabled. ",
+        "ts": 4428
+      }
+    },
+    {
+      "dtMs": 50,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "That sounds harmless until an ",
+        "ts": 4478
+      }
+    },
+    {
+      "dtMs": 31,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "employee leaves and the identity ",
+        "ts": 4509
+      }
+    },
+    {
+      "dtMs": 40,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "provider disables them ",
+        "ts": 4549
+      }
+    },
+    {
+      "dtMs": 30,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "while their local session remains valid. ",
+        "ts": 4579
+      }
+    },
+    {
+      "dtMs": 47,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "For a product that summarizes revenue ",
+        "ts": 4626
+      }
+    },
+    {
+      "dtMs": 55,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "and retention data, ",
+        "ts": 4681
+      }
+    },
+    {
+      "dtMs": 50,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "that is the wrong first ",
+        "ts": 4731
+      }
+    },
+    {
+      "dtMs": 30,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "enterprise story. December 3 gives us ",
+        "ts": 4761
+      }
+    },
+    {
+      "dtMs": 59,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "time to test deprovisioning, audit logs, ",
+        "ts": 4820
+      }
+    },
+    {
+      "dtMs": 58,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "and the shared-tenant boundary together. ",
+        "ts": 4878
+      }
+    },
+    {
+      "dtMs": 52,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "I do not need a perfect ",
+        "ts": 4930
+      }
+    },
+    {
+      "dtMs": 36,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "security program; I ",
+        "ts": 4966
+      }
+    },
+    {
+      "dtMs": 47,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "need one release candidate that ",
+        "ts": 5013
+      }
+    },
+    {
+      "dtMs": 46,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "behaves consistently under failure. I ",
+        "ts": 5059
+      }
+    },
+    {
+      "dtMs": 50,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "would approve a tightly scoped preview ",
+        "ts": 5109
+      }
+    },
+    {
+      "dtMs": 39,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "only with named admins and weekly ",
+        "ts": 5148
+      }
+    },
+    {
+      "dtMs": 42,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "priya-nair",
+        "delta": "access review.",
+        "ts": 5190
+      }
+    },
+    {
+      "dtMs": 180,
+      "event": {
+        "type": "employee_done",
+        "employeeId": "priya-nair",
+        "confidence": 0.88,
+        "turns": 1,
+        "costUsd": 0,
+        "stoppedReason": "natural",
+        "ts": 5370
+      }
+    },
+    {
+      "dtMs": 850,
+      "event": {
+        "type": "employee_start",
+        "employeeId": "elise-moreno",
+        "employeeName": "Elise Moreno"
+      }
+    },
+    {
+      "dtMs": 54,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "I disagree with moving ",
+        "ts": 6274
+      }
+    },
+    {
+      "dtMs": 56,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "every customer-facing moment. We promised ",
+        "ts": 6330
+      }
+    },
+    {
+      "dtMs": 59,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "the November 12 ",
+        "ts": 6389
+      }
+    },
+    {
+      "dtMs": 50,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "cohort a usable ",
+        "ts": 6439
+      }
+    },
+    {
+      "dtMs": 54,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "workflow, and silence ",
+        "ts": 6493
+      }
+    },
+    {
+      "dtMs": 44,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "until December will cost trust ",
+        "ts": 6537
+      }
+    },
+    {
+      "dtMs": 49,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "with Northstar Atlas, Greenbridge Systems, and ",
+        "ts": 6586
+      }
+    },
+    {
+      "dtMs": 46,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "HarborMetric. I support ",
+        "ts": 6632
+      }
+    },
+    {
+      "dtMs": 35,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "changing the label from launch ",
+        "ts": 6667
+      }
+    },
+    {
+      "dtMs": 51,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "to private preview, ",
+        "ts": 6718
+      }
+    },
+    {
+      "dtMs": 60,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "but only if ",
+        "ts": 6778
+      }
+    },
+    {
+      "dtMs": 30,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "we call each sponsor this week ",
+        "ts": 6808
+      }
+    },
+    {
+      "dtMs": 36,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "with a dated ",
+        "ts": 6844
+      }
+    },
+    {
+      "dtMs": 40,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "path: preview on ",
+        "ts": 6884
+      }
+    },
+    {
+      "dtMs": 59,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "November 12, migration ",
+        "ts": 6943
+      }
+    },
+    {
+      "dtMs": 57,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "support by November 21, and general ",
+        "ts": 7000
+      }
+    },
+    {
+      "dtMs": 52,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "availability December 3. ",
+        "ts": 7052
+      }
+    },
+    {
+      "dtMs": 52,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "Their success teams ",
+        "ts": 7104
+      }
+    },
+    {
+      "dtMs": 35,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "need a concrete reporting plan for ",
+        "ts": 7139
+      }
+    },
+    {
+      "dtMs": 60,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "December board packs. I will own ",
+        "ts": 7199
+      }
+    },
+    {
+      "dtMs": 56,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "the calls and the revised enablement ",
+        "ts": 7255
+      }
+    },
+    {
+      "dtMs": 39,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "brief, but I need Amara to ",
+        "ts": 7294
+      }
+    },
+    {
+      "dtMs": 30,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "make the distinction public internally so ",
+        "ts": 7324
+      }
+    },
+    {
+      "dtMs": 50,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "sales does not ",
+        "ts": 7374
+      }
+    },
+    {
+      "dtMs": 45,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "sell GA before Priya ",
+        "ts": 7419
+      }
+    },
+    {
+      "dtMs": 35,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "elise-moreno",
+        "delta": "signs it.",
+        "ts": 7454
+      }
+    },
+    {
+      "dtMs": 180,
+      "event": {
+        "type": "employee_done",
+        "employeeId": "elise-moreno",
+        "confidence": 0.88,
+        "turns": 1,
+        "costUsd": 0,
+        "stoppedReason": "natural",
+        "ts": 7634
+      }
+    },
+    {
+      "dtMs": 850,
+      "event": {
+        "type": "employee_start",
+        "employeeId": "yael-ben-ami",
+        "employeeName": "Yael Ben-Ami"
+      }
+    },
+    {
+      "dtMs": 51,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "I support the split, with ",
+        "ts": 8535
+      }
+    },
+    {
+      "dtMs": 58,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "one condition: the preview must ",
+        "ts": 8593
+      }
+    },
+    {
+      "dtMs": 33,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "feel intentional, not like ",
+        "ts": 8626
+      }
+    },
+    {
+      "dtMs": 40,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "a delayed product hidden behind ",
+        "ts": 8666
+      }
+    },
+    {
+      "dtMs": 59,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "a feature flag. ",
+        "ts": 8725
+      }
+    },
+    {
+      "dtMs": 44,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "In the August ",
+        "ts": 8769
+      }
+    },
+    {
+      "dtMs": 35,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "research sessions, admins said their ",
+        "ts": 8804
+      }
+    },
+    {
+      "dtMs": 40,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "real anxiety was explaining access ",
+        "ts": 8844
+      }
+    },
+    {
+      "dtMs": 53,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "changes to finance leaders. ",
+        "ts": 8897
+      }
+    },
+    {
+      "dtMs": 57,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "A small preview lets ",
+        "ts": 8954
+      }
+    },
+    {
+      "dtMs": 45,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "us test the setup ",
+        "ts": 8999
+      }
+    },
+    {
+      "dtMs": 33,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "language, the audit-log empty ",
+        "ts": 9032
+      }
+    },
+    {
+      "dtMs": 47,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "state, and the invitation copy ",
+        "ts": 9079
+      }
+    },
+    {
+      "dtMs": 41,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "with people who ",
+        "ts": 9120
+      }
+    },
+    {
+      "dtMs": 55,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "know the context. אני ",
+        "ts": 9175
+      }
+    },
+    {
+      "dtMs": 42,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "מעדיפה שנציג את ",
+        "ts": 9217
+      }
+    },
+    {
+      "dtMs": 51,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "זה כשלב למידה מוגבל, ",
+        "ts": 9268
+      }
+    },
+    {
+      "dtMs": 41,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "לא כ\"השקה חלקית\". My recommendation ",
+        "ts": 9309
+      }
+    },
+    {
+      "dtMs": 35,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "is clear: announce ",
+        "ts": 9344
+      }
+    },
+    {
+      "dtMs": 36,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "December 3 as the ",
+        "ts": 9380
+      }
+    },
+    {
+      "dtMs": 46,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "GA date today, invite only ",
+        "ts": 9426
+      }
+    },
+    {
+      "dtMs": 39,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "the three partners on November ",
+        "ts": 9465
+      }
+    },
+    {
+      "dtMs": 44,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "12, and publish a weekly ",
+        "ts": 9509
+      }
+    },
+    {
+      "dtMs": 40,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "readiness note owned by Marcus ",
+        "ts": 9549
+      }
+    },
+    {
+      "dtMs": 49,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "and Priya. Amara, please make ",
+        "ts": 9598
+      }
+    },
+    {
+      "dtMs": 36,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "the call so everyone works from ",
+        "ts": 9634
+      }
+    },
+    {
+      "dtMs": 49,
+      "event": {
+        "type": "text_delta",
+        "employeeId": "yael-ben-ami",
+        "delta": "one promise.",
+        "ts": 9683
+      }
+    },
+    {
+      "dtMs": 180,
+      "event": {
+        "type": "employee_done",
+        "employeeId": "yael-ben-ami",
+        "confidence": 0.88,
+        "turns": 1,
+        "costUsd": 0,
+        "stoppedReason": "natural",
+        "ts": 9863
+      }
+    },
+    {
+      "dtMs": 250,
+      "event": {
+        "type": "council_done"
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "yael-ben-ami",
+  "name": "Yael Ben-Ami",
+  "nameHe": "יעל בן-עמי",
+  "role": "Head of Product Research",
+  "department": "Product",
+  "integrations": ["Notion", "Google Drive"],
+  "lastActiveAt": "2026-10-02T08:10:00.000Z",
+  "questionsThisWeek": 3,
+  "weekOf": "2026-W40",
+  "seedModel": "claude-opus-5-5",
+  "refreshModel": "claude-sonnet-5-5"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "amara-vale",
+  "name": "Amara Vale",
+  "role": "CEO & Product Lead",
+  "department": "Leadership",
+  "integrations": ["Linear", "Google Drive"],
+  "lastActiveAt": "2026-10-02T09:30:00.000Z",
+  "questionsThisWeek": 4,
+  "weekOf": "2026-W40",
+  "seedModel": "claude-opus-5-5",
+  "refreshModel": "claude-sonnet-5-5"
+}

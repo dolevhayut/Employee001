@@ -1,0 +1,12 @@
+{
+  "id": "elise-moreno",
+  "name": "Elise Moreno",
+  "role": "VP Customer Success",
+  "department": "Go-to-Market",
+  "integrations": ["HubSpot", "Google Drive"],
+  "lastActiveAt": "2026-10-02T08:30:00.000Z",
+  "questionsThisWeek": 6,
+  "weekOf": "2026-W40",
+  "seedModel": "claude-opus-5-5",
+  "refreshModel": "claude-sonnet-5-5"
+}

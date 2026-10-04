@@ -1,0 +1,12 @@
+{
+  "id": "priya-nair",
+  "name": "Priya Nair",
+  "role": "Head of Security & Privacy",
+  "department": "Security",
+  "integrations": ["Linear", "Google Drive"],
+  "lastActiveAt": "2026-10-02T08:50:00.000Z",
+  "questionsThisWeek": 5,
+  "weekOf": "2026-W40",
+  "seedModel": "claude-opus-5-5",
+  "refreshModel": "claude-sonnet-5-5"
+}
