@@ -240,7 +240,7 @@ function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
         style={{
           padding: "var(--sp-16)",
           borderColor: "var(--warn)",
-          background: "rgba(180,140,60,0.06)",
+          background: "color-mix(in oklch, var(--accent) 6%, transparent)",
         }}
       >
         <div className="row" style={{ gap: "var(--sp-10)", alignItems: "flex-start" }}>
@@ -853,7 +853,7 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
             padding: "10px 20px",
             fontSize: "var(--fs-ui)",
             fontWeight: 600,
-            color: confirmed ? "#FFFFFF" : "var(--text-subtle)",
+            color: confirmed ? "var(--bg-elevated)" : "var(--text-subtle)",
             background: confirmed ? "var(--danger)" : "var(--bg-sunken)",
             border: `1px solid ${confirmed ? "var(--danger)" : "var(--hairline)"}`,
             borderRadius: 6,
@@ -1241,7 +1241,7 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
                   }}
                 >
                   {active && (
-                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--bg-elevated)" }} />
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1304,7 +1304,7 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
                   }}
                 >
                   {active && (
-                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--bg-elevated)" }} />
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1488,7 +1488,7 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
                       display: "grid", placeItems: "center", cursor: "pointer",
                     }}
                   >
-                    {active && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />}
+                    {active && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--bg-elevated)" }} />}
                   </button>
 
                   {/* Info */}
@@ -1636,7 +1636,7 @@ function OrgSkillAssignmentCard({ employee }: { employee: EmployeeWithTwin }) {
             margin: "var(--sp-12)",
             padding: "var(--sp-10)",
             fontSize: "var(--fs-sm)",
-            background: "rgba(220, 80, 60, 0.08)",
+            background: "color-mix(in oklch, var(--danger) 8%, transparent)",
             color: "var(--danger)",
             borderRadius: 6,
           }}
@@ -3328,7 +3328,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
             borderRadius: 6,
             fontSize: "var(--fs-sm)",
             zIndex: 50,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+            boxShadow: "var(--shadow-lg)",
           }}
         >
           {toast}
@@ -3523,7 +3523,7 @@ function VersionsTab({ employeeId }: { employeeId: string }) {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.45)",
+            background: "color-mix(in srgb, var(--text) 45%, transparent)",
             zIndex: 60,
             display: "flex",
             alignItems: "center",

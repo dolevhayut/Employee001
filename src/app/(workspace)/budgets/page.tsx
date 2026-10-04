@@ -26,8 +26,8 @@ function pct(spent: number, limit: number): number {
 
 function barColor(p: number): string {
   if (p >= 90) return "var(--danger)";
-  if (p >= 70) return "#f59e0b";
-  return "#22c55e";
+  if (p >= 70) return "var(--warn)";
+  return "var(--success)";
 }
 
 function EditableLimit({
@@ -301,7 +301,7 @@ export default function BudgetsPage() {
                               fontSize: "var(--fs-xs)",
                               fontWeight: 600,
                               background: "var(--danger)",
-                              color: "#fff",
+                              color: "var(--bg-elevated)",
                               borderRadius: 4,
                               padding: "1px 5px",
                               textTransform: "uppercase",

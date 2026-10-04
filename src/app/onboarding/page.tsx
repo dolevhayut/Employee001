@@ -58,7 +58,7 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
               cursor: "pointer",
               background: active ? "var(--surface)" : "transparent",
               color: active ? "var(--text)" : "var(--text-subtle)",
-              boxShadow: active ? "0 1px 3px rgba(0,0,0,.08)" : "none",
+              boxShadow: active ? "var(--shadow-sm)" : "none",
               transition: "all .15s",
               letterSpacing: "-0.01em",
             }}
@@ -1041,7 +1041,7 @@ function StepSources({
                   style={{
                     padding: "var(--sp-12)",
                     gap: "var(--sp-12)",
-                    border: `1px solid ${active ? "var(--success, #2c9e6e)" : pending ? "var(--accent-deep)" : "var(--hairline)"}`,
+                    border: `1px solid ${active ? "var(--success)" : pending ? "var(--accent-deep)" : "var(--hairline)"}`,
                     background: active ? "var(--surface)" : "var(--bg-elevated)",
                     borderRadius: 6,
                   }}
@@ -1072,7 +1072,7 @@ function StepSources({
                   </div>
                   {active ? (
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", flexShrink: 0 }}>
-                      <span className="row" style={{ gap: 4, fontSize: "var(--fs-meta)", color: "var(--success, #2c9e6e)", fontWeight: 600 }}>
+                      <span className="row" style={{ gap: 4, fontSize: "var(--fs-meta)", color: "var(--success)", fontWeight: 600 }}>
                         <Icons.Check size={12} /> Connected
                       </span>
                       <button
@@ -1148,7 +1148,7 @@ function StepSources({
                     textAlign: "left",
                     border:
                       "1px solid " +
-                      (active ? "var(--success, #2c9e6e)" : pending ? "var(--accent-deep)" : "var(--hairline)"),
+                      (active ? "var(--success)" : pending ? "var(--accent-deep)" : "var(--hairline)"),
                     background: active ? "var(--surface)" : "var(--bg-elevated)",
                     borderRadius: 6,
                     position: "relative",
@@ -1182,7 +1182,7 @@ function StepSources({
                         style={{
                           gap: 4,
                           fontSize: "var(--fs-meta)",
-                          color: "var(--success, #2c9e6e)",
+                          color: "var(--success)",
                           fontWeight: 600,
                         }}
                       >

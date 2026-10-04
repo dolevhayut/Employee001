@@ -435,7 +435,7 @@ function PrefetchModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15,18,24,0.45)",
+        background: "color-mix(in srgb, var(--text) 45%, transparent)",
         backdropFilter: "blur(4px)",
         zIndex: 100,
         display: "grid",
@@ -455,7 +455,7 @@ function PrefetchModal({
           background: "var(--bg-elevated)",
           borderRadius: 12,
           border: "1px solid var(--hairline)",
-          boxShadow: "0 16px 48px rgba(0,0,0,0.18)",
+          boxShadow: "var(--shadow-lg)",
           padding: "var(--sp-22)",
           maxHeight: "90vh",
           overflow: "auto",

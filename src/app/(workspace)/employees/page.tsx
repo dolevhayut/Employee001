@@ -547,7 +547,7 @@ function EmployeeCard({
               borderRadius: 10,
               background: "var(--surface)",
               border: "1px solid var(--hairline)",
-              color: "var(--muted)",
+              color: "var(--text-muted)",
               display: "inline-flex",
               alignItems: "center",
               gap: "var(--sp-3)",
@@ -627,7 +627,7 @@ function EmployeeCard({
             display: "grid",
             placeItems: "center",
             background:
-              "linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.55))",
+              "linear-gradient(180deg, color-mix(in srgb, var(--surface) 0%, transparent), color-mix(in srgb, var(--surface) 55%, transparent))",
             borderRadius: "inherit",
             pointerEvents: "none",
           }}
@@ -709,8 +709,8 @@ function MissingKeysCard({
       style={{
         padding: "14px 16px",
         marginBottom: "var(--sp-14)",
-        background: "rgba(160, 75, 61, 0.08)",
-        border: "1px solid rgba(160, 75, 61, 0.32)",
+        background: "color-mix(in oklch, var(--danger) 8%, transparent)",
+        border: "1px solid color-mix(in oklch, var(--danger) 32%, transparent)",
         borderRadius: 8,
         fontSize: "var(--fs-meta)",
         color: "var(--text)",
