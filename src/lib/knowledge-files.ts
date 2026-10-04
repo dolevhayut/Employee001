@@ -276,7 +276,7 @@ type WorkerExtractionResult = { body: string; truncated: boolean };
  * archives are rejected conservatively: their 32-bit declarations are not
  * enough to prove they stay inside our limits.
  */
-function isSafeDocxZip(data: Buffer): boolean {
+export function isSafeDocxZip(data: Buffer): boolean {
   if (data.length < 22) return false;
   // EOCD is at the end, preceded by at most a 65,535-byte comment.
   const minEocdOffset = Math.max(0, data.length - 65_557);

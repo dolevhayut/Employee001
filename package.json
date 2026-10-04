@@ -43,6 +43,7 @@
     "dev": "next dev",
     "build": "next build && node scripts/post-build.mjs",
     "start": "next start",
+    "test": "vitest run",
     "lint": "eslint",
     "pack:dry": "npm pack --dry-run",
     "prepack": "npm run build",
@@ -101,10 +102,12 @@
     "@types/three": "^0.184.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "jszip": "3.10.2",
     "promptfoo": "^0.121.9",
     "remotion": "^4.0.458",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "4.1.11"
   },
   "overrides": {
     "@tiptap/pm": "3.31.3",
