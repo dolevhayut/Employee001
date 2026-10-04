@@ -64,6 +64,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as the fallback. Existing twins keep the model they were built with.
 
 ### Added
+- **Boundary mode: run Claude in your own cloud.** `employee001 setup` can
+  point twins at Claude on AWS Bedrock, Google Vertex AI or Azure AI Foundry
+  instead of the Anthropic API. In that mode, features that call the
+  Anthropic API directly (memory rerank, follow-up suggestions, knowledge
+  proposals, live Relay) stay off unless you allow them, so prompts stay in
+  your cloud. Settings shows where Claude runs, and `doctor --egress`
+  reflects it.
 - **Twins learn from Team Meetings, with your OK.** After a meeting, each
   twin that spoke can suggest a short addition to its knowledge files (a
   decision, an owner, a deadline). Suggestions appear under "Suggested
