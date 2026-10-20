@@ -56,6 +56,8 @@ import {
 } from "@/lib/employee-intent-planner";
 import { buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
 import { getToolPolicyOverrides } from "@/lib/tool-policy-overrides";
+import { applyConsent } from "@/lib/consent-policy";
+import { loadConsentStatus } from "@/lib/consent-status";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
 import {
@@ -989,12 +991,13 @@ export async function runSingleTwin(
 
     // Tool-policy gate: pause the agent when a write/external tool fires
     const policyOverrides = await getToolPolicyOverrides(employee.id).catch(() => undefined);
+    const consent = loadConsentStatus(employee.id);
     const canUseTool: CanUseTool = async (
       toolName,
       input
     ): Promise<PermissionResult> => {
       const typedInput = (input as Record<string, unknown>) ?? {};
-      const decision = classifyTool(toolName, typedInput, policyOverrides);
+      const decision = applyConsent(classifyTool(toolName, typedInput, policyOverrides), toolName, consent);
       const bare = toolName.replace(/^mcp__[a-z0-9_]+__/i, "");
 
       if (options.answerOnly) {

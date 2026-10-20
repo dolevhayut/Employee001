@@ -8,6 +8,8 @@ import { ClaudeAgentSDKProvider } from "@composio/claude-agent-sdk";
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import type { McpSdkServerConfigWithInstance } from "@anthropic-ai/claude-agent-sdk";
 import { dataDir } from "./app-home";
+import { toolkitAllowed } from "./consent-policy";
+import { loadConsentStatus } from "./consent-status";
 
 // ─── Toolkit allow-list per role ─────────────────────────────────────────────
 // Curated so each twin can't act outside its functional area.
@@ -324,9 +326,13 @@ export async function buildEmployeeMcpServer(
   // The role allow-list (getEmployeeToolkits) is a UI "Recommended" hint
   // only — once the CEO OAuths a toolkit they expect the twin to use it.
   const state = await refreshConnections(employeeId);
+  // Only what the employee's consent covers: no personal toolkits without
+  // "integrations", no meeting/recording toolkits without "transcripts".
+  const consent = loadConsentStatus(employeeId);
   const toolkits = Object.values(state.connections)
     .filter((c) => c.status === "ACTIVE")
-    .map((c) => c.toolkit);
+    .map((c) => c.toolkit)
+    .filter((toolkit) => toolkitAllowed(consent, toolkit));
 
   if (toolkits.length === 0) return null;
 

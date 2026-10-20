@@ -11,6 +11,9 @@ import { readShiftLog } from "@/lib/shift-log";
 import { ShiftReport, SHIFT_REPORT_JSON_SCHEMA } from "@/lib/shift-schema";
 import type { ShiftReportType } from "@/lib/shift-schema";
 import { buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
+import { getToolPolicyOverrides } from "@/lib/tool-policy-overrides";
+import { applyConsent } from "@/lib/consent-policy";
+import { loadConsentStatus } from "@/lib/consent-status";
 import { getTasksFor } from "@/lib/twin-tasks";
 import { runPrefetches, formatFocusBlock } from "@/lib/twin-focus-prefetch";
 import { appendFeedItem } from "@/lib/feed-store";
@@ -288,12 +291,14 @@ export async function runShift(args: {
       twin_consult: buildConsultMcpServer(consultCtx),
     };
 
+    const policyOverrides = await getToolPolicyOverrides(employee.id).catch(() => undefined);
+    const consent = loadConsentStatus(employee.id);
     const canUseTool: CanUseTool = async (
       toolName,
       input
     ): Promise<PermissionResult> => {
       const typedInput = (input as Record<string, unknown>) ?? {};
-      const decision = classifyTool(toolName, typedInput);
+      const decision = applyConsent(classifyTool(toolName, typedInput, policyOverrides), toolName, consent);
       const bare = toolName.replace(/^mcp__[a-z0-9_]+__/i, "");
 
       if (decision.kind === "allow") {

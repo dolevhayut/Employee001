@@ -22,6 +22,8 @@ import {
   appendBuildEvent,
 } from "@/lib/twin-versions";
 import { dataDir } from "@/lib/app-home";
+import { buildBlockReason } from "@/lib/consent-policy";
+import { loadConsentStatus } from "@/lib/consent-status";
 import { TWIN_FILE_NAMES } from "@/lib/twin-builder-types";
 import type { EmployeeWithTwin } from "@/lib/employees";
 
@@ -79,6 +81,7 @@ export async function clearPendingBuild(employeeId: string): Promise<void> {
 
 export type SpawnResult =
   | { spawned: true; buildId: string; startedAt: string; alreadyRunning: false }
+  | { spawned: false; reason: "consent"; message: string; alreadyRunning: false }
   | {
       spawned: false;
       reason: "already_running";
@@ -100,6 +103,12 @@ export function spawnDetachedBuild(args: {
 }): SpawnResult {
   const { employee, lookbackDays, ceoContext, maxBudgetUsd } = args;
   const employeeId = employee.id;
+
+  // Training collects the employee's work data: only with recorded consent.
+  const blocked = buildBlockReason(loadConsentStatus(employeeId), employee.name);
+  if (blocked) {
+    return { spawned: false, reason: "consent", message: blocked, alreadyRunning: false };
+  }
 
   const existing = getActiveBuild(employeeId);
   if (existing) {

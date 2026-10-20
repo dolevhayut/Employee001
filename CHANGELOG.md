@@ -30,6 +30,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Revoke works.** Revoking consent on a profile deletes the twin and its
   data right away. The consent an employee gives during onboarding is now
   saved on their profile, as the screen always said.
+- **The consent an employee gives is enforced.** A twin is trained only with
+  recorded consent. Without "act on my behalf", actions through the
+  employee's own connected accounts are refused instead of going to the
+  approval queue. Meeting tools (Zoom, Meet, Teams, recorders) load only
+  with "meeting transcripts". Twins created before consent was recorded
+  keep working but can't be retrained until consent is requested.
 - **Twin profiles capture knowledge, not personality.** The profile builder
   no longer writes weaknesses, power dynamics or working-hour patterns, and
   skips health, family, religion, politics, union, salary and performance

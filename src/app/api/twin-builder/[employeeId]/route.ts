@@ -71,6 +71,10 @@ export async function POST(
     maxBudgetUsd: body.maxBudgetUsd,
   });
 
+  if (!result.spawned && result.reason === "consent") {
+    return Response.json({ error: "consent_required", message: result.message }, { status: 409 });
+  }
+
   return Response.json({
     buildId: result.buildId,
     alreadyRunning: result.alreadyRunning,

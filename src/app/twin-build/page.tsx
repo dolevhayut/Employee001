@@ -55,12 +55,12 @@ const FILE_HINTS: Record<TwinFileName, string> = {
   "CONTEXT.md": "Company & domain the twin needs to reason like the employee.",
   "EXPERTISE.md": "Technical / functional expertise — what they're known for.",
   "PROJECTS.md": "Active projects and the employee's role on each.",
-  "PEOPLE.md": "Real teammates: collaborators, deferrals, reports.",
+  "PEOPLE.md": "Who the role works with: sign-off, team, collaborators by project.",
   "DECISIONS.md": "Notable decisions with rationale, grounded in evidence.",
-  "PREFERENCES.md": "Working style, communication cadence, recurring patterns.",
+  "PREFERENCES.md": "How work gets done: meeting formats, channels, processes.",
   "TONE.md": "Voice, characteristic phrases, formality, push-back style.",
   "BOUNDARIES.md": "Topics the twin escalates to the human.",
-  "EMPLOYMENT.md": "HR-style record — title, manager, peers, tenure.",
+  "EMPLOYMENT.md": "Role record — title, manager, peers, tenure.",
 };
 
 function emptyFileMap(): Record<TwinFileName, FileState> {
@@ -458,8 +458,10 @@ function TwinBuildContent() {
       return;
     }
     if (!res.ok) {
+      // The server explains a refusal (e.g. no consent on file); show it.
+      const body = (await res.json().catch(() => ({}))) as { message?: string };
       setPhase("error");
-      setErrorMsg(`Request failed: ${res.status}`);
+      setErrorMsg(body.message ?? `Request failed: ${res.status}`);
       return;
     }
     const data = (await res.json()) as {

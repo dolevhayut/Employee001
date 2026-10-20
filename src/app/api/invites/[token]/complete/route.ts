@@ -488,6 +488,15 @@ export async function POST(request: NextRequest, { params }: Params) {
       ceoContext: "Auto-train on consent",
     });
 
+    if (!spawn.spawned && spawn.reason === "consent") {
+      return NextResponse.json({
+        status: "completed",
+        employeeId,
+        invite: updated,
+        buildStatus: "consent_required",
+      });
+    }
+
     return NextResponse.json({
       status: "completed",
       employeeId,
