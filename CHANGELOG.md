@@ -8,6 +8,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security posture
+This release brings Employee001 in line with established security and
+privacy practices. Each control below is in the code and can be verified:
+
+- **Supply chain (SLSA, OpenSSF).** Every release is built in GitHub
+  Actions and published to npm through Trusted Publishing (OIDC, no
+  long-lived token), with npm provenance and a SLSA v1 build-provenance
+  attestation you can check:
+  `gh attestation verify employee001-<version>.tgz -R dolevhayut/Employee001`.
+  A CycloneDX SBOM ships with every GitHub Release. Dependencies must be at
+  least 7 days old before they enter the lockfile, and each update is
+  scanned for known worm payloads before it is merged.
+- **Least privilege for agents.** A twin reads only its own data, its
+  colleagues' profiles and the company brain. By default every write action
+  and every web fetch waits for human approval, and email and Slack content reach a
+  twin as untrusted data, never as instructions.
+- **Privacy by design (GDPR principles, Israeli Privacy Protection
+  Amendment 13).** Consent is recorded per employee and enforced per scope;
+  profiles capture work knowledge only and exclude sensitive categories;
+  deleting a twin or withdrawing consent erases its data and revokes its
+  connected accounts.
+- **Tamper-evident audit.** Every tool call is written to a hash-chained
+  log that still verifies after an employee's data is erased.
+
+Employee001 is self-hosted and makes no certification claims (no SOC 2 or
+ISO 27001 audit); see [SECURITY.md](SECURITY.md) for scope and data flows.
+
 ### Added
 - **Twins in Slack.** A connected twin drafts answers to its @mentions and
   DMs. Replies go through Approvals by default; a CEO can let a specific
