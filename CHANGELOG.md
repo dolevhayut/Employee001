@@ -8,32 +8,43 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Security posture
-This release brings Employee001 in line with established security and
-privacy practices. Each control below is in the code and can be verified:
+### Permissions inside the product
+Every twin now runs inside a strict permission model. Nothing a twin does
+depends on it behaving well: each rule is enforced in code, before the
+model's request reaches a tool.
 
-- **Supply chain (SLSA, OpenSSF).** Every release is built in GitHub
-  Actions and published to npm through Trusted Publishing (OIDC, no
-  long-lived token), with npm provenance and a SLSA v1 build-provenance
-  attestation you can check:
-  `gh attestation verify employee001-<version>.tgz -R dolevhayut/Employee001`.
-  A CycloneDX SBOM ships with every GitHub Release. Dependencies must be at
-  least 7 days old before they enter the lockfile, and each update is
-  scanned for known worm payloads before it is merged.
-- **Least privilege for agents.** A twin reads only its own data, its
-  colleagues' profiles and the company brain. By default every write action
-  and every web fetch waits for human approval, and email and Slack content reach a
-  twin as untrusted data, never as instructions.
-- **Privacy by design (GDPR principles, Israeli Privacy Protection
-  Amendment 13).** Consent is recorded per employee and enforced per scope;
-  profiles capture work knowledge only and exclude sensitive categories;
-  deleting a twin or withdrawing consent erases its data and revokes its
-  connected accounts.
-- **Tamper-evident audit.** Every tool call is written to a hash-chained
-  log that still verifies after an employee's data is erased.
-
-Employee001 is self-hosted and makes no certification claims (no SOC 2 or
-ISO 27001 audit); see [SECURITY.md](SECURITY.md) for scope and data flows.
+- **What a twin can read.** Its own folder, its colleagues' nine profile
+  files and the company brain. Other twins' memory and chats, invites, the
+  audit log and settings are blocked, in chat, meetings, shifts and while a
+  twin is being built.
+- **What a twin can do without asking.** Only reads. Every send, post,
+  create or update, and every web fetch, waits for approval; there is no
+  "unsupervised" path, including twins with no connected tools and
+  unattended shifts. A twin consulting another twin can't wait for approval,
+  so anything that needs one is refused.
+- **What the employee allowed.** Consent is recorded per employee and each
+  scope is enforced:
+  - no training without consent to use their work data;
+  - without "read from my connected tools", none of their tools are loaded
+    and their email and Slack messages are not taken in;
+  - without "let the twin act on my behalf", nothing is sent or posted
+    through their accounts, even with approval;
+  - without "meeting transcripts", Zoom, Meet, Teams and recorders are not
+    offered or loaded.
+- **What a twin trusts.** Email and Slack messages reach a twin as fenced,
+  untrusted data, never as instructions.
+- **What a profile may contain.** Work knowledge, decisions, voice and
+  processes. No personality judgments, working hours, or health, family,
+  religion, politics, union or salary information.
+- **What a CEO controls.** Per-employee tool policy (allow, ask or off) on
+  top of the defaults. Destructive actions (deletes, payments, transfers)
+  stay blocked whatever the policy says.
+- **What deletion means.** Deleting a twin or revoking consent erases all of
+  its data and revokes its connected accounts; if anything can't be erased,
+  the app says so.
+- **What is recorded.** Every tool call, approval and refusal goes to a
+  hash-chained audit log that still verifies after a person's data is
+  erased.
 
 ### Added
 - **Twins in Slack.** A connected twin drafts answers to its @mentions and
