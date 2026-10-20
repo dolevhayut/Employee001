@@ -7,7 +7,7 @@ export const demoEn = {
   "demo.banner.upgrade": "Ask your own question: stop the demo and run `ANTHROPIC_API_KEY=… npx employee001 demo --live`, or set up your own team with `npx employee001 setup`.",
 };
 
-export const demoHe: Record<keyof typeof demoEn, string> = {
+export const demoHe: Partial<Record<keyof typeof demoEn, string>> = {
   "demo.banner.label": "דמו",
   "demo.banner.replay": "הקלטה חוזרת — ללא קריאות AI",
   "demo.banner.live": "דמו חי — ספק המודל שלך מופעל",

@@ -9,7 +9,7 @@ export const settingsEn = {
   "settings.telemetry.failed": "Could not update this setting. Try again.",
 } as const;
 
-export const settingsHe: Record<keyof typeof settingsEn, string> = {
+export const settingsHe: Partial<Record<keyof typeof settingsEn, string>> = {
   "settings.telemetry.title": "ספירת שימוש אנונימית",
   "settings.telemetry.desc": "כבוי כברירת מחדל — ורק אם תבחרו להפעיל. Employee001 שולח ספירות אנונימיות בלבד, בלי שמות, טקסט, כתובות אימייל, שרתים או נתיבים.",
   "settings.telemetry.toggle": "שיתוף ספירת שימוש אנונימית",

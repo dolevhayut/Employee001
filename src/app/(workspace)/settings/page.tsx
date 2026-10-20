@@ -396,7 +396,7 @@ function WorkspaceSection() {
 
 const LANGUAGE_OPTIONS: { id: Locale; label: string }[] = [
   { id: "en", label: "English" },
-  { id: "he", label: "עברית" },
+  { id: "he", label: "עברית (בטא)" },
 ];
 
 function LanguageControl() {

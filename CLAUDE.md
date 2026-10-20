@@ -54,6 +54,10 @@ boards, plans and logs are in `docs/local/cto/archive/`.
 ## Conventions
 
 - Work directly on `main` (solo repo) unless asked otherwise.
+- **English is the product language.** Hebrew is optional (labelled beta in
+  Settings): new UI strings ship in English only and fall back to English in
+  Hebrew. Exception: the onboarding/consent catalog (`i18n/catalog/onboarding.ts`)
+  must stay fully translated (a test enforces it).
 - Inline-style objects with CSS custom properties (`var(--text)`, `var(--surface)`,
   `var(--hairline)`, `var(--sp-*)`, `var(--fs-*)`) + framer-motion. No Tailwind /
   shadcn in the app UI.

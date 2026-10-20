@@ -158,7 +158,7 @@ export const chatMeetingEn = {
   "meeting.mentionAfter": "to address one specific twin",
 } as const;
 
-export const chatMeetingHe: Record<keyof typeof chatMeetingEn, string> = {
+export const chatMeetingHe: Partial<Record<keyof typeof chatMeetingEn, string>> = {
   "chat.resizeHint": "גררו לשינוי גודל · דאבל-קליק לאיפוס",
   "chat.twinBrain": "מוח התאום",
   "chat.withTwin": "צ'אט עם התאום של {name}",

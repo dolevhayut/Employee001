@@ -278,7 +278,7 @@ export const operationsEn = {
   "focus.save": "Save",
 } as const;
 
-export const operationsHe: Record<keyof typeof operationsEn, string> = {
+export const operationsHe: Partial<Record<keyof typeof operationsEn, string>> = {
   "cockpit.subtitle": "תצפית חיה על כל הסוכנים שרצים — הכלי הנוכחי, העלות, משך הזמן וזנב לוג זורם.",
   "cockpit.activeOne": "פעיל",
   "cockpit.activeMany": "פעילים",

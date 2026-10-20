@@ -12,7 +12,7 @@ export const opsHealthEn = {
   "opsHealth.check.stale_knowledge": "Stale knowledge",
 } as const;
 
-export const opsHealthHe: Record<keyof typeof opsHealthEn, string> = {
+export const opsHealthHe: Partial<Record<keyof typeof opsHealthEn, string>> = {
   "opsHealth.title": "בדיקת תקינות",
   "opsHealth.allClear": "הכול תקין",
   "opsHealth.refresh": "רענון",

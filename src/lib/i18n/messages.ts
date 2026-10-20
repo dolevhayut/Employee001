@@ -464,7 +464,7 @@ const en = { ...coreEn, ...profileEn, ...chatMeetingEn, ...operationsEn, ...work
 
 export type MessageKey = keyof typeof en;
 
-const coreHe: Record<keyof typeof coreEn, string> = {
+const coreHe: Partial<Record<keyof typeof coreEn, string>> = {
   "nav.section.work": "עבודה",
   "nav.section.twins": "תאומים",
   "nav.section.operations": "תפעול",
@@ -905,15 +905,18 @@ const coreHe: Record<keyof typeof coreEn, string> = {
   "inbox.overlay.badJson": "JSON לא תקין",
 };
 
-const he: Record<MessageKey, string> = { ...coreHe, ...profileHe, ...chatMeetingHe, ...operationsHe, ...workHe, ...onboardingHe, ...settingsHe, ...demoHe, ...opsHealthHe };
+// English is the product language. Hebrew is optional (shown as beta): a key
+// without a Hebrew string falls back to English, so new screens can ship in
+// English only. The onboarding/consent catalog stays fully translated.
+const he: Partial<Record<MessageKey, string>> = { ...coreHe, ...profileHe, ...chatMeetingHe, ...operationsHe, ...workHe, ...onboardingHe, ...settingsHe, ...demoHe, ...opsHealthHe };
 
-export const messages: Record<Locale, Record<MessageKey, string>> = { en, he };
+export const messages: { en: Record<MessageKey, string>; he: Partial<Record<MessageKey, string>> } = { en, he };
 
 export type MessageVars = Record<string, string | number>;
 
 /** Resolve one catalog string. `useT()` binds the locale so UI code calls `t(key)`. */
 export function t(locale: Locale, key: MessageKey, vars?: MessageVars): string {
-  const text: string = messages[locale][key];
+  const text: string = messages[locale][key] ?? messages.en[key];
   if (!vars) return text;
   return text.replace(/\{(\w+)\}/g, (match, name: string) => {
     const value = vars[name];
