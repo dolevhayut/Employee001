@@ -28,7 +28,8 @@ watch + verify. Repo-specific details it should honor:
   ```
 - **Data-leak scan:** `release.yml` runs a post-build scan to ensure no `data/`
   directory or `.env` ships in the tarball. When verifying a publish, confirm the
-  packed tarball contains only `bin/ .next/ public/ .env.example README.md LICENSE`
+  packed tarball contains only `bin/ .next/standalone/ .env.example README.md LICENSE` (plus
+  `package.json`; `public/` and `.next/static/` ship only inside `.next/standalone/`)
   — never `data/`.
 - **Version-tombstone gotcha:** a published-then-unpublished npm version number is
   permanently retired (e.g. `0.1.0` is dead — that's why first stable shipped as

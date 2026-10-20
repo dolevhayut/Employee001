@@ -70,6 +70,8 @@ jobs:
             || (echo "::error::Build did not produce .next/standalone/server.js"; exit 1)
           test -d .next/standalone/.next/static \
             || (echo "::error::post-build did not copy .next/static into standalone"; exit 1)
+          test -d .next/standalone/public \
+            || (echo "::error::post-build did not copy public/ into standalone"; exit 1)
 
       - name: Generate production dependency SBOM
         id: sbom

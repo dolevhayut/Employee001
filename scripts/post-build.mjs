@@ -11,7 +11,9 @@
 // `public/` and `.next/static/` into the standalone tree yourself.
 //
 // This script does that copy idempotently so the npm tarball ships a tree
-// that boots with `node .next/standalone/server.js`.
+// that boots with `node .next/standalone/server.js`. The package `files`
+// list ships only .next/standalone/, so these copies are the only ones in
+// the tarball (shipping the root originals too doubled ~9 MB, E-130).
 
 import { cpSync, existsSync, mkdirSync, rmSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

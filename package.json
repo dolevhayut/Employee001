@@ -33,8 +33,6 @@
   "files": [
     "bin/",
     ".next/standalone/",
-    ".next/static/",
-    "public/",
     ".env.example",
     "README.md",
     "LICENSE"
