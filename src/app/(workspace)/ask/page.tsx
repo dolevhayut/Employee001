@@ -14,7 +14,7 @@ import { Icons } from "@/components/ex/icons";
 import { useRoster } from "@/components/ex/roster-context";
 import { useT } from "@/components/ex/i18n-context";
 import MorphOrb from "@/components/ex/morph-orb/morph-orb";
-import { ToolNodes } from "@/components/ex/morph-orb/tool-nodes";
+import { ToolNodes, describeToolCall, words } from "@/components/ex/morph-orb/tool-nodes";
 
 const ANSWER_STYLE =
   "Answer in the language of the question, in at most three short sentences and " +
@@ -61,39 +61,6 @@ function plain(md: string): string {
     .replace(/^\d+\.\s/gm, "")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-const base = (p: unknown) => (typeof p === "string" ? p.split("/").filter(Boolean).pop() ?? p : "");
-const words = (s: string) => s.replace(/[_-]+/g, " ").trim();
-
-/** One readable line per tool call. */
-function describeCall(name: string, args: Record<string, unknown> = {}): Omit<Step, "id" | "done"> {
-  if (name === "Read") {
-    const path = String(args.file_path ?? "");
-    if (path.includes("/profile/")) return { kind: "read", label: "Read profile", detail: base(path) };
-    if (path.includes("org-brain")) return { kind: "brain", label: "Read company brain", detail: base(path).replace(/\.md$/, "") };
-    return { kind: "read", label: "Read", detail: base(path) };
-  }
-  if (name === "Grep" || name === "Glob") {
-    return { kind: "search", label: "Searched", detail: String(args.pattern ?? args.path ?? "") };
-  }
-  if (name === "WebSearch") return { kind: "web", label: "Searched the web", detail: String(args.query ?? "") };
-  if (name === "WebFetch") return { kind: "web", label: "Fetched", detail: String(args.url ?? "") };
-  if (name === "ToolSearch") return { kind: "tool", label: "Looked up tools" };
-  if (name.startsWith("subagent:")) return { kind: "delegate", label: "Delegated to a researcher", detail: String(args.label ?? args.description ?? "") };
-  if (name.endsWith("consult_twin")) return { kind: "delegate", label: "Consulted a colleague", detail: String(args.employeeId ?? args.twin ?? "") };
-  const mcp = /^mcp__(.+?)__(.+)$/.exec(name);
-  if (mcp) {
-    if (mcp[1] === "composio") {
-      // Composio actions are TOOLKIT_VERB_OBJECT: the toolkit is the logo.
-      const toolkit = mcp[2].split("_")[0].toLowerCase();
-      return { kind: "tool", label: toolkit.charAt(0).toUpperCase() + toolkit.slice(1), detail: words(mcp[2].slice(toolkit.length)).toLowerCase(), logo: toolkit };
-    }
-    if (mcp[1] === "org_brain") return { kind: "brain", label: "Company brain", detail: words(mcp[2]).toLowerCase() };
-    const server = mcp[1] === "companysim" ? "CompanySim" : words(mcp[1]);
-    return { kind: "tool", label: server, detail: words(mcp[2]).toLowerCase(), logo: mcp[1].toLowerCase() };
-  }
-  return { kind: "tool", label: words(name) };
 }
 
 async function askTwin(
@@ -147,7 +114,7 @@ async function askTwin(
           on.thinking(evt.delta ?? "");
           break;
         case "tool_call":
-          if (evt.name) on.step(describeCall(evt.name, evt.args));
+          if (evt.name) on.step(describeToolCall(evt.name, evt.args));
           break;
         case "tool_result":
           on.stepDone();

@@ -18,6 +18,40 @@ export type ToolNodeStep = {
   logo?: string;
 };
 
+export const base = (p: unknown) => (typeof p === "string" ? p.split("/").filter(Boolean).pop() ?? p : "");
+export const words = (s: string) => s.replace(/[_-]+/g, " ").trim();
+
+/** One readable line per tool call. */
+export function describeToolCall(name: string, args: Record<string, unknown> = {}): Omit<ToolNodeStep, "id"> {
+  if (name === "Read") {
+    const path = String(args.file_path ?? "");
+    if (path.includes("/profile/")) return { kind: "read", label: "Recalled from profile", detail: base(path).replace(/\.md$/, "") };
+    if (path.includes("org-brain")) return { kind: "brain", label: "Read company brain", detail: base(path).replace(/\.md$/, "") };
+    return { kind: "read", label: "Read", detail: base(path) };
+  }
+  if (name === "Grep" || name === "Glob") {
+    return { kind: "search", label: "Searched", detail: String(args.pattern ?? args.path ?? "") };
+  }
+  if (name === "WebSearch") return { kind: "web", label: "Searched the web", detail: String(args.query ?? "") };
+  if (name === "WebFetch") return { kind: "web", label: "Fetched", detail: String(args.url ?? "") };
+  if (name === "ToolSearch") return { kind: "tool", label: "Looked up tools" };
+  if (name.startsWith("subagent:")) return { kind: "delegate", label: "Delegated to a researcher", detail: String(args.label ?? args.description ?? "") };
+  if (name.endsWith("consult_twin")) return { kind: "delegate", label: "Consulted a colleague", detail: String(args.employeeId ?? args.twin ?? "") };
+  const mcp = /^mcp__(.+?)__(.+)$/.exec(name);
+  if (mcp) {
+    if (mcp[1] === "composio") {
+      // Composio actions are TOOLKIT_VERB_OBJECT: the toolkit is the logo.
+      const toolkit = mcp[2].split("_")[0].toLowerCase();
+      return { kind: "tool", label: toolkit.charAt(0).toUpperCase() + toolkit.slice(1), detail: words(mcp[2].slice(toolkit.length)).toLowerCase(), logo: toolkit };
+    }
+    if (mcp[1] === "org_brain") return { kind: "brain", label: "Company brain", detail: words(mcp[2]).toLowerCase() };
+    const server = mcp[1] === "companysim" ? "CompanySim" : words(mcp[1]);
+    return { kind: "tool", label: server, detail: words(mcp[2]).toLowerCase(), logo: mcp[1].toLowerCase() };
+  }
+  return { kind: "tool", label: words(name) };
+}
+
+
 type Node = {
   key: string;
   kind: ToolNodeStep["kind"];
@@ -63,7 +97,21 @@ function toNodes(steps: ToolNodeStep[]): Node[] {
   return [...byKey.values()];
 }
 
-export function ToolNodes({ steps, visible }: { steps: ToolNodeStep[]; visible: boolean }) {
+export function ToolNodes({
+  steps,
+  visible,
+  rx = RX,
+  ry = RY,
+  cy = 46,
+}: {
+  steps: ToolNodeStep[];
+  visible: boolean;
+  /** Ellipse radii in px; smaller stages pass their own. */
+  rx?: number;
+  ry?: number;
+  /** Vertical centre of the ring, % of the stage height. */
+  cy?: number;
+}) {
   const nodes = toNodes(steps).slice(0, SLOTS.length);
   const latest = steps[steps.length - 1]?.id;
 
@@ -73,8 +121,8 @@ export function ToolNodes({ steps, visible }: { steps: ToolNodeStep[]; visible: 
         {visible &&
           nodes.map((node, i) => {
             const rad = (SLOTS[i] * Math.PI) / 180;
-            const x = Math.cos(rad) * RX;
-            const y = Math.sin(rad) * RY;
+            const x = Math.cos(rad) * rx;
+            const y = Math.sin(rad) * ry;
             const len = Math.hypot(x, y);
             const lit = node.lastId === latest;
             const danger = node.kind === "blocked";
@@ -89,7 +137,7 @@ export function ToolNodes({ steps, visible }: { steps: ToolNodeStep[]; visible: 
                   style={{
                     position: "absolute",
                     left: "50%",
-                    top: "46%",
+                    top: `${cy}%`,
                     width: len,
                     height: 1,
                     transformOrigin: "0 50%",
@@ -108,7 +156,7 @@ export function ToolNodes({ steps, visible }: { steps: ToolNodeStep[]; visible: 
                     style={{
                       position: "absolute",
                       left: "calc(50% - 3px)",
-                      top: "calc(46% - 3px)",
+                      top: `calc(${cy}% - 3px)`,
                       width: 6,
                       height: 6,
                       borderRadius: "50%",
@@ -124,7 +172,7 @@ export function ToolNodes({ steps, visible }: { steps: ToolNodeStep[]; visible: 
                   style={{
                     position: "absolute",
                     left: `calc(50% + ${x}px)`,
-                    top: `calc(46% + ${y}px)`,
+                    top: `calc(${cy}% + ${y}px)`,
                     translateX: "-50%",
                     translateY: "-50%",
                     display: "flex",

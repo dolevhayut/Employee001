@@ -9,11 +9,8 @@ import { bumpActivityOnDisk } from "@/lib/employees-disk";
 import { generateFollowups } from "@/lib/followup-suggestions";
 import { appendTaskRun } from "@/lib/task-history";
 import { canRunModel } from "@/lib/model-provider";
-
-const PROFILE_FILE_NAMES = [
-  "EXPERTISE.md", "DECISIONS.md", "CONTEXT.md", "PEOPLE.md",
-  "PROJECTS.md", "PREFERENCES.md", "TONE.md", "BOUNDARIES.md", "EMPLOYMENT.md",
-] as const;
+import { pickRelevantProfileFiles } from "@/lib/profile-relevance";
+import { dataDir } from "@/lib/app-home";
 
 // Keyword → file heuristic for detecting which files the answer drew from
 const FILE_KEYWORDS: [string[], string][] = [
@@ -113,17 +110,20 @@ export async function POST(request: NextRequest) {
       const runId = `chat_${employeeId ?? "anon"}_${Date.now()}`;
       const startedAtIso = new Date().toISOString();
 
-      // Stagger synthetic "Read" events across all pre-loaded profile files.
-      // The council runner pre-loads all files into the prompt (no runtime Read calls),
-      // so we emit these to drive the memory-graph glow animation while the model thinks.
-      let readingIdx = 0;
-      const emitNextReading = () => {
-        if (readingIdx >= PROFILE_FILE_NAMES.length) return;
-        const file = PROFILE_FILE_NAMES[readingIdx++];
-        send({ type: "tool_call", name: "Read", args: { file_path: `/profile/${file}` }, ts: Date.now() - start });
-        setTimeout(emitNextReading, 220);
-      };
-      setTimeout(emitNextReading, 0);
+      // The whole profile is pre-loaded in the (prompt-cached) system prompt,
+      // so the twin never Reads it at runtime. Light only the files this
+      // question actually touches (none for small talk), so the memory graph
+      // shows a true picture instead of all nine files every time.
+      const recalled = pickRelevantProfileFiles(
+        dataDir("employees", employee.id),
+        // Ask appends a "(answer style… reply in X)" note; score the question only.
+        question.split("\n\n(")[0],
+      );
+      recalled.forEach((file, i) => {
+        setTimeout(() => {
+          send({ type: "tool_call", name: "Read", args: { file_path: `/profile/${file}` }, ts: Date.now() - start });
+        }, i * 220);
+      });
 
       // Map CouncilEvent → TwinTraceEvent SSE
       const onEvent = (evt: CouncilEvent) => {
