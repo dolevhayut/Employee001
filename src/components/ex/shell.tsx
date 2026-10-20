@@ -67,6 +67,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     labelKey: "nav.section.work",
     items: [
+      { href: "/brain", labelKey: "nav.orgBrain", icon: "Flow" },
       { href: "/ask", labelKey: "nav.ask", icon: "Spark" },
       { href: "/inbox", labelKey: "nav.approvals", icon: "Bell", badge: "approvals" },
       { href: "/tasks", labelKey: "nav.tasks", icon: "Zap" },
@@ -194,6 +195,7 @@ function ThemeToggle() {
 const COMPANY_MONTHLY_BUDGET_USD = 50;
 
 const STATIC_COMMANDS: StaticCommand[] = [
+  { id: "org-brain", labelKey: "nav.orgBrain", href: "/brain", icon: "Flow", group: "popular", hintKey: "shell.cmd.orgBrain.hint", keywords: "company brain organization ask everyone route 3d org מוח ארגוני חברה ארגון שאלה" },
   { id: "ask", labelKey: "nav.ask", href: "/ask", icon: "Spark", group: "popular", hintKey: "shell.cmd.ask.hint", keywords: "ask question orb answer twin שאלה שאלו תשובה" },
   { id: "home", labelKey: "nav.twins", href: "/employees", icon: "Home", group: "popular", hintKey: "shell.cmd.twins.hint", keywords: "employees people team admin roster clone status תאומים עובדים אנשים צוות" },
   { id: "inbox", labelKey: "nav.approvals", href: "/inbox", icon: "Bell", group: "popular", hintKey: "shell.cmd.approvals.hint", keywords: "inbox feed activity alerts review approval flagged updates אישורים תיבה התראות עדכונים" },

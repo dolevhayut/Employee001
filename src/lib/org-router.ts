@@ -32,7 +32,10 @@ function terms(text: string): string[] {
       text
         .toLowerCase()
         .split(/[^\p{L}\p{N}]+/u)
-        .filter((w) => w.length >= 3 && !STOP.has(w)),
+        .filter((w) => w.length >= 3 && !STOP.has(w))
+        // Crude English stemming so "customers" finds "customer" (bodies are
+        // matched by substring, so the stem still hits every inflection).
+        .map((w) => (w.length > 4 && /^[a-z]+$/.test(w) ? w.replace(/ies$/, "y").replace(/(?<=[^s])s$/, "") : w)),
     ),
   ];
 }
@@ -53,11 +56,11 @@ export function routeQuestion(question: string, twins: RouteCandidate[], max = 3
   const lowerQ = question.toLowerCase();
   const docs = twins.map((t) => ({
     twin: t,
-    // The role counts three times: it is the strongest signal of who owns what.
-    body: `${t.role} ${t.role} ${t.role}\n${t.text ?? ""}`.toLowerCase(),
+    role: t.role.toLowerCase(),
+    body: `${t.role}\n${t.text ?? ""}`.toLowerCase(),
   }));
 
-  const picks: RoutePick[] = docs.map(({ twin, body }) => {
+  const picks: RoutePick[] = docs.map(({ twin, role, body }) => {
     const named = [twin.firstName, twin.name].some((n) => n && lowerQ.includes(n.toLowerCase()));
     let score = named ? 100 : 0;
     const matched: { term: string; w: number }[] = [];
@@ -65,7 +68,9 @@ export function routeQuestion(question: string, twins: RouteCandidate[], max = 3
       const hits = body.split(term).length - 1;
       if (!hits) continue;
       const df = docs.filter((d) => d.body.includes(term)).length;
-      const w = Math.log(1 + docs.length / df) * Math.min(3, 1 + Math.log(hits));
+      // The role is the strongest signal of who owns what: a word in the role
+      // beats the same word mentioned in passing across a profile.
+      const w = Math.log(1 + docs.length / df) * Math.min(3, 1 + Math.log(hits)) + (role.includes(term) ? 3 : 0);
       score += w;
       matched.push({ term, w });
     }

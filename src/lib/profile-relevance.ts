@@ -48,7 +48,10 @@ function terms(text: string): string[] {
       text
         .toLowerCase()
         .split(/[^\p{L}\p{N}]+/u)
-        .filter((w) => w.length >= 3 && !STOP.has(w)),
+        .filter((w) => w.length >= 3 && !STOP.has(w))
+        // Crude English stemming so "customers" finds "customer" (bodies are
+        // matched by substring, so the stem still hits every inflection).
+        .map((w) => (w.length > 4 && /^[a-z]+$/.test(w) ? w.replace(/ies$/, "y").replace(/(?<=[^s])s$/, "") : w)),
     ),
   ];
 }

@@ -10,14 +10,15 @@ const TWINS: RouteCandidate[] = [
 
 describe("routeQuestion", () => {
   it("routes to the twin whose role and profile match", () => {
+    expect(routeQuestion("Which customers are at risk?", TWINS)[0].id).toBe("daniel");
     expect(routeQuestion("Which customer renewals are at risk of churn?", TWINS)[0].id).toBe("daniel");
     expect(routeQuestion("How is the Postgres incident going?", TWINS)[0].id).toBe("itai");
   });
 
   it("can ask several twins for a cross-team question", () => {
-    const ids = routeQuestion("What's on the roadmap and how does it affect customer renewals?", TWINS).map((p) => p.id);
+    const ids = routeQuestion("Does the product roadmap depend on the backend Postgres work?", TWINS).map((p) => p.id);
     expect(ids.length).toBeGreaterThan(1);
-    expect(ids).toContain("daniel");
+    expect(ids).toEqual(expect.arrayContaining(["itai", "shira"]));
   });
 
   it("always includes a twin named in the question", () => {
