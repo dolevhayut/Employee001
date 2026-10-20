@@ -26,6 +26,11 @@ function entry(input: Record<string, unknown> = {}) {
 }
 
 function auditFile() {
+  // Never resolve against the repo itself: a test writing here would overwrite
+  // the project's real audit log (it happened once, 2026-10-20).
+  if (!tempDir || process.cwd() === originalCwd) {
+    throw new Error("audit test touched the real data dir: call auditModule() first");
+  }
   return path.join(process.cwd(), "data", "audit.jsonl");
 }
 

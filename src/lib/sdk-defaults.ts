@@ -253,6 +253,9 @@ export function buildTwinHooks(
   // overwrite their own profile, brain nodes, or anything else under data/.
   // Path is relative to the agent's cwd (set to data/ in council-runner).
   const restrictWriteToScratch: HookCallback = async (input) => {
+    // The twin builder's job is writing the 9 profile files; its own
+    // canUseTool gate (twin-builder.ts) limits Write to exactly those.
+    if (ctx.surface === "builder") return {};
     if (input.hook_event_name !== "PreToolUse") return {};
     const pre = input as PreToolUseHookInput;
     if (pre.tool_name !== "Write") return {};

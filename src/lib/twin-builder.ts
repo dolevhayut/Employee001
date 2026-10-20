@@ -347,7 +347,9 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
         ...baseOptions,
         cwd: employeeDir,
         systemPrompt,
-        allowedTools: ["Read", "Write", "Glob", "Grep", "TodoWrite"],
+        // Write is deliberately not auto-allowed: allowedTools skip canUseTool,
+        // and canUseTool is what limits Write to the 9 profile files.
+        allowedTools: ["Read", "Glob", "Grep", "TodoWrite"],
         mcpServers,
         // Bumped from 80 → 120: the knowledge-capture prompt requires deeper
         // multi-source cross-referencing (sent emails + Slack + calendar +

@@ -23,14 +23,14 @@ const HARD_BLOCK_PATTERNS: RegExp[] = [
  * outside the agent's own working directory.
  */
 const READ_ONLY_PATTERNS: RegExp[] = [
-  /_GET_/i,
-  /_LIST_/i,
-  /_SEARCH_/i,
-  /_FETCH_/i,
-  /_RETRIEVE_/i,
-  /_READ_/i,
-  /_FIND_/i,
+  // Composio style (GITHUB_LIST_ISSUES) and MCP style (get_company,
+  // find_projects): a read verb at the start or after a toolkit prefix.
+  /(?:^|_)(?:GET|LIST|SEARCH|FETCH|RETRIEVE|READ|FIND)_/i,
 ];
+
+/** A mutating verb anywhere in the name ("get_or_create_ticket") means it is
+ *  not a pure read, whatever verb comes first. */
+const MUTATING_SEGMENT = /(?:^|_)(?:CREATE|UPDATE|SEND|POST|REPLY|EDIT|MODIFY|PATCH|MERGE|CLOSE|REOPEN|ASSIGN|TRANSFER|DELETE|REMOVE|WRITE|UPSERT|INSERT|SET|ADD|MOVE|INVITE|SHARE|PUBLISH|SUBMIT|APPROVE|ARCHIVE)(?:_|$)/i;
 
 /** Local sandbox tools the SDK exposes for agent-internal use only. */
 const LOCAL_SAFE_TOOLS = new Set([
@@ -198,7 +198,7 @@ export function classifyTool(
 
   // Auto-allow read-only patterns.
   for (const re of READ_ONLY_PATTERNS) {
-    if (re.test(name)) {
+    if (re.test(name) && !MUTATING_SEGMENT.test(name)) {
       return { kind: "allow" };
     }
   }

@@ -642,7 +642,7 @@ type DoneViewState =
   | { kind: "generic_done" };
 
 function Page() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get("invite") ?? "";
@@ -959,7 +959,11 @@ function Page() {
                   marginBottom: 28,
                 }}
               >
-                {t("join.welcomeSub", { role: state.invite.role ? ` כ־${state.invite.role}` : "" })}
+                {t("join.welcomeSub", {
+                  role: state.invite.role
+                    ? locale === "he" ? ` כ־${state.invite.role}` : ` as ${state.invite.role}`
+                    : "",
+                })}
               </p>
               <button
                 type="button"
@@ -977,7 +981,7 @@ function Page() {
                   letterSpacing: "-0.01em",
                 }}
               >
-                {t("join.cta")} ←
+                {t("join.cta")} {locale === "he" ? "←" : "→"}
               </button>
             </>
           )}

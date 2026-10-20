@@ -23,9 +23,11 @@ export type ConsentStatus =
 /** Toolkits whose data is meeting audio, video or transcripts. */
 export const TRANSCRIPT_TOOLKITS = new Set([
   "zoom",
+  "meet",
   "googlemeet",
   "google_meet",
   "microsoft_teams",
+  "teams",
   "fireflies",
   "otter",
   "gong",

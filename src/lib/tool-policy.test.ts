@@ -203,3 +203,17 @@ describe("WebFetch gate", () => {
     });
   });
 });
+
+describe("read-only detection", () => {
+  it("auto-allows MCP-style reads that start with the verb", () => {
+    for (const name of ["mcp__companysim__get_company", "mcp__companysim__find_projects", "list_tickets"]) {
+      expect(classifyTool(name, {}), name).toEqual({ kind: "allow" });
+    }
+  });
+
+  it("never auto-allows a name that also mutates", () => {
+    for (const name of ["mcp__x__get_or_create_ticket", "GITHUB_FIND_AND_UPDATE_ISSUE", "list_and_send_report"]) {
+      expect(classifyTool(name, {}).kind, name).not.toBe("allow");
+    }
+  });
+});

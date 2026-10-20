@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Icons } from "@/components/ex/icons";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { useT } from "@/components/ex/i18n-context";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { INTEGRATIONS, type Integration } from "@/lib/ex-data";
+import { TRANSCRIPT_TOOLKITS } from "@/lib/consent-policy";
 import {
   CONSENT_SCOPES,
   CURRENT_CONSENT_VERSION,
@@ -29,6 +31,14 @@ type Boundaries = {
 };
 
 const STEPS = ["Consent", "Profile", "Sources", "Boundaries", "Review"] as const;
+
+/** Consent scope wording, translated (the scope ids and rules live in employees.ts). */
+const SCOPE_TEXT: Record<ConsentScope, { label: MessageKey; desc: MessageKey }> = {
+  "data-collection": { label: "onboarding.scopeData", desc: "onboarding.scopeDataDesc" },
+  integrations: { label: "onboarding.scopeIntegrations", desc: "onboarding.scopeIntegrationsDesc" },
+  "third-party-actions": { label: "onboarding.scopeActions", desc: "onboarding.scopeActionsDesc" },
+  transcripts: { label: "onboarding.scopeTranscripts", desc: "onboarding.scopeTranscriptsDesc" },
+};
 
 function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
   const { t } = useT();
@@ -389,7 +399,7 @@ function OnboardingPageInner() {
             marginBottom: "var(--sp-12)",
           }}
         >
-          Step {step + 1} of {STEPS.length}
+          {t("onboarding.stepOf", { step: step + 1, total: STEPS.length })}
         </div>
 
         {step === 0 && (
@@ -419,6 +429,7 @@ function OnboardingPageInner() {
             extraToolkits={extraToolkits}
             setExtraToolkits={setExtraToolkits}
             inviteToken={inviteToken}
+            transcriptsAllowed={acceptedScopes.has("transcripts")}
           />
         )}
         {step === 3 && (
@@ -446,11 +457,11 @@ function OnboardingPageInner() {
             disabled={step === 0}
             style={{ opacity: step === 0 ? 0.4 : 1 }}
           >
-            Back
+            {t("onboarding.back")}
           </button>
           <div className="spacer" />
           <span className="subtle" style={{ fontSize: "var(--fs-meta)" }}>
-            You can change everything later
+            {t("onboarding.changeLater")}
           </span>
           {step < STEPS.length - 1 ? (
             (() => {
@@ -622,10 +633,10 @@ function StepConsent({
         }}
       >
         <strong style={{ color: "var(--text)" }}>
-          {isCeo ? "זכויות העובד." : t("onboarding.rights")}
+          {isCeo ? t("onboarding.rightsCeo") : t("onboarding.rights")}
         </strong>{" "}
         {isCeo
-          ? <>{firstName} can withdraw consent at any time, and you revoke it on their twin&apos;s profile. The twin and all of its data are then deleted right away, and its tool connections are disconnected.</>
+          ? t("onboarding.rightsCeoBody", { name: firstName })
           : t("onboarding.rightsBody")}
       </div>
 
@@ -657,7 +668,7 @@ function StepConsent({
                   style={{ gap: "var(--sp-8)", alignItems: "center", marginBottom: "var(--sp-2)" }}
                 >
                   <span style={{ fontSize: "var(--fs-ui)", fontWeight: 600, color: "var(--text)" }}>
-                    {scope.label}
+                    {t(SCOPE_TEXT[scope.id].label)}
                   </span>
                   {scope.required ? (
                     <span
@@ -668,7 +679,7 @@ function StepConsent({
                         fontSize: "var(--fs-2xs)",
                       }}
                     >
-                      Required
+                      {t("onboarding.required")}
                     </span>
                   ) : (
                     <span
@@ -679,12 +690,12 @@ function StepConsent({
                         fontSize: "var(--fs-2xs)",
                       }}
                     >
-                      Optional
+                      {t("onboarding.optional")}
                     </span>
                   )}
                 </div>
                 <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", lineHeight: 1.5 }}>
-                  {scope.desc}
+                  {t(SCOPE_TEXT[scope.id].desc)}
                 </div>
               </div>
             </label>
@@ -701,8 +712,8 @@ function StepConsent({
         }}
       >
         {isCeo
-          ? <>By continuing, {firstName} agrees to terms version <span className="mono">v{CURRENT_CONSENT_VERSION}</span>. The acceptance timestamp and the scopes below will be recorded on {firstName}&apos;s profile.</>
-          : <>By continuing, you agree to terms version <span className="mono">v{CURRENT_CONSENT_VERSION}</span>. The acceptance timestamp and the scopes below will be recorded on your profile.</>}
+          ? t("onboarding.termsCeo", { name: firstName, version: CURRENT_CONSENT_VERSION })
+          : t("onboarding.terms", { version: CURRENT_CONSENT_VERSION })}
       </div>
     </div>
   );
@@ -801,6 +812,7 @@ function StepSources({
   extraToolkits,
   setExtraToolkits,
   inviteToken,
+  transcriptsAllowed,
 }: {
   viewMode: ViewMode;
   chosen: Set<string>;
@@ -810,9 +822,12 @@ function StepSources({
     v: Record<string, { slug: string; name: string; iconUrl?: string; description?: string }>
   ) => void;
   inviteToken: string;
+  /** Meeting/recording tools are offered only with the "transcripts" scope. */
+  transcriptsAllowed: boolean;
 }) {
   const { t } = useT();
   const isCeo = viewMode === "ceo";
+  const offered = (slug: string) => transcriptsAllowed || !TRANSCRIPT_TOOLKITS.has(slug.toLowerCase());
 
   // ─── Live connection state (employee-side OAuth) ────────────────────────
   const [connections, setConnections] = useState<Record<string, InviteConnectionRecord>>({});
@@ -911,6 +926,7 @@ function StepSources({
 
   const grouped: Record<string, Integration[]> = {};
   INTEGRATIONS.forEach((s) => {
+    if (!transcriptsAllowed && s.category === "Meetings") return;
     (grouped[s.category] ||= []).push(s);
   });
 
@@ -948,7 +964,7 @@ function StepSources({
     if (!catalog) return [];
     const q = query.trim().toLowerCase();
     return catalog
-      .filter((t) => !builtInSlugs.has(t.slug.toLowerCase()))
+      .filter((t) => !builtInSlugs.has(t.slug.toLowerCase()) && offered(t.slug))
       .filter((t) => {
         if (!q) return true;
         return (
@@ -958,7 +974,8 @@ function StepSources({
         );
       })
       .slice(0, 40);
-  }, [catalog, query, builtInSlugs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- offered() only reads transcriptsAllowed
+  }, [catalog, query, builtInSlugs, transcriptsAllowed]);
 
   const addFromCatalog = (t: CatalogToolkit) => {
     setExtraToolkits({

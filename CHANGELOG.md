@@ -36,6 +36,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   approval queue. Meeting tools (Zoom, Meet, Teams, recorders) load only
   with "meeting transcripts". Twins created before consent was recorded
   keep working but can't be retrained until consent is requested.
+- **Building a twin writes its profile again.** A write guard meant for chat
+  notes also blocked the twin builder, so new builds left the onboarding
+  placeholder in place.
+- **Read-only MCP tools run without asking.** Tools named like `get_company`
+  or `find_projects` are now recognized as reads; any name that also
+  creates, updates or sends still asks.
+- **Onboarding matches the consent.** Meeting tools are offered only when
+  the employee allows meeting transcripts, and the consent step is fully in
+  Hebrew when the app is.
 - **Twin profiles capture knowledge, not personality.** The profile builder
   no longer writes weaknesses, power dynamics or working-hour patterns, and
   skips health, family, religion, politics, union, salary and performance
