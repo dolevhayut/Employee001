@@ -8,6 +8,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Twins in Slack.** A connected twin drafts answers to its @mentions and
+  DMs. Replies go through Approvals by default; a CEO can let a specific
+  twin answer directly, but action requests and external shared channels
+  still need approval, and replies are capped at 10 per channel per hour.
+- **Email arrives instantly.** With a public URL and `COMPOSIO_WEBHOOK_SECRET`
+  set, new mail reaches the twin through a signed Composio webhook; the
+  poller keeps running as a safety net, and both paths are deduplicated.
+- **Goals.** A goals tree for the workspace; twins see the goals they own
+  and the chain above them.
+- **Playbooks (engine + API).** Run a saved procedure across one twin or a
+  meeting, with results going to the feed, a file or the approval queue.
+- **`employee001 secure`** moves your API keys out of `.env` into the OS
+  keychain (macOS Keychain, or Secret Service on Linux).
+- **Opus 5.5 and Fable 5.1** are available as twin models (Agent SDK 0.3).
+
 ### Security
 - **A twin only reads what it needs.** Chat and meeting twins can read their
   own folder, colleagues' profile files and the company brain. Other twins'
@@ -21,6 +37,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   untrusted content.
 
 ### Changed
+- **English first.** Hebrew stays available in Settings as a beta; screens
+  without a Hebrew translation fall back to English. The consent flow is
+  always fully translated.
+- **Releases ship an SBOM and a build-provenance attestation** for the npm
+  tarball (`gh attestation verify employee001-<version>.tgz -R dolevhayut/Employee001`).
+- **Dependencies refreshed** (React 19.2.8, three 0.185, Tailwind 4.3.3,
+  Remotion 4.0.506), all published at least 7 days before the lockfile.
 - **Deleting a twin deletes everything.** Memory, chat history, run logs,
   shifts, relay data, routines, invites, feed items and pending approvals go
   with the profile, and the twin's Composio connections are revoked. Audit
