@@ -18,10 +18,11 @@ model's request reaches a tool.
   audit log and settings are blocked, in chat, meetings, shifts and while a
   twin is being built.
 - **What a twin can do without asking.** Only reads. Every send, post,
-  create or update, and every web fetch, waits for approval; there is no
-  "unsupervised" path, including twins with no connected tools and
-  unattended shifts. A twin consulting another twin can't wait for approval,
-  so anything that needs one is refused.
+  create or update, and every web fetch, waits for approval, including for
+  twins with no connected tools and in unattended shifts. The only way
+  around it is a CEO's explicit choice for a specific twin (allowing one
+  tool, or direct Slack answers). A twin consulting another twin can't wait
+  for approval, so anything that needs one is refused.
 - **What the employee allowed.** Consent is recorded per employee and each
   scope is enforced:
   - no training without consent to use their work data;
