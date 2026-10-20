@@ -89,7 +89,8 @@ export async function pollEmailInboxes(): Promise<void> {
       for (const raw of extractEmailMessages(result?.data)) {
         const msg = normalizeSharedEmailMessage(raw);
         if (!msg) continue;
-        const { deduped } = ingestEmailMessage(employee.id, msg);
+        const { deduped, skipped } = ingestEmailMessage(employee.id, msg);
+        if (skipped) continue;
         if (!deduped) enqueued++;
       }
       // Advance only after successful ingestion. A crash causes a safe, deduped rescan.

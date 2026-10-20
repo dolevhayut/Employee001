@@ -1,4 +1,6 @@
 import { enqueueWorkItem } from "@/lib/work-items";
+import { toolkitAllowed } from "@/lib/consent-policy";
+import { loadConsentStatus } from "@/lib/consent-status";
 
 export type RawEmailMessage = Record<string, unknown>;
 export type IncomingEmail = { messageId: string; threadId?: string; from?: string; subject?: string; date?: string; body?: string };
@@ -24,8 +26,16 @@ export function normalizeEmailMessage(message: RawEmailMessage): IncomingEmail |
   return { messageId, threadId: text(message.threadId) ?? text(message.thread_id), from: text(message.sender) ?? text(message.from), subject: text(message.subject), date: text(message.messageTimestamp) ?? text(message.date) ?? text(message.internalDate), body: text(message.messageText) ?? text(message.snippet) ?? text(message.preview) ?? text(payload?.body) };
 }
 
-/** The one downstream door for both Composio push and reconciliation pulls. */
-export function ingestEmailMessage(employeeId: string, message: IncomingEmail): { deduped: boolean; workItemId: string } {
+/** The one downstream door for both Composio push and reconciliation pulls.
+ *  Mail is only taken in when the employee's consent covers their connected
+ *  tools ("integrations"); otherwise it is dropped, not queued. */
+export function ingestEmailMessage(
+  employeeId: string,
+  message: IncomingEmail,
+): { deduped: boolean; workItemId: string | null; skipped?: "consent" } {
+  if (!toolkitAllowed(loadConsentStatus(employeeId), "gmail")) {
+    return { deduped: false, workItemId: null, skipped: "consent" };
+  }
   const { item, deduped } = enqueueWorkItem({ type: "email", assigneeEmployeeId: employeeId, title: message.subject ? `Email: ${message.subject}` : "Email (no subject)", payload: message, idempotencyKey: `email:${message.messageId}` });
   return { deduped, workItemId: item.id };
 }

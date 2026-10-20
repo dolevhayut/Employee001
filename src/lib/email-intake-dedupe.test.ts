@@ -11,6 +11,9 @@ vi.mock("@/lib/work-items", () => ({
   },
 }));
 
+const consent = vi.hoisted(() => ({ status: { kind: "legacy" } as unknown }));
+vi.mock("@/lib/consent-status", () => ({ loadConsentStatus: () => consent.status }));
+
 import { ingestEmailMessage } from "./email-intake";
 
 describe("push/poll email dedupe", () => {
@@ -19,5 +22,16 @@ describe("push/poll email dedupe", () => {
     const email = { messageId: "gmail-message-9", subject: "same message" };
     expect(ingestEmailMessage("ava", email)).toMatchObject({ deduped: false });
     expect(ingestEmailMessage("ava", email)).toMatchObject({ deduped: true, workItemId: "work-1" });
+  });
+
+  it("drops mail when the employee's consent doesn't cover connected tools", () => {
+    queue.clear();
+    consent.status = { kind: "recorded", scopes: new Set(["data-collection"]) };
+    try {
+      expect(ingestEmailMessage("ava", { messageId: "m-2" })).toEqual({ deduped: false, workItemId: null, skipped: "consent" });
+      expect(queue.size).toBe(0);
+    } finally {
+      consent.status = { kind: "legacy" };
+    }
   });
 });
