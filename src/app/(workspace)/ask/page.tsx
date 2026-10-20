@@ -88,6 +88,7 @@ function describeCall(name: string, args: Record<string, unknown> = {}): Omit<St
       const toolkit = mcp[2].split("_")[0].toLowerCase();
       return { kind: "tool", label: toolkit.charAt(0).toUpperCase() + toolkit.slice(1), detail: words(mcp[2].slice(toolkit.length)).toLowerCase(), logo: toolkit };
     }
+    if (mcp[1] === "org_brain") return { kind: "brain", label: "Company brain", detail: words(mcp[2]).toLowerCase() };
     const server = mcp[1] === "companysim" ? "CompanySim" : words(mcp[1]);
     return { kind: "tool", label: server, detail: words(mcp[2]).toLowerCase(), logo: mcp[1].toLowerCase() };
   }
@@ -103,7 +104,13 @@ async function askTwin(
   const res = await fetch("/api/twin/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ employeeId, history, question: `${question}\n\n(${ANSWER_STYLE})` }),
+    // Name the language outright: a twin whose memory is in Hebrew otherwise
+    // drifts into Hebrew for an English question.
+    body: JSON.stringify({
+      employeeId,
+      history,
+      question: `${question}\n\n(${ANSWER_STYLE} Reply in ${/[\u0590-\u05FF]/.test(question) ? "Hebrew" : "English"}.)`,
+    }),
   });
   if (!res.ok || !res.body) throw new Error(`chat failed: ${res.status}`);
 
@@ -448,6 +455,7 @@ export default function AskPage() {
               answerTitle: twin ? `${twin.name} · ${twin.role}` : t("ask.answer"),
               reset: t("ask.reset"),
               send: t("ask.send"),
+              followUp: twin ? t("ask.followUp", { name: twin.firstName }) : t("ask.placeholderAny"),
             }}
           />
 

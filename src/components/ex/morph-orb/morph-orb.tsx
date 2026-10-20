@@ -17,6 +17,7 @@ export type MorphOrbCopy = {
   answerBody: string;
   reset: string;
   send: string;
+  followUp: string;
 };
 
 const DEFAULT_COPY: MorphOrbCopy = {
@@ -27,6 +28,7 @@ const DEFAULT_COPY: MorphOrbCopy = {
   answerBody: "No answer came back. Try again.",
   reset: "New question",
   send: "Send",
+  followUp: "Ask a follow-up…",
 };
 // Module-level so the runtime (outside React) reads the current copy; the
 // component refreshes it in a layout effect.
@@ -889,6 +891,9 @@ export default function MorphOrb(props: MorphOrbProps) {
   const reducedRef = useRef(false);
   const rtRef = useRef<Runtime | null>(null);
   const lastTextRef = useRef("");
+  // A follow-up typed under the answer: sent once the orb is back to idle.
+  const pendingRef = useRef<string | null>(null);
+  const [follow, setFollow] = useState("");
   const timers = useRef<{ typing?: number; shake?: number; flash?: number }>({});
 
   useIsoLayoutEffect(() => {
@@ -921,7 +926,22 @@ export default function MorphOrb(props: MorphOrbProps) {
         clearInput: () => setValue(""),
         live: (s) => { if (liveRef.current) liveRef.current.textContent = s; },
         lock: (on) => { form.toggleAttribute("inert", on); },
-        idleReady: () => { inputRef.current?.focus({ preventScroll: true }); },
+        idleReady: () => {
+          const next = pendingRef.current;
+          pendingRef.current = null;
+          if (next) {
+            lastTextRef.current = next;
+            setValue(next);
+            window.requestAnimationFrame(() => {
+              rt.start(next, {
+                onSubmit: propsRef.current.onSubmit ?? (() => COPY.answerBody),
+                minThink: propsRef.current.minThinkMs ?? 3450,
+              });
+            });
+            return;
+          }
+          inputRef.current?.focus({ preventScroll: true });
+        },
         focusAnswer: () => { answerRef.current?.focus({ preventScroll: true }); },
       },
     });
@@ -1009,6 +1029,15 @@ export default function MorphOrb(props: MorphOrbProps) {
     if (!text) { shake(); return; }
     lastTextRef.current = text;
     rt.start(text, makeCfg());
+  };
+
+  const onFollowUp = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = follow.trim();
+    if (!text || phaseRef.current !== "answered") return;
+    pendingRef.current = text;
+    setFollow("");
+    rtRef.current?.reset();
   };
 
   const onReset = () => {
@@ -1112,6 +1141,33 @@ export default function MorphOrb(props: MorphOrbProps) {
       </div>
 
       <button type="button" className="mo-reset" onClick={onReset}>{copy.reset}</button>
+
+      {/* keep the conversation going without leaving the answer */}
+      <form className="mo-follow" onSubmit={onFollowUp} autoComplete="off">
+        <span className="mo-follow-ring" aria-hidden="true" />
+        <svg className="mo-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M10 3.5l1.7 4.8 4.8 1.7-4.8 1.7L10 16.5l-1.7-4.8L3.5 10l4.8-1.7L10 3.5z" />
+          <path d="M18 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z" />
+        </svg>
+        <input
+          className="mo-field"
+          type="text"
+          dir="auto"
+          value={follow}
+          maxLength={200}
+          placeholder={copy.followUp}
+          aria-label={copy.followUp}
+          spellCheck={false}
+          tabIndex={phase === "answered" ? 0 : -1}
+          onChange={(e) => setFollow(e.target.value)}
+        />
+        <button type="submit" className="mo-send" aria-label={copy.send} data-ready={follow.trim() ? "" : undefined} tabIndex={phase === "answered" ? 0 : -1}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 19V5" />
+            <path d="M5.5 11.5L12 5l6.5 6.5" />
+          </svg>
+        </button>
+      </form>
 
       <div className="mo-live" ref={liveRef} role="status" aria-live="polite" />
 

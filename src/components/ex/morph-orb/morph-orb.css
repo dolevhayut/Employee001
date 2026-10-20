@@ -379,6 +379,46 @@
 .mo-reset:hover { background: var(--surface-soft); color: var(--text); }
 .mo-root[data-phase="answered"] .mo-reset { pointer-events: auto; animation: mo-fade-in 0.35s 0.2s ease-out both; }
 
+/* follow-up input: appears under the answer, where the pill lives */
+.mo-follow {
+  position: absolute;
+  left: 50%;
+  bottom: 66px;
+  width: min(600px, calc(100% - 32px));
+  height: 60px;
+  transform: translate(-50%, 10px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 0 20px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px color-mix(in oklab, var(--text) 10%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease-out, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 3;
+}
+.mo-root[data-phase="answered"] .mo-follow {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+  transition-delay: 0.25s;
+}
+.mo-follow-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from var(--angle), var(--accent), var(--accent-soft), var(--twin), var(--warn), var(--accent-deep), var(--accent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0.9;
+  animation: mo-spin 6s linear infinite;
+  pointer-events: none;
+}
+
 .mo-live {
   position: absolute;
   width: 1px;
