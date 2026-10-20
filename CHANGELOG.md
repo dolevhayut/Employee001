@@ -81,6 +81,8 @@ model's request reaches a tool.
   always fully translated.
 - **Releases ship an SBOM and a build-provenance attestation** for the npm
   tarball (`gh attestation verify employee001-<version>.tgz -R dolevhayut/Employee001`).
+- **A smaller package.** The npm tarball no longer ships the static assets
+  twice: 13.6 MB instead of 18.2 MB (50 MB unpacked instead of 62 MB).
 - **Dependencies refreshed** (React 19.2.8, three 0.185, Tailwind 4.3.3,
   Remotion 4.0.506), all published at least 7 days before the lockfile.
 - **Deleting a twin deletes everything.** Memory, chat history, run logs,
