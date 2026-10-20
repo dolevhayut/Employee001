@@ -16,6 +16,7 @@ import {
   countActiveConnections,
 } from "@/lib/twin-build-runner";
 import { dataDir } from "@/lib/app-home";
+import { CONSENT_SCOPES, CURRENT_CONSENT_VERSION, type ConsentScope, type EmployeeConsent } from "@/lib/employees";
 
 export const runtime = "nodejs";
 
@@ -51,6 +52,18 @@ type CompletePayload = {
   /** Optional override: explicit markdown bodies per profile file. */
   profile?: Partial<Record<(typeof PROFILE_FILES)[number], string>>;
 };
+
+/** The consent the employee gave in the wizard, recorded on their profile:
+ *  known scopes only, and only when every required scope is present. */
+function consentRecord(raw: unknown): EmployeeConsent | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const { version, scopes } = raw as { version?: unknown; scopes?: unknown };
+  if (version !== CURRENT_CONSENT_VERSION || !Array.isArray(scopes)) return undefined;
+  const known = new Set(CONSENT_SCOPES.map((s) => s.id));
+  const accepted = [...new Set(scopes.filter((s): s is ConsentScope => typeof s === "string" && known.has(s as ConsentScope)))];
+  if (!CONSENT_SCOPES.filter((s) => s.required).every((s) => accepted.includes(s.id))) return undefined;
+  return { grantedAt: new Date().toISOString(), version: CURRENT_CONSENT_VERSION, scopes: accepted };
+}
 
 function buildProfileMarkdown(
   payload: CompletePayload,
@@ -299,6 +312,16 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
   const role = (body.role || invite.role || "").trim();
 
+  // No twin without recorded consent to the current terms and every required
+  // scope. Checked before anything is written or the invite is claimed.
+  const consent = consentRecord((body as { consent?: unknown }).consent);
+  if (!consent) {
+    return NextResponse.json(
+      { status: "consent_required", message: "Consent to the current terms, with every required scope, is required." },
+      { status: 400 },
+    );
+  }
+
   const slug = slugify(name);
   if (!slug) {
     return NextResponse.json(
@@ -372,6 +395,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           createdAt: existingSidecar.createdAt ?? new Date().toISOString(),
           lastActiveAt: new Date().toISOString(),
           via: { invite: token },
+          consent,
         },
         null,
         2,

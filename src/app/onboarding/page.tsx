@@ -238,6 +238,7 @@ function OnboardingPageInner() {
             domain,
             integrations: Array.from(chosen),
             boundaries,
+            consent: { version: CURRENT_CONSENT_VERSION, scopes: Array.from(acceptedScopes) },
           }),
         },
       );
@@ -624,7 +625,7 @@ function StepConsent({
           {isCeo ? "זכויות העובד." : t("onboarding.rights")}
         </strong>{" "}
         {isCeo
-          ? <>{firstName} can revoke consent at any time from <span className="mono">/profile</span>. On revocation, their twin is paused immediately and all indexed data is queued for deletion within 30 days.</>
+          ? <>{firstName} can withdraw consent at any time, and you revoke it on their twin&apos;s profile. The twin and all of its data are then deleted right away, and its tool connections are disconnected.</>
           : t("onboarding.rightsBody")}
       </div>
 

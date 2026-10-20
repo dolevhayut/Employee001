@@ -230,8 +230,33 @@ function SectionGroup({
 
 function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
   const { t, locale } = useT();
+  const router = useRouter();
   const consent = employee.consent;
   const firstName = employee.name.split(" ")[0];
+  const [revoking, setRevoking] = useState(false);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
+
+  // Revoking consent deletes the twin and everything it holds, right away
+  // (same full purge as the Danger tab), and disconnects its tools.
+  async function revokeConsent() {
+    if (revoking || !window.confirm(t("profile.consent.revokeConfirm", { name: employee.name }))) return;
+    setRevoking(true);
+    setRevokeError(null);
+    try {
+      const res = await fetch(
+        `/api/employees/${encodeURIComponent(employee.id)}?reason=consent_revoked`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { message?: string };
+        throw new Error(body.message ?? `Revoke failed (${res.status})`);
+      }
+      router.push("/employees");
+    } catch (err) {
+      setRevokeError(err instanceof Error ? err.message : t("profile.danger.error"));
+      setRevoking(false);
+    }
+  }
 
   if (!consent) {
     return (
@@ -300,10 +325,17 @@ function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
           className="btn sm ghost"
           style={{ color: "var(--danger)" }}
           title={t("profile.consent.revokeTitle")}
+          onClick={revokeConsent}
+          disabled={revoking}
         >
-          {t("profile.consent.revoke")}
+          {revoking ? t("profile.danger.deleting") : t("profile.consent.revoke")}
         </button>
       </div>
+      {revokeError ? (
+        <div role="alert" style={{ color: "var(--danger)", fontSize: "var(--fs-sm)", marginBottom: "var(--sp-8)" }}>
+          {revokeError}
+        </div>
+      ) : null}
       <div
         className="subtle"
         style={{ fontSize: "var(--fs-meta)", lineHeight: 1.5, marginBottom: "var(--sp-8)" }}

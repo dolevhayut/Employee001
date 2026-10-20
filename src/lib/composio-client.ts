@@ -271,6 +271,37 @@ export async function disconnectToolkit(
   await writeState(employeeId, state);
 }
 
+/**
+ * Delete every Composio connected account for an employee — including ones
+ * the local state file never saw — and clear the local state. Returns the
+ * number of accounts deleted. Throws if Composio can't be reached, so a
+ * deletion request never reports success while tokens are still live.
+ */
+export async function disconnectAllToolkits(employeeId: string): Promise<number> {
+  if (!isComposioConfigured()) return 0;
+  const composio = getComposio();
+  const ids: string[] = [];
+  let cursor: string | null | undefined;
+  for (let page = 0; page < 50; page++) {
+    const remote = (await composio.connectedAccounts.list({
+      userIds: [composioUserIdFor(employeeId)],
+      ...(cursor ? { cursor } : {}),
+    })) as { items?: Array<{ id: string }>; nextCursor?: string | null };
+    ids.push(...(remote.items ?? []).map((item) => item.id));
+    cursor = remote.nextCursor;
+    if (!cursor) break;
+  }
+  for (const id of ids) {
+    await composio.connectedAccounts.delete(id);
+  }
+  const state = await readState(employeeId);
+  if (Object.keys(state.connections).length) {
+    state.connections = {};
+    await writeState(employeeId, state);
+  }
+  return ids.length;
+}
+
 // ─── Build an SDK MCP server for an employee ─────────────────────────────────
 
 /**

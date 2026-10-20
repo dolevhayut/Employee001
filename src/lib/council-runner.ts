@@ -55,6 +55,7 @@ import {
   planEmployeeResponseIntent,
 } from "@/lib/employee-intent-planner";
 import { buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
+import { getToolPolicyOverrides } from "@/lib/tool-policy-overrides";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
 import {
@@ -330,6 +331,8 @@ Workspace layout:
 - \`employees/{other-employee-id}/*.md\` — your colleagues' 9 profile files (CONTEXT, EXPERTISE, TONE, BOUNDARIES, DECISIONS, PREFERENCES, PEOPLE, PROJECTS, EMPLOYMENT). Read when a question references another teammate's domain.
 - \`org-brain/nodes/*.md\` — the **company brain**: pricing policies, customer-segment definitions, decisions, incident postmortems, product facts. **This is where most "what's our policy on X" answers live.** Glob this directory or Grep across it when the question touches company-wide knowledge.
 - \`org-skills/*/SKILL.md\` — operating playbooks (assignment-gated; relevant ones are auto-injected as a dynamic block when triggers match).
+
+Nothing else under the data root is readable: other twins' memory and chat history, invites, the audit log and settings are blocked, and a Read of them will be denied. Grep across colleagues' profiles with \`path: "employees"\` and \`glob: "*.md"\`.
 
 Heuristic for which tool to use:
 
@@ -621,7 +624,10 @@ export function buildToolConfig(options: RunOptions): {
     };
   }
   return {
-    allowedTools: ["TodoWrite", "AskUserQuestion", "Read", "Glob", "Grep", "Write", "WebSearch", "WebFetch", "Task"],
+    // allowedTools are auto-approved and skip canUseTool. WebFetch stays
+    // available but is left out so every fetch goes through the tool policy
+    // (a URL can carry data out).
+    allowedTools: ["TodoWrite", "AskUserQuestion", "Read", "Glob", "Grep", "Write", "WebSearch", "Task"],
     agents: buildTwinAgentDefinitions(),
   };
 }
@@ -786,9 +792,11 @@ export async function runSingleTwin(
 
   // The SDK's Read/Glob/Grep tools sandbox to `cwd` and won't traverse upward
   // via `..`. We therefore set the agent's cwd to `data/` so the twin can
-  // freely browse its own profile (`employees/<id>/*.md`), peer profiles
+  // browse its own profile (`employees/<id>/*.md`), peer profiles
   // (`employees/<other>/*.md`), and the company brain (`org-brain/nodes/*.md`)
-  // — but NOT the source code or anything above the data root.
+  // — but NOT the source code or anything above the data root. The
+  // restrictReadsToTwinScope hook narrows that further: other twins' memory,
+  // chat history, invites, audit and settings stay unreadable.
   const dataRoot = dataDir();
 
   // Prefer SDK session resumption when caller passed a sessionId — the SDK
@@ -980,12 +988,13 @@ export async function runSingleTwin(
     }
 
     // Tool-policy gate: pause the agent when a write/external tool fires
+    const policyOverrides = await getToolPolicyOverrides(employee.id).catch(() => undefined);
     const canUseTool: CanUseTool = async (
       toolName,
       input
     ): Promise<PermissionResult> => {
       const typedInput = (input as Record<string, unknown>) ?? {};
-      const decision = classifyTool(toolName, typedInput);
+      const decision = classifyTool(toolName, typedInput, policyOverrides);
       const bare = toolName.replace(/^mcp__[a-z0-9_]+__/i, "");
 
       if (options.answerOnly) {
@@ -1037,6 +1046,12 @@ export async function runSingleTwin(
           blockReason: decision.reason,
         });
         return { behavior: "deny", message: decision.reason };
+      }
+
+      // A consultation hop (twin asking a twin) has no approval card to show,
+      // so anything that would need one is refused instead of hanging.
+      if (consultMode) {
+        return { behavior: "deny", message: `${decision.reason} Not available while consulting another twin.` };
       }
 
       // "ask" — register an approval request and pause until the user resolves it
@@ -1123,6 +1138,9 @@ export async function runSingleTwin(
       employeeId: employee.id,
       employeeName: employee.name,
       surface,
+      // cwd is the whole data root: keep reads to this twin's own folder,
+      // peer profile files and the company brain.
+      restrictReadsToTwinScope: true,
       onNotification: (n) => {
         // Scratch-write denials get a dedicated event so the UI can render
         // a yellow warning instead of a generic red-block banner.
@@ -1187,8 +1205,10 @@ export async function runSingleTwin(
         maxTurns: consultMode ? 8 : hasMcp ? 20 : 6,
         ...(options.maxBudgetUsd ? { maxBudgetUsd: options.maxBudgetUsd } : {}),
         includePartialMessages: true,
-        permissionMode: hasMcp ? "default" : "bypassPermissions",
-        canUseTool: hasMcp ? canUseTool : undefined,
+        // Always gated: without MCP tools a twin can still WebFetch, and a URL
+        // can carry data out, so no run bypasses the tool policy.
+        permissionMode: "default",
+        canUseTool,
         settingSources: [],
         hooks,
       },
@@ -1445,12 +1465,10 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
   const colleagueNames = (forId: string) =>
     allParticipants.filter((e) => e.id !== forId).map((e) => e.firstName);
 
-  // Diagnostic file logger
-  const logFile = dataDir("council-debug.log");
+  // Diagnostic logger. Console only: the old data/council-debug.log kept CEO
+  // questions and names forever with no retention.
   const dlog = (msg: string) => {
-    const line = `[${new Date().toISOString()}] ${msg}\n`;
     console.log(msg);
-    try { fs.appendFileSync(logFile, line); } catch { /* ignore */ }
   };
 
   dlog(`[council] === RUN === meeting=${meeting.id} priorTurns=${meeting.transcript.length - 1} CEO: "${question.slice(0, 100)}". Responders: [${responders.map((e) => e.firstName).join(", ")}]`);

@@ -201,7 +201,12 @@ export async function runShift(args: {
     // Run prefetches in parallel with MCP setup. Prefetch failures degrade
     // gracefully — a missing focus block is fine, the shift still runs.
     const [composioMcp, orgMcpServers, focusResults] = await Promise.all([
-      buildEmployeeMcpServer(employee.id),
+      // A Composio outage or bad key must not kill the shift: run without the
+      // personal toolkits, as council-runner does.
+      buildEmployeeMcpServer(employee.id).catch((err) => {
+        console.warn("[shift-runner] Composio tools unavailable, running without them:", err instanceof Error ? err.message : err);
+        return null;
+      }),
       loadOrgCustomMcpServers(),
       runPrefetches(employee.id).catch((err) => {
         console.warn("[shift-runner] focus prefetch failed:", err);
@@ -382,6 +387,8 @@ export async function runShift(args: {
       employeeId: employee.id,
       employeeName: employee.name,
       surface: "routine",
+      restrictReadsToTwinScope: true,
+      cwd: employeeDir,
     });
 
     const stream = query({
@@ -394,8 +401,9 @@ export async function runShift(args: {
         mcpServers: mcpServersWithConsult,
         maxTurns: 12,
         includePartialMessages: true,
-        permissionMode: hasMcp ? "default" : "bypassPermissions",
-        canUseTool: hasMcp ? canUseTool : undefined,
+        // Always gated: shifts run unattended, often on untrusted input.
+        permissionMode: "default",
+        canUseTool,
         outputFormat: {
           type: "json_schema",
           schema: SHIFT_REPORT_JSON_SCHEMA as Record<string, unknown>,

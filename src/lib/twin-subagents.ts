@@ -73,6 +73,8 @@ export function buildTwinAgentDefinitions(): Record<string, AgentDefinition> {
         "Your cwd is the workspace data root. Look up information ONLY in:",
         "- org-brain/nodes/*.md (the company brain)",
         "- employees/<id>/*.md (peer profile files)",
+        "Other folders are blocked. Always pass Grep an explicit path:",
+        "`org-brain`, or `employees` together with glob `*.md`.",
         "",
         "Workflow:",
         "1. Glob or Grep first to find relevant files for the EXACT topic asked.",

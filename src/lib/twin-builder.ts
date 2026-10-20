@@ -290,6 +290,10 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
       employeeId: employee.id,
       employeeName: employee.name,
       surface: "builder",
+      // The builder reads untrusted mail and chat through MCP: keep its own
+      // Read/Glob/Grep inside the data it is meant to use.
+      restrictReadsToTwinScope: true,
+      cwd: employeeDir,
       onNotification: (n) => {
         // Surface SDK notifications (idle prompts, auth refresh, etc.) to
         // the build event stream so the CEO sees what's blocking.
@@ -345,7 +349,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
         systemPrompt,
         allowedTools: ["Read", "Write", "Glob", "Grep", "TodoWrite"],
         mcpServers,
-        // Bumped from 80 → 120: the HR-psychologist prompt requires deeper
+        // Bumped from 80 → 120: the knowledge-capture prompt requires deeper
         // multi-source cross-referencing (sent emails + Slack + calendar +
         // GitHub for one TONE.md alone). Budget cap still gates total cost.
         maxTurns: 120,
@@ -600,17 +604,17 @@ function buildBuilderSystemPrompt(args: {
   const fileSpecs: { name: TwinFileName; spec: string }[] = [
     {
       name: "CONTEXT.md",
-      spec: `The company + role context the twin needs to reason like ${firstName}: company name & stage, business model, target customer, current quarter focus, real day-to-day constraints, the political map (who has influence, where the friction is). **Evidence preference order:** email signatures + calendar invites ${firstName} sent or organized → Slack channels they're most active in (channel names + their topics) → Notion/Drive docs they authored or last edited → Linear cycle goals they own. Avoid generic boilerplate ("a fast-paced startup"); the CEO needs the *specific* current reality.`,
+      spec: `The company + role context the twin needs to reason like ${firstName}: company name & stage, business model, target customer, current quarter focus, real day-to-day constraints, which decisions this role owns and which it routes to others. **Evidence preference order:** email signatures + calendar invites ${firstName} sent or organized → Slack channels they're most active in (channel names + their topics) → Notion/Drive docs they authored or last edited → Linear cycle goals they own. Avoid generic boilerplate ("a fast-paced startup"); the CEO needs the *specific* current reality.`,
     },
     {
       name: "EXPERTISE.md",
-      spec: `${firstName}'s technical/functional expertise as a **light SWOT**:
+      spec: `The knowledge ${firstName}'s role holds — what the twin can answer with authority:
 
-  - **Strengths (3–5)** — domains they're authoritative on, with verbatim evidence (e.g. "led the migration from X to Y per PR #1234", "authored 4 specs on retrieval ranking in Notion"). Recognize patterns: what kinds of problems do they take on first?
-  - **Weaknesses / gaps (1–3)** — be honest. Even senior people have areas they avoid, defer, or get pushback on. Look for: topics they CC their manager on, threads they hand off, problems they ask others to solve. If you genuinely can't find any, say "(no observable gaps in available signals)" — don't invent.
-  - **Adjacent opportunities** — areas where their existing strengths give them a natural next step.
+  - **Core domains (3–5)** — subjects this role is the go-to source on, with verbatim evidence (e.g. "led the migration from X to Y per PR #1234", "authored 4 specs on retrieval ranking in Notion"). What kinds of problems does this role take on?
+  - **Outside this role's lane** — topics the role routes to someone else (by role or team, e.g. "pricing questions go to Sales"), so the twin knows where to send a question instead of guessing. This is about scope, not ability: never judge how good ${firstName} is at anything.
+  - **Key know-how** — systems, procedures, customers' technical setups and tribal knowledge that would be hard to rebuild if the role changed hands.
 
-  Cite the tool calls and quote the evidence. The CEO uses this section to know when to push and when to defer to ${firstName}.`,
+  Cite the tool calls and quote the evidence.`,
     },
     {
       name: "PROJECTS.md",
@@ -618,19 +622,19 @@ function buildBuilderSystemPrompt(args: {
 
   - **Project name → ${firstName}'s role → current status → next milestone → blockers → threats → opportunities.**
   - Evidence preference: Linear/Jira issues *assigned to or created by* ${firstName} (not just visible to them); GitHub PRs they authored; Notion project pages they edited in the last ${lookbackDays} days; calendar events they organize for that project.
-  - "Threats" = what could derail it (resource, dependency, deadline, political).
+  - "Threats" = what could derail it (resource, dependency, deadline).
   - "Opportunities" = what would 10x it if they leaned in.
   - Avoid listing projects they're peripherally CC'd on — that's noise, not their actual work.`,
     },
     {
       name: "PEOPLE.md",
-      spec: `Real teammates ${firstName} works with — and the **power dynamics**, not just an org-chart dump:
+      spec: `Who ${firstName}'s role works with, so the twin knows who to involve on what — a working map, not a judgment of relationships:
 
-  - **Who they defer to** (escalate decisions to, ask for sign-off, CC for cover): ${firstName}'s manager + anyone whose name shows up disproportionately as the recipient of "wanted to flag…" / "checking with you on…" / "your call".
-  - **Who they manage / mentor** (their team, their reports, anyone they coach in Slack DMs).
-  - **Peers they collaborate most with** (top 3–5 by Slack DM frequency, recurring 1:1 calendar slots, GitHub co-review pairs).
-  - **External counterparts** (customers, vendors, contractors) named in their sent emails.
-  - Use signals like Slack DM frequency, GitHub PR reviewers, recurring calendar attendees. Don't list every name; rank by signal strength.`,
+  - **Sign-off and escalation:** who approves this role's decisions, by topic (e.g. "budget over $5k → the CFO").
+  - **Team:** who reports to this role or works in its team, and what each of them owns.
+  - **Collaborators by project:** colleagues this role works with on each active project (shared PRs, project channels, project meetings).
+  - **External counterparts:** customers, vendors and partners by **organization and role only** (e.g. "Acme — procurement lead"), never a private person's name.
+  - Describe working relationships only. Never characterize anyone's personality, standing, loyalty or influence.`,
     },
     {
       name: "DECISIONS.md",
@@ -639,18 +643,17 @@ function buildBuilderSystemPrompt(args: {
   - **Decision style:** decisive vs deliberative? Data-led vs intuition-led? Build vs buy? Fast iteration vs careful design?
   - Look for hedging vs assertive language: "I think we should…" / "let me check with X first" vs "do this" / "shipping Friday" / "no, we're not doing that". Quantify if you can ("~70% of their PR reviews end with a specific ask, ~30% are open questions").
   - **3–5 example decisions** with: the situation, ${firstName}'s position (verbatim quote ≤30 words), the rationale, the outcome if visible. Pull from PR descriptions, design-doc comments, Linear issue threads, Slack threads where they pushed back.
-  - **How they say no:** hard refusal? Soft deferral ("not now, let's revisit Q3")? Redirect ("the bigger problem is…")? This is gold for the CEO.`,
+  - **How they decline or redirect a request:** a clear no, a deferral ("not now, let's revisit Q3") or a redirect ("the bigger problem is…")? Quote an example.`,
     },
     {
       name: "PREFERENCES.md",
-      spec: `How ${firstName} actually operates day-to-day — the **behavioral signature**:
+      spec: `How work gets done in ${firstName}'s role — formats and processes the twin should follow:
 
-  - **Meeting style:** load (meetings/day), preferred lengths, decline rate, who they decline (and who they always accept). Recurring blocks (deep-work mornings? no-meeting Wednesdays?).
-  - **Communication cadence:** when do they ship messages — early morning, late night, weekends? Reply latency. Do they batch responses or interleave with deep work?
-  - **Tooling preferences:** when given the choice, which tool do they reach for? (Linear vs GitHub Issues? Notion vs Google Docs? Slack DM vs email?)
-  - **Process patterns:** doc structures they reuse, recurring agenda templates, how they run a kickoff or retro.
+  - **Meeting formats:** recurring meetings this role runs (kickoff, weekly sync, retro), their agenda and expected outputs.
+  - **Preferred channels:** which tool the role uses for which kind of work (Linear vs GitHub Issues? Notion vs Google Docs? Slack vs email for decisions?).
+  - **Document and process patterns:** doc structures they reuse, templates, checklists, review steps.
 
-  Evidence is in calendar (organizer/attendee data, accept/decline patterns), Slack timestamps, GitHub commit times, Gmail send-time histogram.`,
+  Do NOT record when or how much ${firstName} works (hours, nights, weekends, reply speed, meeting load or decline rates): that is monitoring, not knowledge. Evidence is in meetings they organize, docs they author and the tools their work lives in.`,
     },
     {
       name: "TONE.md",
@@ -670,13 +673,13 @@ function buildBuilderSystemPrompt(args: {
     },
     {
       name: "EMPLOYMENT.md",
-      spec: `HR-style record: title, manager (if discoverable from email/calendar/Slack), direct reports if any (recurring 1:1s, code-review delegates, mentees), peers (frequent collaborators at the same level), tenure (estimate from earliest message date if you can, else mark as unknown), certifications/credentials visible in signatures or LinkedIn-style sources. **Public information only — never compensation, never home address, never private contact info.**`,
+      spec: `Role record: title, manager (if discoverable from email/calendar/Slack), direct reports if any (recurring 1:1s, code-review delegates, mentees), peers (frequent collaborators at the same level), tenure (estimate from earliest message date if you can, else mark as unknown), certifications/credentials visible in signatures or LinkedIn-style sources. **Public information only — never compensation, never home address, never private contact info.**`,
     },
   ];
 
-  return `You are an **HR psychologist + workplace ethnographer** building a behavioral profile of a real person. The output is 9 markdown files that will permanently ground a digital twin of ${firstName}. The twin then chats and acts on the CEO's behalf using these files as its identity, so the profile has to be one their own colleagues would recognize as accurate — not a generic corporate bio.
+  return `You are a **knowledge-capture analyst** documenting the working knowledge of ${firstName}'s role: what they know, how they make decisions, how they write and how their work gets done. The output is 9 markdown files that ground a digital twin of ${firstName}. The twin then chats and acts on the CEO's behalf using these files, so the profile has to be one their own colleagues would recognize as accurate — not a generic corporate bio.
 
-You are NOT a content generator. You are reading between the lines of a digital trail. Apply the same skills a great manager applies on day-30 of a new hire: pattern recognition, NLP, behavioral analysis, light SWOT thinking.
+This is **not** a personality, psychological or performance assessment. Do not judge ${firstName}'s character, abilities, weaknesses or behavior, and do not track when or how much they work. Capture knowledge, decisions, voice and processes, with evidence.
 
 # Subject
 
@@ -720,8 +723,7 @@ While you read, watch for these signals — they feed the file specs below:
 - **How they say no**: hard refusal, soft deferral, redirection, silent ignore.
 - **How they praise**: name + specific reason, or generic "great work".
 - **Formality gradient**: with whom do they get more formal, with whom more casual?
-- **Power dyads**: who do they always CC? Who do they DM most? Who do they decline meetings from / always accept from?
-- **Time-of-day patterns**: morning shipper vs night writer? Weekend worker?
+- **Escalation paths**: which topics go to which role for sign-off?
 - **Message-length distribution**: one-liner vs essayist?
 
 Don't dump these as raw observations — fold them into the relevant file's narrative.
@@ -751,6 +753,7 @@ ${existingFiles.length > 0 ? `\n# Existing files on disk (you may overwrite to i
 6. **Quality bar.** Each file should be 600–2,500 chars of substantive, evidence-grounded content. Use markdown sections, lists, and verbatim quotes. Never write "Lorem ipsum", "TBD", or filler.
 7. **One file per Write call.** Always invoke \`Write\` with \`file_path\` set to just the filename (\`CONTEXT.md\`) — the cwd is already \`${employeeDir}\`. Do not batch multiple files into one Write.
 8. **Don't quote PII.** Phone numbers, home addresses, government IDs, banking details, customer lists with full names — never include these. Verbatim quotes about style and decisions are fine.
+   **Never record or infer special categories**, even if they appear in the source: health or medical information, family or personal life, religion, political views, union or works-council membership, sexual orientation, ethnicity, salary or personal finances, performance ratings or HR matters. Skip that message and move on. Name external people by organization and role only.
 9. **Stop only when all 9 files exist on disk with substantive content** (or with the explicit "(insufficient evidence)" stub from rule 4 — that's still a complete file).
 
 # Output protocol

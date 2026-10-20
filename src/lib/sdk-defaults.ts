@@ -17,6 +17,7 @@ import type {
 import { appendAuditEntry } from "@/lib/audit-log";
 import { modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
 import { dataDir } from "@/lib/app-home";
+import { checkTwinRead } from "@/lib/twin-read-scope";
 
 const PKG_VERSION = "Employee001/0.2.0";
 
@@ -135,6 +136,12 @@ export type TwinHookContext = {
   onNotification?: (n: { kind: string; message: string; title?: string }) => void;
   /** Fire once when the agent loop ends (cleaner than parsing the result msg). */
   onStop?: (info: { stoppedBy: "natural" | "max_turns" | "user_abort" }) => void;
+  /** Limit Read/Glob/Grep to the twin's own data (see twin-read-scope.ts).
+   *  Set by runners whose cwd is the whole data root. */
+  restrictReadsToTwinScope?: boolean;
+  /** The run's cwd, for resolving relative Read/Glob/Grep paths. Defaults to
+   *  the data root. */
+  cwd?: string;
 };
 
 /**
@@ -343,8 +350,40 @@ export function buildTwinHooks(
     return {};
   };
 
+  // Keep Read/Glob/Grep away from other twins' memory, chat history, invites,
+  // audit and settings. PreToolUse hooks run before any permission check, so
+  // this holds even for tools listed in allowedTools.
+  const restrictReadsToTwinScope: HookCallback = async (input) => {
+    if (!ctx.restrictReadsToTwinScope) return {};
+    if (input.hook_event_name !== "PreToolUse") return {};
+    const pre = input as PreToolUseHookInput;
+    if (!["Read", "Glob", "Grep"].includes(pre.tool_name)) return {};
+    const toolInput = (pre.tool_input ?? {}) as Record<string, unknown>;
+    const decision = checkTwinRead(pre.tool_name, toolInput, ctx.employeeId, dataDir(), ctx.cwd ?? dataDir());
+    if (decision.ok) return {};
+    try {
+      appendAuditEntry({
+        runId: ctx.runId,
+        employeeId: ctx.employeeId,
+        employeeName: ctx.employeeName,
+        toolName: pre.tool_name,
+        bareName: pre.tool_name,
+        input: toolInput,
+        verdict: "hard_blocked",
+        blockReason: decision.reason,
+      });
+    } catch { /* audit must not crash the run */ }
+    return {
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse" as const,
+        permissionDecision: "deny" as const,
+        permissionDecisionReason: decision.reason,
+      },
+    };
+  };
+
   return {
-    PreToolUse: [{ hooks: [blockHardDisallowed, restrictWriteToScratch] }],
+    PreToolUse: [{ hooks: [blockHardDisallowed, restrictWriteToScratch, restrictReadsToTwinScope] }],
     PostToolUse: [{ hooks: [auditPostToolUse, injectWebCitation] }],
     Notification: [{ hooks: [forwardNotification] }],
     Stop: [{ hooks: [onStopHook] }],

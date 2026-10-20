@@ -626,8 +626,7 @@ function ModeDone({ summary }: { summary: ProgressState["finished"] }) {
         </div>
       ) : null}
       <p style={{ color: TEXT_MUTED, fontSize: 13, lineHeight: 1.55, margin: 0 }}>
-        {t("join.revoke")} <bdi><span style={{ fontFamily: "ui-monospace, monospace" }}>/profile</span></bdi>{" "}
-        (your manager will share the link).
+        {t("join.revoke")}
       </p>
     </Card>
   );

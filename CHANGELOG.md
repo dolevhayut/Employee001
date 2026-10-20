@@ -8,6 +8,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- **A twin only reads what it needs.** Chat and meeting twins can read their
+  own folder, colleagues' profile files and the company brain. Other twins'
+  memory and chats, invites, the audit log and settings are now off limits,
+  so a twin tricked by an email or a web page can't pass them on.
+- **Web fetches ask first.** A URL can carry data out, so `WebFetch` now waits
+  for approval like any write action. A per-employee tool policy can allow it
+  again. Every twin run goes through the approval gate, including twins with
+  no connected tools.
+- **Email is data, not instructions.** Emails a twin handles are passed in as
+  untrusted content.
+
+### Changed
+- **Deleting a twin deletes everything.** Memory, chat history, run logs,
+  shifts, relay data, routines, invites, feed items and pending approvals go
+  with the profile, and the twin's Composio connections are revoked. Audit
+  rows keep the time, tool and outcome but lose the input and the name; the
+  hash chain still verifies. If anything can't be deleted, the app says so
+  and you can retry.
+- **Revoke works.** Revoking consent on a profile deletes the twin and its
+  data right away. The consent an employee gives during onboarding is now
+  saved on their profile, as the screen always said.
+- **Twin profiles capture knowledge, not personality.** The profile builder
+  no longer writes weaknesses, power dynamics or working-hour patterns, and
+  skips health, family, religion, politics, union, salary and performance
+  information.
+
 ## [0.6.0] — 2026-10-05
 
 

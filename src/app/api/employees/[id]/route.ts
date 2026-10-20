@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import path from "path";
 import { getHiredAgentIds, dismissAgent } from "@/lib/hired-agents";
 import { appendAuditEntry } from "@/lib/audit-log";
+import { purgeEmployee, runningWorkFor } from "@/lib/employee-purge";
 import { withSidecarLock } from "@/lib/sidecar-lock";
 import { dataDir } from "@/lib/app-home";
 
@@ -55,68 +56,54 @@ function employeeDir(id: string, action: "delete" | "update"): { dir: string } |
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
   const located = employeeDir(id, "delete");
   if (located instanceof NextResponse) return located;
-  const { dir } = located;
 
-  // Branch 1 — marketplace hire. `dismissAgent` removes the directory and
-  // the hired-agents.json row in one transactional step.
-  if (getHiredAgentIds().includes(id)) {
-    const ok = dismissAgent(id);
-    if (!ok) {
-      return NextResponse.json(
-        { error: "dismiss_failed", message: "Could not dismiss marketplace hire." },
-        { status: 500 },
-      );
-    }
-    appendAuditEntry({
-      runId: `delete-${Date.now()}`,
-      employeeId: id,
-      employeeName: id,
-      toolName: "deleteEmployee",
-      bareName: "deleteEmployee",
-      input: { id, kind: "marketplace" },
-      verdict: "executed",
-    });
-    return NextResponse.json({ ok: true, kind: "marketplace" });
+  // A run still in progress would write files back after the purge.
+  const running = runningWorkFor(id);
+  if (running.length) {
+    return NextResponse.json(
+      {
+        error: "twin_busy",
+        message: `This twin is still working (${running.map((r) => r.label).join(", ")}). Stop it or wait for it to finish, then delete again.`,
+        running,
+      },
+      { status: 409 },
+    );
   }
 
-  // Branch 2 — invite-created or imported twin. Just remove the directory.
-  // If it doesn't exist we still 200 — idempotent delete.
-  let existed = true;
-  try {
-    await fs.access(dir);
-  } catch {
-    existed = false;
+  // Marketplace hires also have a hired-agents.json row to drop.
+  const marketplace = getHiredAgentIds().includes(id);
+  if (marketplace && !dismissAgent(id)) {
+    return NextResponse.json(
+      { error: "dismiss_failed", message: "Could not dismiss marketplace hire." },
+      { status: 500 },
+    );
   }
 
-  if (existed) {
-    try {
-      await fs.rm(dir, { recursive: true, force: true });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return NextResponse.json(
-        { error: "delete_failed", message },
-        { status: 500 },
-      );
-    }
+  // Full deletion: profile, memory, chats, runs, relay, feed, routines,
+  // invites, audit inputs and Composio connections (see employee-purge.ts).
+  // Idempotent, so a retry after a partial failure finishes the job.
+  // ?reason=consent_revoked records a consent withdrawal in the tombstone.
+  const reason = new URL(req.url).searchParams.get("reason") === "consent_revoked" ? "consent_revoked" : "deleted";
+  const report = await purgeEmployee(id, reason);
+  if (!report.complete) {
+    const failed = report.steps.filter((s) => s.status === "error").map((s) => s.target);
+    return NextResponse.json(
+      {
+        error: "purge_incomplete",
+        message: `Some data could not be deleted (${failed.join(", ")}). Try again.`,
+        report,
+      },
+      { status: 500 },
+    );
   }
 
-  appendAuditEntry({
-    runId: `delete-${Date.now()}`,
-    employeeId: id,
-    employeeName: id,
-    toolName: "deleteEmployee",
-    bareName: "deleteEmployee",
-    input: { id, kind: "disk", existed },
-    verdict: "executed",
-  });
-
-  return NextResponse.json({ ok: true, kind: "disk", existed });
+  return NextResponse.json({ ok: true, kind: marketplace ? "marketplace" : "disk", report });
 }
 
 export async function PATCH(

@@ -34,6 +34,18 @@ Set up AWS Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-com
 
 In this boundary mode, the direct Anthropic endpoint is disabled by default. That disables memory rerank, follow-up suggestions, knowledge proposals, and live Relay because those features use the direct Anthropic SDK. `EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1` is an explicit egress opt-in; `employee001 doctor --egress` reports its effective state. This changes where Agent SDK model prompts go, not the egress behavior of enabled Composio, OpenAI embeddings, ElevenLabs, web research, or custom MCP services.
 
+## What a twin can reach
+
+- **Reads.** A chat or meeting twin's `Read`, `Glob` and `Grep` are limited to its own folder, colleagues' nine profile files, `org-brain/` and `org-skills/`. Other twins' memory and chat history, invites, the audit log and settings are blocked.
+- **Approvals.** Write actions (send, post, create, update) and every `WebFetch` wait for approval, because a URL can carry data out. Read-only tool calls and `WebSearch` run on their own. A per-employee tool policy can turn a tool off, or allow it without asking.
+- **Email.** Email handled by a twin is passed in as untrusted data, never as instructions.
+
+## Deleting an employee's data
+
+Deleting a twin, or revoking its consent on the profile page, removes the data right away: profile and versions, knowledge files, memory, chat history, scratch notes, handover and relay data, shifts, run logs, routines, work items, invites, feed items and pending approvals. The twin's Composio connected accounts are deleted, so their tokens stop working; if Composio can't be reached, the deletion reports itself incomplete and can be retried. Goals the employee owned stay with the company, unassigned.
+
+The audit log keeps each row's time, tool and outcome, but the tool input and the employee's name are erased, and a deletion record is appended. The hash chain still verifies. The employee's id (a slug of their name) remains on those rows, and mentions of them in other twins' memory or in exported files are not searched.
+
 ## Your compliance scope
 
 You host Employee001, so it runs inside your environment and within your compliance scope. We make no SOC 2 or ISO claims. Assess the deployment, connected services, access controls, and data handling against the requirements that apply to your organization, as you would with other self-hosted software.

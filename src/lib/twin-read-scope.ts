@@ -1,0 +1,124 @@
+// What a chat/meeting twin may read from the data root with Read/Glob/Grep.
+//
+// The twin's cwd is data/ so it can reach its own profile, peer profiles and
+// the company brain. Everything else under data/ (other twins' memory and chat
+// history, invites, audit log, settings, relay transcripts, run logs) is
+// need-to-know and must stay out of reach: a prompt-injected twin (say, from an
+// email it was asked to handle) could otherwise read it and pass it on.
+//
+// Allowed:
+//   employees/<self>/**                  own profile, knowledge, scratch notes
+//   employees/<peer>/<PROFILE>.md        a colleague's 9 profile files only
+//   org-brain/**, org-skills/**          company knowledge and playbooks
+//   scratch/<self>/**                    own scratch notes
+// Glob may also list names under employees/ (file names, not content).
+// Grep over employees/ is allowed only with a glob naming profile files one
+// level down ("*/EXPERTISE.md", "*/{CONTEXT.md,PEOPLE.md}"): ripgrep anchors a
+// glob containing "/" and its "*" doesn't cross "/", so scratch/ and
+// knowledge/ notes inside a colleague's folder stay out.
+
+import path from "path";
+
+export const PEER_PROFILE_FILES = new Set([
+  "CONTEXT.md",
+  "EXPERTISE.md",
+  "PROJECTS.md",
+  "PEOPLE.md",
+  "DECISIONS.md",
+  "PREFERENCES.md",
+  "TONE.md",
+  "BOUNDARIES.md",
+  "EMPLOYMENT.md",
+]);
+
+const SHARED_ROOTS = ["org-brain", "org-skills"];
+
+export type ReadScopeDecision = { ok: true } | { ok: false; reason: string };
+
+/** Data-root-relative POSIX path, or null if it points outside the data root.
+ *  Relative paths resolve against the agent's cwd (the data root by default). */
+export function toDataRelative(rawPath: string, dataRoot: string, cwd: string = dataRoot): string | null {
+  const cleaned = rawPath.replace(/\\/g, "/").trim();
+  const abs = path.resolve(cwd, cleaned || ".");
+  const rel = path.relative(dataRoot, abs).split(path.sep).join("/");
+  if (rel === "") return "";
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  return rel;
+}
+
+function underRoot(rel: string, root: string): boolean {
+  return rel === root || rel.startsWith(`${root}/`);
+}
+
+/** May the twin read file contents at this data-relative path? */
+export function canReadPath(rel: string, employeeId: string): boolean {
+  if (SHARED_ROOTS.some((root) => underRoot(rel, root))) return true;
+  if (underRoot(rel, `employees/${employeeId}`)) return true;
+  if (underRoot(rel, `scratch/${employeeId}`)) return true;
+  const parts = rel.split("/");
+  return parts.length === 3 && parts[0] === "employees" && PEER_PROFILE_FILES.has(parts[2]);
+}
+
+function deny(tool: string, rawPath: string, employeeId: string): ReadScopeDecision {
+  return {
+    ok: false,
+    reason:
+      `${tool} is limited to your own folder (employees/${employeeId}/), colleagues' profile .md files, ` +
+      `org-brain/ and org-skills/. "${rawPath || "(data root)"}" is outside that scope.`,
+  };
+}
+
+export function checkTwinRead(
+  toolName: string,
+  input: Record<string, unknown> | undefined,
+  employeeId: string,
+  dataRoot: string,
+  cwd: string = dataRoot,
+): ReadScopeDecision {
+  const relOf = (raw: string) => toDataRelative(raw, dataRoot, cwd);
+  const str = (key: string) => (typeof input?.[key] === "string" ? (input[key] as string) : "");
+
+  if (toolName === "Read") {
+    const raw = str("file_path");
+    const rel = relOf(raw);
+    return rel !== null && rel !== "" && canReadPath(rel, employeeId)
+      ? { ok: true }
+      : deny("Read", raw, employeeId);
+  }
+
+  if (toolName === "Glob") {
+    const raw = str("path");
+    const pattern = str("pattern");
+    // A pattern that climbs out (../) or is absolute is judged on its own.
+    if (pattern.includes("..") || path.isAbsolute(pattern)) return deny("Glob", pattern, employeeId);
+    const rel = relOf(raw);
+    if (rel === null) return deny("Glob", raw, employeeId);
+    // Glob returns names only, so listing peers under employees/ is fine.
+    const base = rel === "" ? firstSegment(pattern) : rel;
+    if (base === "employees" || underRoot(base, "employees")) return { ok: true };
+    return canReadPath(base, employeeId) ? { ok: true } : deny("Glob", raw || pattern, employeeId);
+  }
+
+  if (toolName === "Grep") {
+    const raw = str("path");
+    const rel = relOf(raw);
+    if (rel === null || rel === "") return deny("Grep", raw, employeeId);
+    if (canReadPath(rel, employeeId)) return { ok: true };
+    // Searching across colleagues' profiles: only markdown files.
+    if (rel === "employees" && isPeerProfileGlob(str("glob"))) return { ok: true };
+    return deny("Grep", raw, employeeId);
+  }
+
+  return { ok: true };
+}
+
+function firstSegment(pattern: string): string {
+  return pattern.replace(/^\.\//, "").split("/")[0] ?? "";
+}
+
+function isPeerProfileGlob(glob: string): boolean {
+  const m = /^\*\/(?:\{([^{}]+)\}|([^/{},*?[\]]+))$/.exec(glob);
+  if (!m) return false;
+  const names = m[1] ? m[1].split(",") : [m[2]];
+  return names.every((n) => PEER_PROFILE_FILES.has(n.trim()));
+}

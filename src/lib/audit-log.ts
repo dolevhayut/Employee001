@@ -86,6 +86,15 @@ export type AuditEntry = {
   agentType?: string;
   /** Subagent instance id from the SDK hook input (parent_tool_use_id link). */
   agentId?: string;
+  /** SHA-256 of the canonical input. When present, the row hash commits to
+   *  this digest instead of the input itself, so the input (and the name) can
+   *  later be redacted for a deleted employee without breaking the chain. */
+  inputDigest?: string;
+  /** SHA-256 of employeeName, committed by the row hash the same way. */
+  nameDigest?: string;
+  /** Set when the row's personal data was removed by purgeEmployee. A
+   *  "purgeEmployee" tombstone row later in the chain lists this row's id. */
+  redacted?: { at: string };
   /** Hash of the preceding hashed row, or "genesis" for a new chain. */
   prevHash?: string;
   /** SHA-256 of prevHash plus the canonical row payload. */
@@ -122,10 +131,44 @@ function canonicalJson(value: unknown): string {
   return stableJson(JSON.parse(JSON.stringify(value)) as unknown);
 }
 
+function sha256(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+function digestInput(input: Record<string, unknown>): string {
+  return sha256(canonicalJson(input));
+}
+
+function digestName(name: string | undefined): string {
+  return sha256(name ?? "");
+}
+
+/** Fingerprint of a legacy row's fields other than the redactable ones. A
+ *  redacted legacy row can't be re-hashed (its hash covered the input), so the
+ *  purge record pins this value instead. */
+function legacyPin(row: AuditEntry): string {
+  const rest: Partial<AuditEntry> = { ...row };
+  delete rest.input;
+  delete rest.employeeName;
+  delete rest.redacted;
+  delete rest.hash;
+  return sha256(canonicalJson(rest));
+}
+
+/** What the row hash covers. Digest rows leave out the redactable fields
+ *  (input, employeeName); legacy rows are hashed whole. */
+function hashedPayload(row: Omit<AuditEntry, "hash">): Omit<AuditEntry, "hash"> {
+  const payload = { ...row };
+  delete payload.redacted;
+  if (payload.inputDigest) {
+    delete (payload as Partial<AuditEntry>).input;
+    delete (payload as Partial<AuditEntry>).employeeName;
+  }
+  return payload;
+}
+
 function hashRow(prevHash: string, row: Omit<AuditEntry, "hash">): string {
-  return createHash("sha256")
-    .update(`${prevHash}\n${canonicalJson(row)}`)
-    .digest("hex");
+  return sha256(`${prevHash}\n${canonicalJson(hashedPayload(row))}`);
 }
 
 /** Read only the final line, even when the active log is large. */
@@ -190,7 +233,7 @@ function makeId(): string {
 /** Append one entry to data/audit.jsonl (non-blocking). */
 export function appendAuditEntry(
   entry: Omit<AuditEntry, "id" | "ts" | "prevHash" | "hash">
-): void {
+): boolean {
   try {
     ensureDir();
     maybeRotate(AUDIT_FILE);
@@ -202,6 +245,8 @@ export function appendAuditEntry(
       id: makeId(),
       ts: new Date().toISOString(),
       ...entry,
+      inputDigest: digestInput(entry.input ?? {}),
+      nameDigest: digestName(entry.employeeName),
       prevHash: previous ?? "genesis",
     };
     const row: AuditEntry = {
@@ -211,8 +256,11 @@ export function appendAuditEntry(
     fs.appendFileSync(AUDIT_FILE, JSON.stringify(row) + "\n", "utf8");
     const stat = fs.statSync(AUDIT_FILE);
     lastHashCache = { filePath: AUDIT_FILE, hash: row.hash, size: stat.size, mtimeMs: stat.mtimeMs };
+    return true;
   } catch {
-    // Audit writes must never crash the agent run.
+    // Audit writes must never crash the agent run; callers that must know
+    // (the purge record) check the return value.
+    return false;
   }
 }
 
@@ -297,6 +345,8 @@ export function verifyAuditChain(): AuditChainVerification {
   let legacy = 0;
   let previous = "genesis";
   let chainStarted = false;
+  // Redacted rows seen so far that no purge record has vouched for yet.
+  const pending = new Map<string, { employeeId: string; pin?: string }>();
 
   const files = [
     ...listArchives().sort().map(pathForArchive),
@@ -330,12 +380,39 @@ export function verifyAuditChain(): AuditChainVerification {
 
       const unsignedRow = { ...row };
       delete unsignedRow.hash;
-      const expected = hashRow(row.prevHash, unsignedRow);
       if (row.prevHash !== previous) {
         return { ok: false, checked, legacy, firstBadId: row.id, reason: "previous hash mismatch" };
       }
-      if (row.hash !== expected) {
+      // A redacted legacy row no longer has the input its hash covered: only
+      // its place in the chain can be checked. Digest rows verify in full.
+      const contentCheckable = !row.redacted || Boolean(row.inputDigest);
+      if (contentCheckable && row.hash !== hashRow(row.prevHash, unsignedRow)) {
         return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
+      }
+      if (!row.redacted && row.inputDigest && row.inputDigest !== digestInput(row.input ?? {})) {
+        return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
+      }
+      if (!row.redacted && row.nameDigest && row.nameDigest !== digestName(row.employeeName)) {
+        return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
+      }
+      if (row.redacted) {
+        // A purge record is never redacted, and only fully checkable rows
+        // (with digests) or pinned legacy rows can be vouched for.
+        if (row.bareName === "purgeEmployee") {
+          return { ok: false, checked, legacy, firstBadId: row.id, reason: "redacted purge record" };
+        }
+        pending.set(row.id, { employeeId: row.employeeId, pin: row.inputDigest ? undefined : legacyPin(row) });
+      } else if (row.bareName === "purgeEmployee" && row.inputDigest) {
+        // Only a verified purge record that comes after the rows it lists,
+        // for the same employee, can vouch for them.
+        const pins = (row.input?.legacyPins ?? {}) as Record<string, unknown>;
+        for (const id of Array.isArray(row.input?.redactedIds) ? (row.input.redactedIds as unknown[]) : []) {
+          if (typeof id !== "string") continue;
+          const seen = pending.get(id);
+          if (!seen || seen.employeeId !== row.employeeId) continue;
+          if (seen.pin && pins[id] !== seen.pin) continue;
+          pending.delete(id);
+        }
       }
       chainStarted = true;
       previous = row.hash;
@@ -343,7 +420,61 @@ export function verifyAuditChain(): AuditChainVerification {
     }
   }
 
+  const orphan = pending.keys().next().value;
+  if (orphan) {
+    return { ok: false, checked, legacy, firstBadId: orphan, reason: "redacted row without a purge record" };
+  }
+
   return { ok: true, checked, legacy };
+}
+
+export type AuditRedaction = {
+  /** Every redacted row of the employee, including ones a failed earlier
+   *  attempt already redacted, so a retry's purge record still covers them. */
+  redactedIds: string[];
+  /** Fingerprints for redacted legacy rows (see legacyPin). */
+  legacyPins: Record<string, string>;
+};
+
+/**
+ * Remove an employee's personal data from every audit file (active and
+ * archived): the tool input and name are replaced; the row id, time, tool,
+ * verdict and hashes stay. The caller must then append a "purgeEmployee" row
+ * with the returned ids and pins, or verification fails.
+ */
+export function redactEmployeeAudit(employeeId: string): AuditRedaction {
+  const result: AuditRedaction = { redactedIds: [], legacyPins: {} };
+  const at = new Date().toISOString();
+  const files = [...listArchives().map(pathForArchive), AUDIT_FILE];
+  for (const filePath of files) {
+    if (!fs.existsSync(filePath)) continue;
+    const lines = fs.readFileSync(filePath, "utf8").split("\n").filter(Boolean);
+    let changed = false;
+    const out = lines.map((line) => {
+      let row: AuditEntry;
+      try {
+        row = JSON.parse(line) as AuditEntry;
+      } catch {
+        return line;
+      }
+      if (row.employeeId !== employeeId || row.bareName === "purgeEmployee") return line;
+      let next = row;
+      if (!row.redacted) {
+        changed = true;
+        next = { ...row, employeeName: "[deleted]", input: { redacted: true }, redacted: { at } };
+      }
+      result.redactedIds.push(row.id);
+      if (!row.inputDigest) result.legacyPins[row.id] = legacyPin(next);
+      return next === row ? line : JSON.stringify(next);
+    });
+    if (changed) {
+      const tmp = `${filePath}.tmp-${process.pid}`;
+      fs.writeFileSync(tmp, out.join("\n") + "\n", "utf8");
+      fs.renameSync(tmp, filePath);
+    }
+  }
+  lastHashCache = undefined;
+  return result;
 }
 
 /**

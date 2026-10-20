@@ -45,7 +45,7 @@ npx employee001 start     # opens http://localhost:3000
 
 - **Twins of real people, not role templates.** Each employee connects their own tools (Slack, Gmail, Linear, GitHub ...) and a training agent writes their twin from their actual history: expertise, decisions, tone.
 - **Team Meeting.** Ask one question and the right twins argue it out, challenge each other and land on a verdict you can act on.
-- **Nothing runs unapproved by default.** Every external action (an email, a Slack post, a ticket) stops at an approval gate, and every tool call is written to an audit log. Each employee authorizes their own twin's tools with their own OAuth.
+- **Nothing changes unapproved by default.** Every write action (an email, a Slack post, a ticket) and every web fetch stops at an approval gate; read-only tool calls run on their own. Every tool call is written to an audit log, and each employee authorizes their own twin's tools with their own OAuth.
 - **Local-first.** Your profiles, memory, audit log and org knowledge live in `./data/` on your hardware. Prefer a server? Run your own single-tenant cloud instance.
 - **Speaks Hebrew.** Twins converse, write and remember in natural Hebrew, with right-to-left rendering, no extra service needed.
 
@@ -146,7 +146,7 @@ As of October 2026:
 |---|---|---|---|---|---|
 | Who the agent represents | A generic assistant | Agent teams | Configurable AI "employees" | Agents that engineers build and deliver | **A twin of a real, named person, trained on their own work** |
 | Where it runs | OpenAI / Microsoft cloud | Self-hosted, markdown on disk (cloud on a waitlist) | Self-hosted or managed | Managed cloud | **Your machine, or your own single-tenant cloud. [What leaves it](SECURITY.md#what-leaves-your-machine)** |
-| External actions | Depends on the connector | Human approval queue | Its own approvals; Claude/Codex runs default to full auto since v2026.1001.0 | Approval gates | **Approval gate on every external action, on by default** |
+| External actions | Depends on the connector | Human approval queue | Its own approvals; Claude/Codex runs default to full auto since v2026.1001.0 | Approval gates | **Approval gate on every write action, on by default** |
 | Several agents on one question | — | Agent teams | Task routing between agents | Agent workflows | **Team Meeting: twins debate and converge on a verdict** |
 | Shared knowledge | Conversation history | Knowledge base | Company skills learned from finished tasks | Packaged agent skills | **Org Brain: what one twin learns, the others can use** |
 
@@ -216,7 +216,7 @@ No twin runs shell commands on your machine. Enforced in two places at once (the
 
 ² `Task` spawns one of two restricted sub-agents: a **web-researcher** (only `WebSearch` + `WebFetch`) or a **brain-explorer** (only `Read` + `Glob` + `Grep`). Sub-agents inherit the same hard-disallow list.
 
-³ Composio MCP tools are *external-effect* tools — posting to Slack, sending Gmail, opening GitHub PRs. Every call hits the approval gate above. Auto-execution is off by default. Read-only Composio calls run without prompting.
+³ Composio MCP tools are *external-effect* tools — posting to Slack, sending Gmail, opening GitHub PRs. Every call that changes something hits the approval gate above. Auto-execution is off by default. Read-only Composio calls (list, search, fetch) run without prompting.
 
 **Audit trail.** Every tool call — built-in or Composio — is appended to `data/audit.jsonl` with the run id, the employee id, the tool name, the input, and the verdict (`executed` / `ceo_approved` / `ceo_denied` / `hard_blocked`). Browseable from `/audit`.
 
@@ -320,7 +320,7 @@ The product has shipped the core loop end-to-end. Tracking against the public ro
 
 - [x] Twin chat with profile-file citations (`/flow`)
 - [x] Composio MCP integration (Slack, Gmail, GitHub, Linear, Calendar, Drive)
-- [x] Approval gate on every external tool call
+- [x] Approval gate on every external write and web fetch
 - [x] In-UI profile editing of the 9 markdown files
 - [x] Per-invite training window (30–360 days)
 - [x] Team Meeting: multi-twin debates (`/council`)

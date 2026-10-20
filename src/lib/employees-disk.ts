@@ -5,7 +5,7 @@
 import "server-only";
 import fs from "fs/promises";
 import path from "path";
-import type { ClaudeModel, EmployeeWithTwin } from "./employees";
+import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin } from "./employees";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 import { withSidecarLock } from "./sidecar-lock";
 import { dataDir } from "./app-home";
@@ -48,6 +48,8 @@ type DiskSidecar = {
   lastActiveAt?: string;
   questionsThisWeek?: number;
   weekOf?: string; // ISO week string e.g. "2026-W20"
+  /** Recorded by the invite wizard (version, scopes, timestamp). */
+  consent?: EmployeeConsent;
   /** Legacy single-model records apply the selected model to both workflows. */
   model?: ClaudeModel;
   seedModel?: ClaudeModel;
@@ -163,6 +165,7 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
       seedModel: sidecar.seedModel ?? sidecar.model ?? TWIN_MODEL_OPUS,
       refreshModel: sidecar.refreshModel ?? sidecar.model ?? TWIN_MODEL_PRIMARY,
       ttsVoiceId: "EXAVITQu4vr4xnSDxMaL",
+      ...(sidecar.consent ? { consent: sidecar.consent } : {}),
     });
   }
 
