@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
+import { fetchSpeech } from "@/lib/tts-model";
 
 const MAX_CHARS = 5000;
 const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
-const MODEL_ID = "eleven_flash_v2_5";
 
 function stripMarkdown(md: string): string {
   return md
@@ -35,21 +35,7 @@ export async function POST(request: NextRequest) {
   const text = stripMarkdown(rawText).slice(0, MAX_CHARS);
   const voiceId = body.voiceId ?? DEFAULT_VOICE_ID;
 
-  const upstream = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
-    {
-      method: "POST",
-      headers: {
-        "xi-api-key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text,
-        model_id: MODEL_ID,
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-      }),
-    }
-  );
+  const upstream = await fetchSpeech(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, apiKey, text);
 
   if (!upstream.ok) {
     const err = await upstream.text();

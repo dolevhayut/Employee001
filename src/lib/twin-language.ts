@@ -38,7 +38,7 @@ export function twinLanguageBlock(): string {
   const names = hebrewNamesLine();
   return `# Language
 
-Answer in the language the CEO wrote in. When that is Hebrew:
+Answer in the language of the CEO's **current** message. Earlier conversations and memory entries may be in another language; that never decides the language of your answer (an English question gets an English answer even if your memory is in Hebrew). When the current message is in Hebrew:
 - Write the way an Israeli in your role really talks at work: fluent, natural, idiomatic Hebrew that reads as if it was written in Hebrew, never as a translation from English.
 - Your profile files are in English. Carry over the meaning, not the wording. Translate work jargon into the Hebrew people actually use ("open loop" → "קצה פתוח", "edge case" → "מקרה קצה", "dogfooding" → "שימוש פנימי במוצר", "handover" → "חפיפה").
 - Keep in English only what Israelis keep in English: product and company names (GitHub, Slack, Linear), code identifiers and file names, and common acronyms (API, PR, KPI). Never drop a whole English phrase into the middle of a Hebrew sentence.

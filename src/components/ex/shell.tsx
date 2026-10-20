@@ -67,6 +67,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     labelKey: "nav.section.work",
     items: [
+      { href: "/ask", labelKey: "nav.ask", icon: "Spark" },
       { href: "/inbox", labelKey: "nav.approvals", icon: "Bell", badge: "approvals" },
       { href: "/tasks", labelKey: "nav.tasks", icon: "Zap" },
       { href: "/council", labelKey: "nav.teamMeeting", icon: "Team" },
@@ -193,6 +194,7 @@ function ThemeToggle() {
 const COMPANY_MONTHLY_BUDGET_USD = 50;
 
 const STATIC_COMMANDS: StaticCommand[] = [
+  { id: "ask", labelKey: "nav.ask", href: "/ask", icon: "Spark", group: "popular", hintKey: "shell.cmd.ask.hint", keywords: "ask question orb answer twin שאלה שאלו תשובה" },
   { id: "home", labelKey: "nav.twins", href: "/employees", icon: "Home", group: "popular", hintKey: "shell.cmd.twins.hint", keywords: "employees people team admin roster clone status תאומים עובדים אנשים צוות" },
   { id: "inbox", labelKey: "nav.approvals", href: "/inbox", icon: "Bell", group: "popular", hintKey: "shell.cmd.approvals.hint", keywords: "inbox feed activity alerts review approval flagged updates אישורים תיבה התראות עדכונים" },
   { id: "cockpit", labelKey: "nav.cockpit", href: "/cockpit", icon: "Activity", group: "popular", hintKey: "shell.cmd.cockpit.hint", keywords: "live agents running cockpit monitor real-time קוקפיט הרצות סוכנים חי" },

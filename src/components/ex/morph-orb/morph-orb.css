@@ -1,0 +1,406 @@
+/* MorphOrb styles, built on the app's theme tokens so the stage reads as part
+   of Employee001 in every theme (light, dark, cool). The 21st.dev registry
+   shipped only the keyframes; the class styles are ours. The runtime drives
+   everything through CSS variables on .mo-actor (--w, --h, --r and the --o*
+   opacities), .mo-status (--sOp, --sTy) and .mo-root (--oCenter, --cardH).
+   The orb's dots are drawn on a canvas in colors read from --text and
+   --accent (see themeColors in morph-orb.tsx). */
+
+@property --angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes mo-spin { to { --angle: 360deg; } }
+@keyframes mo-drift { from { transform: translateX(-14%); } to { transform: translateX(14%); } }
+@keyframes mo-shimmer { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+@keyframes mo-dot { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@keyframes mo-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes mo-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-6px); } }
+@keyframes mo-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mo-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes mo-shake {
+  0%, 100% { transform: translate(-50%, -50%); }
+  25% { transform: translate(calc(-50% - 4px), -50%); }
+  75% { transform: translate(calc(-50% + 4px), -50%); }
+}
+
+.mo-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  isolation: isolate;
+  --oCenter: 0;
+}
+
+/* dotted grid that fades out toward the edges */
+.mo-bg {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(color-mix(in oklab, var(--text) 13%, transparent) 1px, transparent 1.3px);
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 62% at 50% 46%, #000 25%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 62% at 50% 46%, #000 25%, transparent 100%);
+  pointer-events: none;
+}
+
+/* warm light behind the orb while it thinks */
+.mo-halo {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 640px;
+  height: 640px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    color-mix(in oklab, var(--accent) 16%, transparent) 0%,
+    color-mix(in oklab, var(--accent) 6%, transparent) 38%,
+    transparent 66%);
+  opacity: var(--oCenter);
+  pointer-events: none;
+}
+
+/* the mover sits at the stage centre; the runtime translates it */
+.mo-mover {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 0;
+  height: 0;
+  will-change: transform;
+  z-index: 2;
+}
+
+.mo-trail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    color-mix(in oklab, var(--accent) 45%, transparent) 0%,
+    color-mix(in oklab, var(--accent) 12%, transparent) 45%,
+    transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* the shape that morphs: pill -> ball -> orb -> accent ball -> card */
+.mo-actor {
+  --w: 560px; --h: 60px; --r: 999px;
+  --oGlow: 1; --oHalo: 0; --oPill: 1; --oBall: 0; --oGreen: 0; --oCard: 0; --oRing: 1;
+  --oInput: 1; --inScale: 1; --oAur: 1; --gs: .55; --cs: 1; --hOp: 0; --dotS: 0; --bloom: 1;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--w);
+  height: var(--h);
+  border-radius: var(--r);
+  transform: translate(-50%, -50%) scale(var(--cs));
+}
+.mo-actor[data-shake] { animation: mo-shake 0.26s ease-in-out; }
+
+.mo-actor > * { position: absolute; border-radius: inherit; }
+
+/* warm light spilling under the pill */
+.mo-underglow {
+  left: 8%;
+  right: 8%;
+  bottom: -22px;
+  height: 40px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--warn) 30%, var(--twin) 60%, var(--accent-deep));
+  filter: blur(26px);
+  opacity: calc(var(--oGlow) * 0.32);
+  animation: mo-drift 6s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.mo-actor[data-typing] .mo-underglow { opacity: calc(var(--oGlow) * 0.5); }
+
+.mo-halo-green {
+  inset: -36px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    color-mix(in oklab, var(--accent) 50%, transparent) 0%,
+    color-mix(in oklab, var(--accent) 12%, transparent) 45%,
+    transparent 70%);
+  filter: blur(8px);
+  opacity: var(--oHalo);
+  pointer-events: none;
+}
+
+.mo-surface {
+  inset: 0;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--text) 4%, transparent), 0 12px 32px color-mix(in oklab, var(--text) 10%, transparent);
+  opacity: var(--oPill);
+}
+
+/* soft colour along the bottom edge of the pill */
+.mo-aurora {
+  position: absolute;
+  inset: 0;
+  opacity: var(--oAur);
+  filter: blur(14px);
+}
+.mo-aurora i {
+  position: absolute;
+  bottom: -20px;
+  width: 26%;
+  height: 28px;
+  border-radius: 50%;
+  opacity: 0.32;
+  animation: mo-drift 5s ease-in-out infinite alternate;
+}
+.mo-aurora i:nth-child(1) { left: 4%; background: var(--accent); animation-duration: 6.5s; }
+.mo-aurora i:nth-child(2) { left: 28%; background: var(--warn); animation-duration: 5.2s; animation-delay: -2s; }
+.mo-aurora i:nth-child(3) { left: 52%; background: var(--twin); animation-duration: 7s; animation-delay: -1s; }
+.mo-aurora i:nth-child(4) { left: 74%; background: var(--accent-deep); animation-duration: 5.8s; animation-delay: -3s; }
+
+.mo-ball {
+  inset: 0;
+  background: radial-gradient(circle at 35% 30%, var(--surface) 0%, var(--bg-sunken) 70%, color-mix(in oklab, var(--bg-sunken) 85%, var(--text)) 100%);
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--text) 14%, transparent);
+  opacity: var(--oBall);
+}
+
+/* the "answer found" ball, in the theme accent */
+.mo-green {
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%,
+    color-mix(in oklab, var(--accent) 35%, var(--surface)) 0%,
+    var(--accent) 50%,
+    var(--accent-deep) 100%);
+  box-shadow: 0 0 40px color-mix(in oklab, var(--accent) 55%, transparent);
+  transform: scale(var(--gs));
+  opacity: var(--oGreen);
+}
+
+.mo-card {
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse calc(var(--bloom) * 60%) calc(var(--bloom) * 120%) at 0% 70%,
+      color-mix(in oklab, var(--accent) 16%, transparent), transparent 70%),
+    var(--surface);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 18px 50px color-mix(in oklab, var(--text) 12%, transparent);
+  opacity: var(--oCard);
+}
+
+/* turning gradient border around the pill and the ball */
+.mo-ring {
+  inset: 0;
+  padding: 1px;
+  background: conic-gradient(from var(--angle), var(--accent), var(--accent-soft), var(--twin), var(--warn), var(--accent-deep), var(--accent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: calc(var(--oRing) * 0.9);
+  animation: mo-spin 6s linear infinite;
+  pointer-events: none;
+}
+.mo-actor[data-flash] .mo-ring {
+  background: var(--danger);
+  opacity: 1;
+}
+
+.mo-input {
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 0 20px;
+  opacity: var(--oInput);
+  transform: scale(var(--inScale));
+  transform-origin: center;
+}
+.mo-spark { width: 18px; height: 18px; flex: none; color: var(--accent); }
+.mo-field {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base, 15px);
+}
+.mo-field::placeholder { color: var(--text-subtle); }
+.mo-send {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg-sunken);
+  color: var(--text-subtle);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+.mo-send svg { width: 18px; height: 18px; }
+.mo-send[data-ready] { background: var(--text); color: var(--bg-elevated); }
+.mo-send[data-ready]:hover { transform: scale(1.06); }
+
+.mo-orb {
+  left: 50%;
+  top: 50%;
+  width: 220px;
+  height: 220px;
+  border-radius: 0;
+  transform: translate(-50%, -50%);
+  color: var(--text);
+  pointer-events: none;
+}
+
+.mo-pulse {
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, var(--accent) 70%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* the answer, written inside the card */
+.mo-answer {
+  inset: 0;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  outline: none;
+  visibility: hidden;
+}
+.mo-root[data-phase="unfold"] .mo-answer,
+.mo-root[data-phase="answered"] .mo-answer { visibility: visible; }
+.mo-a-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  opacity: var(--hOp);
+}
+.mo-a-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--accent) 80%, transparent);
+  transform: scale(var(--dotS));
+}
+.mo-a-body {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+.mo-a-body::-webkit-scrollbar { width: 6px; }
+.mo-a-body::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 3px; }
+.mo-w { display: inline-block; opacity: 0; will-change: opacity, transform, filter; }
+
+/* Thinking / Searching / … under the orb */
+.mo-status {
+  --sOp: 0;
+  --sTy: 6;
+  position: absolute;
+  left: 50%;
+  top: calc(46% + 88px);
+  width: 320px;
+  height: 22px;
+  transform: translate(-50%, calc(var(--sTy) * 1px));
+  opacity: var(--sOp);
+  pointer-events: none;
+  z-index: 3;
+}
+.mo-lab {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.mo-lab.mo-in { animation: mo-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.mo-lab.mo-out { animation: mo-out 0.26s ease-in both; }
+.mo-lab-t {
+  background: linear-gradient(90deg, var(--text-subtle) 0%, var(--text) 50%, var(--text-subtle) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: mo-shimmer 1.8s linear infinite;
+}
+.mo-lab-done { color: var(--accent-deep); font-weight: 500; }
+.mo-dots { display: inline-flex; gap: 3px; }
+.mo-dots i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; animation: mo-dot 1.2s infinite; }
+.mo-dots i:nth-child(2) { animation-delay: 0.15s; }
+.mo-dots i:nth-child(3) { animation-delay: 0.3s; }
+
+.mo-reset {
+  position: absolute;
+  left: 50%;
+  top: calc(46% + var(--cardH, 216px) / 2 + 18px);
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: background 0.2s, color 0.2s;
+  z-index: 3;
+}
+.mo-reset:hover { background: var(--surface-soft); color: var(--text); }
+.mo-root[data-phase="answered"] .mo-reset { pointer-events: auto; animation: mo-fade-in 0.35s 0.2s ease-out both; }
+
+.mo-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.mo-debug {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  z-index: 4;
+}
+.mo-chip { padding: 2px 8px; border-radius: 999px; background: var(--bg-sunken); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mo-underglow, .mo-aurora i, .mo-ring, .mo-lab-t, .mo-dots i { animation: none; }
+}

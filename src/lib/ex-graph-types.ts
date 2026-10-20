@@ -83,6 +83,12 @@ export type TwinTraceEvent =
       ts: number;
     }
   | {
+      /** The twin's reasoning (extended thinking), streamed separately from the answer. */
+      type: "thinking_delta";
+      delta: string;
+      ts: number;
+    }
+  | {
       type: "cite";
       /** A file the final answer cites — drives the persistent "cited" highlight */
       file: string;

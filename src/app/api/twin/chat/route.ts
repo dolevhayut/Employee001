@@ -165,6 +165,10 @@ export async function POST(request: NextRequest) {
           case "tool_result":
             send({ type: "tool_result", name: "result", summary: "ok", files: [], ts });
             break;
+          case "thinking_delta":
+            // The twin's reasoning, for clients that show how it got there.
+            send({ type: "thinking_delta", delta: evt.delta, ts });
+            break;
           case "text_delta":
             responseText += evt.delta;
             send({ type: "text_delta", delta: evt.delta, ts });
