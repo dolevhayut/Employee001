@@ -30,6 +30,7 @@ type Turn = {
   twinName: string;
   initials: string;
   color: string;
+  voiceId?: string;
   question: string;
   steps: Step[];
   thinking: string;
@@ -216,6 +217,37 @@ function Avatar({ initials, color, size = 26 }: { initials: string; color: strin
   );
 }
 
+type AudioState = { id: number; status: "loading" | "playing" } | null;
+
+/** Speaker button: plays an answer in the twin's voice (ElevenLabs). */
+function SpeakButton({ state, onClick, label, size = 26 }: { state: "idle" | "loading" | "playing"; onClick: () => void; label: string; size?: number }) {
+  const icon = size * 0.5;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      style={{
+        width: size,
+        height: size,
+        flex: "none",
+        display: "grid",
+        placeItems: "center",
+        borderRadius: "50%",
+        border: `1px solid ${state === "idle" ? "var(--hairline)" : "var(--accent)"}`,
+        background: state === "playing" ? "color-mix(in oklab, var(--accent) 16%, var(--surface))" : "var(--surface)",
+        color: state === "idle" ? "var(--text-muted)" : "var(--accent)",
+        cursor: "pointer",
+        boxShadow: state === "playing" ? "0 0 0 4px color-mix(in oklab, var(--accent) 14%, transparent)" : "none",
+        transition: "all 0.2s",
+      }}
+    >
+      {state === "loading" ? <Icons.Loader size={icon} /> : state === "playing" ? <Icons.VolumeOff size={icon} /> : <Icons.Volume size={icon} />}
+    </button>
+  );
+}
+
 function Trace({ turn, live }: { turn: Turn; live: boolean }) {
   const { t } = useT();
   const [open, setOpen] = useState(true);
@@ -323,6 +355,8 @@ export default function AskPage() {
   const turnSeq = useRef(0);
   const stepSeq = useRef(0);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const [audio, setAudio] = useState<AudioState>(null);
+  const [voiceHint, setVoiceHint] = useState(false);
 
   const twinId = selected ?? twins[0]?.id ?? null;
   const liveTurn = turns.find((turn) => turn.answer === null);
@@ -346,27 +380,44 @@ export default function AskPage() {
   const stopAudio = () => {
     audioRef.current?.pause();
     audioRef.current = null;
+    setAudio(null);
   };
 
-  const speak = async (answer: string) => {
-    if (!voiceOn || !voiceReady || !answer) return;
+  /** Play (or stop) one answer in the twin's voice, through ElevenLabs. */
+  const speak = async (turnId: number, answer: string, voiceId?: string) => {
+    if (audio?.id === turnId) {
+      stopAudio();
+      return;
+    }
+    if (!voiceReady) {
+      setVoiceHint(true);
+      window.setTimeout(() => setVoiceHint(false), 4500);
+      return;
+    }
+    if (!answer) return;
+    stopAudio();
+    setAudio({ id: turnId, status: "loading" });
     try {
       const res = await fetch("/api/tts/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: answer, voiceId: twin?.ttsVoiceId }),
+        body: JSON.stringify({ text: answer, voiceId }),
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`tts ${res.status}`);
       const url = URL.createObjectURL(await res.blob());
-      stopAudio();
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => URL.revokeObjectURL(url);
-      await audio.play();
+      const player = new Audio(url);
+      audioRef.current = player;
+      player.onended = () => {
+        URL.revokeObjectURL(url);
+        if (audioRef.current === player) stopAudio();
+      };
+      await player.play();
+      setAudio({ id: turnId, status: "playing" });
     } catch {
-      /* voice is a bonus; the answer is already on screen */
+      setAudio(null); /* voice is a bonus; the answer is already on screen */
     }
   };
+  const audioStateFor = (id: number) => (audio?.id === id ? audio.status : "idle");
 
   const patchTurn = (id: number, fn: (turn: Turn) => Turn) =>
     setTurns((prev) => prev.map((turn) => (turn.id === id ? fn(turn) : turn)));
@@ -386,7 +437,7 @@ export default function AskPage() {
     const id = ++turnSeq.current;
     setTurns((prev) => [
       ...prev,
-      { id, twinId, twinName: twin.name, initials: twin.initials, color: twin.avatarColor, question, steps: [], thinking: "", answer: null },
+      { id, twinId, twinName: twin.name, initials: twin.initials, color: twin.avatarColor, voiceId: twin.ttsVoiceId, question, steps: [], thinking: "", answer: null },
     ]);
     let answer: string;
     try {
@@ -442,7 +493,21 @@ export default function AskPage() {
         <div style={{ position: "relative", flex: 7, minWidth: 0, minHeight: 520 }}>
           <MorphOrb
             onSubmit={onSubmit}
-            onAnswered={(answer) => void speak(answer)}
+            onAnswered={(answer) => {
+              const last = turns[turns.length - 1];
+              if (voiceOn && voiceReady && last) void speak(last.id, answer, last.voiceId);
+            }}
+            answerAction={(() => {
+              const last = turns[turns.length - 1];
+              if (!last?.answer) return null;
+              return (
+                <SpeakButton
+                  state={audioStateFor(last.id)}
+                  label={t("ask.listen")}
+                  onClick={() => void speak(last.id, last.answer ?? "", last.voiceId)}
+                />
+              );
+            })()}
             onReset={() => {
               setBusy(false);
               stopAudio();
@@ -461,6 +526,38 @@ export default function AskPage() {
 
           {/* every tool, MCP server and knowledge source the twin touches lights up around the orb */}
           <ToolNodes steps={liveTurn?.steps ?? []} visible={Boolean(liveTurn)} />
+
+          <AnimatePresence>
+            {voiceHint && (
+              <motion.a
+                href="/settings"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  top: 20,
+                  translateX: "-50%",
+                  zIndex: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  background: "var(--surface)",
+                  border: "1px solid var(--hairline)",
+                  boxShadow: "0 8px 24px color-mix(in oklab, var(--text) 10%, transparent)",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <Icons.Volume size={13} /> {t("ask.voiceSetup")}
+              </motion.a>
+            )}
+          </AnimatePresence>
 
           {/* who answers */}
           <motion.div
@@ -600,6 +697,14 @@ export default function AskPage() {
                     }}
                   >
                     {turn.answer}
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+                      <SpeakButton
+                        size={24}
+                        state={audioStateFor(turn.id)}
+                        label={t("ask.listen")}
+                        onClick={() => void speak(turn.id, turn.answer ?? "", turn.voiceId)}
+                      />
+                    </div>
                   </motion.div>
                 )}
               </motion.div>

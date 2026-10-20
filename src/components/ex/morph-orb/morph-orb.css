@@ -297,6 +297,11 @@
   color: var(--text-subtle);
   opacity: var(--hOp);
 }
+.mo-a-action {
+  margin-inline-start: auto;
+  letter-spacing: normal;
+  text-transform: none;
+}
 .mo-a-dot {
   width: 6px;
   height: 6px;

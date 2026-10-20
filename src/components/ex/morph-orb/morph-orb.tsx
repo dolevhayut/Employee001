@@ -42,6 +42,8 @@ export interface MorphOrbProps {
   onAnswered?: (answer: string) => void;
   /** Called when the orb returns to the idle input. */
   onReset?: () => void;
+  /** Rendered at the end of the answer card's header (e.g. a speaker button). */
+  answerAction?: React.ReactNode;
   copy?: Partial<MorphOrbCopy>;
   minThinkMs?: number;
   speed?: number;
@@ -1121,6 +1123,7 @@ export default function MorphOrb(props: MorphOrbProps) {
             <div className="mo-a-head">
               <i className="mo-a-dot" aria-hidden="true" />
               <span>{copy.answerTitle}</span>
+              {props.answerAction ? <span className="mo-a-action">{props.answerAction}</span> : null}
             </div>
             <p className="mo-a-body" ref={bodyRef} dir="auto">
               {words.map((w, i) => (
