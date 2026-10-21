@@ -5,6 +5,7 @@ import { getHiredEmployees } from "@/lib/hired-agents";
 import { hasEmployeeFiles } from "@/lib/employees-files";
 import { createDemoReplayResponse } from "@/lib/demo-replay";
 import { canRunModel } from "@/lib/model-provider";
+import { pickTwins } from "@/lib/org-ask";
 
 export async function POST(request: NextRequest) {
   // Demo replay is explicit, never inferred from missing credentials. This keeps
@@ -20,6 +21,8 @@ export async function POST(request: NextRequest) {
      *  ids as "start a new meeting" and returns the new id in a `meeting`
      *  SSE event for the client to persist. */
     meetingId?: string;
+    /** Let the relevant twins answer: the org router picks 1–3 of employeeIds. */
+    auto?: boolean;
   };
 
   const question = body.question?.trim();
@@ -36,7 +39,7 @@ export async function POST(request: NextRequest) {
     ...fromDisk,
     ...getHiredEmployees().filter((h) => !fromDisk.some((e) => e.id === h.id)),
   ];
-  const employees = roster.filter(
+  let employees = roster.filter(
     (e) =>
       e.twinStatus === "ready" &&
       requestedIds.includes(e.id) &&
@@ -78,6 +81,15 @@ export async function POST(request: NextRequest) {
       };
 
       try {
+        // "Relevant" mode: only the twins who know answer; the rest can be @tagged in.
+        if (body.auto && employees.length > 1) {
+          const { picks } = await pickTwins(question, employees);
+          const chosen = picks.map((p) => employees.find((e) => e.id === p.id)).filter((e): e is (typeof employees)[number] => Boolean(e));
+          if (chosen.length) {
+            employees = chosen;
+            send({ type: "routed", picks: picks.map((p) => ({ id: p.id, matched: p.matched })) });
+          }
+        }
         const result = await runCouncil({
           responders: employees,
           question,

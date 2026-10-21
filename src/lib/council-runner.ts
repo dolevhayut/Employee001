@@ -490,6 +490,8 @@ Hard cap 25 MB. Use share_with_meeting sparingly — only when the data is reusa
 
 You are in a live group meeting with the CEO and your colleagues. Treat this like a Slack thread or a real meeting room: **everyone sees every message, including yours**. Speakers take turns. You will see the **full transcript so far** below — read it carefully before you respond.
 
+**Keep it Slack-short. This overrides the "2–4 short paragraphs" rule above:** in this meeting write at most 4 sentences (about 70 words), one paragraph, plain prose, no headings, lists or tables. Answer from your own area, knowledge and memory; say what you'd do and why, and leave the rest to colleagues.
+
 **Colleagues in the room:** ${teamMeetingContext.colleagues.join(", ")}
 ${teamMeetingContext.calledInBy ? `\n**You were just called in by ${teamMeetingContext.calledInBy}** — they tagged you because they think your input is needed. Address that directly.\n` : ""}
 ## Meeting transcript so far
@@ -506,10 +508,10 @@ ${sharedFilesSection ? `\n${sharedFilesSection}\n` : ""}${scratchToolsSection ? 
 
 **Delegation rule:** If your answer needs a specific colleague's expertise or tools (Slack, email, GitHub, etc.), tag them with @FirstName at the end of your response. They'll be called in next.
 
-- Only tag if their input genuinely adds value.
+- Only tag if their input genuinely adds value, and ask them something specific.
 - Tag at most one colleague per response.
-- Do NOT tag yourself or anyone who has already been called in this thread.
-- Example: "I'd defer the GTM side to @Noa — she has the customer context."`
+- You may tag someone who already spoke if you have a direct question or pushback for them; that's how a real discussion goes. Never tag yourself.
+- Example: "@Noa, can engineering commit to the 3-week date, or is that a guess?"`
     : "";
 
   // Current date/time — must live in the dynamic section so it doesn't
@@ -1481,7 +1483,13 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
     throw new Error(modelRun.reason);
   }
 
-  const MAX_DELEGATION_ROUNDS = 3;
+  const MAX_DELEGATION_ROUNDS = 4;
+  // A real back-and-forth: a twin can be called in again, but a run stays
+  // bounded: at most 8 twin turns per CEO message, 2 call-ins per twin.
+  const MAX_TURNS_PER_RUN = 8;
+  const MAX_CALL_INS_PER_TWIN = 2;
+  const callIns = new Map<string, number>();
+  let turnsThisRun = 0;
 
   // Load or create meeting state.
   const meeting: Meeting = getOrCreateMeeting(
@@ -1520,6 +1528,7 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
     delegatedFrom?: EmployeeWithTwin
   ): Promise<string> {
     spokenThisRun.add(employee.id);
+    turnsThisRun++;
 
     const transcriptText = renderTranscriptForPrompt(meeting.transcript);
     const sharedFilesText = renderSharedFilesForPrompt(
@@ -1624,8 +1633,8 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
       // block in the system prompt. We still pass a short user-side nudge
       // so the SDK has a non-empty prompt to anchor on.
       delegatedFrom
-        ? `${delegatedFrom.firstName} tagged you. Read the transcript above and respond.`
-        : `Respond to the CEO's most recent message in the transcript.`,
+        ? `${delegatedFrom.firstName} tagged you. Read the transcript above and respond in at most 4 sentences.`
+        : `Respond to the CEO's most recent message in the transcript, in at most 4 sentences.`,
       cockpitOnEvent,
       [],
       {
@@ -1677,8 +1686,9 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
         text,
         allParticipants.filter((e) => e.id !== employee.id)
       );
-      const mentioned = allMentions.filter((e) => !spokenThisRun.has(e.id));
-      const blocked = allMentions.filter((e) => spokenThisRun.has(e.id));
+      const canCallIn = (e: EmployeeWithTwin) => (callIns.get(e.id) ?? 0) < MAX_CALL_INS_PER_TWIN && turnsThisRun < MAX_TURNS_PER_RUN;
+      const mentioned = allMentions.filter(canCallIn);
+      const blocked = allMentions.filter((e) => !canCallIn(e));
 
       const tail = text.slice(-200).replace(/\s+/g, " ");
       dlog(`[council]   ${employee.firstName} (${text.length} chars). Tail: "…${tail}". Mentions: [${mentioned.map((m) => m.firstName).join(", ") || "none"}]. Blocked: [${blocked.map((m) => m.firstName).join(", ") || "none"}]`);
@@ -1696,7 +1706,8 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
       }
 
       for (const target of mentioned) {
-        if (spokenThisRun.has(target.id)) continue;
+        if (!canCallIn(target)) continue;
+        callIns.set(target.id, (callIns.get(target.id) ?? 0) + 1);
         dlog(`[council]     → calling in ${target.firstName}`);
 
         onEvent({

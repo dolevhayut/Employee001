@@ -72,6 +72,8 @@ type TwinResponse = {
   blocked: { tool: string; reason: string }[];
   artifacts: EmployeeCanvas[];
   delegatedFrom?: { id: string; name: string }; // set when this response was triggered by a @mention
+  /** The twin's reasoning while it works (shown before its answer arrives). */
+  thinking?: string;
 };
 
 type DelegationBadge = {
@@ -112,6 +114,16 @@ type MessageThread = {
   blockedDelegations: BlockedDelegation[];
   fileShares: SharedFileChip[];
   pending: boolean;
+  /** Set when the CEO replied to one twin's message (Slack/WhatsApp style). */
+  replyTo?: { employeeId: string; name: string; excerpt: string };
+  /** "Relevant" mode: who the router asked, and why (null while routing). */
+  routed?: { id: string; matched: string[] }[] | null;
+};
+
+type MeetingDecision = {
+  decision: string;
+  actions: { employeeId: string; action: string; due?: string }[];
+  open: string[];
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -345,7 +357,7 @@ function EmptyState({ onChip }: { onChip: (text: string) => void }) {
 
 // ─── Message bubbles ──────────────────────────────────────────────────────────
 
-function UserBubble({ text }: { text: string }) {
+function UserBubble({ text, replyTo }: { text: string; replyTo?: { name: string; excerpt: string } }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -373,6 +385,15 @@ function UserBubble({ text }: { text: string }) {
           fontWeight: 450,
         }}
       >
+        {replyTo && (
+          <div
+            dir="auto"
+            style={{ marginBottom: 6, padding: "5px 9px", borderRadius: 7, borderInlineStart: "3px solid var(--accent)", background: "color-mix(in oklab, var(--bg) 14%, transparent)", fontSize: "var(--fs-sm)", lineHeight: 1.4, opacity: 0.85 }}
+          >
+            <div style={{ fontWeight: 650 }}><bdi>{replyTo.name}</bdi></div>
+            <div style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{replyTo.excerpt}</div>
+          </div>
+        )}
         {text}
       </div>
     </motion.div>
@@ -1351,6 +1372,8 @@ function TwinBubble({
   onClarify,
   delay,
   delegatedFrom,
+  thinking,
+  onReply,
 }: {
   emp: EmployeeWithTwin;
   text: string;
@@ -1366,20 +1389,43 @@ function TwinBubble({
   onClarify: (approvalId: string, answers: Record<string, string>) => Promise<void>;
   delay: number;
   delegatedFrom?: { id: string; name: string };
+  thinking?: string;
+  onReply?: () => void;
 }) {
   const { t, locale } = useT();
+  const [hover, setHover] = useState(false);
+  const thought = thinking && thinking.length > 220 ? `…${thinking.slice(-220)}` : thinking;
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: "easeOut", delay }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       style={{
+        position: "relative",
         display: "flex",
         gap: "var(--sp-10)",
         marginBottom: "var(--sp-14)",
         maxWidth: 560,
       }}
     >
+      {/* reply to this message, like Slack / WhatsApp */}
+      <AnimatePresence>
+        {onReply && !streaming && text && hover && (
+          <motion.button
+            initial={{ opacity: 0, y: 4, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.12 }}
+            onClick={onReply}
+            title={t("meeting.reply")}
+            style={{ position: "absolute", top: 12, insetInlineEnd: -8, zIndex: 2, display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 999, border: "1px solid var(--hairline-strong)", background: "var(--surface)", color: "var(--text)", font: "inherit", fontSize: "var(--fs-xs)", fontWeight: 600, cursor: "pointer", boxShadow: "var(--shadow-sm)" }}
+          >
+            <span style={{ display: "inline-block", transform: locale === "he" ? "scaleX(-1)" : undefined }}>↩</span> {t("meeting.reply")}
+          </motion.button>
+        )}
+      </AnimatePresence>
       <div style={{ flexShrink: 0, paddingTop: "var(--sp-18)" }}>
         <Avatar emp={emp} size={30} />
       </div>
@@ -1420,6 +1466,15 @@ function TwinBubble({
           )}
         </div>
         <ToolFeed traces={traces} />
+        {/* the twin's reasoning, live, until its answer starts */}
+        {streaming && !text && thought && (
+          <div
+            dir="auto"
+            style={{ margin: "2px 0 8px", padding: "6px 10px", borderInlineStart: "2px solid var(--accent-soft)", fontSize: "var(--fs-sm)", fontStyle: "italic", lineHeight: 1.5, color: "var(--text-subtle)" }}
+          >
+            {thought}
+          </div>
+        )}
         {blocked.map((b, i) => (
           <BlockedNotice key={`b-${i}`} tool={b.tool} reason={b.reason} />
         ))}
@@ -1475,6 +1530,251 @@ function TwinBubble({
           </div>
         )}
       </div>
+    </motion.div>
+  );
+}
+
+/** What leaves the meeting besides words: a follow-up on the calendar, Jira
+ *  tickets for the next steps, the summary posted to Slack. Each card opens a
+ *  preview of exactly what would be sent. For now these are example outputs;
+ *  the real send goes through the owner twin's own Composio connection. */
+function MeetingOutputs({ decision, empById, question }: { decision: MeetingDecision; empById: Record<string, EmployeeWithTwin>; question: string }) {
+  const { t, locale } = useT();
+  const [open, setOpen] = useState<"calendar" | "jira" | "slack" | null>(null);
+  const [sent, setSent] = useState<Record<string, boolean>>({});
+  const owners = [...new Set(decision.actions.map((a) => a.employeeId))].map((id) => empById[id]).filter(Boolean);
+  const when = (() => {
+    const d = new Date();
+    do d.setDate(d.getDate() + 1);
+    while (d.getDay() === 5 || d.getDay() === 6); // skip Fri/Sat (IL work week)
+    d.setHours(10, 0, 0, 0);
+    return d.toLocaleString(locale === "he" ? "he-IL" : "en-US", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  })();
+  const topic = question.replace(/\s+/g, " ").slice(0, 60);
+  const cards = [
+    { key: "calendar" as const, slug: "googlecalendar", title: t("meeting.out.calendar"), sub: `${when} · ${owners.length + 1}` },
+    { key: "jira" as const, slug: "jira", title: t("meeting.out.jira"), sub: t("meeting.out.ticketCount", { count: decision.actions.length }) },
+    { key: "slack" as const, slug: "slack", title: t("meeting.out.slack"), sub: "#leadership" },
+  ];
+  const mono = "var(--font-mono, ui-monospace, monospace)";
+  return (
+    <div style={{ padding: "4px 12px 12px" }}>
+      <div style={{ fontSize: "var(--fs-xs)", fontWeight: 650, color: "var(--text-subtle)", textTransform: "uppercase", letterSpacing: "0.06em", padding: "4px 4px 8px" }}>{t("meeting.outputs")}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+        {cards.map((c, i) => {
+          const on = open === c.key;
+          return (
+            <motion.button
+              key={c.key}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 + i * 0.07 }}
+              whileHover={{ y: -2 }}
+              onClick={() => setOpen(on ? null : c.key)}
+              style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: 12, borderRadius: 12, cursor: "pointer", font: "inherit", textAlign: "start", background: on ? "var(--bg-sunken)" : "var(--surface)", border: `1px solid ${on ? "var(--accent)" : "var(--hairline)"}`, boxShadow: on ? "0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent)" : "var(--shadow-sm)" }}
+            >
+              <span style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                <ToolkitIcon slug={c.slug} size={26} />
+                {sent[c.key] && (
+                  <span style={{ marginInlineStart: "auto", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 650, color: "var(--success)" }}>
+                    <Icons.Check size={11} /> {t("meeting.out.sent")}
+                  </span>
+                )}
+              </span>
+              <span style={{ fontSize: "var(--fs-sm)", fontWeight: 650, color: "var(--text)" }}>{c.title}</span>
+              <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{c.sub}</span>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      <AnimatePresence mode="wait">
+        {open && (
+          <motion.div
+            key={open}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+            style={{ overflow: "hidden" }}
+          >
+            <div style={{ marginTop: 8, padding: 14, borderRadius: 12, border: "1px solid var(--hairline)", background: "var(--bg-sunken)", display: "flex", flexDirection: "column", gap: 10 }}>
+              {open === "calendar" && (
+                <>
+                  <div style={{ fontSize: "var(--fs-base)", fontWeight: 650, color: "var(--text)" }} dir="auto">{`Follow-up: ${topic}`}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
+                    <Icons.Clock size={13} /> {when} · 30 min · Google Meet
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {[{ name: "CEO", initials: "CEO" }, ...owners.map((e) => ({ name: e.firstName, initials: e.initials }))].map((p) => (
+                      <span key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px 3px 4px", borderRadius: 999, background: "var(--surface)", border: "1px solid var(--hairline)", fontSize: "var(--fs-xs)", color: "var(--text)" }}>
+                        <span style={{ width: 18, height: 18, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700, background: "var(--accent-soft)" }}>{p.initials}</span>
+                        <bdi>{p.name}</bdi>
+                      </span>
+                    ))}
+                  </div>
+                  <div dir="auto" style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", lineHeight: 1.5 }}>
+                    {(decision.open.length ? decision.open : [decision.decision]).map((q, i) => (
+                      <div key={i}>• {q}</div>
+                    ))}
+                  </div>
+                </>
+              )}
+              {open === "jira" &&
+                decision.actions.map((a, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--hairline)" }}>
+                    <span style={{ fontFamily: mono, fontSize: 11.5, fontWeight: 650, color: "var(--accent-deep)", whiteSpace: "nowrap" }}>OPS-{142 + i}</span>
+                    <span dir="auto" style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-sm)", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.action}</span>
+                    <span style={{ fontSize: 11.5, color: "var(--text-subtle)", whiteSpace: "nowrap" }}>
+                      <bdi>{empById[a.employeeId]?.firstName}</bdi>
+                      {a.due && ` · ${a.due}`}
+                    </span>
+                  </div>
+                ))}
+              {open === "slack" && (
+                <div style={{ display: "flex", gap: 10 }}>
+                  <span style={{ width: 32, height: 32, borderRadius: 8, display: "grid", placeItems: "center", background: "var(--surface)", border: "1px solid var(--hairline)", flexShrink: 0 }}>
+                    <ToolkitIcon slug="slack" size={18} />
+                  </span>
+                  <div dir="auto" style={{ fontSize: "var(--fs-sm)", lineHeight: 1.55, color: "var(--text)" }}>
+                    <div style={{ fontWeight: 700 }}>Employee001 · <span style={{ fontWeight: 400, color: "var(--text-subtle)" }}>#leadership</span></div>
+                    <div style={{ marginTop: 4 }}><b>Decision:</b> {decision.decision}</div>
+                    <div style={{ marginTop: 4 }}><b>Next steps:</b></div>
+                    {decision.actions.map((a, i) => (
+                      <div key={i}>• <b><bdi>{empById[a.employeeId]?.firstName}</bdi></b> — {a.action}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
+                <span style={{ flex: 1, fontSize: 11, color: "var(--text-subtle)", lineHeight: 1.45 }}>{t("meeting.outputsNote")}</span>
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => setSent((x) => ({ ...x, [open]: true }))}
+                  disabled={sent[open]}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, border: "none", font: "inherit", fontSize: "var(--fs-xs)", fontWeight: 650, cursor: sent[open] ? "default" : "pointer", color: sent[open] ? "var(--success)" : "var(--bg)", background: sent[open] ? "color-mix(in oklab, var(--success) 14%, transparent)" : "var(--text)" }}
+                >
+                  {sent[open] ? <><Icons.Check size={12} /> {t("meeting.out.sent")}</> : <><Icons.Send size={12} /> {t("meeting.out.send")}</>}
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** "Summarize & decide": the meeting ends in a decision and owned next steps,
+ *  each one a click away from becoming that twin's task. */
+function DecisionPanel({
+  state,
+  empById,
+  question,
+  onSummarize,
+  onAssign,
+}: {
+  state?: { status: "loading" | "ready" | "error"; data?: MeetingDecision; assigned?: Record<number, boolean> };
+  empById: Record<string, EmployeeWithTwin>;
+  question: string;
+  onSummarize: () => void;
+  onAssign: (idx: number) => void;
+}) {
+  const { t } = useT();
+  if (!state || state.status === "error") {
+    return (
+      <div style={{ margin: "4px 0 12px 40px", display: "flex", alignItems: "center", gap: 10 }}>
+        <motion.button
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={onSummarize}
+          style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: 999, border: "1px solid var(--hairline-strong)", background: "var(--surface)", color: "var(--text)", font: "inherit", fontSize: "var(--fs-sm)", fontWeight: 600, cursor: "pointer", boxShadow: "var(--shadow-sm)" }}
+        >
+          <Icons.CheckCircle size={14} /> {t("meeting.decide")}
+        </motion.button>
+        {state?.status === "error" && <span style={{ fontSize: "var(--fs-xs)", color: "var(--danger)" }}>{t("meeting.decideError")}</span>}
+      </div>
+    );
+  }
+  if (state.status === "loading") {
+    return (
+      <div style={{ margin: "4px 0 12px 40px", display: "flex", alignItems: "center", gap: 8, fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>
+        <motion.span animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} style={{ display: "inline-flex" }}>
+          <Icons.Loader size={14} />
+        </motion.span>
+        {t("meeting.deciding")}
+      </div>
+    );
+  }
+  const d = state.data!;
+  const assigned = state.assigned ?? {};
+  const allAssigned = d.actions.length > 0 && d.actions.every((_, i) => assigned[i]);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+      style={{ margin: "4px 0 16px 40px", maxWidth: 640, borderRadius: "var(--radius-xl)", border: "1px solid color-mix(in oklab, var(--success) 45%, var(--hairline))", background: "var(--surface)", boxShadow: "var(--shadow-sm)", overflow: "hidden" }}
+    >
+      <div style={{ padding: "14px 16px", background: "color-mix(in oklab, var(--success) 8%, var(--surface))", borderBottom: "1px solid var(--hairline)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: "var(--fs-xs)", fontWeight: 650, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--success)" }}>
+          <Icons.CheckCircle size={13} /> {t("meeting.decision")}
+        </div>
+        <div dir="auto" style={{ marginTop: 6, fontSize: "var(--fs-base)", fontWeight: 600, lineHeight: 1.5, color: "var(--text)" }}>{d.decision}</div>
+      </div>
+      {d.actions.length > 0 && (
+        <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", padding: "0 4px 4px" }}>
+            <span style={{ fontSize: "var(--fs-xs)", fontWeight: 650, color: "var(--text-subtle)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t("meeting.nextSteps")}</span>
+            {!allAssigned && (
+              <button
+                onClick={() => d.actions.forEach((_, i) => !assigned[i] && onAssign(i))}
+                style={{ marginInlineStart: "auto", padding: "4px 10px", borderRadius: 8, border: "none", background: "var(--text)", color: "var(--bg)", font: "inherit", fontSize: "var(--fs-xs)", fontWeight: 650, cursor: "pointer" }}
+              >
+                {t("meeting.assignAll")}
+              </button>
+            )}
+          </div>
+          {d.actions.map((a, i) => {
+            const emp = empById[a.employeeId];
+            const done = assigned[i];
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.06 * i }}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, background: "var(--bg-sunken)" }}
+              >
+                {emp && <Avatar emp={emp} size={26} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div dir="auto" style={{ fontSize: "var(--fs-sm)", color: "var(--text)", lineHeight: 1.45 }}>{a.action}</div>
+                  <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>
+                    <bdi>{emp?.firstName ?? a.employeeId}</bdi>
+                    {a.due && <> · {a.due}</>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => !done && onAssign(i)}
+                  disabled={done}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 8, border: `1px solid ${done ? "transparent" : "var(--hairline-strong)"}`, background: done ? "color-mix(in oklab, var(--success) 14%, transparent)" : "var(--surface)", color: done ? "var(--success)" : "var(--text)", font: "inherit", fontSize: "var(--fs-xs)", fontWeight: 650, cursor: done ? "default" : "pointer", whiteSpace: "nowrap" }}
+                >
+                  {done ? <><Icons.Check size={11} /> {t("meeting.assigned")}</> : <><Icons.Zap size={11} /> {t("meeting.assign")}</>}
+                </button>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+      <MeetingOutputs decision={d} empById={empById} question={question} />
+      {d.open.length > 0 && (
+        <div style={{ padding: "0 16px 14px" }}>
+          <div style={{ fontSize: "var(--fs-xs)", fontWeight: 650, color: "var(--text-subtle)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "6px 0 4px" }}>{t("meeting.open")}</div>
+          {d.open.map((q, i) => (
+            <div key={i} dir="auto" style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", lineHeight: 1.5 }}>• {q}</div>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -1577,6 +1877,10 @@ function CouncilPageInner() {
     if (prefill) setInput(prefill);
   }
   const [typingFor, setTypingFor] = useState<string[]>([]);
+  // Who answers: only the relevant twins (router picks) or everyone selected.
+  const [relevantOnly, setRelevantOnly] = useState(true);
+  const [replyTo, setReplyTo] = useState<{ employeeId: string; name: string; excerpt: string } | null>(null);
+  const [decisions, setDecisions] = useState<Record<string, { status: "loading" | "ready" | "error"; data?: MeetingDecision; assigned?: Record<number, boolean> }>>({});
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [openFile, setOpenFile] = useState<SharedFileChip | null>(null);
@@ -1641,13 +1945,19 @@ function CouncilPageInner() {
     // If @-mentions are present, only those twins respond.
     // Otherwise, all currently selected twins respond.
     const mentionedIds = parseMentions(trimmed);
+    const quoting = replyTo;
+    setReplyTo(null);
     const respondingIds = mentionedIds
       ? mentionedIds
-      : roster.filter(
+      : quoting
+        ? [quoting.employeeId]
+        : roster.filter(
           (e) => activeIds.has(e.id) && e.twinStatus === "ready"
         ).map((e) => e.id);
 
     if (respondingIds.length === 0) return;
+    // Relevant mode (no @mentions): the server picks who answers out of the room.
+    const auto = relevantOnly && !mentionedIds && !quoting && respondingIds.length > 1;
 
     // Add user message + skeleton responses
     setThreads((prev) => [
@@ -1655,7 +1965,9 @@ function CouncilPageInner() {
       {
         id: threadId,
         userText: trimmed,
-        responses: respondingIds.map((id) => ({
+        routed: auto ? null : undefined,
+        replyTo: quoting ?? undefined,
+        responses: (auto ? [] : respondingIds).map((id) => ({
           employeeId: id,
           text: "",
           streaming: false,
@@ -1672,7 +1984,7 @@ function CouncilPageInner() {
       },
     ]);
     setInput("");
-    setTypingFor(respondingIds);
+    setTypingFor(auto ? [] : respondingIds);
     scrollToBottom();
 
     try {
@@ -1680,9 +1992,11 @@ function CouncilPageInner() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: trimmed,
+          // A reply carries the quoted message, so the twin knows what it answers.
+          question: quoting ? `(Replying to ${quoting.name}'s message: "${quoting.excerpt}")\n\n${trimmed}` : trimmed,
           employeeIds: respondingIds,
           meetingId: meetingId ?? undefined,
+          auto,
         }),
       });
 
@@ -1707,12 +2021,41 @@ function CouncilPageInner() {
           const raw = line.slice(6).trim();
           if (!raw) continue;
 
-          let event: CouncilEvent | { type: "meeting"; meetingId: string };
+          let event: CouncilEvent | { type: "meeting"; meetingId: string } | { type: "routed"; picks: { id: string; matched: string[] }[] };
           try {
             event = JSON.parse(raw) as
               | CouncilEvent
-              | { type: "meeting"; meetingId: string };
+              | { type: "meeting"; meetingId: string }
+              | { type: "routed"; picks: { id: string; matched: string[] }[] };
           } catch {
+            continue;
+          }
+
+          // Relevant mode: the server says who it asked. Seed their bubbles.
+          if (event.type === "routed") {
+            const picks = event.picks;
+            setThreads((prev) =>
+              prev.map((t) =>
+                t.id === threadId
+                  ? {
+                      ...t,
+                      routed: picks,
+                      responses: picks.map((p) => ({
+                        employeeId: p.id,
+                        text: "",
+                        streaming: false,
+                        confidence: undefined,
+                        traces: [],
+                        pendingApprovals: [],
+                        pendingClarifications: [],
+                        blocked: [],
+                        artifacts: [],
+                      })),
+                    }
+                  : t,
+              ),
+            );
+            setTypingFor(picks.map((p) => p.id));
             continue;
           }
 
@@ -1894,6 +2237,19 @@ function CouncilPageInner() {
           })
         );
         scrollToBottom();
+        break;
+
+      case "thinking_delta":
+        setThreads((prev) =>
+          prev.map((t) => {
+            if (t.id !== threadId) return t;
+            const idx = lastStreamingIdx(t.responses, event.employeeId);
+            if (idx < 0) return t;
+            const responses = t.responses.slice();
+            responses[idx] = { ...responses[idx], thinking: (responses[idx].thinking ?? "") + event.delta };
+            return { ...t, responses };
+          })
+        );
         break;
 
       case "text_delta":
@@ -2345,11 +2701,32 @@ function CouncilPageInner() {
           <div style={{ display: "flex", flexDirection: "column" }}>
             {threads.map((thread) => (
               <div key={thread.id} style={{ marginBottom: "var(--sp-12)" }}>
-                <UserBubble text={thread.userText} />
+                <UserBubble text={thread.userText} replyTo={thread.replyTo} />
 
-                {/* Twin responses — shown as they stream in */}
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  {thread.responses
+                {/* who the room asked (relevant mode) */}
+                {thread.routed === null && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px 40px", fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>
+                    <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.1, repeat: Infinity }} style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }} />
+                    {t("meeting.routing")}
+                  </div>
+                )}
+                {thread.routed && thread.routed.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, margin: "0 0 12px 40px", fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>
+                    {t("meeting.routedTo")}
+                    {thread.routed.map((p) => (
+                      <span key={p.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px 2px 3px", borderRadius: 999, border: "1px solid var(--hairline)", background: "var(--surface)" }}>
+                        {empById[p.id] && <Avatar emp={empById[p.id]} size={16} />}
+                        <span style={{ fontWeight: 600, color: "var(--text-muted)" }}><bdi>{empById[p.id]?.firstName ?? p.id}</bdi></span>
+                        {p.matched.length > 0 && <span>· {p.matched.join(", ")}</span>}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Twin responses, Slack-style: a twin called in by a @tag answers
+                    in a thread under the message that tagged them. */}
+                {(() => {
+                  const visible = thread.responses
                     .map((resp, originalIdx) => ({ resp, originalIdx }))
                     .filter(
                       ({ resp }) =>
@@ -2359,60 +2736,127 @@ function CouncilPageInner() {
                         resp.pendingApprovals.length > 0 ||
                         resp.blocked.length > 0 ||
                         resp.artifacts.length > 0
-                    )
-                    .map(({ resp, originalIdx }, i) => {
-                      const emp = empById[resp.employeeId];
-                      if (!emp) return null;
-                      const blockedHere = thread.blockedDelegations.filter(
-                        (b) => b.afterResponseIdx === originalIdx
-                      );
-                      const filesHere = thread.fileShares.filter(
-                        (f) => f.afterResponseIdx === originalIdx
-                      );
-                      // Use originalIdx so each response (incl. delegation re-runs) is unique
-                      return (
-                        <div key={`${resp.employeeId}-${originalIdx}`}>
-                          {resp.delegatedFrom && (
-                            <DelegationArrow
-                              fromName={resp.delegatedFrom.name}
-                              toName={emp.firstName}
-                            />
-                          )}
-                          <TwinBubble
-                            emp={emp}
-                            text={resp.text}
-                            streaming={resp.streaming}
-                            confidence={resp.confidence}
-                            traces={resp.traces}
-                            pendingApprovals={resp.pendingApprovals}
-                            pendingClarifications={resp.pendingClarifications}
-                            blocked={resp.blocked}
-                            artifacts={resp.artifacts}
-                            onApprove={resolveApprovalCall("allow")}
-                            onDeny={resolveApprovalCall("deny")}
-                            onClarify={resolveClarification}
-                            delay={i * 0.04}
-                            delegatedFrom={resp.delegatedFrom}
-                          />
-                          {filesHere.map((f) => (
-                            <FileShareChip
-                              key={f.id}
-                              chip={f}
-                              meetingId={meetingId}
-                              onOpen={() => setOpenFile(f)}
-                            />
-                          ))}
-                          {blockedHere.map((b) => (
-                            <BlockedDelegationNote
-                              key={b.id}
-                              fromName={b.fromName}
-                              toName={b.toName}
-                            />
-                          ))}
-                        </div>
-                      );
-                    })}
-                </div>
+                    );
+                  // Thread root of each response: the latest earlier message by
+                  // whoever tagged it (and that message's own root).
+                  const rootOf = new Map<number, number>();
+                  for (const { resp, originalIdx } of visible) {
+                    let root = originalIdx;
+                    if (resp.delegatedFrom) {
+                      for (let j = originalIdx - 1; j >= 0; j--) {
+                        if (thread.responses[j].employeeId === resp.delegatedFrom.id && rootOf.has(j)) {
+                          root = rootOf.get(j) ?? j;
+                          break;
+                        }
+                      }
+                    }
+                    rootOf.set(originalIdx, root);
+                  }
+                  const renderOne = (resp: TwinResponse, originalIdx: number, i: number, inThread: boolean) => {
+                    const emp = empById[resp.employeeId];
+                    if (!emp) return null;
+                    const blockedHere = thread.blockedDelegations.filter((b) => b.afterResponseIdx === originalIdx);
+                    const filesHere = thread.fileShares.filter((f) => f.afterResponseIdx === originalIdx);
+                    return (
+                      <div key={`${resp.employeeId}-${originalIdx}`}>
+                        {resp.delegatedFrom && !inThread && <DelegationArrow fromName={resp.delegatedFrom.name} toName={emp.firstName} />}
+                        <TwinBubble
+                          emp={emp}
+                          text={resp.text}
+                          streaming={resp.streaming}
+                          confidence={resp.confidence}
+                          traces={resp.traces}
+                          pendingApprovals={resp.pendingApprovals}
+                          pendingClarifications={resp.pendingClarifications}
+                          blocked={resp.blocked}
+                          artifacts={resp.artifacts}
+                          onApprove={resolveApprovalCall("allow")}
+                          onDeny={resolveApprovalCall("deny")}
+                          onClarify={resolveClarification}
+                          delay={i * 0.04}
+                          delegatedFrom={resp.delegatedFrom}
+                          thinking={resp.thinking}
+                          onReply={() => {
+                            const plain = resp.text.replace(/[#*_`>]/g, "").replace(/\s+/g, " ").trim();
+                            setReplyTo({ employeeId: resp.employeeId, name: emp.firstName, excerpt: plain.length > 160 ? `${plain.slice(0, 160)}…` : plain });
+                            inputRef.current?.focus();
+                          }}
+                        />
+                        {filesHere.map((f) => (
+                          <FileShareChip key={f.id} chip={f} meetingId={meetingId} onOpen={() => setOpenFile(f)} />
+                        ))}
+                        {blockedHere.map((b) => (
+                          <BlockedDelegationNote key={b.id} fromName={b.fromName} toName={b.toName} />
+                        ))}
+                      </div>
+                    );
+                  };
+                  const roots = visible.filter(({ originalIdx }) => rootOf.get(originalIdx) === originalIdx);
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {roots.map(({ resp, originalIdx }, i) => {
+                        const replies = visible.filter((v) => v.originalIdx !== originalIdx && rootOf.get(v.originalIdx) === originalIdx);
+                        return (
+                          <div key={`root-${originalIdx}`}>
+                            {renderOne(resp, originalIdx, i, false)}
+                            {replies.length > 0 && (
+                              <motion.div
+                                initial={{ opacity: 0, x: -6 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                style={{ marginInlineStart: 40, marginTop: -6, marginBottom: 14, paddingInlineStart: 16, borderInlineStart: "2px solid var(--hairline-strong)" }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "4px 0 10px", fontSize: "var(--fs-xs)", fontWeight: 600, color: "var(--accent-deep)" }}>
+                                  <Icons.MessageSquare size={11} />
+                                  {t(replies.length === 1 ? "meeting.replyOne" : "meeting.replies", { count: replies.length })}
+                                </div>
+                                {replies.map((r, j) => renderOne(r.resp, r.originalIdx, j, true))}
+                              </motion.div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {/* close the discussion: a decision and who does what next */}
+                {!thread.pending && meetingId && thread.id === threads[threads.length - 1]?.id && thread.responses.filter((r) => r.text).length >= 2 && (
+                  <DecisionPanel
+                    state={decisions[thread.id]}
+                    empById={empById}
+                    question={thread.userText}
+                    onSummarize={async () => {
+                      setDecisions((d) => ({ ...d, [thread.id]: { status: "loading" } }));
+                      try {
+                        const res = await fetch("/api/council/summary", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ meetingId }),
+                        });
+                        if (!res.ok) throw new Error(String(res.status));
+                        const data = (await res.json()) as MeetingDecision;
+                        setDecisions((d) => ({ ...d, [thread.id]: { status: "ready", data, assigned: {} } }));
+                      } catch {
+                        setDecisions((d) => ({ ...d, [thread.id]: { status: "error" } }));
+                      }
+                    }}
+                    onAssign={async (idx) => {
+                      const a = decisions[thread.id]?.data?.actions[idx];
+                      if (!a) return;
+                      setDecisions((d) => ({ ...d, [thread.id]: { ...d[thread.id], assigned: { ...d[thread.id]?.assigned, [idx]: true } } }));
+                      await fetch("/api/work-items", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          assigneeEmployeeId: a.employeeId,
+                          title: a.action.slice(0, 90),
+                          task: `From today's team meeting ("${thread.userText.slice(0, 200)}"), the CEO assigned you this next step${a.due ? ` (due: ${a.due})` : ""}. Do it, then end with a short summary of what you did and the result.\n\n${a.action}`,
+                          startNow: true,
+                        }),
+                      }).catch(() => {});
+                    }}
+                  />
+                )}
               </div>
             ))}
 
@@ -2438,6 +2882,36 @@ function CouncilPageInner() {
           position: "relative",
         }}
       >
+        {/* replying to one message: the quote sits above the input, like WhatsApp */}
+        <AnimatePresence>
+          {replyTo && (
+            <motion.div
+              initial={{ opacity: 0, y: 6, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: 6, height: 0 }}
+              transition={{ duration: 0.18 }}
+              style={{ overflow: "hidden" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, padding: "7px 10px", borderRadius: 10, borderInlineStart: "3px solid var(--accent)", background: "var(--surface)", border: "1px solid var(--hairline)" }}>
+                {empById[replyTo.employeeId] && <Avatar emp={empById[replyTo.employeeId]} size={22} />}
+                <div style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>
+                  <div style={{ fontSize: "var(--fs-xs)", fontWeight: 650, color: "var(--accent-deep)" }}>
+                    {t("meeting.replyingTo")} <bdi>{replyTo.name}</bdi>
+                  </div>
+                  <div dir="auto" style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{replyTo.excerpt}</div>
+                </div>
+                <button
+                  onClick={() => setReplyTo(null)}
+                  aria-label={t("meeting.cancelReply")}
+                  style={{ display: "grid", placeItems: "center", width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: "var(--text-subtle)", cursor: "pointer" }}
+                >
+                  <Icons.X size={12} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* @-mention dropdown */}
         {mentionQuery !== null && mentionMatches.length > 0 && (
           <div
@@ -2583,6 +3057,19 @@ function CouncilPageInner() {
             gap: "var(--sp-6)",
           }}
         >
+          <span role="group" aria-label={t("meeting.whoAnswers")} style={{ display: "inline-flex", padding: 2, gap: 2, borderRadius: 8, background: "var(--bg-sunken)", border: "1px solid var(--hairline)" }}>
+            {([true, false] as const).map((rel) => (
+              <button
+                key={String(rel)}
+                onClick={() => setRelevantOnly(rel)}
+                aria-pressed={relevantOnly === rel}
+                title={rel ? t("meeting.relevantHint") : t("meeting.everyoneHint")}
+                style={{ padding: "2px 9px", borderRadius: 6, border: "none", cursor: "pointer", font: "inherit", fontSize: "var(--fs-meta)", fontWeight: 600, background: relevantOnly === rel ? "var(--surface)" : "transparent", color: relevantOnly === rel ? "var(--text)" : "var(--text-subtle)", boxShadow: relevantOnly === rel ? "0 1px 2px color-mix(in oklab, var(--text) 12%, transparent)" : "none" }}
+              >
+                {rel ? t("meeting.relevant") : t("meeting.everyone")}
+              </button>
+            ))}
+          </span>
           <span>
             <bdi>{readyCount}</bdi>{" "}
             {t(readyCount === 1 ? "meeting.twinsConnectedOne" : "meeting.twinsConnectedMany")} ·
