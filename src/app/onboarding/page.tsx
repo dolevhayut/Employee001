@@ -91,7 +91,7 @@ export default function OnboardingPage() {
 
 function OnboardingPageInner() {
   const router = useRouter();
-  const { t } = useT();
+  const { t, locale } = useT();
   const searchParams = useSearchParams();
   const empId = searchParams.get("employee") ?? "";
   const inviteToken = searchParams.get("invite") ?? "";
@@ -249,6 +249,8 @@ function OnboardingPageInner() {
             integrations: Array.from(chosen),
             boundaries,
             consent: { version: CURRENT_CONSENT_VERSION, scopes: Array.from(acceptedScopes) },
+            // Which language's consent text was shown (recorded as evidence).
+            locale,
           }),
         },
       );

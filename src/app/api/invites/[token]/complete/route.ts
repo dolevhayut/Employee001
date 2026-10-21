@@ -16,6 +16,7 @@ import {
   countActiveConnections,
 } from "@/lib/twin-build-runner";
 import { dataDir } from "@/lib/app-home";
+import { recordConsentEvidence } from "@/lib/consent-evidence";
 import { CONSENT_SCOPES, CURRENT_CONSENT_VERSION, type ConsentScope, type EmployeeConsent } from "@/lib/employees";
 
 export const runtime = "nodejs";
@@ -402,6 +403,16 @@ export async function POST(request: NextRequest, { params }: Params) {
       ),
       "utf8",
     );
+
+    // Immutable evidence of the consent (hash-chained audit row).
+    recordConsentEvidence({
+      employeeId,
+      employeeName: name,
+      inviteToken: token,
+      consent,
+      locale: typeof (body as { locale?: unknown }).locale === "string" ? (body as { locale: string }).locale : undefined,
+      headers: request.headers,
+    });
 
     const updated = markInviteCompleted(token, employeeId);
 
