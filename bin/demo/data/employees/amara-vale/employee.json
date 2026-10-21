@@ -8,5 +8,6 @@
   "questionsThisWeek": 4,
   "weekOf": "2026-W40",
   "seedModel": "claude-opus-5-5",
-  "refreshModel": "claude-sonnet-5-5"
+  "refreshModel": "claude-sonnet-5-5",
+  "synthetic": true
 }

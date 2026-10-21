@@ -258,6 +258,14 @@ function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
     }
   }
 
+  if (!consent && employee.synthetic) {
+    return (
+      <div className="card subtle" style={{ padding: "var(--sp-16)", fontSize: "var(--fs-sm)" }}>
+        Synthetic demo twin: not a real person, so consent doesn&apos;t apply.
+      </div>
+    );
+  }
+
   if (!consent) {
     return (
       <div

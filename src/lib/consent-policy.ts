@@ -7,17 +7,19 @@
 //   transcripts                     → meeting/recording toolkits are loaded
 //   third-party-actions             → the twin may act (send, post, create…)
 //
-// Twins with no record are "legacy" (created before consent was recorded, or
-// the demo twins): they keep running as before, the profile shows "Consent not
-// on file", and they can't be retrained until consent is requested. Marketplace
-// hires are not people, so consent doesn't apply to them.
+// Deny by default: a twin with no record is "consent_required". It can't be
+// trained, loads none of the employee's tools (transcripts included) and
+// can't act through their accounts until the employee records consent. The
+// UI shows a banner and the re-consent invite. Marketplace hires and the
+// synthetic demo fixture (employee.json "synthetic": true) aren't people, so
+// consent doesn't apply to them.
 
 import type { ConsentScope, EmployeeConsent } from "./employees";
 import type { ToolDecision } from "./tool-policy";
 
 export type ConsentStatus =
-  | { kind: "exempt" }
-  | { kind: "legacy" }
+  | { kind: "exempt"; reason: "marketplace" | "synthetic" }
+  | { kind: "consent_required" }
   | { kind: "recorded"; scopes: ReadonlySet<ConsentScope> };
 
 /** Toolkits whose data is meeting audio, video or transcripts. */
@@ -39,22 +41,24 @@ export const TRANSCRIPT_TOOLKITS = new Set([
 ]);
 
 export function consentStatusFor(
-  employee: { consent?: EmployeeConsent | null },
+  employee: { consent?: EmployeeConsent | null; synthetic?: boolean },
   isMarketplaceHire: boolean,
 ): ConsentStatus {
-  if (isMarketplaceHire) return { kind: "exempt" };
+  if (isMarketplaceHire) return { kind: "exempt", reason: "marketplace" };
+  if (employee.synthetic === true) return { kind: "exempt", reason: "synthetic" };
   const scopes = employee.consent?.scopes;
-  if (!Array.isArray(scopes)) return { kind: "legacy" };
+  if (!Array.isArray(scopes)) return { kind: "consent_required" };
   return { kind: "recorded", scopes: new Set(scopes) };
 }
 
+/** Granted only by an exemption or a recorded scope. No record, no grant. */
 const has = (status: ConsentStatus, scope: ConsentScope) =>
-  status.kind !== "recorded" || status.scopes.has(scope);
+  status.kind === "exempt" || (status.kind === "recorded" && status.scopes.has(scope));
 
 /** Why the twin can't be trained right now, or null if it can. */
 export function buildBlockReason(status: ConsentStatus, name: string): string | null {
   if (status.kind === "exempt") return null;
-  if (status.kind === "legacy") {
+  if (status.kind === "consent_required") {
     return `${name} hasn't recorded consent, so the twin can't be trained on their data. Request consent from their profile first.`;
   }
   if (!status.scopes.has("data-collection") || !status.scopes.has("integrations")) {
@@ -86,7 +90,13 @@ function actsThroughEmployeeAccounts(toolName: string): boolean {
  *  "third-party-actions", any action through the employee's own accounts that
  *  would need approval is refused instead. Reads (auto-allowed) are unaffected. */
 export function applyConsent(decision: ToolDecision, toolName: string, status: ConsentStatus): ToolDecision {
-  if (decision.kind !== "ask" || has(status, "third-party-actions") || !actsThroughEmployeeAccounts(toolName)) {
+  if (decision.kind === "block" || !actsThroughEmployeeAccounts(toolName)) return decision;
+  // No consent at all: nothing runs through the employee's accounts, reads
+  // included (normally their toolkits aren't even loaded; this is the backstop).
+  if (status.kind === "consent_required") {
+    return { kind: "block", reason: "This employee hasn't recorded consent, so the twin can't use their accounts." };
+  }
+  if (decision.kind !== "ask" || has(status, "third-party-actions")) {
     return decision;
   }
   return {

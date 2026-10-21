@@ -11,7 +11,7 @@ vi.mock("@/lib/work-items", () => ({
   },
 }));
 
-const consent = vi.hoisted(() => ({ status: { kind: "legacy" } as unknown }));
+const consent = vi.hoisted(() => ({ status: { kind: "exempt", reason: "synthetic" } as unknown }));
 vi.mock("@/lib/consent-status", () => ({ loadConsentStatus: () => consent.status }));
 
 import { ingestEmailMessage } from "./email-intake";
@@ -31,7 +31,7 @@ describe("push/poll email dedupe", () => {
       expect(ingestEmailMessage("ava", { messageId: "m-2" })).toEqual({ deduped: false, workItemId: null, skipped: "consent" });
       expect(queue.size).toBe(0);
     } finally {
-      consent.status = { kind: "legacy" };
+      consent.status = { kind: "exempt", reason: "synthetic" };
     }
   });
 });

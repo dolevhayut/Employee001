@@ -230,6 +230,8 @@ export type EmployeeWithTwin = Employee & {
   orgSkillIds: string[];
   /** Employee consent record. Required before any data is ingested. */
   consent?: EmployeeConsent;
+  /** Synthetic demo-fixture twin (not a person): consent doesn't apply. */
+  synthetic?: boolean;
   /** What data fed the twin — data lineage. */
   lineage?: TwinLineage;
   /** Model used for the one-time 180-day seed */

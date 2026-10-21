@@ -4,7 +4,7 @@ vi.mock("@/lib/work-items", () => ({ enqueueWorkItem: (input: { idempotencyKey: 
 import { ingestSlackMessage } from "./slack-intake";
 describe("Slack push/poll dedupe", () => { it("dedupes channel:ts regardless of intake path", () => { queue.clear(); const m = { channel: "C1", ts: "123.4", text: "hi", userId: "U1", isBot: false, isDm: false, mentionedUserIds: [] }; expect(ingestSlackMessage("dana", m).deduped).toBe(false); expect(ingestSlackMessage("dana", m)).toMatchObject({ deduped: true, workItemId: "work-1" }); }); });
 
-const consent = vi.hoisted(() => ({ status: { kind: "legacy" } as unknown }));
+const consent = vi.hoisted(() => ({ status: { kind: "exempt", reason: "synthetic" } as unknown }));
 vi.mock("@/lib/consent-status", () => ({ loadConsentStatus: () => consent.status }));
 
 describe("Slack intake consent", () => {
@@ -16,7 +16,18 @@ describe("Slack intake consent", () => {
       expect(ingestSlackMessage("dana", m)).toEqual({ deduped: false, workItemId: null, skipped: "consent" });
       expect(queue.size).toBe(0);
     } finally {
-      consent.status = { kind: "legacy" };
+      consent.status = { kind: "exempt", reason: "synthetic" };
+    }
+  });
+
+  it("drops messages for a twin whose employee hasn't recorded consent", () => {
+    queue.clear();
+    consent.status = { kind: "consent_required" };
+    try {
+      const m = { channel: "C3", ts: "1.1", text: "hi", userId: "U1", isBot: false, isDm: true, mentionedUserIds: [] };
+      expect(ingestSlackMessage("dana", m)).toMatchObject({ workItemId: null, skipped: "consent" });
+    } finally {
+      consent.status = { kind: "exempt", reason: "synthetic" };
     }
   });
 });

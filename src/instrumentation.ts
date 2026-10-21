@@ -8,6 +8,8 @@ export async function register(): Promise<void> {
 
   const { removeLegacyDebugLog } = await import("@/lib/legacy-cleanup");
   removeLegacyDebugLog();
+  const { markTwinsConsentRequired } = await import("@/lib/consent-migration");
+  markTwinsConsentRequired();
 
   const { ensureSchedulerStarted } = await import("@/lib/routine-scheduler");
   ensureSchedulerStarted();

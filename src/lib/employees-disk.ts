@@ -55,6 +55,8 @@ type DiskSidecar = {
   seedModel?: ClaudeModel;
   refreshModel?: ClaudeModel;
   answerSlackWithoutAsking?: boolean;
+  /** Synthetic demo-fixture twin: not a person, consent doesn't apply. */
+  synthetic?: boolean;
   /**
    * Set when materialised from an invite before the employee finished the
    * consent wizard. Such records have placeholder markdown that would
@@ -167,6 +169,7 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
       refreshModel: sidecar.refreshModel ?? sidecar.model ?? TWIN_MODEL_PRIMARY,
       ttsVoiceId: "EXAVITQu4vr4xnSDxMaL",
       ...(sidecar.consent ? { consent: sidecar.consent } : {}),
+      ...(sidecar.synthetic === true ? { synthetic: true } : {}),
       answerSlackWithoutAsking: sidecar.answerSlackWithoutAsking === true,
     });
   }

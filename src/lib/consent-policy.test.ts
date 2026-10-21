@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyConsent, buildBlockReason, consentStatusFor, toolkitAllowed } from "./consent-policy";
+import { actionsAllowed, applyConsent, buildBlockReason, consentStatusFor, toolkitAllowed } from "./consent-policy";
 import type { ConsentScope } from "./employees";
 import { classifyTool } from "./tool-policy";
 
@@ -10,10 +10,11 @@ const BASE: ConsentScope[] = ["data-collection", "integrations"];
 const SEND = "mcp__composio__GMAIL_SEND_EMAIL";
 
 describe("consentStatusFor", () => {
-  it("treats a twin with no record as legacy and marketplace hires as exempt", () => {
-    expect(consentStatusFor({}, false)).toEqual({ kind: "legacy" });
-    expect(consentStatusFor({ consent: null }, false)).toEqual({ kind: "legacy" });
-    expect(consentStatusFor({}, true)).toEqual({ kind: "exempt" });
+  it("requires consent from a twin with no record; hires and synthetic demo twins are exempt", () => {
+    expect(consentStatusFor({}, false)).toEqual({ kind: "consent_required" });
+    expect(consentStatusFor({ consent: null }, false)).toEqual({ kind: "consent_required" });
+    expect(consentStatusFor({}, true)).toEqual({ kind: "exempt", reason: "marketplace" });
+    expect(consentStatusFor({ synthetic: true }, false)).toEqual({ kind: "exempt", reason: "synthetic" });
   });
 });
 
@@ -34,9 +35,12 @@ describe("toolkits", () => {
     expect(toolkitAllowed(recorded("data-collection"), "gmail")).toBe(false);
   });
 
-  it("leaves legacy and marketplace twins as they were", () => {
-    expect(toolkitAllowed(consentStatusFor({}, false), "zoom")).toBe(true);
+  it("denies every personal toolkit, transcripts included, until consent is recorded", () => {
+    for (const tk of ["gmail", "slack", "zoom", "fireflies"]) {
+      expect(toolkitAllowed(consentStatusFor({}, false), tk), tk).toBe(false);
+    }
     expect(toolkitAllowed(consentStatusFor({}, true), "fireflies")).toBe(true);
+    expect(toolkitAllowed(consentStatusFor({ synthetic: true }, false), "gmail")).toBe(true);
   });
 });
 
@@ -59,8 +63,11 @@ describe("acting on the employee's behalf", () => {
     expect(decide("mcp__apify__call-actor", BASE)).toMatchObject({ kind: "ask" });
   });
 
-  it("doesn't restrict legacy twins", () => {
-    const decision = applyConsent(classifyTool(SEND, {}), SEND, consentStatusFor({}, false));
-    expect(decision).toMatchObject({ kind: "ask" });
+  it("blocks every call through the employee's accounts, reads included, without consent", () => {
+    const none = consentStatusFor({}, false);
+    expect(applyConsent(classifyTool(SEND, {}), SEND, none)).toMatchObject({ kind: "block" });
+    const read = "mcp__composio__GMAIL_FETCH_EMAILS";
+    expect(applyConsent(classifyTool(read, {}), read, none)).toMatchObject({ kind: "block" });
+    expect(actionsAllowed(none)).toBe(false);
   });
 });
