@@ -14,7 +14,10 @@ import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { useRoster } from "@/components/ex/roster-context";
 import { useT } from "@/components/ex/i18n-context";
-import MorphOrb from "@/components/ex/morph-orb/morph-orb";
+import MorphOrb, { type MorphOrbHandle } from "@/components/ex/morph-orb/morph-orb";
+import { useVoiceInput, type VoiceInputError } from "@/components/ex/voice/use-voice-input";
+import { MicButton } from "@/components/ex/voice/mic-button";
+import { bcp47 } from "@/lib/i18n/format";
 import { describeToolCall, words } from "@/components/ex/morph-orb/tool-nodes";
 import { FlowCanvas } from "@/components/ex/morph-orb/flow-canvas";
 import { CitedAnswer, type CitedSource } from "@/components/ex/cited-answer";
@@ -85,6 +88,8 @@ type Turn = {
   color: string;
   voiceId?: string;
   question: string;
+  /** Asked by voice: the answer is spoken back, like a conversation. */
+  viaVoice?: boolean;
   steps: Step[];
   thinking: string;
   answer: string | null;
@@ -404,7 +409,7 @@ function writePanelWidth(px: number) {
 const linkedTwin = () => new URLSearchParams(window.location.search).get("twin");
 
 export default function AskPage() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const roster = useRoster();
   const twins = roster.filter((e) => e.twinStatus === "ready");
   const [selected, setSelected] = useState<string | null>(null);
@@ -440,7 +445,18 @@ export default function AskPage() {
   const stepSeq = useRef(0);
   const listRef = useRef<HTMLDivElement | null>(null);
   const [audio, setAudio] = useState<AudioState>(null);
-  const [voiceHint, setVoiceHint] = useState(false);
+  // A short notice over the stage; `settings` links it to where keys are set.
+  const [voiceHint, setVoiceHint] = useState<{ text: string; settings: boolean; mic: boolean } | null>(null);
+  const hintTimer = useRef<number | undefined>(undefined);
+  const flashHint = (text: string, { settings = false, mic = false } = {}) => {
+    setVoiceHint({ text, settings, mic });
+    window.clearTimeout(hintTimer.current);
+    hintTimer.current = window.setTimeout(() => setVoiceHint(null), 4500);
+  };
+  useEffect(() => () => window.clearTimeout(hintTimer.current), []);
+  const orbRef = useRef<MorphOrbHandle | null>(null);
+  // Set while a spoken question is handed to the orb, read by onSubmit.
+  const viaVoiceRef = useRef(false);
 
   // ?twin=<id> preselects a twin (the Company brain links here when a twin is clicked).
   const linked = useSyncExternalStore(noopSubscribe, linkedTwin, () => null);
@@ -464,7 +480,12 @@ export default function AskPage() {
   // Stop any playing answer when leaving the page.
   useEffect(() => () => audioRef.current?.pause(), []);
 
+  // Every stop bumps the generation, so a speak() still fetching its audio
+  // gives up instead of playing over the mic (or over a newer answer).
+  const speakGen = useRef(0);
+  const voiceStateRef = useRef<"idle" | "listening" | "transcribing">("idle");
   const stopAudio = () => {
+    speakGen.current++;
     audioRef.current?.pause();
     audioRef.current = null;
     setAudio(null);
@@ -477,13 +498,13 @@ export default function AskPage() {
       return;
     }
     if (!voiceReady) {
-      setVoiceHint(true);
-      window.setTimeout(() => setVoiceHint(false), 4500);
+      flashHint(t("ask.voiceSetup"), { settings: true });
       return;
     }
     if (!answer) return;
     answer = stripCites(answer);
     stopAudio();
+    const gen = speakGen.current;
     setAudio({ id: turnId, status: "loading" });
     try {
       const res = await fetch("/api/tts/stream", {
@@ -492,7 +513,10 @@ export default function AskPage() {
         body: JSON.stringify({ text: answer, voiceId }),
       });
       if (!res.ok) throw new Error(`tts ${res.status}`);
-      const url = URL.createObjectURL(await res.blob());
+      const blob = await res.blob();
+      // Stopped (or the mic opened) while the audio was on its way: drop it.
+      if (gen !== speakGen.current || voiceStateRef.current !== "idle") return;
+      const url = URL.createObjectURL(blob);
       const player = new Audio(url);
       audioRef.current = player;
       player.onended = () => {
@@ -512,14 +536,14 @@ export default function AskPage() {
 
   // Hand the twin a task, like you would a colleague: it goes on the twin's
   // work queue and starts now; the conversation shows its status and result.
-  const assign = async (task: string) => {
+  const assign = async (task: string, viaVoice = false) => {
     if (!twinId || !twin) return t("ask.noTwin");
     setBusy(true);
     stopAudio();
     const id = ++turnSeq.current;
     setTurns((prev) => [
       ...prev,
-      { id, twinId, twinName: twin.name, initials: twin.initials, color: twin.avatarColor, voiceId: twin.ttsVoiceId, question: task, steps: [], thinking: "", answer: null, task: { status: "queued" } },
+      { id, twinId, twinName: twin.name, initials: twin.initials, color: twin.avatarColor, voiceId: twin.ttsVoiceId, question: task, viaVoice, steps: [], thinking: "", answer: null, task: { status: "queued" } },
     ]);
     const hebrew = /[\u0590-\u05FF]/.test(task);
     try {
@@ -647,7 +671,9 @@ export default function AskPage() {
   }, [openTasks]);
 
   const onSubmit = async (question: string) => {
-    if (mode === "task") return assign(question);
+    const viaVoice = viaVoiceRef.current;
+    viaVoiceRef.current = false;
+    if (mode === "task") return assign(question, viaVoice);
     if (!twinId || !twin) return t("ask.noTwin");
     setBusy(true);
     stopAudio();
@@ -662,7 +688,7 @@ export default function AskPage() {
     const id = ++turnSeq.current;
     setTurns((prev) => [
       ...prev,
-      { id, twinId, twinName: twin.name, initials: twin.initials, color: twin.avatarColor, voiceId: twin.ttsVoiceId, question, steps: [], thinking: "", answer: null },
+      { id, twinId, twinName: twin.name, initials: twin.initials, color: twin.avatarColor, voiceId: twin.ttsVoiceId, question, viaVoice, steps: [], thinking: "", answer: null },
     ]);
     let answer: string;
     try {
@@ -692,6 +718,65 @@ export default function AskPage() {
     return answer;
   };
 
+  // Talk instead of type: the transcript is asked (or handed as a task, per
+  // the mode) exactly as if it had been typed into the orb.
+  const voice = useVoiceInput({
+    serverStt: voiceReady,
+    lang: bcp47(locale),
+    onTranscript: (text) => {
+      viaVoiceRef.current = true;
+      if (!orbRef.current?.submit(text)) {
+        // The orb is busy (a typed question is still running): say so.
+        viaVoiceRef.current = false;
+        flashHint(t("ask.mic.busy"), { mic: true });
+      }
+    },
+    onError: (err: VoiceInputError) => {
+      if (err === "unsupported") flashHint(t("ask.mic.setup"), { settings: true, mic: true });
+      else if (err === "denied") flashHint(t("ask.mic.denied"), { mic: true });
+      else if (err === "no_speech") flashHint(t("ask.mic.noSpeech"), { mic: true });
+      else flashHint(t("ask.mic.failed"), { mic: true });
+    },
+  });
+  const onMic = () => {
+    // Don't let the mic hear the twin's last answer.
+    if (voice.state === "idle") {
+      stopAudio();
+      // Without an ElevenLabs key the browser transcribes, through its vendor's
+      // servers (Google in Chrome, Apple in Safari). Say so once.
+      if (voice.engine === "browser") {
+        try {
+          if (!localStorage.getItem("ask.mic.browserNotice")) {
+            localStorage.setItem("ask.mic.browserNotice", "1");
+            flashHint(t("ask.mic.browserNotice"), { mic: true });
+          }
+        } catch {
+          // storage blocked: skip the notice
+        }
+      }
+    }
+    voice.toggle();
+  };
+  useEffect(() => {
+    voiceStateRef.current = voice.state;
+  }, [voice.state]);
+  // Escape drops a question still being spoken.
+  const listening = voice.state === "listening";
+  const cancelVoice = voice.cancel;
+  useEffect(() => {
+    if (!listening) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Capture phase + stop: Escape drops the spoken question only, it must
+      // not also reach the orb's own Escape (which resets the answer).
+      e.stopImmediatePropagation();
+      cancelVoice();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [listening, cancelVoice]);
+  const voiceCopy = listening ? voice.interim || t("ask.mic.listening") : voice.state === "transcribing" ? t("ask.mic.transcribing") : null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <Topbar
@@ -718,7 +803,16 @@ export default function AskPage() {
         {/* stage: 70% */}
         <div style={{ position: "relative", flex: 7, minWidth: 0, minHeight: 520 }}>
           <MorphOrb
+            ref={orbRef}
             onSubmit={onSubmit}
+            inputAccessory={
+              <MicButton
+                state={voice.state}
+                level={voice.level}
+                onClick={onMic}
+                label={listening ? t("ask.mic.stop") : t("ask.mic.start")}
+              />
+            }
             // The run as an n8n-style flow around the orb: question → orb →
             // answer, every source the twin reaches for, and the tools pulled
             // through MCP. Inside the stage, under the orb and the answer card.
@@ -739,7 +833,8 @@ export default function AskPage() {
             }
             onAnswered={(answer) => {
               const last = turns[turns.length - 1];
-              if (voiceOn && voiceReady && last) void speak(last.id, answer, last.voiceId);
+              // A spoken question always gets a spoken answer.
+              if (last && voiceReady && (voiceOn || last.viaVoice)) void speak(last.id, answer, last.voiceId);
             }}
             answerAction={(() => {
               const last = turns[turns.length - 1];
@@ -758,13 +853,13 @@ export default function AskPage() {
             }}
             minThinkMs={2600}
             copy={{
-              placeholder: twin ? (mode === "task" ? t("ask.task.placeholder", { name: twin.firstName }) : t("ask.placeholder", { name: twin.firstName })) : t("ask.placeholderAny"),
+              placeholder: voiceCopy ?? (twin ? (mode === "task" ? t("ask.task.placeholder", { name: twin.firstName }) : t("ask.placeholder", { name: twin.firstName })) : t("ask.placeholderAny")),
               labels: [t("ask.l.thinking"), t("ask.l.searching"), t("ask.l.reading"), t("ask.l.composing")],
               done: t("ask.done"),
               answerTitle: twin ? `${twin.name} · ${twin.role}` : t("ask.answer"),
               reset: t("ask.reset"),
               send: t("ask.send"),
-              followUp: twin ? t("ask.followUp", { name: twin.firstName }) : t("ask.placeholderAny"),
+              followUp: voiceCopy ?? (twin ? t("ask.followUp", { name: twin.firstName }) : t("ask.placeholderAny")),
             }}
           />
 
@@ -773,7 +868,8 @@ export default function AskPage() {
           <AnimatePresence>
             {voiceHint && (
               <motion.a
-                href="/settings"
+                href={voiceHint.settings ? "/settings" : undefined}
+                role={voiceHint.settings ? undefined : "status"}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
@@ -797,7 +893,7 @@ export default function AskPage() {
                   whiteSpace: "nowrap",
                 }}
               >
-                <Icons.Volume size={13} /> {t("ask.voiceSetup")}
+                {voiceHint.mic ? <Icons.Mic size={13} /> : <Icons.Volume size={13} />} {voiceHint.text}
               </motion.a>
             )}
           </AnimatePresence>

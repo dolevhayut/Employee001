@@ -36,6 +36,10 @@ export type DiscoveredOAuthMetadata = {
   scopesSupported?: string[];
   /** Whether the server advertises S256 PKCE. We require S256. */
   pkceS256Supported: boolean;
+  /** Whether the server accepts a Client ID Metadata Document (an HTTPS URL
+   *  used as client_id) in place of Dynamic Client Registration. ElevenLabs'
+   *  hosted MCP only offers this. */
+  clientIdMetadataDocumentSupported: boolean;
 };
 
 /** Browse the well-knowns and return the auth endpoints we need. */
@@ -60,6 +64,7 @@ export async function discoverOAuth(
     registration_endpoint?: string;
     scopes_supported?: string[];
     code_challenge_methods_supported?: string[];
+    client_id_metadata_document_supported?: boolean;
   }>(joinWellKnown(authServer, "oauth-authorization-server"));
 
   if (!asMeta.authorization_endpoint || !asMeta.token_endpoint) {
@@ -80,7 +85,74 @@ export async function discoverOAuth(
     registrationEndpoint: asMeta.registration_endpoint,
     scopesSupported: asMeta.scopes_supported ?? resourceMeta.scopes_supported,
     pkceS256Supported: true,
+    clientIdMetadataDocumentSupported: asMeta.client_id_metadata_document_supported === true,
   };
+}
+
+/** Env var naming a public HTTPS URL that serves this install's OAuth Client
+ *  ID Metadata Document. Needed only for auth servers without Dynamic Client
+ *  Registration (e.g. ElevenLabs). The document's `client_id` must equal the
+ *  URL and its `redirect_uris` must list this install's
+ *  `/api/org/mcp/oauth/callback` URL. */
+export const CLIENT_METADATA_URL_ENV = "EMPLOYEE001_OAUTH_CLIENT_METADATA_URL";
+
+export type ClientRegistrationPlan =
+  | { kind: "dcr"; registrationEndpoint: string }
+  | { kind: "metadata-document"; clientId: string }
+  | { kind: "unsupported"; error: string };
+
+/**
+ * Decide how to obtain a client_id for this authorization server. Dynamic
+ * Client Registration wins when offered. Otherwise, a Client ID Metadata
+ * Document works when the server supports it and the install has one
+ * configured (`clientMetadataUrl`, a public HTTPS URL with a path).
+ */
+export function planClientRegistration(
+  meta: Pick<DiscoveredOAuthMetadata, "registrationEndpoint" | "clientIdMetadataDocumentSupported">,
+  clientMetadataUrl: string | undefined,
+): ClientRegistrationPlan {
+  if (meta.registrationEndpoint) {
+    return { kind: "dcr", registrationEndpoint: meta.registrationEndpoint };
+  }
+  if (!meta.clientIdMetadataDocumentSupported) {
+    return {
+      kind: "unsupported",
+      error:
+        "This server's sign-in supports neither Dynamic Client Registration nor client metadata documents, so Employee001 can't connect to it yet.",
+    };
+  }
+  const url = clientMetadataUrl?.trim();
+  if (!url) {
+    return {
+      kind: "unsupported",
+      error:
+        "This server signs in apps with a client metadata document instead of Dynamic Client Registration. " +
+        `Host one at a public HTTPS URL and set ${CLIENT_METADATA_URL_ENV} to it, then restart Employee001.`,
+    };
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { kind: "unsupported", error: `${CLIENT_METADATA_URL_ENV} is not a valid URL.` };
+  }
+  if (parsed.protocol !== "https:" || parsed.pathname === "/" || parsed.hash) {
+    return {
+      kind: "unsupported",
+      error: `${CLIENT_METADATA_URL_ENV} must be an https:// URL with a path and no #fragment.`,
+    };
+  }
+  return { kind: "metadata-document", clientId: parsed.toString() };
+}
+
+/** Whether `clientMetadataUrl` (normally the CLIENT_METADATA_URL_ENV value)
+ *  is a usable Client ID Metadata Document URL. Drives whether Settings
+ *  offers presets that need one (e.g. ElevenLabs). */
+export function isClientMetadataUrlConfigured(clientMetadataUrl: string | undefined): boolean {
+  return (
+    planClientRegistration({ clientIdMetadataDocumentSupported: true }, clientMetadataUrl).kind ===
+    "metadata-document"
+  );
 }
 
 export type RegisteredClient = {

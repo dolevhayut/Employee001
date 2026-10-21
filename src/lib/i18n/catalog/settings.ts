@@ -7,6 +7,8 @@ export const settingsEn = {
   "settings.telemetry.preview": "What we send",
   "settings.telemetry.loading": "Loading preview…",
   "settings.telemetry.failed": "Could not update this setting. Try again.",
+  "settings.api.elevenLabsHint": "Optional, for voice. Create a restricted key: Text to Speech: Access, Speech to Text: Access, Voices: Read, everything else: No Access. Set a monthly credit limit on the key too.",
+  "settings.api.elevenLabsLink": "Create a key in ElevenLabs",
 } as const;
 
 export const settingsHe: Partial<Record<keyof typeof settingsEn, string>> = {
@@ -18,4 +20,6 @@ export const settingsHe: Partial<Record<keyof typeof settingsEn, string>> = {
   "settings.telemetry.preview": "מה נשלח",
   "settings.telemetry.loading": "טוענים תצוגה מקדימה…",
   "settings.telemetry.failed": "לא הצלחנו לעדכן את ההגדרה. נסו שוב.",
+  "settings.api.elevenLabsHint": "אופציונלי, בשביל קול. צרו מפתח מוגבל: Text to Speech: Access, Speech to Text: Access, Voices: Read, וכל השאר: No Access. כדאי גם להגדיר למפתח מגבלת קרדיטים חודשית.",
+  "settings.api.elevenLabsLink": "יצירת מפתח ב-ElevenLabs",
 };

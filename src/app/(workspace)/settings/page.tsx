@@ -13,7 +13,12 @@ import type {
   CustomMcpServer,
   CustomMcpTransport,
 } from "@/lib/custom-mcp";
-import { MCP_PRESETS, type McpPreset } from "@/lib/mcp-presets";
+import {
+  isPresetAvailable,
+  MCP_PRESETS,
+  type McpPreset,
+  type PresetCapabilities,
+} from "@/lib/mcp-presets";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import type { OrgSkillPlaybook } from "@/lib/org-skills";
 import type { OrgBrainNode, OrgBrainNodeType, OrgBrainInput } from "@/lib/org-brain";
@@ -159,6 +164,8 @@ function TelemetrySection() {
   );
 }
 
+const ELEVENLABS_API_KEYS_URL = "https://elevenlabs.io/app/developers/api-keys";
+
 function ApiKeysSection() {
   const { t } = useT();
   const [anthropic, setAnthropic] = useState("");
@@ -197,10 +204,31 @@ function ApiKeysSection() {
     }
   }
 
-  const keyRows: { key: string; label: string; statusKey: keyof typeof status; value: string; setValue: (v: string) => void; required: boolean }[] = [
+  const keyRows: {
+    key: string;
+    label: string;
+    statusKey: keyof typeof status;
+    value: string;
+    setValue: (v: string) => void;
+    required: boolean;
+    /** Optional guidance under the field: what to grant, plus a link to create the key. */
+    hint?: { text: string; linkLabel: string; href: string };
+  }[] = [
     { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key", statusKey: "anthropic", value: anthropic, setValue: setAnthropic, required: true },
     { key: "COMPOSIO_API_KEY", label: "Composio API Key", statusKey: "composio", value: composio, setValue: setComposio, required: true },
-    { key: "ELEVENLABS_API_KEY", label: "ElevenLabs API Key", statusKey: "elevenLabs", value: elevenLabs, setValue: setElevenLabs, required: false },
+    {
+      key: "ELEVENLABS_API_KEY",
+      label: "ElevenLabs API Key",
+      statusKey: "elevenLabs",
+      value: elevenLabs,
+      setValue: setElevenLabs,
+      required: false,
+      hint: {
+        text: t("settings.api.elevenLabsHint"),
+        linkLabel: t("settings.api.elevenLabsLink"),
+        href: ELEVENLABS_API_KEYS_URL,
+      },
+    },
   ];
 
   return (
@@ -210,7 +238,7 @@ function ApiKeysSection() {
         desc={t("settings.api.desc")}
       />
       <div className="card" style={{ padding: "var(--sp-20)", display: "flex", flexDirection: "column", gap: "var(--sp-16)" }}>
-        {keyRows.map(({ key, label, statusKey, value, setValue, required }) => (
+        {keyRows.map(({ key, label, statusKey, value, setValue, required, hint }) => (
           <div key={key}>
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", marginBottom: "var(--sp-6)" }}>
               <span className="section-title" style={{ fontSize: "var(--fs-xs)" }}>{label}</span>
@@ -256,6 +284,26 @@ function ApiKeysSection() {
                 {saving === key ? t("settings.action.saving") : t("settings.action.save")}
               </button>
             </div>
+            {hint && (
+              <p
+                style={{
+                  margin: "var(--sp-6) 0 0",
+                  fontSize: "var(--fs-xs)",
+                  lineHeight: 1.5,
+                  color: "var(--text-subtle)",
+                }}
+              >
+                {hint.text}{" "}
+                <a
+                  href={hint.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--accent-deep)", fontWeight: 600, whiteSpace: "nowrap" }}
+                >
+                  {hint.linkLabel} ↗
+                </a>
+              </p>
+            )}
           </div>
         ))}
         <p style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", margin: 0 }}>
@@ -2017,12 +2065,24 @@ function CustomMcpSection() {
 
   const [oauthConnecting, setOauthConnecting] = useState<string | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  // Presets that need install-side setup stay hidden until the server says
+  // that setup is done (fail closed while loading or on an older server).
+  const [presetCaps, setPresetCaps] = useState<PresetCapabilities>({
+    oauthClientMetadataConfigured: false,
+  });
+  const presets = MCP_PRESETS.filter((p) => isPresetAvailable(p, presetCaps));
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/org/mcp", { cache: "no-store" });
-      const data = (await res.json()) as { servers?: CustomMcpServer[] };
+      const data = (await res.json()) as {
+        servers?: CustomMcpServer[];
+        presetCapabilities?: Partial<PresetCapabilities>;
+      };
       setServers(data.servers ?? []);
+      setPresetCaps({
+        oauthClientMetadataConfigured: data.presetCapabilities?.oauthClientMetadataConfigured === true,
+      });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("settings.status.failedToLoad"));
@@ -2135,7 +2195,7 @@ function CustomMcpSection() {
           </button>
         </div>
 
-        {servers !== null && MCP_PRESETS.length > 0 && (
+        {servers !== null && presets.length > 0 && (
           <div
             style={{
               display: "flex",
@@ -2153,7 +2213,7 @@ function CustomMcpSection() {
               {t("settings.mcp.quickAdd")}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-8)" }}>
-              {MCP_PRESETS.map((p) => {
+              {presets.map((p) => {
                 const alreadyAdded = servers.some(
                   (s) => s.url === p.url || s.name.toLowerCase() === p.name.toLowerCase(),
                 );

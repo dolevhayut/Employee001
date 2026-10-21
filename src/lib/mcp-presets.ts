@@ -20,7 +20,8 @@ export type McpPreset = {
    * field in the modal; `"oauth"` swaps that for a Connect button that
    * opens the upstream service's OAuth flow in a popup. The OAuth path
    * relies on the target server implementing the MCP authorization spec
-   * (Dynamic Client Registration + PKCE) — verified at /start time.
+   * (PKCE plus Dynamic Client Registration, or a client metadata document,
+   * see `requires`) — verified at /start time.
    */
   auth?: "bearer" | "oauth";
   /** Optional header skeleton — value is left blank ("Bearer ") so the
@@ -40,6 +41,18 @@ export type McpPreset = {
   /** Static asset path or absolute URL to a logo. Used when Composio
    *  doesn't carry the brand (e.g. Higgsfield). Wins over `iconSlug`. */
   iconUrl?: string;
+  /** Set when the OAuth flow only works after this install is configured.
+   *  `"client-metadata-document"`: the auth server has no Dynamic Client
+   *  Registration, so the install must host a Client ID Metadata Document
+   *  and point EMPLOYEE001_OAUTH_CLIENT_METADATA_URL at it. Settings hides
+   *  the chip until the server reports it configured. */
+  requires?: "client-metadata-document";
+};
+
+/** Install capabilities that gate presets, as reported by GET /api/org/mcp. */
+export type PresetCapabilities = {
+  /** EMPLOYEE001_OAUTH_CLIENT_METADATA_URL is set to a usable https URL. */
+  oauthClientMetadataConfigured: boolean;
 };
 
 export const MCP_PRESETS: McpPreset[] = [
@@ -139,7 +152,28 @@ export const MCP_PRESETS: McpPreset[] = [
       "You'll be sent to Higgsfield in a popup to sign in. Tokens stay on this machine — they're never sent anywhere else.",
     iconUrl: "/mcp-icons/higgsfield.png",
   },
+  {
+    id: "elevenlabs",
+    name: "ElevenLabs",
+    description:
+      "Voices, text to speech, transcription and voice agents through ElevenLabs' hosted MCP.",
+    transport: "http",
+    url: "https://api.elevenlabs.io/v1/mcp",
+    auth: "oauth",
+    tokenHint:
+      "You'll be sent to ElevenLabs in a popup to sign in. Usage bills to your ElevenLabs plan. Tokens stay on this machine.",
+    iconSlug: "elevenlabs",
+    // ElevenLabs offers no Dynamic Client Registration, only client metadata
+    // documents, so the chip only appears once the install hosts one.
+    requires: "client-metadata-document",
+  },
 ];
+
+/** Whether a preset can actually connect on this install. */
+export function isPresetAvailable(p: McpPreset, caps: PresetCapabilities): boolean {
+  if (p.requires === "client-metadata-document") return caps.oauthClientMetadataConfigured;
+  return true;
+}
 
 export function findPreset(id: string): McpPreset | undefined {
   return MCP_PRESETS.find((p) => p.id === id);

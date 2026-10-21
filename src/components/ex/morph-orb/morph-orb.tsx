@@ -5,7 +5,7 @@
 // the window (the app has a sidebar), the answer card is larger, and the copy
 // comes from props. Styles live in ./morph-orb.css (the registry only shipped
 // keyframes; the class styles were rebuilt from the published preview).
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import "./morph-orb.css";
 
 /* ───────────────────────────── copy ───────────────────────────── */
@@ -36,7 +36,15 @@ const COPY: MorphOrbCopy = { ...DEFAULT_COPY };
 
 type Phase = "idle" | "launch" | "assemble" | "think" | "resolve" | "condense" | "unfold" | "answered" | "reset";
 
+/** Drive the orb from outside (e.g. a spoken question). */
+export interface MorphOrbHandle {
+  /** Ask `text` as if it had been typed and sent: from the idle input, or as a
+   *  follow-up while an answer is shown. False when the orb is mid-run. */
+  submit(text: string): boolean;
+}
+
 export interface MorphOrbProps {
+  ref?: React.Ref<MorphOrbHandle>;
   onSubmit?: (text: string) => Promise<string> | string;
   /** Called once the answer card has unfolded (e.g. to read it aloud). */
   onAnswered?: (answer: string) => void;
@@ -50,6 +58,9 @@ export interface MorphOrbProps {
   /** Drawn inside the stage, above its background and below the orb and the
    *  answer card (e.g. a flow of the run). Must not take pointer events. */
   backdrop?: React.ReactNode;
+  /** Rendered in the input pill and the follow-up pill, before the send
+   *  button (e.g. a mic). Should be about 38px square, like the send button. */
+  inputAccessory?: React.ReactNode;
   copy?: Partial<MorphOrbCopy>;
   minThinkMs?: number;
   speed?: number;
@@ -865,7 +876,7 @@ function createRuntime(env: Env): Runtime {
 /* ───────────────────────────── component ───────────────────────────── */
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-export default function MorphOrb(props: MorphOrbProps) {
+export default function MorphOrb({ ref, ...props }: MorphOrbProps) {
   const copy: MorphOrbCopy = { ...DEFAULT_COPY, ...props.copy };
   const [phase, setPhaseState] = useState<Phase>("idle");
   const [value, setValue] = useState("");
@@ -1052,6 +1063,31 @@ export default function MorphOrb(props: MorphOrbProps) {
     if (phaseRef.current === "answered") rtRef.current?.reset();
   };
 
+  useImperativeHandle(ref, () => ({
+    submit: (raw: string) => {
+      const rt = rtRef.current;
+      const text = raw.replace(/\s+/g, " ").trim().slice(0, 1000);
+      if (!rt || !text) return false;
+      if (phaseRef.current === "answered") {
+        // Same path as a typed follow-up: back to idle, then sent.
+        pendingRef.current = text;
+        setFollow("");
+        rt.reset();
+        return true;
+      }
+      if (phaseRef.current !== "idle" || rt.busy()) return false;
+      lastTextRef.current = text;
+      setValue(text);
+      window.requestAnimationFrame(() => {
+        rt.start(text, {
+          onSubmit: propsRef.current.onSubmit ?? (() => COPY.answerBody),
+          minThink: propsRef.current.minThinkMs ?? 3450,
+        });
+      });
+      return true;
+    },
+  }), []);
+
   const replay = () => {
     const rt = rtRef.current;
     if (!rt) return;
@@ -1119,6 +1155,7 @@ export default function MorphOrb(props: MorphOrbProps) {
               onChange={onChange}
               onKeyDown={onKeyDown}
             />
+            {props.inputAccessory}
             <button type="submit" className="mo-send" aria-label={copy.send} data-ready={ready ? "" : undefined}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 19V5" />
@@ -1182,6 +1219,7 @@ export default function MorphOrb(props: MorphOrbProps) {
           tabIndex={phase === "answered" ? 0 : -1}
           onChange={(e) => setFollow(e.target.value)}
         />
+        {props.inputAccessory ? <span inert={phase !== "answered"} style={{ display: "contents" }}>{props.inputAccessory}</span> : null}
         <button type="submit" className="mo-send" aria-label={copy.send} data-ready={follow.trim() ? "" : undefined} tabIndex={phase === "answered" ? 0 : -1}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M12 19V5" />

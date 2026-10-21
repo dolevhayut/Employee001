@@ -4,13 +4,21 @@ import {
   listCustomMcp,
   type CreateCustomMcpInput,
 } from "@/lib/custom-mcp";
+import { CLIENT_METADATA_URL_ENV, isClientMetadataUrlConfigured } from "@/lib/mcp-oauth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const servers = await listCustomMcp();
-  return NextResponse.json({ servers }, { headers: { "Cache-Control": "no-store" } });
+  // Lets Settings hide quick-add presets that can't connect on this install.
+  const presetCapabilities = {
+    oauthClientMetadataConfigured: isClientMetadataUrlConfigured(process.env[CLIENT_METADATA_URL_ENV]),
+  };
+  return NextResponse.json(
+    { servers, presetCapabilities },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function POST(request: Request) {

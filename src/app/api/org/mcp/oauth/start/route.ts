@@ -18,10 +18,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   buildAuthUrl,
+  CLIENT_METADATA_URL_ENV,
   discoverOAuth,
   pkcePair,
+  planClientRegistration,
   randomState,
   registerClient,
+  type RegisteredClient,
 } from "@/lib/mcp-oauth";
 import { putPendingOAuth } from "@/lib/mcp-oauth-state";
 
@@ -71,18 +74,17 @@ export async function POST(req: NextRequest) {
     const origin = originFromRequest(req);
     const redirectUri = `${origin}/api/org/mcp/oauth/callback`;
 
-    if (!meta.registrationEndpoint) {
-      return NextResponse.json(
-        {
-          error:
-            "Authorization server does not support Dynamic Client Registration. " +
-            "Pre-registering an app per workspace isn't supported yet.",
-        },
-        { status: 501 },
-      );
+    // DCR when offered; otherwise a Client ID Metadata Document (an HTTPS
+    // URL used as client_id, e.g. ElevenLabs), if this install has one.
+    const plan = planClientRegistration(meta, process.env[CLIENT_METADATA_URL_ENV]);
+    if (plan.kind === "unsupported") {
+      return NextResponse.json({ error: plan.error }, { status: 501 });
     }
 
-    const client = await registerClient(meta.registrationEndpoint, redirectUri, "Employee001 workspace");
+    const client: RegisteredClient =
+      plan.kind === "dcr"
+        ? await registerClient(plan.registrationEndpoint, redirectUri, "Employee001 workspace")
+        : { clientId: plan.clientId };
     const { verifier, challenge } = pkcePair();
     const state = randomState();
     const scope = (meta.scopesSupported ?? []).join(" ") || undefined;
