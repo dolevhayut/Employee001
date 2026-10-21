@@ -78,7 +78,6 @@ const NAV_SECTIONS: NavSection[] = [
     labelKey: "nav.section.twins",
     items: [
       { href: "/employees", labelKey: "nav.twins", icon: "Home" },
-      { href: "/flow", labelKey: "nav.chat", icon: "Bot" },
       { href: "/marketplace", labelKey: "nav.hire", icon: "Store" },
     ],
   },

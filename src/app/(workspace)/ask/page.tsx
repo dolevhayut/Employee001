@@ -7,7 +7,7 @@
 // reasoning when the model streams it. Read-only by design: a tool call that
 // would need approval is declined, so the orb never waits on a hidden card.
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
@@ -309,6 +309,9 @@ function Trace({ turn, live }: { turn: Turn; live: boolean }) {
   );
 }
 
+const noopSubscribe = () => () => {};
+const linkedTwin = () => new URLSearchParams(window.location.search).get("twin");
+
 export default function AskPage() {
   const { t } = useT();
   const roster = useRoster();
@@ -325,7 +328,9 @@ export default function AskPage() {
   const [audio, setAudio] = useState<AudioState>(null);
   const [voiceHint, setVoiceHint] = useState(false);
 
-  const twinId = selected ?? twins[0]?.id ?? null;
+  // ?twin=<id> preselects a twin (the Company brain links here when a twin is clicked).
+  const linked = useSyncExternalStore(noopSubscribe, linkedTwin, () => null);
+  const twinId = selected ?? (linked && twins.some((e) => e.id === linked) ? linked : null) ?? twins[0]?.id ?? null;
   const liveTurn = turns.find((turn) => turn.answer === null);
   const twin = twins.find((e) => e.id === twinId);
 

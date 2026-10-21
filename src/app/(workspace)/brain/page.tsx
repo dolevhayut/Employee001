@@ -1,12 +1,14 @@
 "use client";
 
 // The organization brain: ask the whole company one question. A router picks
-// the twins who know (keywords, Haiku when unsure), a team meeting runs with
-// them, and the 3D Org Cosmos shows it happen: impulses from the core to the
-// routed twins, regions igniting while they work, sparks per tool, beams when
-// one twin calls in another. Answers stream into the thread on the side.
+// the twins who know (keywords, Haiku when unsure) and a team meeting runs
+// with them. The company is drawn as one BrainCosmos (company hub, twins,
+// shared tools): impulses run from the hub to each twin while it works, a tool
+// node lights when it is used, and a twin that answered sends a shockwave.
+// Answers stream into the thread on the side. Clicking a twin opens Ask.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
@@ -15,7 +17,9 @@ import { useRoster } from "@/components/ex/roster-context";
 import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
-import { OrgCosmos, twinColor, type OrgCosmosHandle } from "@/components/ex/org-cosmos";
+import { BrainCosmos, canRenderCosmos } from "@/components/ex/brain-cosmos";
+import { ObsidianGraph, type GraphHighlightState } from "@/components/ex/obsidian-graph";
+import type { OrgGraph } from "@/lib/org-graph";
 import { describeToolCall, type ToolNodeStep } from "@/components/ex/morph-orb/tool-nodes";
 
 type Status = "waiting" | "thinking" | "working" | "done" | "error";
@@ -45,21 +49,82 @@ type CouncilEvent = {
 };
 
 const NEW_ANSWER: Answer = { status: "waiting", text: "", thinking: "", tools: [] };
+const NO_HIGHLIGHT: GraphHighlightState = { reading: new Set(), recentlyTouched: new Set(), cited: new Set() };
+
+const noopSubscribe = () => () => {};
+
+/** Lower-case alphanumerics, same rule as toolKey() in lib/org-graph. */
+const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const mono = "var(--font-mono, ui-monospace, monospace)";
 
 export default function OrgBrainPage() {
   const { t } = useT();
   const roster = useRoster();
   const twins = useMemo(() => roster.filter((e) => e.twinStatus === "ready"), [roster]);
-  const cosmosTwins = useMemo(() => twins.map((e) => ({ id: e.id, name: e.firstName, role: e.role })), [twins]);
-  const colorOf = useMemo(() => new Map(twins.map((e, i) => [e.id, twinColor(i)])), [twins]);
+  const colorOf = useMemo(() => new Map(twins.map((e) => [e.id, e.avatarColor])), [twins]);
   const byId = useMemo(() => new Map(twins.map((e) => [e.id, e])), [twins]);
 
-  const ctl = useRef<OrgCosmosHandle | null>(null);
-  const labels = useRef(new Map<string, HTMLElement>());
+  const router = useRouter();
+  const [graph, setGraph] = useState<OrgGraph | null>(null);
+  const cosmos = useSyncExternalStore(noopSubscribe, canRenderCosmos, () => false);
+  const [hl, setHl] = useState<GraphHighlightState>(NO_HIGHLIGHT);
+  const graphRef = useRef<OrgGraph | null>(null);
   const meetingId = useRef<string | undefined>(undefined);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [input, setInput] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/org/graph")
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((g: OrgGraph) => {
+        if (cancelled) return;
+        graphRef.current = g;
+        setGraph(g);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ── graph highlights driven by the meeting ──
+  const nodeOfTwin = (id: string) =>
+    Object.entries(graphRef.current?.refs ?? {}).find(([, r]) => r.kind === "twin" && r.id === id)?.[0];
+  const nodeOfTool = (tool: string, input: Record<string, unknown>) => {
+    const refs = Object.entries(graphRef.current?.refs ?? {});
+    const byKey = (k: string) => refs.find(([, r]) => r.kind === "tool" && r.key === k)?.[0];
+    if (tool === "WebSearch" || tool === "WebFetch") return byKey("web");
+    if (tool.startsWith("mcp__org_brain") || String(input.file_path ?? input.path ?? "").includes("org-brain")) return byKey("companybrain");
+    const mcp = /^mcp__(.+?)__/.exec(tool);
+    return mcp ? byKey(key(mcp[1])) : undefined;
+  };
+  const light = (names: (string | undefined)[]) =>
+    setHl((s) => ({ ...s, reading: new Set([...s.reading, ...names.filter((n): n is string => Boolean(n))]) }));
+  const flash = (name: string | undefined) => {
+    if (!name) return;
+    setHl((s) => {
+      const reading = new Set(s.reading);
+      reading.delete(name); // re-adding fires a fresh impulse
+      return { ...s, reading };
+    });
+    setTimeout(() => light([name]), 30);
+    setTimeout(() => {
+      setHl((s) => {
+        const reading = new Set(s.reading);
+        reading.delete(name);
+        return { ...s, reading, recentlyTouched: new Set([...s.recentlyTouched, name]) };
+      });
+    }, 1400);
+  };
+  const cite = (name: string | undefined) => {
+    if (!name) return;
+    setHl((s) => {
+      const reading = new Set(s.reading);
+      reading.delete(name);
+      return { ...s, reading, cited: new Set([...s.cited, name]) };
+    });
+  };
+
   const busy = rounds.length > 0 && !rounds[rounds.length - 1].done;
   const live = rounds[rounds.length - 1];
 
@@ -76,7 +141,7 @@ export default function OrgBrainPage() {
     setInput("");
     const id = Date.now();
     setRounds((rs) => [...rs, { id, question, routing: true, picks: [], order: [], answers: {}, done: false }]);
-    ctl.current?.reset();
+    setHl(NO_HIGHLIGHT);
 
     try {
       const routed = await fetch("/api/org/router", {
@@ -86,7 +151,7 @@ export default function OrgBrainPage() {
       }).then((r) => r.json() as Promise<{ picks?: { id: string; matched: string[] }[] }>);
       const picks = (routed.picks ?? []).map((p) => ({ id: p.id, why: p.matched }));
       if (picks.length === 0) throw new Error("no route");
-      ctl.current?.route(picks.map((p) => p.id));
+      light(picks.map((p) => nodeOfTwin(p.id)));
       patch(id, (r) => ({
         ...r,
         routing: false,
@@ -141,12 +206,12 @@ export default function OrgBrainPage() {
         return;
       case "employee_start":
         if (!who) return;
-        ctl.current?.activate(who);
+        light([nodeOfTwin(who)]);
         patchAnswer(id, who, (a) => ({ ...a, status: "thinking" }));
         return;
       case "tool_use":
         if (!who || !evt.tool) return;
-        ctl.current?.spark(who);
+        flash(nodeOfTool(evt.tool, (evt.input ?? {}) as Record<string, unknown>));
         patchAnswer(id, who, (a) => ({
           ...a,
           status: "working",
@@ -163,17 +228,17 @@ export default function OrgBrainPage() {
         return;
       case "delegation":
         if (!evt.fromId || !evt.toId) return;
-        ctl.current?.beam(evt.fromId, evt.toId);
+        light([nodeOfTwin(evt.toId)]);
         patchAnswer(id, evt.toId, (a) => ({ ...a, calledInBy: evt.fromName }));
         return;
       case "employee_done":
         if (!who) return;
-        ctl.current?.settle(who);
+        cite(nodeOfTwin(who));
         patchAnswer(id, who, (a) => ({ ...a, status: "done" }));
         return;
       case "employee_error":
         if (!who) return;
-        ctl.current?.settle(who);
+        cite(nodeOfTwin(who));
         patchAnswer(id, who, (a) => ({ ...a, status: "error" }));
         return;
       case "tool_approval_request":
@@ -198,8 +263,11 @@ export default function OrgBrainPage() {
     }
   }
 
-  // Status per twin for the labels over the 3D regions (latest round only).
-  const labelStatus = (twinId: string): Answer | undefined => live?.answers[twinId];
+  // Clicking a twin in the brain opens it in Ask; other nodes do nothing.
+  const openNode = (name: string) => {
+    const ref = graphRef.current?.refs[name];
+    if (ref?.kind === "twin") router.push(`/ask?twin=${encodeURIComponent(ref.id)}`);
+  };
 
   return (
     <>
@@ -211,7 +279,7 @@ export default function OrgBrainPage() {
               onClick={() => {
                 setRounds([]);
                 meetingId.current = undefined;
-                ctl.current?.reset();
+                setHl(NO_HIGHLIGHT);
               }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--hairline)", background: "var(--surface)", color: "var(--text)", font: "inherit", fontSize: "var(--fs-xs)", fontWeight: 600, cursor: "pointer" }}
             >
@@ -232,57 +300,13 @@ export default function OrgBrainPage() {
             border: "1px solid var(--hairline)",
           }}
         >
-          {twins.length > 0 && <OrgCosmos twins={cosmosTwins} labels={labels} controlRef={ctl} />}
-
-          {/* twin labels, positioned by the scene every frame */}
-          <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "clip" }}>
-            {twins.map((e) => {
-              const a = labelStatus(e.id);
-              const active = a && (a.status === "thinking" || a.status === "working");
-              const color = colorOf.get(e.id)!;
-              return (
-                <div
-                  key={e.id}
-                  ref={(el) => {
-                    if (el) labels.current.set(e.id, el);
-                    else labels.current.delete(e.id);
-                  }}
-                  style={{ position: "absolute", left: 0, top: 0, opacity: 0, transition: "opacity .3s", willChange: "transform" }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "5px 10px 5px 6px",
-                      borderRadius: 999,
-                      whiteSpace: "nowrap",
-                      background: "rgba(20,13,8,0.62)",
-                      border: `1px solid ${active ? color : "rgba(255,226,184,0.16)"}`,
-                      boxShadow: active ? `0 0 18px ${color}66` : "none",
-                      backdropFilter: "blur(6px)",
-                      transition: "border-color .3s, box-shadow .3s",
-                    }}
-                  >
-                    <span style={{ width: 22, height: 22, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 700, color: "#1a120c", background: color }}>{e.initials}</span>
-                    <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
-                      <span style={{ fontSize: 12, fontWeight: 650, color: "#fff3e6" }}>
-                        <bdi>{e.firstName}</bdi>
-                      </span>
-                      <span style={{ fontSize: 10, color: "rgba(255,226,184,0.6)" }}>
-                        {a && a.status !== "waiting" ? (
-                          <span style={{ color: a.status === "done" ? "#7ef0b5" : color }}>
-                            {a.status === "done" ? t("org.status.done") : a.tools.length ? t("org.status.working", { count: a.tools.length }) : t("org.status.thinking")}
-                          </span>
-                        ) : (
-                          <bdi>{e.role}</bdi>
-                        )}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+          {/* the company as one brain: BrainCosmos, unchanged, fed the org graph */}
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}>
+            {cosmos ? (
+              <BrainCosmos graph={graph} state={hl} onOpenFile={openNode} loading={!graph} />
+            ) : (
+              <ObsidianGraph graph={graph} state={hl} onOpenFile={openNode} loading={!graph} />
+            )}
           </div>
 
           {/* title */}
