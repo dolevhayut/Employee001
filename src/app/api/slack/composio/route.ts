@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 /** Composio signs raw delivery bytes; normalize only after verification. */
 export async function POST(request: Request) {
   const raw = await request.text();
-  const verified = await verifyComposioWebhook({ payload: raw, signature: request.headers.get("webhook-signature"), id: request.headers.get("webhook-id"), timestamp: request.headers.get("webhook-timestamp"), secret: process.env.COMPOSIO_WEBHOOK_SECRET });
+  const verified = await verifyComposioWebhook({ payload: raw, signature: request.headers.get("webhook-signature"), id: request.headers.get("webhook-id"), timestamp: request.headers.get("webhook-timestamp"), secret: process.env.COMPOSIO_WEBHOOK_SECRET, scope: "composio-slack" });
   if (!verified) return Response.json({ error: "unauthorized" }, { status: 401 });
   const envelope = verified as { payload?: unknown; rawPayload?: unknown };
   const message = slackFromTriggerPayload(envelope.payload ?? envelope.rawPayload);

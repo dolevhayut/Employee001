@@ -2,6 +2,7 @@ import fs from "fs";
 import { dataDir } from "@/lib/app-home";
 import path from "path";
 import { getComposio, composioUserIdFor, readState } from "@/lib/composio-client";
+import { acceptWebhookOnce, timestampFresh } from "@/lib/webhook-replay";
 
 const FILE = () => dataDir("org", "email-triggers.json");
 const FALLBACK_TRIGGER_SLUG = "GMAIL_NEW_GMAIL_MESSAGE";
@@ -58,4 +59,18 @@ export async function ensureEmailTrigger(employeeId: string): Promise<{ armed: b
 }
 export async function disableEmailTrigger(employeeId: string): Promise<void> { const trigger = emailTriggerFor(employeeId); forgetEmailTrigger(employeeId); if (!trigger) return; try { await (getComposio() as unknown as TriggerClient).triggers.disable(trigger.triggerId); } catch { /* local record must clear */ } }
 export type WebhookVerifier = (params: { payload: string; signature: string; id: string; timestamp: string; secret: string }) => Promise<unknown>;
-export async function verifyComposioWebhook(input: { payload: string; signature: string | null; id: string | null; timestamp: string | null; secret?: string }, verifier?: WebhookVerifier): Promise<unknown | null> { if (!input.secret || !input.signature || !input.id || !input.timestamp) return null; try { const verify = verifier ?? ((params) => (getComposio() as unknown as { triggers: { verifyWebhook(value: typeof params): Promise<unknown> } }).triggers.verifyWebhook(params)); return await verify({ payload: input.payload, signature: input.signature, id: input.id, timestamp: input.timestamp, secret: input.secret }); } catch { return null; } }
+/** Signature (Composio SDK), then replay protection: a stale timestamp or a
+ *  webhook id already seen returns null like a bad signature. */
+export async function verifyComposioWebhook(input: { payload: string; signature: string | null; id: string | null; timestamp: string | null; secret?: string; scope?: string; now?: number }, verifier?: WebhookVerifier): Promise<unknown | null> {
+  if (!input.secret || !input.signature || !input.id || !input.timestamp) return null;
+  if (!timestampFresh(input.timestamp, input.now).ok) return null;
+  let verified: unknown;
+  try {
+    const verify = verifier ?? ((params) => (getComposio() as unknown as { triggers: { verifyWebhook(value: typeof params): Promise<unknown> } }).triggers.verifyWebhook(params));
+    verified = await verify({ payload: input.payload, signature: input.signature, id: input.id, timestamp: input.timestamp, secret: input.secret });
+  } catch {
+    return null;
+  }
+  if (!verified) return null;
+  return acceptWebhookOnce(input.scope ?? "composio", input.id, input.timestamp, input.now).ok ? verified : null;
+}

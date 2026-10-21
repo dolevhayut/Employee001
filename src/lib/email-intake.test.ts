@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { emailFromTriggerPayload, gmailQuerySince, normalizeEmailMessage } from "./email-intake";
 import { emailPollIntervalMs, findNewMailTrigger, publicWebhookUrl, verifyComposioWebhook } from "./email-intake-trigger";
@@ -28,7 +31,9 @@ describe("email intake", () => {
 
   it("passes raw body and all Composio signature fields to the SDK verifier", async () => {
     const calls: unknown[] = [];
-    const result = await verifyComposioWebhook({ payload: '{"x":1}', signature: "v1,sig", id: "msg_1", timestamp: "1791115200", secret: "secret" }, async (params) => { calls.push(params); return { payload: { ok: true } }; });
+    const now = 1791115200 * 1000;
+    process.env.EMPLOYEE001_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "e001-hook-"));
+    const result = await verifyComposioWebhook({ payload: '{"x":1}', signature: "v1,sig", id: "msg_1", timestamp: "1791115200", secret: "secret", now }, async (params) => { calls.push(params); return { payload: { ok: true } }; });
     expect(result).toEqual({ payload: { ok: true } });
     expect(calls).toEqual([{ payload: '{"x":1}', signature: "v1,sig", id: "msg_1", timestamp: "1791115200", secret: "secret" }]);
     expect(await verifyComposioWebhook({ payload: "{}", signature: null, id: "msg", timestamp: "1", secret: "secret" })).toBeNull();
