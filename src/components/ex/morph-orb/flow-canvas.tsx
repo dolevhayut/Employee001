@@ -8,7 +8,9 @@
 // get person, search tickets). Wires are dashed with dots flowing along them,
 // and a small orb hops along the wire to whatever the twin is doing now.
 // The flowing-dot wires follow 21st.dev's "AI Agent Pipeline" (SVG
-// animateMotion); the node look follows n8n.
+// animateMotion); the node look follows n8n. When the answer card opens, a
+// wave runs out from it and gently pushes the nodes clear of it, nearest
+// first.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -34,6 +36,13 @@ const CENTER_Y = 0.46; // the orb sits at 46% of the stage height
 const NODE = 54;
 const MAX_ITEMS = 3;
 const EASE = [0.23, 1, 0.32, 1] as const;
+/** The push: a soft spring with a little overshoot, like a wave lifting it. */
+const PUSH = { type: "spring" as const, stiffness: 170, damping: 15, mass: 0.9 };
+/** Seconds per pixel of distance from the card: the wave's travel time. */
+const WAVE_SPEED = 0.0011;
+const CARD_MARGIN = 26;
+
+type Rect = { l: number; t: number; r: number; b: number };
 
 const KIND_ICON: Record<FlowStep["kind"], (s: number) => ReactNode> = {
   read: (s) => <Icons.Doc size={s} />,
@@ -93,15 +102,14 @@ function Wire({ d, live, done, delay = 0 }: { d: string; live: boolean; done: bo
   return (
     <g>
       <motion.path
-        d={d}
         fill="none"
         stroke={done ? "var(--success)" : live ? "var(--accent)" : "var(--text)"}
         strokeOpacity={done ? 0.55 : live ? 0.7 : 0.18}
         strokeWidth={live ? 1.8 : 1.4}
         strokeDasharray="4 5"
-        initial={{ pathLength: 0, opacity: 0 }}
-        animate={{ pathLength: 1, opacity: 1 }}
-        transition={{ duration: 0.6, delay, ease: EASE }}
+        initial={{ pathLength: 0, opacity: 0, d }}
+        animate={{ pathLength: 1, opacity: 1, d }}
+        transition={{ duration: 0.6, delay, ease: EASE, d: PUSH }}
       />
       {live &&
         [0, 0.5].map((b) => (
@@ -123,6 +131,7 @@ function NodeBox({
   children,
   delay = 0,
   labelBelow = true,
+  pushDelay = 0,
 }: {
   x: number;
   y: number;
@@ -133,14 +142,15 @@ function NodeBox({
   children: ReactNode;
   delay?: number;
   labelBelow?: boolean;
+  pushDelay?: number;
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.4 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0, scale: 0.4, left: x, top: y }}
+      animate={{ opacity: 1, scale: 1, left: x, top: y }}
       exit={{ opacity: 0, scale: 0.6 }}
-      transition={{ type: "spring", stiffness: 380, damping: 24, delay }}
-      style={{ position: "absolute", left: x, top: y, translateX: "-50%", translateY: "-50%", display: "flex", flexDirection: labelBelow ? "column" : "column-reverse", alignItems: "center", gap: 7, pointerEvents: "none" }}
+      transition={{ type: "spring", stiffness: 380, damping: 24, delay, left: { ...PUSH, delay: pushDelay }, top: { ...PUSH, delay: pushDelay } }}
+      style={{ position: "absolute", translateX: "-50%", translateY: "-50%", display: "flex", flexDirection: labelBelow ? "column" : "column-reverse", alignItems: "center", gap: 7, pointerEvents: "none" }}
     >
       <span style={{ position: "relative", width: NODE, height: NODE }}>
         {live && (
@@ -208,17 +218,61 @@ export function FlowCanvas({
     return () => ro.disconnect();
   }, []);
 
+  // The answer card (MorphOrb's .mo-card) once it opens, in this box's
+  // coordinates. Polled while the run is on screen: the card grows as it unfolds.
+  const [card, setCard] = useState<Rect | null>(null);
+  useEffect(() => {
+    if (!visible || !answered) {
+      const id = setTimeout(() => setCard(null), 0);
+      return () => clearTimeout(id);
+    }
+    const read = () => {
+      const box = boxRef.current;
+      const root = box?.closest(".mo-root");
+      const el = root?.querySelector(".mo-card");
+      const phase = root?.getAttribute("data-phase");
+      if (!box || !el || (phase !== "unfold" && phase !== "answered")) return;
+      const b = box.getBoundingClientRect();
+      const c = el.getBoundingClientRect();
+      if (c.width < 200) return; // still the pill
+      const next = { l: c.left - b.left, t: c.top - b.top, r: c.right - b.left, b: c.bottom - b.top };
+      setCard((prev) =>
+        prev && Math.abs(prev.l - next.l) < 4 && Math.abs(prev.t - next.t) < 4 && Math.abs(prev.r - next.r) < 4 && Math.abs(prev.b - next.b) < 4 ? prev : next,
+      );
+    };
+    const iv = setInterval(read, 120);
+    read();
+    return () => clearInterval(iv);
+  }, [visible, answered]);
+
   const groups = useMemo(() => groupSteps(steps).slice(0, 6), [steps]);
   const latest = steps[steps.length - 1];
   const { w, h } = size;
   const cx = w / 2;
   const cy = h * CENTER_Y;
-  const qx = Math.max(90, cx - ORB_R - 210);
-  const ax = Math.min(w - 90, cx + ORB_R + 210);
+  // Push a node (centre x,y, half-size hw,hh) clear of the open card.
+  const ccx = card ? (card.l + card.r) / 2 : cx;
+  const ccy = card ? (card.t + card.b) / 2 : cy;
+  const push = (x: number, y: number, hw: number, hh: number, axis: "x" | "y"): { x: number; y: number; delay: number } => {
+    if (!card) return { x, y, delay: 0 };
+    const l = card.l - CARD_MARGIN, r = card.r + CARD_MARGIN, t = card.t - CARD_MARGIN, b = card.b + CARD_MARGIN;
+    const overlaps = x + hw > l && x - hw < r && y + hh > t && y - hh < b;
+    const delay = Math.hypot(x - ccx, y - ccy) * WAVE_SPEED;
+    if (!overlaps) return { x, y, delay };
+    if (axis === "x") return { x: x < ccx ? Math.max(hw + 8, l - hw) : Math.min(w - hw - 8, r + hw), y, delay };
+    return { x, y: y < ccy ? Math.max(hh + 8, t - hh) : Math.min(h - hh - 8, b + hh), delay };
+  };
+
+  const q = push(Math.max(90, cx - ORB_R - 210), cy, NODE / 2 + 10, NODE / 2 + 22, "x");
+  const a = push(Math.min(w - 90, cx + ORB_R + 210), cy, NODE / 2 + 10, NODE / 2 + 22, "x");
+  const qx = q.x;
+  const ax = a.x;
 
   // Geometry for every group node, its wire to the orb, and its tool leaves.
   const laid = groups.map((g, i) => {
-    const s = slot(i, w, h);
+    const base = slot(i, w, h);
+    const moved = push(base.x, base.y, NODE / 2 + 12, NODE / 2 + 26, "y");
+    const s = { ...base, x: moved.x, y: moved.y, delay: moved.delay };
     const fromY = s.above ? cy - ORB_R : cy + ORB_R;
     const fromX = cx + Math.max(-ORB_R * 0.7, Math.min(ORB_R * 0.7, (s.x - cx) * 0.35));
     const toY = s.above ? s.y + NODE / 2 : s.y - NODE / 2;
@@ -262,6 +316,34 @@ export function FlowCanvas({
                 ))}
               </svg>
 
+              {/* the wave: rings run out from the card as it opens */}
+              <AnimatePresence>
+                {card && (
+                  <motion.div key="wave" initial={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+                    {[0, 0.16, 0.32].map((d, k) => (
+                      <motion.span
+                        key={k}
+                        initial={{ scale: 0.2, opacity: 0.55 - k * 0.12 }}
+                        animate={{ scale: 1, opacity: 0 }}
+                        transition={{ duration: 1.5, delay: d, ease: [0.16, 1, 0.3, 1] }}
+                        style={{
+                          position: "absolute",
+                          left: ccx,
+                          top: ccy,
+                          width: Math.max(w, h) * 1.6,
+                          height: Math.max(w, h) * 1.6,
+                          marginLeft: -Math.max(w, h) * 0.8,
+                          marginTop: -Math.max(w, h) * 0.8,
+                          borderRadius: "50%",
+                          border: `${2 - k * 0.5}px solid var(--accent)`,
+                          background: k === 0 ? "radial-gradient(circle, transparent 55%, color-mix(in oklab, var(--accent) 10%, transparent) 68%, transparent 72%)" : "none",
+                        }}
+                      />
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* the orb hopping to whatever the twin is doing now */}
               <AnimatePresence>
                 {active && (
@@ -289,10 +371,10 @@ export function FlowCanvas({
                 )}
               </AnimatePresence>
 
-              <NodeBox x={qx} y={cy} live={!latest} done={Boolean(latest)} label={questionLabel}>
+              <NodeBox x={qx} y={cy} live={!latest} done={Boolean(latest)} label={questionLabel} pushDelay={q.delay}>
                 <Icons.MessageSquare size={20} />
               </NodeBox>
-              <NodeBox x={ax} y={cy} live={false} done={answered} label={answerLabel} delay={0.1}>
+              <NodeBox x={ax} y={cy} live={false} done={answered} label={answerLabel} delay={0.1} pushDelay={a.delay}>
                 <Icons.Send size={19} />
               </NodeBox>
 
@@ -307,6 +389,7 @@ export function FlowCanvas({
                     sub={l.g.items.length > MAX_ITEMS ? `+${l.g.items.length - MAX_ITEMS} more` : l.g.items.length ? `${l.g.items.length} pulled` : undefined}
                     labelBelow={!l.s.above}
                     delay={0.05 * i}
+                    pushDelay={l.s.delay}
                   >
                     {l.g.logo ? <ToolkitIcon slug={l.g.logo} size={26} /> : KIND_ICON[l.g.kind](22)}
                   </NodeBox>
@@ -317,14 +400,12 @@ export function FlowCanvas({
                       return (
                         <motion.div
                           key={lf.name}
-                          initial={{ opacity: 0, scale: 0.5, y: l.s.above ? 10 : -10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          initial={{ opacity: 0, scale: 0.5, left: lf.x, top: lf.y }}
+                          animate={{ opacity: 1, scale: 1, left: lf.x, top: lf.y }}
                           exit={{ opacity: 0 }}
-                          transition={{ type: "spring", stiffness: 420, damping: 26 }}
+                          transition={{ type: "spring", stiffness: 420, damping: 26, left: { ...PUSH, delay: l.s.delay + 0.04 }, top: { ...PUSH, delay: l.s.delay + 0.04 } }}
                           style={{
                             position: "absolute",
-                            left: lf.x,
-                            top: lf.y,
                             translateX: "-50%",
                             translateY: "-50%",
                             display: "inline-flex",
