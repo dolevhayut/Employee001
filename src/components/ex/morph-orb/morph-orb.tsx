@@ -44,6 +44,9 @@ export interface MorphOrbProps {
   onReset?: () => void;
   /** Rendered at the end of the answer card's header (e.g. a speaker button). */
   answerAction?: React.ReactNode;
+  /** Renders a `[[id,id]]` citation marker in the answer as a source chip.
+   *  Without it, markers are dropped from the text. */
+  renderCite?: (ids: string[]) => React.ReactNode;
   /** Drawn inside the stage, above its background and below the orb and the
    *  answer card (e.g. a flow of the run). Must not take pointer events. */
   backdrop?: React.ReactNode;
@@ -1136,7 +1139,14 @@ export default function MorphOrb(props: MorphOrbProps) {
             <p className="mo-a-body" ref={bodyRef} dir="auto">
               {words.map((w, i) => (
                 <React.Fragment key={i}>
-                  <span className="mo-w">{w}</span>{" "}
+                  <span className="mo-w">
+                    {w.split(/(\[\[[^\]]+\]\])/).map((part, j) => {
+                      const cite = /^\[\[([^\]]+)\]\]$/.exec(part);
+                      if (!cite) return part;
+                      if (!props.renderCite) return null;
+                      return <React.Fragment key={j}>{props.renderCite(cite[1].split(",").map((id) => id.trim()).filter(Boolean))}</React.Fragment>;
+                    })}
+                  </span>{" "}
                 </React.Fragment>
               ))}
             </p>

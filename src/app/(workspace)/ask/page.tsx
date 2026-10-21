@@ -17,11 +17,62 @@ import { useT } from "@/components/ex/i18n-context";
 import MorphOrb from "@/components/ex/morph-orb/morph-orb";
 import { describeToolCall, words } from "@/components/ex/morph-orb/tool-nodes";
 import { FlowCanvas } from "@/components/ex/morph-orb/flow-canvas";
+import { CitedAnswer, type CitedSource } from "@/components/ex/cited-answer";
+import { ToolkitIcon } from "@/components/ex/toolkit-icon";
+import { parseCitedAnswer } from "@/lib/org-answer";
 
 const ANSWER_STYLE =
   "Answer in the language of the question, in at most three short sentences and " +
   "under 70 words, as plain text (no markdown, no lists). Be concrete: name the people, " +
-  "projects or numbers involved.";
+  "projects or numbers involved. After each fact, cite where it came from as [[source]] with " +
+  "no spaces, before the period: [[profile]] for your own profile, [[brain]] for the company " +
+  "brain, [[web]] for the web, or a connected system's name in lowercase, e.g. [[companysim]]. " +
+  "Several sources: [[companysim,profile]].";
+
+/** Collapse spaces inside citation markers so each one stays a single word. */
+const tidyCites = (s: string) => s.replace(/\[\[([^\]]+)\]\]/g, (_, ids: string) => `[[${ids.replace(/\s+/g, "")}]]`);
+/** The answer without citation markers (for speech). */
+const stripCites = (s: string) => s.replace(/\s*\[\[[^\]]*\]\]/g, "");
+
+type Source = CitedSource & { kind: StepKind; logo?: string };
+
+/** The sources a turn can cite, from the steps it actually took. */
+function sourcesOf(steps: { kind: StepKind; label: string; detail?: string; logo?: string }[]): Source[] {
+  const out = new Map<string, Source>();
+  const add = (id: string, src: Omit<Source, "id" | "snippet">, detail?: string) => {
+    const prev = out.get(id);
+    const items = new Set((prev?.snippet ?? "").split(" · ").filter(Boolean));
+    if (detail) items.add(detail);
+    out.set(id, { id, ...src, snippet: [...items].join(" · ") });
+  };
+  // The profile is always in the twin's context, even when nothing lit up.
+  add("profile", { name: "Profile", title: "Own profile", initials: "P", color: "var(--accent-soft)", kind: "read" });
+  for (const st of steps) {
+    if (st.kind === "read" && st.label.startsWith("Recalled from profile")) add("profile", { name: "Profile", title: "Own profile", initials: "P", color: "var(--accent-soft)", kind: "read" }, st.detail);
+    else if (st.kind === "brain") add("brain", { name: "Company brain", title: "Documents", initials: "B", color: "var(--accent-soft)", kind: "brain" }, st.detail);
+    else if (st.kind === "web") add("web", { name: "Web", title: "Searched the web", initials: "W", color: "var(--accent-soft)", kind: "web" }, st.detail);
+    else if (st.logo) add(st.logo, { name: st.label, title: "Connected system", initials: st.label.charAt(0), color: "var(--accent-soft)", kind: "tool", logo: st.logo }, st.detail);
+  }
+  return [...out.values()];
+}
+
+/** A source chip inside the orb's answer card. */
+function CiteChip({ src }: { src: Source[] }) {
+  if (src.length === 0) return null;
+  const first = src[0];
+  return (
+    <span
+      title={src.map((s) => `${s.name}${s.snippet ? `: ${s.snippet}` : ""}`).join("\n")}
+      style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 19, padding: "0 7px 0 4px", marginInlineStart: 2, verticalAlign: "middle", transform: "translateY(-1px)", borderRadius: 999, background: "var(--bg-sunken)", border: "1px solid var(--hairline)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", whiteSpace: "nowrap" }}
+    >
+      <span style={{ display: "inline-flex", color: "var(--accent-deep)" }}>
+        {first.logo ? <ToolkitIcon slug={first.logo} size={12} /> : first.kind === "brain" ? <Icons.Database size={11} /> : first.kind === "web" ? <Icons.Eye size={11} /> : <Icons.Doc size={11} />}
+      </span>
+      {first.name}
+      {src.length > 1 && <span style={{ opacity: 0.6 }}>+{src.length - 1}</span>}
+    </span>
+  );
+}
 
 type StepKind = "read" | "search" | "tool" | "web" | "brain" | "skill" | "delegate" | "blocked";
 type Step = { id: number; kind: StepKind; label: string; detail?: string; logo?: string; done: boolean };
@@ -373,6 +424,7 @@ export default function AskPage() {
       return;
     }
     if (!answer) return;
+    answer = stripCites(answer);
     stopAudio();
     setAudio({ id: turnId, status: "loading" });
     try {
@@ -493,6 +545,7 @@ export default function AskPage() {
             })),
           thinking: (d) => patchTurn(id, (turn) => ({ ...turn, thinking: turn.thinking + d })),
         })) || t("ask.empty");
+      answer = tidyCites(answer);
     } catch {
       answer = t("ask.error");
     }
@@ -530,6 +583,12 @@ export default function AskPage() {
             // The run as an n8n-style flow around the orb: question → orb →
             // answer, every source the twin reaches for, and the tools pulled
             // through MCP. Inside the stage, under the orb and the answer card.
+            // [[source]] markers in the answer become source chips in the card.
+            renderCite={(ids) => {
+              const last = turns[turns.length - 1];
+              const srcs = last ? sourcesOf(last.steps).filter((x) => ids.includes(x.id)) : [];
+              return <CiteChip src={srcs} />;
+            }}
             backdrop={
               <FlowCanvas
                 steps={flowTurn?.steps ?? []}
@@ -775,7 +834,17 @@ export default function AskPage() {
                       color: "var(--text)",
                     }}
                   >
-                    {turn.answer}
+                    {(() => {
+                      const srcs = sourcesOf(turn.steps);
+                      return (
+                        <CitedAnswer
+                          parts={parseCitedAnswer(turn.answer ?? "", new Set(srcs.map((x) => x.id)))}
+                          sources={srcs}
+                          sourcesLabel={(count) => t("org.sources", { count })}
+                          showList={false}
+                        />
+                      );
+                    })()}
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
                       <SpeakButton
                         size={24}
