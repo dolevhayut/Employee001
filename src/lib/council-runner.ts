@@ -609,6 +609,12 @@ export type RunOptions = {
   /** A no-side-effects consultation: only local read tools are available. */
   answerOnly?: boolean;
   /**
+   * Read-only run for "Ask the company": the twin may use any tool the policy
+   * classifies as a read (profile, org brain, read-only MCP calls such as
+   * CompanySim lookups) and nothing that needs approval, writes or asks back.
+   */
+  readOnly?: boolean;
+  /**
    * When set, registers the twin-to-twin consultation MCP server for this run
    * so the twin can consult / request approval from peers. Threaded one hop
    * deeper on each consultation; the shared `visited` set + depth cap inside
@@ -622,6 +628,12 @@ export function buildToolConfig(options: RunOptions): {
   disallowedTools?: string[];
   agents?: ReturnType<typeof buildTwinAgentDefinitions>;
 } {
+  if (options.readOnly) {
+    return {
+      allowedTools: ["Read", "Glob", "Grep", "mcp__org_brain__search_org_brain"],
+      disallowedTools: ["AskUserQuestion", "Write", "WebFetch", "Task", "TodoWrite"],
+    };
+  }
   if (options.answerOnly) {
     return {
       allowedTools: ["Read", "Glob", "Grep", "mcp__org_brain__search_org_brain"],
@@ -1016,6 +1028,10 @@ export async function runSingleTwin(
       const typedInput = (input as Record<string, unknown>) ?? {};
       const decision = applyConsent(classifyTool(toolName, typedInput, policyOverrides), toolName, consent);
       const bare = toolName.replace(/^mcp__[a-z0-9_]+__/i, "");
+
+      if (options.readOnly && decision.kind !== "allow") {
+        return { behavior: "deny", message: "Read-only company question: no actions, approvals or questions back. Answer with what you can read." };
+      }
 
       if (options.answerOnly) {
         const allowed = new Set(buildToolConfig(options).allowedTools);
