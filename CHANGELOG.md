@@ -8,6 +8,41 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-21
+
+### Three ways to work with your company
+Each surface has its own shape, so you always know which one to reach for.
+
+- **Ask the company** (the new home page). One question to the whole
+  organization, one answer back. The company brain (documents in Settings),
+  the connected systems (org MCP servers such as a CRM or ERP) and the twins
+  whose area it is all look it up in parallel, read-only, and a single
+  answer comes back with every claim cited to where it came from. Watch the
+  sources work live side by side with the answer; hover a citation to see
+  what that source said.
+- **Ask, one twin.** Talk to a twin like a colleague. Its run is drawn as a
+  live workflow around the orb: the question, every source it reaches for,
+  the tools it pulls through MCP, and the answer, with citations. Hand it a
+  task instead and watch it work; the documents it writes open right in the
+  conversation.
+- **Team Meeting, Slack-style.** The twins whose area it is answer, in a
+  few sentences each, from their own knowledge, tools and memory. They tag
+  each other and go back and forth; a tagged twin answers in a thread. Reply
+  to one message, then "Summarize & decide": a decision, next steps you can
+  hand to each twin as a task, and what is still open.
+
+### Also new
+- A twin's answer lights only the profile files the question touches
+  (it used to animate all nine every time).
+- Hand a twin a task from Ask; it starts right away and reports back there.
+- Answers in a twin's own voice (ElevenLabs Eleven v4, with a restricted
+  API key).
+- Clearer errors: when the model provider refuses a request (for example a
+  spend limit), the twin shows the provider's own message.
+
+### Fixed
+- Inline code in answers rendered as a separate block.
+
 ### Permissions inside the product
 Every twin now runs inside a strict permission model. Nothing a twin does
 depends on it behaving well: each rule is enforced in code, before the
