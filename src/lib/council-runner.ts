@@ -29,7 +29,7 @@ import {
 } from "@/lib/meeting-store";
 import { classifyTool, describeTool } from "@/lib/tool-policy";
 import { twinLanguageBlock } from "@/lib/twin-language";
-import { registerApproval } from "@/lib/approval-bus";
+import { approvalActorFields, registerApproval } from "@/lib/approval-bus";
 import type { ApprovalSurface, ApprovalContext } from "@/lib/approval-bus";
 import { appendAuditEntry } from "@/lib/audit-log";
 import {
@@ -632,6 +632,8 @@ export type RunOptions = {
    * twin's public profile already says.
    */
   publicReply?: boolean;
+  /** The signed-in user who asked (audit requesterId), when there is one. */
+  requesterId?: string;
   /**
    * When set, registers the twin-to-twin consultation MCP server for this run
    * so the twin can consult / request approval from peers. Threaded one hop
@@ -1047,6 +1049,7 @@ export async function runSingleTwin(
     const policyOverrides = await getToolPolicyOverrides(employee.id).catch(() => undefined);
     const consent = loadConsentStatus(employee.id);
     const readAllowlist = loadReadAllowlist();
+    const requesterId = options.requesterId;
     const canUseTool: CanUseTool = async (
       toolName,
       input
@@ -1165,6 +1168,8 @@ export async function runSingleTwin(
           input: finalInput,
           verdict: "ceo_approved",
           approvalId,
+          ...approvalActorFields(verdict),
+          ...(requesterId ? { requesterId } : {}),
           inputEdited: verdict.updatedInput !== undefined,
         });
         return {
@@ -1182,6 +1187,8 @@ export async function runSingleTwin(
         input: typedInput,
         verdict: "ceo_denied",
         approvalId,
+        ...approvalActorFields(verdict),
+        ...(requesterId ? { requesterId } : {}),
       });
       return {
         behavior: "deny",
@@ -1502,6 +1509,8 @@ export type RunCouncilArgs = {
   /** All ready twins in the org — used to resolve @mentions for delegation. */
   allParticipants: EmployeeWithTwin[];
   onEvent: (event: CouncilEvent) => void;
+  /** The signed-in user who asked (audit requesterId). */
+  requesterId?: string;
 };
 
 export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: string }> {
@@ -1668,6 +1677,7 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
       [],
       {
         surface: "chat",
+        requesterId: args.requesterId,
         teamMeetingContext: {
           colleagues: colleagueNames(employee.id),
           transcript: transcriptText,

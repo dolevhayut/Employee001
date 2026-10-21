@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 import { runCouncil } from "@/lib/council-runner";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
@@ -96,6 +97,7 @@ export async function POST(request: NextRequest) {
           meetingId: body.meetingId,
           allParticipants,
           onEvent: send,
+          requesterId: sessionUserFromHeaders(request.headers)?.id,
         });
         // Echo the resolved meeting id so the client can persist it across
         // CEO messages — same id on a new meeting, unchanged on followups.

@@ -13,6 +13,11 @@ export type ApprovalDecision =
   | { action: "allow"; updatedInput?: Record<string, unknown>; by?: ApprovalActor }
   | { action: "deny"; message?: string; by?: ApprovalActor };
 
+/** Audit fields naming who decided an approval. */
+export function approvalActorFields(decision: ApprovalDecision): { approvedBy?: string; approvalChannel?: ApprovalActor["channel"] } {
+  return decision.by ? { approvedBy: decision.by.userId, approvalChannel: decision.by.channel } : {};
+}
+
 export type ApprovalSurface = "chat" | "background";
 
 export type ApprovalContext = {

@@ -25,7 +25,7 @@ import { dataDir } from "@/lib/app-home";
 import { recordSpend } from "@/lib/twin-budget";
 import { createConsultContext } from "@/lib/twin-consult";
 import { buildConsultMcpServer } from "@/lib/consult-mcp";
-import { registerApproval } from "@/lib/approval-bus";
+import { approvalActorFields, registerApproval } from "@/lib/approval-bus";
 import {
   initShiftArchive,
   archiveEvent,
@@ -179,8 +179,10 @@ export async function runShift(args: {
   employee: EmployeeWithTwin;
   trigger: "scheduled" | "manual" | "wakeup";
   abortController?: AbortController;
+  /** The user who started a manual shift (audit requesterId). */
+  requesterId?: string;
 }): Promise<ShiftRunResult> {
-  const { employee, trigger, abortController } = args;
+  const { employee, trigger, abortController, requesterId } = args;
   const runId = `shift_${employee.id}_${Date.now()}`;
 
   const employeeDir = dataDir("employees", employee.id);
@@ -360,6 +362,8 @@ export async function runShift(args: {
           input: finalInput,
           verdict: "ceo_approved",
           approvalId,
+          ...approvalActorFields(verdict),
+          ...(requesterId ? { requesterId } : {}),
           inputEdited: verdict.updatedInput !== undefined,
         });
         return { behavior: "allow", updatedInput: finalInput as typeof input };
@@ -374,6 +378,8 @@ export async function runShift(args: {
         input: typedInput,
         verdict: "ceo_denied",
         approvalId,
+        ...approvalActorFields(verdict),
+        ...(requesterId ? { requesterId } : {}),
       });
       return {
         behavior: "deny",

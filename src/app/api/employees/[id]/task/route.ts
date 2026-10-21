@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 import { hasEmployeeFiles } from "@/lib/employees-files";
@@ -449,6 +450,7 @@ export async function POST(
           surface: "chat",
           runId,
           maxBudgetUsd: budgetUsd,
+          requesterId: sessionUserFromHeaders(request.headers)?.id,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";

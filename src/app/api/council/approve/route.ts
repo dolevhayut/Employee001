@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { resolveApproval } from "@/lib/approval-bus";
+import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 
 /**
  * POST /api/council/approve
@@ -45,10 +46,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Record who decided: the signed-in user (or the local owner on a
+  // single-user install), for the audit row's approvedBy.
+  const me = sessionUserFromHeaders(req.headers);
+  const by = { userId: me?.id ?? "local-owner", channel: "ui" as const };
   const decision =
     action === "allow"
-      ? { action: "allow" as const, updatedInput }
-      : { action: "deny" as const, message };
+      ? { action: "allow" as const, updatedInput, by }
+      : { action: "deny" as const, message, by };
 
   const ok = resolveApproval(approvalId, decision);
   if (!ok) {

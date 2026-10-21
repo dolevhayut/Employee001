@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 import type { TwinTraceEvent } from "@/lib/ex-graph-types";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
@@ -307,7 +308,7 @@ export async function POST(request: NextRequest) {
           question,
           onEvent,
           useResume ? [] : body.history ?? [],
-          { resumeSessionId: useResume ? body.sessionId : undefined }
+          { resumeSessionId: useResume ? body.sessionId : undefined, requesterId: sessionUserFromHeaders(request.headers)?.id }
         );
 
         // After the main answer finished streaming, emit 3 follow-up
