@@ -18,6 +18,7 @@ import { appendAuditEntry } from "@/lib/audit-log";
 import { modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
 import { dataDir } from "@/lib/app-home";
 import { checkTwinRead } from "@/lib/twin-read-scope";
+import { discloseOutbound, isOutboundMessageTool } from "@/lib/ai-disclosure";
 
 const PKG_VERSION = "Employee001/0.2.0";
 
@@ -385,8 +386,24 @@ export function buildTwinHooks(
     };
   };
 
+  // Art. 50 disclosure on every Slack/email send. No permissionDecision: the
+  // send still goes through canUseTool and its approval gate, which applies
+  // the disclosure again after any human edit (withOutboundDisclosure).
+  const discloseAiOnSends: HookCallback = async (input) => {
+    if (input.hook_event_name !== "PreToolUse") return {};
+    const pre = input as PreToolUseHookInput;
+    if (!isOutboundMessageTool(pre.tool_name)) return {};
+    const toolInput = (pre.tool_input ?? {}) as Record<string, unknown>;
+    return {
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse" as const,
+        updatedInput: discloseOutbound(pre.tool_name, toolInput, ctx.employeeName),
+      },
+    };
+  };
+
   return {
-    PreToolUse: [{ hooks: [blockHardDisallowed, restrictWriteToScratch, restrictReadsToTwinScope] }],
+    PreToolUse: [{ hooks: [blockHardDisallowed, restrictWriteToScratch, restrictReadsToTwinScope, discloseAiOnSends] }],
     PostToolUse: [{ hooks: [auditPostToolUse, injectWebCitation] }],
     Notification: [{ hooks: [forwardNotification] }],
     Stop: [{ hooks: [onStopHook] }],

@@ -14,6 +14,7 @@ import { buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
 import { getToolPolicyOverrides } from "@/lib/tool-policy-overrides";
 import { applyConsent } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
+import { withOutboundDisclosure } from "@/lib/ai-disclosure";
 import { getTasksFor } from "@/lib/twin-tasks";
 import { runPrefetches, formatFocusBlock } from "@/lib/twin-focus-prefetch";
 import { appendFeedItem } from "@/lib/feed-store";
@@ -408,7 +409,7 @@ export async function runShift(args: {
         includePartialMessages: true,
         // Always gated: shifts run unattended, often on untrusted input.
         permissionMode: "default",
-        canUseTool,
+        canUseTool: withOutboundDisclosure(canUseTool, employee.name),
         outputFormat: {
           type: "json_schema",
           schema: SHIFT_REPORT_JSON_SCHEMA as Record<string, unknown>,

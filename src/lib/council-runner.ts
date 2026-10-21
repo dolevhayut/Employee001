@@ -58,6 +58,7 @@ import { buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
 import { getToolPolicyOverrides } from "@/lib/tool-policy-overrides";
 import { applyConsent } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
+import { withOutboundDisclosure } from "@/lib/ai-disclosure";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
 import {
@@ -1247,7 +1248,7 @@ export async function runSingleTwin(
         // Always gated: without MCP tools a twin can still WebFetch, and a URL
         // can carry data out, so no run bypasses the tool policy.
         permissionMode: "default",
-        canUseTool,
+        canUseTool: withOutboundDisclosure(canUseTool, employee.name),
         settingSources: [],
         hooks,
       },
