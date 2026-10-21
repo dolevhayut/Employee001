@@ -15,7 +15,7 @@ import {
 import type { SVGProps } from "react";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
-import { Markdown } from "@/components/ex/markdown";
+import { Markdown, linkMentions } from "@/components/ex/markdown";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import {
   EmployeeCanvasPanel,
@@ -1394,6 +1394,7 @@ function TwinBubble({
 }) {
   const { t, locale } = useT();
   const [hover, setHover] = useState(false);
+  const roster = useRoster();
   const thought = thinking && thinking.length > 220 ? `…${thinking.slice(-220)}` : thinking;
   return (
     <motion.div
@@ -1513,7 +1514,7 @@ function TwinBubble({
               transition: "border-color .3s",
             }}
           >
-            <Markdown>{text}</Markdown>
+            <Markdown>{linkMentions(text, roster)}</Markdown>
             {streaming && (
               <span
                 style={{

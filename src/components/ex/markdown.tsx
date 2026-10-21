@@ -3,6 +3,50 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ReactNode } from "react";
+import { useRoster } from "@/components/ex/roster-context";
+
+/** Turn `@FirstName` for the given people into mention links Markdown renders as chips. */
+export function linkMentions(text: string, people: { id: string; firstName: string }[]): string {
+  if (!people.length) return text;
+  const byName = new Map(people.map((p) => [p.firstName.toLowerCase(), p.id]));
+  const names = people.map((p) => p.firstName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  return text.replace(new RegExp(`(^|[^\\w\\[])@(${names})\\b`, "gi"), (m, pre: string, name: string) => {
+    const id = byName.get(name.toLowerCase());
+    return id ? `${pre}[@${name}](#mention-${id})` : m;
+  });
+}
+
+/** An @mention of a twin: avatar + name on the accent tint. */
+function MentionChip({ id, children }: { id: string; children?: ReactNode }) {
+  const emp = useRoster().find((e) => e.id === id);
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "0 7px 0 2px",
+        margin: "0 1px",
+        borderRadius: 999,
+        verticalAlign: "baseline",
+        fontWeight: 600,
+        fontSize: "0.92em",
+        lineHeight: 1.55,
+        color: "var(--accent-deep)",
+        background: "color-mix(in oklab, var(--accent) 14%, transparent)",
+        border: "1px solid color-mix(in oklab, var(--accent) 30%, transparent)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {emp && (
+        <span style={{ width: 16, height: 16, borderRadius: "50%", display: "inline-grid", placeItems: "center", fontSize: 8, fontWeight: 700, color: "var(--text)", background: emp.avatarColor }}>
+          {emp.initials}
+        </span>
+      )}
+      {children}
+    </span>
+  );
+}
 
 type Props = {
   children: string;
@@ -204,7 +248,11 @@ export function Markdown({ children }: Props) {
               }}
             />
           ),
-          a: ({ href, children }: { href?: string; children?: ReactNode }) => (
+          // `[@Name](#mention-<employeeId>)` (see linkMentions) renders as a chip.
+          a: ({ href, children }: { href?: string; children?: ReactNode }) =>
+            href?.startsWith("#mention-") ? (
+              <MentionChip id={href.slice("#mention-".length)}>{children}</MentionChip>
+            ) : (
             <a
               href={href}
               target="_blank"
@@ -217,7 +265,7 @@ export function Markdown({ children }: Props) {
             >
               {children}
             </a>
-          ),
+            ),
         }}
       >
         {children}
