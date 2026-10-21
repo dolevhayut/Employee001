@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { canRunModel } from "@/lib/model-provider";
-import { briefFrom, pickTwins, readyTwins, synthesize } from "@/lib/org-ask";
+import { briefFrom, briefFromOrgBrain, briefFromSystems, pickTwins, readyTwins, synthesize } from "@/lib/org-ask";
 
 // POST /api/org/ask { question } → SSE. The company answers with one voice:
 //   route        → which twins were asked, and why
-//   source_*     → each twin's read-only brief (start, tool calls, done)
+//   source_*     → each source's read-only brief (start, tool calls, done):
+//                  the company brain, the connected systems, each twin
 //   answer_delta → the single synthesized answer, with [[twin-id]] citations
 //   done | error
 export async function POST(req: NextRequest) {
@@ -35,11 +36,14 @@ export async function POST(req: NextRequest) {
         }
       };
       try {
+        // Documents and systems start right away; twins once the router picked them.
+        const fromBrain = briefFromOrgBrain(question, send);
+        const fromSystems = briefFromSystems(question, send, abort);
         const { picks, by } = await pickTwins(question, twins);
         send({ type: "route", picks, by });
         const chosen = picks.map((p) => twins.find((t) => t.id === p.id)).filter((t): t is (typeof twins)[number] => Boolean(t));
         // Sources work in parallel: this is a lookup, not a meeting.
-        const briefs = await Promise.all(chosen.map((twin) => briefFrom(twin, question, send, abort).then((brief) => ({ twin, brief }))));
+        const briefs = [fromBrain, ...(await Promise.all([fromSystems, ...chosen.map((twin) => briefFrom(twin, question, send, abort))]))];
         if (!abort.signal.aborted) {
           await synthesize(question, briefs, (delta) => send({ type: "answer_delta", delta }));
           send({ type: "done" });

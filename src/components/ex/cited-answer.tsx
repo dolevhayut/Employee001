@@ -107,13 +107,19 @@ export function CitedAnswer({
   sources,
   streaming,
   onOpenSource,
+  onActiveSources,
   sourcesLabel,
+  showList = true,
 }: {
   parts: AnswerPart[];
   sources: CitedSource[];
   streaming?: boolean;
   onOpenSource?: (id: string) => void;
+  /** Fires with the ids a previewed chip cites ([] when the preview closes). */
+  onActiveSources?: (ids: string[]) => void;
   sourcesLabel: (count: number) => string;
+  /** Set false when the sources are shown elsewhere on the page. */
+  showList?: boolean;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const { preview, warm, show, hide } = usePreview();
@@ -139,6 +145,11 @@ export function CitedAnswer({
 
   const active = preview ? parts[preview.part] : null;
   const activeSources = (active?.cite ?? []).map((id) => byId.get(id)).filter((s): s is CitedSource => Boolean(s));
+
+  const activeKey = (active?.cite ?? []).join("|");
+  useEffect(() => {
+    onActiveSources?.(activeKey ? activeKey.split("|") : []);
+  }, [activeKey, onActiveSources]);
 
   useEffect(() => {
     if (!preview) return;
@@ -305,7 +316,7 @@ export function CitedAnswer({
           )}
         </AnimatePresence>
 
-        {cited.length > 0 && !streaming && (
+        {showList && cited.length > 0 && !streaming && (
           <div style={{ marginTop: 16 }}>
             <button
               type="button"
