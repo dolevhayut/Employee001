@@ -13,7 +13,7 @@ export type RunLogEvent =
       artifactId: string;
       payload: { type: "html" | "svg"; title: string; content: string };
     }
-  | { ts: string; type: "tool_use"; tool: string; input?: Record<string, unknown> }
+  | { ts: string; type: "tool_use"; tool: string; input?: Record<string, unknown>; /** Full tool name (mcp__server__tool) when `tool` is the bare one. */ full?: string }
   | { ts: string; type: "tool_result"; tool: string; output?: string }
   | { ts: string; type: "approval"; tool: string; decision: "allow" | "deny" | "deferred" }
   | { ts: string; type: "meta"; message: string }

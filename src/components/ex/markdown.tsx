@@ -99,28 +99,10 @@ export function Markdown({ children }: Props) {
           em: ({ children }: { children?: ReactNode }) => (
             <em style={{ fontStyle: "italic" }}>{children}</em>
           ),
-          code: ({
-            inline,
-            children,
-          }: {
-            inline?: boolean;
-            children?: ReactNode;
-          }) =>
-            inline ? (
-              <code
-                style={{
-                  fontFamily:
-                    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                  fontSize: "0.88em",
-                  background: "var(--bg-sunken)",
-                  padding: "1px 5px",
-                  borderRadius: 3,
-                  border: "1px solid var(--hairline)",
-                }}
-              >
-                {children}
-              </code>
-            ) : (
+          // react-markdown no longer passes `inline`: a fenced block has a
+          // language class or spans lines; anything else is inline code.
+          code: ({ className, children }: { className?: string; children?: ReactNode }) =>
+            /language-/.test(className ?? "") || String(children ?? "").includes("\n") ? (
               <pre
                 style={{
                   background: "var(--bg-sunken)",
@@ -137,7 +119,23 @@ export function Markdown({ children }: Props) {
               >
                 <code>{children}</code>
               </pre>
+            ) : (
+              <code
+                style={{
+                  fontFamily:
+                    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  fontSize: "0.88em",
+                  background: "var(--bg-sunken)",
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  border: "1px solid var(--hairline)",
+                }}
+              >
+                {children}
+              </code>
             ),
+          // The block styling lives on `code`; keep `pre` from adding a second box.
+          pre: ({ children }: { children?: ReactNode }) => <>{children}</>,
           blockquote: ({ children }: { children?: ReactNode }) => (
             <blockquote
               dir="auto"

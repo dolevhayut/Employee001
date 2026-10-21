@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { leaseNextWorkItem, completeWorkItem, failWorkItem, skipWorkItem, releaseWorkItem, type WorkItem, type EmailPayload, type SlackPayload } from "@/lib/work-items";
+import { leaseNextWorkItem, completeWorkItem, failWorkItem, skipWorkItem, releaseWorkItem, attachRunToWorkItem, type WorkItem, type EmailPayload, type SlackPayload } from "@/lib/work-items";
 import { drainOrphanedApprovals } from "@/lib/approval-store";
 import { runSingleTwin, type CouncilEvent } from "@/lib/council-runner";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
@@ -119,16 +119,42 @@ async function executeWorkItem(item: WorkItem): Promise<void> {
     message: `Work item ${item.id} (${item.type}) started — attempt ${item.attemptCount}/${item.maxAttempts}`,
   });
 
+  attachRunToWorkItem(item.id, runId);
+
+  // Thinking and answer text stream in tiny deltas: log them in readable chunks.
+  let thinkBuf = "";
+  let textBuf = "";
+  const flush = () => {
+    if (thinkBuf) {
+      appendRunLog("routine", runId, { type: "thinking", text: thinkBuf });
+      updateRun(runId, { lastThinking: thinkBuf.slice(-400) });
+      thinkBuf = "";
+    }
+    if (textBuf) {
+      appendRunLog("routine", runId, { type: "text", text: textBuf });
+      textBuf = "";
+    }
+  };
+
   let textOut = "";
   let errored = false;
   let costUsd = 0;
   let toolCalls = 0;
   const onEvent = (evt: CouncilEvent) => {
-    if (evt.type === "text_delta") textOut += evt.delta;
+    if (evt.type === "text_delta") {
+      textOut += evt.delta;
+      textBuf += evt.delta;
+      if (textBuf.length > 240) flush();
+    }
+    if (evt.type === "thinking_delta") {
+      thinkBuf += evt.delta;
+      if (thinkBuf.length > 240) flush();
+    }
     if (evt.type === "tool_use") {
+      flush();
       toolCalls++;
       const bare = evt.tool.replace(/^mcp__[a-z0-9_]+__/i, "");
-      appendRunLog("routine", runId, { type: "tool_use", tool: bare, input: evt.input as Record<string, unknown> });
+      appendRunLog("routine", runId, { type: "tool_use", tool: bare, full: evt.tool, input: evt.input as Record<string, unknown> });
       updateRun(runId, { toolCalls, currentTool: bare });
     }
     if (evt.type === "employee_error") {
@@ -157,6 +183,7 @@ async function executeWorkItem(item: WorkItem): Promise<void> {
     textOut = textOut || (err instanceof Error ? err.message : String(err));
   }
 
+  flush();
   appendRunLog("routine", runId, {
     type: "done",
     summary: textOut.trim().slice(0, 200) || "Work item processed",

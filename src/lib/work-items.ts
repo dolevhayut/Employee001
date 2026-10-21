@@ -169,6 +169,11 @@ export function leaseNextWorkItem(): WorkItem | null {
   return null;
 }
 
+/** Link the run as soon as it starts, so the UI can follow it live. */
+export function attachRunToWorkItem(id: string, runId: string): void {
+  patch(id, { runId });
+}
+
 export function completeWorkItem(id: string, summary: string, runId?: string): void {
   patch(id, { status: "done", resultSummary: summary.slice(0, 500), runId });
 }

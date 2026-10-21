@@ -89,7 +89,16 @@ type Turn = {
   thinking: string;
   answer: string | null;
   /** Set when the CEO handed this as a task instead of asking. */
-  task?: { itemId?: string; status: "queued" | "leased" | "done" | "failed" | "skipped"; result?: string };
+  task?: {
+    itemId?: string;
+    status: "queued" | "leased" | "done" | "failed" | "skipped";
+    result?: string;
+    /** The run behind it, followed live through its log. */
+    runId?: string;
+    logOffset?: number;
+    /** Documents the twin wrote while working. */
+    docs?: { name: string; content: string }[];
+  };
 };
 
 type TraceEvent = {
@@ -365,6 +374,33 @@ function Trace({ turn, live }: { turn: Turn; live: boolean }) {
 }
 
 const noopSubscribe = () => () => {};
+
+// Conversation panel width (px), dragged by the CEO and remembered.
+const PANEL_KEY = "ask.panelWidth";
+const PANEL_DEFAULT = 400;
+const PANEL_MIN = 320;
+const panelListeners = new Set<() => void>();
+function panelSubscribe(cb: () => void) {
+  panelListeners.add(cb);
+  return () => panelListeners.delete(cb);
+}
+function panelSnapshot(): number {
+  try {
+    const n = Number(localStorage.getItem(PANEL_KEY));
+    if (Number.isFinite(n) && n >= PANEL_MIN) return n;
+  } catch {
+    // ignore
+  }
+  return PANEL_DEFAULT;
+}
+function writePanelWidth(px: number) {
+  try {
+    localStorage.setItem(PANEL_KEY, String(Math.round(px)));
+  } catch {
+    // ignore
+  }
+  for (const cb of panelListeners) cb();
+}
 const linkedTwin = () => new URLSearchParams(window.location.search).get("twin");
 
 export default function AskPage() {
@@ -373,6 +409,28 @@ export default function AskPage() {
   const twins = roster.filter((e) => e.twinStatus === "ready");
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<"ask" | "task">("ask");
+  const panelWidth = useSyncExternalStore(panelSubscribe, panelSnapshot, () => PANEL_DEFAULT);
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: PointerEvent) => {
+      const rtl = document.documentElement.dir === "rtl";
+      // The panel hugs the inline-end edge: its width is the distance from the pointer to it.
+      const px = rtl ? e.clientX - 8 : window.innerWidth - e.clientX - 8;
+      writePanelWidth(Math.max(PANEL_MIN, Math.min(window.innerWidth * 0.6, px)));
+    };
+    const onUp = () => setDragging(false);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [dragging]);
   const [busy, setBusy] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceReady, setVoiceReady] = useState(false);
@@ -456,6 +514,8 @@ export default function AskPage() {
   // work queue and starts now; the conversation shows its status and result.
   const assign = async (task: string) => {
     if (!twinId || !twin) return t("ask.noTwin");
+    setBusy(true);
+    stopAudio();
     const id = ++turnSeq.current;
     setTurns((prev) => [
       ...prev,
@@ -484,27 +544,106 @@ export default function AskPage() {
     }
   };
 
-  // Follow handed tasks until they finish.
+  // Follow handed tasks live until they finish: status from the work queue,
+  // and every tool call, thought and written document from the run's log.
   const openTasks = turns.filter((turn) => turn.task?.itemId && (turn.task.status === "queued" || turn.task.status === "leased")).length;
+  const turnsRef = useRef(turns);
+  useEffect(() => {
+    turnsRef.current = turns;
+  }, [turns]);
   useEffect(() => {
     if (!openTasks) return;
+    let stopped = false;
     const poll = async () => {
+      let items: { id: string; status: NonNullable<Turn["task"]>["status"]; resultSummary?: string; runId?: string }[] = [];
       try {
-        const items = (await fetch("/api/work-items", { cache: "no-store" }).then((r) => r.json())) as { id: string; status: NonNullable<Turn["task"]>["status"]; resultSummary?: string }[];
-        const byId = new Map(items.map((i) => [i.id, i]));
-        setTurns((prev) =>
-          prev.map((turn) => {
-            const item = turn.task?.itemId ? byId.get(turn.task.itemId) : undefined;
-            if (!item || (item.status === turn.task?.status && item.resultSummary === turn.task?.result)) return turn;
-            return { ...turn, task: { ...turn.task!, status: item.status, result: item.resultSummary } };
-          }),
-        );
+        items = await fetch("/api/work-items", { cache: "no-store" }).then((r) => r.json());
       } catch {
-        // try again next tick
+        return;
+      }
+      const byId = new Map(items.map((i) => [i.id, i]));
+      for (const turn of turnsRef.current) {
+        const task = turn.task;
+        if (!task?.itemId) continue;
+        const item = byId.get(task.itemId);
+        if (!item) continue;
+        const runId = item.runId ?? task.runId;
+        // Read what the run logged since last time.
+        let fresh: { type: string; tool?: string; full?: string; input?: Record<string, unknown>; text?: string }[] = [];
+        let read = 0;
+        if (runId && task.status !== "done" && task.status !== "failed") {
+          try {
+            const res = await fetch(`/api/runs/${encodeURIComponent(runId)}/log?offset=${task.logOffset ?? 0}`, { cache: "no-store" });
+            if (res.ok) {
+              const buf = new Uint8Array(await res.arrayBuffer());
+              const text = new TextDecoder().decode(buf);
+              const lastNl = text.lastIndexOf("\n");
+              if (lastNl >= 0) {
+                read = new TextEncoder().encode(text.slice(0, lastNl + 1)).length;
+                fresh = text
+                  .slice(0, lastNl)
+                  .split("\n")
+                  .filter(Boolean)
+                  .map((l) => {
+                    try {
+                      return JSON.parse(l);
+                    } catch {
+                      return null;
+                    }
+                  })
+                  .filter(Boolean);
+              }
+            }
+          } catch {
+            // next tick
+          }
+        }
+        if (stopped) return;
+        patchTurn(turn.id, (tu) => {
+          let steps = tu.steps;
+          let thinking = tu.thinking;
+          const docs = [...(tu.task?.docs ?? [])];
+          for (const ev of fresh) {
+            if (ev.type === "tool_use" && ev.tool) {
+              const name = ev.full ?? ev.tool;
+              if (name === "ToolSearch" || name === "TodoWrite") continue;
+              if (name === "Write" && typeof ev.input?.content === "string") {
+                const fp = String(ev.input.file_path ?? "document.md");
+                docs.push({ name: fp.split("/").pop() ?? fp, content: ev.input.content });
+                steps = [...steps.map((x) => ({ ...x, done: true })), { kind: "read" as const, label: "Wrote a document", detail: fp.split("/").pop(), id: ++stepSeq.current, done: false }];
+                continue;
+              }
+              if (name === "Edit" && typeof ev.input?.old_string === "string" && typeof ev.input?.new_string === "string") {
+                // The twin revised a document it wrote: keep the shown copy current.
+                const fname = String(ev.input.file_path ?? "").split("/").pop();
+                const at = docs.findIndex((d) => d.name === fname);
+                if (at >= 0) docs[at] = { ...docs[at], content: docs[at].content.replace(ev.input.old_string, ev.input.new_string) };
+                steps = [...steps.map((x) => ({ ...x, done: true })), { kind: "read" as const, label: "Revised the document", detail: fname, id: ++stepSeq.current, done: false }];
+                continue;
+              }
+              steps = [...steps.map((x) => ({ ...x, done: true })), { ...describeToolCall(name, ev.input ?? {}), id: ++stepSeq.current, done: false }];
+            } else if (ev.type === "thinking" && ev.text) {
+              thinking += ev.text;
+            }
+          }
+          const status = item.status;
+          const finished = status === "done" || status === "failed" || status === "skipped";
+          if (finished) steps = steps.map((x) => ({ ...x, done: true }));
+          return {
+            ...tu,
+            steps,
+            thinking,
+            task: { ...tu.task!, status, result: item.resultSummary, runId, logOffset: (tu.task?.logOffset ?? 0) + read, docs },
+          };
+        });
       }
     };
-    const iv = setInterval(poll, 3000);
-    return () => clearInterval(iv);
+    void poll();
+    const iv = setInterval(() => void poll(), 1500);
+    return () => {
+      stopped = true;
+      clearInterval(iv);
+    };
   }, [openTasks]);
 
   const onSubmit = async (question: string) => {
@@ -592,8 +731,8 @@ export default function AskPage() {
             backdrop={
               <FlowCanvas
                 steps={flowTurn?.steps ?? []}
-                visible={Boolean(flowTurn) && !flowTurn?.task}
-                answered={flowTurn?.answer != null}
+                visible={Boolean(flowTurn)}
+                answered={flowTurn?.task ? flowTurn.task.status === "done" : flowTurn?.answer != null}
                 questionLabel={t("ask.flow.question")}
                 answerLabel={t("ask.flow.answer")}
               />
@@ -744,12 +883,31 @@ export default function AskPage() {
         </div>
 
         {/* conversation + how the twin got there: 30% */}
+        {/* drag to widen the conversation (double-click resets) */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("ask.resize")}
+          title={t("ask.resize")}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDoubleClick={() => writePanelWidth(PANEL_DEFAULT)}
+          style={{ flex: "0 0 12px", cursor: "col-resize", display: "grid", placeItems: "center", touchAction: "none" }}
+        >
+          <motion.span
+            animate={{ height: dragging ? 56 : 32, opacity: dragging ? 1 : 0.55 }}
+            whileHover={{ height: 48, opacity: 1 }}
+            style={{ width: 4, borderRadius: 4, background: dragging ? "var(--accent)" : "var(--hairline-strong)" }}
+          />
+        </div>
+
         {/* detached like the sidebar: same radius, border, shadow and gutter */}
         <aside
           style={{
-            flex: 3,
-            minWidth: 300,
-            maxWidth: 460,
+            flex: `0 0 ${panelWidth}px`,
+            minWidth: PANEL_MIN,
             display: "flex",
             flexDirection: "column",
             margin: "var(--sp-8)",
@@ -816,7 +974,8 @@ export default function AskPage() {
                   <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--text)" }}>{turn.twinName}</span>
                 </div>
 
-                {turn.task ? <TaskStatus task={turn.task} /> : <Trace turn={turn} live={turn.answer === null} />}
+                <Trace turn={turn} live={turn.task ? turn.task.status === "queued" || turn.task.status === "leased" : turn.answer === null} />
+                {turn.task && <TaskStatus task={turn.task} />}
 
                 {turn.answer !== null && (
                   <motion.div
@@ -866,32 +1025,103 @@ export default function AskPage() {
 
 function TaskStatus({ task }: { task: NonNullable<Turn["task"]> }) {
   const { t } = useT();
+  const [open, setOpen] = useState<number | null>(null);
   const running = task.status === "queued" || task.status === "leased";
   const tone = task.status === "done" ? "var(--success)" : task.status === "failed" || task.status === "skipped" ? "var(--danger)" : "var(--accent-deep)";
   const label =
     task.status === "queued" ? t("ask.task.queued") : task.status === "leased" ? t("ask.task.working") : task.status === "done" ? t("ask.task.done") : t("ask.task.failed");
+  const docs = task.docs ?? [];
+  const titleOf = (d: { name: string; content: string }) => /^#\s+(.+)$/m.exec(d.content)?.[1]?.trim() ?? d.name;
   return (
-    <motion.div
-      layout
-      style={{ borderRadius: 12, border: `1px solid ${running ? "color-mix(in oklab, var(--accent) 40%, var(--hairline))" : "var(--hairline)"}`, background: "var(--surface)", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Icons.Zap size={12} />
-        <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text)" }}>{t("ask.task.title")}</span>
-        <span style={{ marginInlineStart: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 650, color: tone }}>
-          {running && <motion.span animate={{ opacity: [1, 0.25, 1] }} transition={{ duration: 1, repeat: Infinity }} style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />}
-          {task.status === "done" && <Icons.Check size={11} />}
-          {label}
-        </span>
-      </div>
-      {task.result && (
-        <motion.div dir="auto" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ fontSize: 13, lineHeight: 1.55, color: "var(--text)", maxHeight: 280, overflowY: "auto" }}>
-          <Markdown>{task.result}</Markdown>
-        </motion.div>
-      )}
-      <a href="/tasks" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--accent-deep)", textDecoration: "none" }}>
-        {t("ask.task.open")} →
-      </a>
-    </motion.div>
+    <>
+      <motion.div
+        layout
+        style={{ borderRadius: 12, border: `1px solid ${running ? "color-mix(in oklab, var(--accent) 40%, var(--hairline))" : "var(--hairline)"}`, background: "var(--surface)", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 10 }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Icons.Zap size={12} />
+          <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text)" }}>{t("ask.task.title")}</span>
+          <span style={{ marginInlineStart: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 650, color: tone }}>
+            {running && <motion.span animate={{ opacity: [1, 0.25, 1] }} transition={{ duration: 1, repeat: Infinity }} style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />}
+            {task.status === "done" && <Icons.Check size={11} />}
+            {label}
+          </span>
+        </div>
+
+        {/* documents the twin wrote */}
+        {docs.map((d, i) => (
+          <motion.button
+            key={i}
+            type="button"
+            onClick={() => setOpen(i)}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -1 }}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 10, border: "1px solid var(--hairline)", background: "var(--bg-sunken)", cursor: "pointer", font: "inherit", textAlign: "start" }}
+          >
+            <span style={{ width: 34, height: 40, borderRadius: 6, display: "grid", placeItems: "center", background: "var(--surface)", border: "1px solid var(--hairline)", color: "var(--accent-deep)", flexShrink: 0 }}>
+              <Icons.Doc size={16} />
+            </span>
+            <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+              <span dir="auto" style={{ fontSize: 13, fontWeight: 650, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{titleOf(d)}</span>
+              <span style={{ fontSize: 11, color: "var(--text-subtle)", fontFamily: "var(--font-mono, ui-monospace, monospace)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {d.name} · {t("ask.task.words", { count: d.content.split(/\s+/).filter(Boolean).length })}
+              </span>
+            </span>
+            <span style={{ fontSize: 11.5, fontWeight: 650, color: "var(--accent-deep)", whiteSpace: "nowrap" }}>{t("ask.task.read")} →</span>
+          </motion.button>
+        ))}
+
+        {task.result && (
+          <motion.div dir="auto" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ fontSize: 13, lineHeight: 1.55, color: "var(--text)", maxHeight: 240, overflowY: "auto" }}>
+            <Markdown>{task.result}</Markdown>
+          </motion.div>
+        )}
+      </motion.div>
+
+      {/* the document, read right here */}
+      <AnimatePresence>
+        {open !== null && docs[open] && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setOpen(null)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setOpen(null);
+            }}
+            style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 24, background: "color-mix(in oklab, var(--bg) 55%, transparent)", backdropFilter: "blur(6px)" }}
+          >
+            <motion.div
+              role="dialog"
+              aria-label={titleOf(docs[open])}
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+              style={{ width: "min(820px, 100%)", maxHeight: "86vh", display: "flex", flexDirection: "column", borderRadius: "var(--radius-xl)", background: "var(--bg)", border: "1px solid var(--hairline)", boxShadow: "0 30px 80px -30px color-mix(in oklab, var(--text) 45%, transparent)", overflow: "hidden" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid var(--hairline)" }}>
+                <Icons.Doc size={14} />
+                <span style={{ fontSize: 12, fontFamily: "var(--font-mono, ui-monospace, monospace)", color: "var(--text-muted)" }}>{docs[open].name}</span>
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setOpen(null)}
+                  aria-label={t("ask.task.close")}
+                  style={{ marginInlineStart: "auto", display: "grid", placeItems: "center", width: 28, height: 28, borderRadius: 8, border: "1px solid var(--hairline)", background: "var(--surface)", color: "var(--text-muted)", cursor: "pointer" }}
+                >
+                  <Icons.X size={13} />
+                </button>
+              </div>
+              <div dir="auto" style={{ overflowY: "auto", padding: "22px 28px 28px", fontSize: 14.5, lineHeight: 1.65, color: "var(--text)" }}>
+                <Markdown>{docs[open].content}</Markdown>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
