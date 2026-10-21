@@ -18,6 +18,7 @@ import { appendAuditEntry } from "@/lib/audit-log";
 import { modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
 import { dataDir } from "@/lib/app-home";
 import { checkTwinRead } from "@/lib/twin-read-scope";
+import { sdkChildEnv } from "@/lib/sdk-env";
 import { discloseOutbound, isOutboundMessageTool } from "@/lib/ai-disclosure";
 
 const PKG_VERSION = "Employee001/0.2.0";
@@ -106,16 +107,13 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
     thinking,
     disallowedTools: TWIN_HARD_DISALLOWED,
     betas,
-    // Drop undefined entries: providerEnvForAgentSdk() unsets other
-    // providers' flags with undefined, and a stringified "undefined" would
-    // read as truthy in the Claude Code subprocess.
-    env: Object.fromEntries(
-      Object.entries({
-        ...process.env,
-        ...providerEnvForAgentSdk(),
-        CLAUDE_AGENT_SDK_CLIENT_APP: PKG_VERSION,
-      }).filter(([, value]) => value !== undefined),
-    ),
+    // Only the allowlisted variables (sdk-env.ts): the child must not see
+    // the app's other secrets. providerEnvForAgentSdk() unsets other
+    // providers' flags with undefined, which sdkChildEnv drops.
+    env: sdkChildEnv(process.env, {
+      ...providerEnvForAgentSdk(),
+      CLAUDE_AGENT_SDK_CLIENT_APP: PKG_VERSION,
+    }),
     abortController: args.abortController,
     title: args.title,
     // Predicted follow-ups in chat surfaces — free (rides parent prompt cache).
