@@ -12,7 +12,9 @@ import { appendRunLog, logPathFor } from "@/lib/run-logs";
 import { registerApproval } from "@/lib/approval-bus";
 import { appendAuditEntry } from "@/lib/audit-log";
 import { getComposio, composioUserIdFor } from "@/lib/composio-client";
-import { isWithinSlackReplyRate, slackReplyNeedsApproval } from "@/lib/slack-intake";
+import { isWithinSlackReplyRate } from "@/lib/slack-intake";
+import { loadSlackAutoReplyConfig, slackAutoReplyDecision, type SlackAutoReplyDecision } from "@/lib/slack-autoreply-policy";
+import { withAiDisclosure } from "@/lib/ai-disclosure";
 import { actionsAllowed } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
 import { dataDir } from "@/lib/app-home";
@@ -170,13 +172,17 @@ async function executeWorkItem(item: WorkItem): Promise<void> {
     const effectiveItem = item.type === "slack"
       ? { ...item, payload: { ...(item.payload as SlackPayload), threadMessages: await fetchSlackThread(employee.id, item.payload as SlackPayload) } }
       : item;
+    // Decide before drafting: an unattended reply is drafted from the public
+    // profile only, so it can't carry what a human would have to vet.
+    const slackDecision = item.type === "slack" ? decideSlackReply(employee.id, item.payload as SlackPayload) : undefined;
     await runSingleTwin(employee, taskFor(effectiveItem), onEvent, [], {
       surface: "background",
       runId,
       maxBudgetUsd: RUN_BUDGET_USD,
+      ...(slackDecision?.mode === "auto" ? { publicReply: true } : {}),
     });
-    if (!errored && item.type === "slack" && textOut.trim()) {
-      await deliverSlackReply({ employeeId: employee.id, employeeName: employee.name, runId, payload: item.payload as SlackPayload, text: textOut.trim() });
+    if (!errored && slackDecision && textOut.trim()) {
+      await deliverSlackReply({ employeeId: employee.id, employeeName: employee.name, runId, payload: item.payload as SlackPayload, text: textOut.trim(), decision: slackDecision });
     }
   } catch (err) {
     errored = true;
@@ -249,6 +255,13 @@ type SlackSettings = { answerSlackWithoutAsking?: boolean };
 function slackSettings(employeeId: string): SlackSettings {
   try { return JSON.parse(fs.readFileSync(dataDir("employees", employeeId, "employee.json"), "utf8")) as SlackSettings; } catch { return {}; }
 }
+function decideSlackReply(employeeId: string, payload: SlackPayload): SlackAutoReplyDecision {
+  return slackAutoReplyDecision({
+    twinAutoReplyEnabled: slackSettings(employeeId).answerSlackWithoutAsking === true,
+    config: loadSlackAutoReplyConfig(),
+    message: payload,
+  });
+}
 type RateState = Record<string, number[]>;
 const RATE_FILE = () => dataDir("slack-reply-rate.json");
 function underSlackRateLimit(employeeId: string, channel: string): boolean {
@@ -257,32 +270,55 @@ function underSlackRateLimit(employeeId: string, channel: string): boolean {
     if (!isWithinSlackReplyRate(recent, now)) return false; recent.push(now); state[key] = recent; fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(state, null, 2) + "\n"); return true;
   } catch { const file = RATE_FILE(); const state: RateState = {}; state[`${employeeId}:${channel}`] = [Date.now()]; fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(state, null, 2) + "\n"); return true; }
 }
-async function postSlack(employeeId: string, payload: SlackPayload, text: string): Promise<void> {
-  await getComposio().tools.execute("SLACK_SEND_MESSAGE", { userId: composioUserIdFor(employeeId), arguments: { channel: payload.channel, text, thread_ts: payload.threadTs ?? payload.ts } });
+
+/**
+ * Post a twin's Slack reply. Always carries the AI disclosure. With
+ * SLACK_BOT_TOKEN set it posts as the org's bot, so the message never appears
+ * under the employee's own name; otherwise through the employee's connection.
+ */
+async function postSlack(employeeId: string, employeeName: string, payload: SlackPayload, text: string): Promise<"bot" | "user"> {
+  const body = withAiDisclosure(text, employeeName);
+  const threadTs = payload.threadTs ?? payload.ts;
+  const botToken = process.env.SLACK_BOT_TOKEN?.trim();
+  if (botToken) {
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { authorization: `Bearer ${botToken}`, "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ channel: payload.channel, text: body, thread_ts: threadTs, username: `${employeeName} (AI twin)` }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!json.ok) throw new Error(`Slack bot post failed: ${json.error ?? res.status}`);
+    return "bot";
+  }
+  await getComposio().tools.execute("SLACK_SEND_MESSAGE", { userId: composioUserIdFor(employeeId), arguments: { channel: payload.channel, text: body, thread_ts: threadTs } });
+  return "user";
 }
-async function deliverSlackReply(input: { employeeId: string; employeeName: string; runId: string; payload: SlackPayload; text: string }): Promise<void> {
-  const { employeeId, employeeName, runId, payload, text } = input;
+
+async function deliverSlackReply(input: { employeeId: string; employeeName: string; runId: string; payload: SlackPayload; text: string; decision: SlackAutoReplyDecision }): Promise<void> {
+  const { employeeId, employeeName, runId, payload, text, decision } = input;
+  const requesterId = `slack:${payload.userId}`;
+  const base = { runId, employeeId, employeeName, toolName: "SLACK_SEND_MESSAGE", bareName: "SLACK_SEND_MESSAGE", requesterId } as const;
   // Posting is acting as the employee: only with their "act on my behalf" consent.
   if (!actionsAllowed(loadConsentStatus(employeeId))) {
-    appendAuditEntry({ runId, employeeId, employeeName, toolName: "SLACK_SEND_MESSAGE", bareName: "SLACK_SEND_MESSAGE", input: { channel: payload.channel }, verdict: "hard_blocked", blockReason: "The employee's consent doesn't let the twin act on their behalf." });
+    appendAuditEntry({ ...base, input: { channel: payload.channel }, verdict: "hard_blocked", blockReason: "The employee's consent doesn't let the twin act on their behalf." });
     return;
   }
-  if (!underSlackRateLimit(employeeId, payload.channel)) { appendAuditEntry({ runId, employeeId, employeeName, toolName: "SLACK_SEND_MESSAGE", bareName: "SLACK_SEND_MESSAGE", input: { channel: payload.channel, text }, verdict: "hard_blocked", blockReason: "Slack reply rate limit: 10 replies/channel/hour" }); return; }
-  const settings = slackSettings(employeeId);
-  const forceApproval = slackReplyNeedsApproval({ autoReplyEnabled: settings.answerSlackWithoutAsking === true, externalWorkspace: payload.externalWorkspace, text: payload.text });
-  const direct = !forceApproval;
-  const auditInput = { channel: payload.channel, text, thread_ts: payload.threadTs ?? payload.ts };
-  if (!direct) {
-    const { approvalId, promise } = registerApproval({ runId, employeeId, employeeName, toolName: "SLACK_SEND_MESSAGE", bareName: "SLACK_SEND_MESSAGE", input: auditInput, reason: forceApproval ? "External-workspace or action-request Slack message requires approval." : "Post this drafted Slack reply?", surface: "background" });
-    const decision = await promise;
-    if (decision.action !== "allow") { appendAuditEntry({ runId, employeeId, employeeName, toolName: "SLACK_SEND_MESSAGE", bareName: "SLACK_SEND_MESSAGE", input: auditInput, verdict: "ceo_denied", approvalId }); return; }
-    const updated = decision.updatedInput ?? auditInput;
-    await postSlack(employeeId, payload, typeof updated.text === "string" ? updated.text : text);
-    appendAuditEntry({ runId, employeeId, employeeName, toolName: "SLACK_SEND_MESSAGE", bareName: "SLACK_SEND_MESSAGE", input: updated, verdict: "ceo_approved", approvalId, inputEdited: decision.updatedInput !== undefined });
+  if (!underSlackRateLimit(employeeId, payload.channel)) { appendAuditEntry({ ...base, input: { channel: payload.channel, text }, verdict: "hard_blocked", blockReason: "Slack reply rate limit: 10 replies/channel/hour" }); return; }
+  const auditInput = { channel: payload.channel, text: withAiDisclosure(text, employeeName), thread_ts: payload.threadTs ?? payload.ts };
+  if (decision.mode === "approval") {
+    const { approvalId, promise } = registerApproval({ runId, employeeId, employeeName, toolName: "SLACK_SEND_MESSAGE", bareName: "SLACK_SEND_MESSAGE", input: auditInput, reason: `Post this drafted Slack reply? ${decision.reason}`, surface: "background" });
+    const verdict = await promise;
+    const by = verdict.by ? { approvedBy: verdict.by.userId, approvalChannel: verdict.by.channel } : {};
+    if (verdict.action !== "allow") { appendAuditEntry({ ...base, ...by, input: auditInput, verdict: "ceo_denied", approvalId }); return; }
+    const updated = verdict.updatedInput ?? auditInput;
+    const finalText = typeof updated.text === "string" ? updated.text : text;
+    const identity = await postSlack(employeeId, employeeName, payload, finalText);
+    appendAuditEntry({ ...base, ...by, input: { ...updated, text: withAiDisclosure(finalText, employeeName), postedAs: identity }, verdict: "ceo_approved", approvalId, inputEdited: verdict.updatedInput !== undefined });
     return;
   }
-  await postSlack(employeeId, payload, text);
-  appendAuditEntry({ runId, employeeId, employeeName, toolName: "SLACK_SEND_MESSAGE", bareName: "SLACK_SEND_MESSAGE", input: auditInput, verdict: "executed" });
+  const identity = await postSlack(employeeId, employeeName, payload, text);
+  appendAuditEntry({ ...base, input: { ...auditInput, postedAs: identity, policy: decision.reason }, verdict: "executed", approvedBy: "policy:slack-autoreply", approvalChannel: "policy" });
 }
 
 function taskFor(item: WorkItem): string {

@@ -11,6 +11,8 @@ export type TelegramCallbackQuery = {
   id: string;
   data?: string;
   message?: TelegramMessage;
+  /** The Telegram user who pressed the button. */
+  from?: { id: number; username?: string };
 };
 
 export type TelegramUpdate = {

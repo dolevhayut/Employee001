@@ -81,10 +81,6 @@ export function isActionRequest(text: string): boolean {
   return /\b(send|post|create|delete|update|schedule|invite|approve|deploy|run|execute|change)\b|(?:שלח|פרסם|צור|מחק|עדכן|קבע|הזמן|אשר|הרץ|בצע)/i.test(text);
 }
 
-export function slackReplyNeedsApproval(input: { autoReplyEnabled: boolean; externalWorkspace?: boolean; text: string }): boolean {
-  return !input.autoReplyEnabled || input.externalWorkspace === true || isActionRequest(input.text);
-}
-
 /** Pure so the per-channel hourly policy is testable without touching disk. */
 export function isWithinSlackReplyRate(timestamps: number[], now = Date.now(), limit = 10): boolean {
   return timestamps.filter((ts) => ts > now - 60 * 60_000).length < limit;

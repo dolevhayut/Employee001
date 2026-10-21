@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mappedTwinForMessage, mentionUserIds, normalizeSlackMessage, shouldIgnoreSlackMessage, isActionRequest, isWithinSlackReplyRate, slackReplyNeedsApproval } from "./slack-intake";
+import { mappedTwinForMessage, mentionUserIds, normalizeSlackMessage, shouldIgnoreSlackMessage, isActionRequest, isWithinSlackReplyRate } from "./slack-intake";
 
 describe("Slack intake", () => {
   const message = normalizeSlackMessage({ channel: "C1", ts: "123.4", text: "hi <@U999>", user: "U111", team: "T1" })!;
@@ -15,12 +15,6 @@ describe("Slack intake", () => {
   it("identifies action requests that cannot auto-post", () => {
     expect(isActionRequest("Please deploy this now")).toBe(true);
     expect(isActionRequest("מה הסטטוס של הפרויקט?")).toBe(false);
-  });
-  it("uses approval by default and never auto-posts external or action requests", () => {
-    expect(slackReplyNeedsApproval({ autoReplyEnabled: false, text: "What is the status?" })).toBe(true);
-    expect(slackReplyNeedsApproval({ autoReplyEnabled: true, text: "What is the status?" })).toBe(false);
-    expect(slackReplyNeedsApproval({ autoReplyEnabled: true, externalWorkspace: true, text: "What is the status?" })).toBe(true);
-    expect(slackReplyNeedsApproval({ autoReplyEnabled: true, text: "Please deploy now" })).toBe(true);
   });
   it("limits replies to ten per channel per rolling hour", () => {
     const now = 1_000_000;

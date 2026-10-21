@@ -120,9 +120,10 @@ export async function handleCallback(
     return "rejected";
   }
 
+  const by = { userId: `telegram:${query.from?.id ?? "unknown"}`, channel: "telegram" as const };
   const resolved = resolveApproval(
     callback.approvalId,
-    callback.action === "approve" ? { action: "allow" } : { action: "deny", message: "Skipped from Telegram." },
+    callback.action === "approve" ? { action: "allow", by } : { action: "deny", message: "Skipped from Telegram.", by },
   );
   const isHebrew = options.language === "he";
   const text = resolved

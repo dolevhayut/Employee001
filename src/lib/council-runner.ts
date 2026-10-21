@@ -253,8 +253,14 @@ const PROFILE_FILE_NAMES = [
   "EMPLOYMENT.md",
 ];
 
-function loadProfileFiles(employeeDir: string): string {
-  return PROFILE_FILE_NAMES.map((name) => {
+/** Profile files an auto-reply may draw on. PEOPLE (views on colleagues),
+ *  DECISIONS (internal reasoning), PREFERENCES and EMPLOYMENT stay out: the
+ *  requester never chose to see them and no human reviews the reply. */
+export const PUBLIC_PROFILE_FILE_NAMES = ["EXPERTISE.md", "CONTEXT.md", "PROJECTS.md", "TONE.md", "BOUNDARIES.md"] as const;
+
+function loadProfileFiles(employeeDir: string, publicOnly = false): string {
+  const names: readonly string[] = publicOnly ? PUBLIC_PROFILE_FILE_NAMES : PROFILE_FILE_NAMES;
+  return names.map((name) => {
     try {
       const content = fs.readFileSync(path.join(employeeDir, name), "utf8");
       return `### ${name}\n\n${content.trim()}`;
@@ -288,10 +294,11 @@ function buildSystemPromptBlocks(
      *  whether the prompt mentions the share/read tools at all. */
     scratchEnabled?: boolean;
   },
-  responseIntentBlock?: string
+  responseIntentBlock?: string,
+  publicOnly = false,
 ): string[] {
-  const profileContent = loadProfileFiles(employeeDir);
-  const knowledgeIndex = knowledgeIndexMarkdown(employee.id);
+  const profileContent = loadProfileFiles(employeeDir, publicOnly);
+  const knowledgeIndex = publicOnly ? "" : knowledgeIndexMarkdown(employee.id);
   const knowledgeBlock = knowledgeIndex
     ? `
 
@@ -618,6 +625,13 @@ export type RunOptions = {
    */
   readOnly?: boolean;
   /**
+   * Unattended reply to someone outside the app (Slack auto-reply without a
+   * human approval). No tools, no memory, no org brain or goals, and only the
+   * non-confidential profile files: what goes out is limited to what the
+   * twin's public profile already says.
+   */
+  publicReply?: boolean;
+  /**
    * When set, registers the twin-to-twin consultation MCP server for this run
    * so the twin can consult / request approval from peers. Threaded one hop
    * deeper on each consultation; the shared `visited` set + depth cap inside
@@ -631,6 +645,12 @@ export function buildToolConfig(options: RunOptions): {
   disallowedTools?: string[];
   agents?: ReturnType<typeof buildTwinAgentDefinitions>;
 } {
+  if (options.publicReply) {
+    return {
+      allowedTools: [],
+      disallowedTools: ["AskUserQuestion", "Read", "Glob", "Grep", "Write", "WebSearch", "WebFetch", "Task", "TodoWrite"],
+    };
+  }
   if (options.readOnly) {
     return {
       allowedTools: ["Read", "Glob", "Grep", "mcp__org_brain__search_org_brain"],
@@ -847,7 +867,8 @@ export async function runSingleTwin(
     // Consultation runs stay light: skip the personal Composio + org-wide MCP
     // setup entirely (the consulted twin gives advice from its profile +
     // org-brain, it doesn't act on external systems on this hop).
-    const consultMode = options.consultMode === true;
+    const publicReply = options.publicReply === true;
+    const consultMode = options.consultMode === true || publicReply;
     const [composioMcp, orgMcpServers] = consultMode
       ? [null, {} as Awaited<ReturnType<typeof loadOrgCustomMcpServers>>]
       : await Promise.all([
@@ -921,7 +942,7 @@ export async function runSingleTwin(
     const hasMcp = Object.keys(mcpServers).length > 0;
 
     let memoryBlock = "";
-    try {
+    if (!publicReply) try {
       const [episodic, structured] = await Promise.all([
         searchTwinMemory(employee.id, question),
         Promise.resolve(searchStructuredMemory(employee.id, question)),
@@ -940,7 +961,7 @@ export async function runSingleTwin(
 
     let orgSkillsBlock = "";
     let orgSkillHits: OrgSkillHit[] = [];
-    try {
+    if (!publicReply) try {
       orgSkillHits = selectOrgSkillsForRun(employee, question);
       orgSkillsBlock = formatOrgSkillsBlock(orgSkillHits);
       if (orgSkillHits.length > 0) {
@@ -962,7 +983,7 @@ export async function runSingleTwin(
 
     let orgBrainBlock = "";
     let orgBrainHits: OrgBrainHit[] = [];
-    try {
+    if (!publicReply) try {
       orgBrainHits = selectOrgBrainNodesForRun(question);
       orgBrainBlock = formatOrgBrainBlock(orgBrainHits);
       if (orgBrainHits.length > 0) {
@@ -984,7 +1005,7 @@ export async function runSingleTwin(
     }
 
     let goalsBlock = "";
-    try {
+    if (!publicReply) try {
       const activeGoals = listGoals().filter((goal) =>
         goal.status === "active" && (goal.ownerEmployeeId === employee.id || goal.ownerEmployeeId === null),
       );
@@ -1031,6 +1052,10 @@ export async function runSingleTwin(
       const typedInput = (input as Record<string, unknown>) ?? {};
       const decision = applyConsent(classifyTool(toolName, typedInput, policyOverrides), toolName, consent);
       const bare = toolName.replace(/^mcp__[a-z0-9_]+__/i, "");
+
+      if (publicReply) {
+        return { behavior: "deny", message: "Auto-reply: no tools. Answer only from the profile above." };
+      }
 
       if (options.readOnly && decision.kind !== "allow") {
         return { behavior: "deny", message: "Read-only company question: no actions, approvals or questions back. Answer with what you can read." };
@@ -1225,7 +1250,8 @@ export async function runSingleTwin(
                 scratchEnabled: Boolean(meetingId),
               }
             : undefined,
-          responseIntentBlock
+          responseIntentBlock,
+          publicReply,
         ),
         // Allowed built-ins:
         //   - TodoWrite / AskUserQuestion: surface twin reasoning + clarifications.

@@ -74,9 +74,10 @@ describe("Telegram approvals", () => {
 
     await expect(handleCallback({
       update_id: 1,
-      callback_query: { id: "cb_1", data: callbackData, message: { message_id: 4, chat: { id: 10 } } },
+      callback_query: { id: "cb_1", data: callbackData, from: { id: 77 }, message: { message_id: 4, chat: { id: 10 } } },
     }, { chatId: 10, secret: "test-secret", client })).resolves.toBe("resolved");
-    await expect(pending.promise).resolves.toEqual({ action: "allow" });
+    // The approver is recorded so the audit row can name them.
+    await expect(pending.promise).resolves.toEqual({ action: "allow", by: { userId: "telegram:77", channel: "telegram" } });
   });
 
   it("advances the long-poll offset after every update", async () => {

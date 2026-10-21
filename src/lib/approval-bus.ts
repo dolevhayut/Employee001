@@ -6,9 +6,12 @@ import { appendFeedItem, feedSourceForApproval } from "@/lib/feed-store";
 // CEO approval; the API route resolves that Promise when the user clicks
 // Approve / Edit / Skip in the UI.
 
+/** Who decided, recorded on the audit row. */
+export type ApprovalActor = { userId: string; channel: "ui" | "telegram" | "slack" };
+
 export type ApprovalDecision =
-  | { action: "allow"; updatedInput?: Record<string, unknown> }
-  | { action: "deny"; message?: string };
+  | { action: "allow"; updatedInput?: Record<string, unknown>; by?: ApprovalActor }
+  | { action: "deny"; message?: string; by?: ApprovalActor };
 
 export type ApprovalSurface = "chat" | "background";
 

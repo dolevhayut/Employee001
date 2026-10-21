@@ -92,6 +92,15 @@ export type AuditEntry = {
   inputDigest?: string;
   /** SHA-256 of employeeName, committed by the row hash the same way. */
   nameDigest?: string;
+  /** Who approved or denied (a user id, "policy:<name>" for an automatic
+   *  policy decision). */
+  approvedBy?: string;
+  /** Where the decision was made. */
+  approvalChannel?: "ui" | "telegram" | "slack" | "policy";
+  /** Who asked for the action, e.g. "slack:U123" or a user id. */
+  requesterId?: string;
+  /** Which organisation the row belongs to (EMPLOYEE001_TENANT_ID). */
+  tenantId?: string;
   /** Set when the row's personal data was removed by purgeEmployee. A
    *  "purgeEmployee" tombstone row later in the chain lists this row's id. */
   redacted?: { at: string };
@@ -224,6 +233,11 @@ function ensureDir() {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+/** Single-tenant installs are "local"; a hosted instance sets its org id. */
+export function tenantId(): string {
+  return process.env.EMPLOYEE001_TENANT_ID?.trim() || "local";
+}
+
 let _counter = 0;
 function makeId(): string {
   _counter++;
@@ -244,6 +258,7 @@ export function appendAuditEntry(
     const unsignedRow: Omit<AuditEntry, "hash"> = {
       id: makeId(),
       ts: new Date().toISOString(),
+      tenantId: tenantId(),
       ...entry,
       inputDigest: digestInput(entry.input ?? {}),
       nameDigest: digestName(entry.employeeName),
