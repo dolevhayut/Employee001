@@ -360,8 +360,29 @@ export type AuditChainVerification = {
   reason?: string;
 };
 
+/** Every audit line in chain order: archives oldest first, then the active log. */
+function chainLines(): string[] {
+  const files = [...listArchives().sort().map(pathForArchive), AUDIT_FILE];
+  return files.flatMap((f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").split("\n").filter(Boolean) : []));
+}
+
 /** Verify every archive (oldest first) followed by the active log. */
 export function verifyAuditChain(): AuditChainVerification {
+  return verifyAuditLines(chainLines());
+}
+
+/** The audit log as one JSONL document in chain order (for export). */
+export function exportAuditChain(): string {
+  const lines = chainLines();
+  return lines.length ? lines.join("\n") + "\n" : "";
+}
+
+/**
+ * Verify a chain given as JSONL lines in order. Pure, so an exported log
+ * can be checked anywhere; bin/lib/audit-verify.mjs is the same algorithm
+ * for the CLI (a test keeps the two in step).
+ */
+export function verifyAuditLines(lines: string[]): AuditChainVerification {
   let checked = 0;
   let legacy = 0;
   let previous = "genesis";
@@ -369,82 +390,73 @@ export function verifyAuditChain(): AuditChainVerification {
   // Redacted rows seen so far that no purge record has vouched for yet.
   const pending = new Map<string, { employeeId: string; pin?: string }>();
 
-  const files = [
-    ...listArchives().sort().map(pathForArchive),
-    AUDIT_FILE,
-  ];
-
-  for (const filePath of files) {
-    if (!fs.existsSync(filePath)) continue;
-    const lines = fs.readFileSync(filePath, "utf8").split("\n").filter(Boolean);
-    for (const line of lines) {
-      let row: AuditEntry;
-      try {
-        row = JSON.parse(line) as AuditEntry;
-      } catch {
-        return { ok: false, checked, legacy, reason: "invalid JSON row" };
-      }
-
-      if (!row.hash || !row.prevHash) {
-        if (!chainStarted) {
-          legacy++;
-          continue;
-        }
-        return {
-          ok: false,
-          checked,
-          legacy,
-          firstBadId: row.id,
-          reason: "missing hash fields after chain start",
-        };
-      }
-
-      const unsignedRow = { ...row };
-      delete unsignedRow.hash;
-      if (row.prevHash !== previous) {
-        return { ok: false, checked, legacy, firstBadId: row.id, reason: "previous hash mismatch" };
-      }
-      // A redacted row whose hash no longer covers what's stored (a legacy
-      // row, or a digest row from before idDigest whose id was pseudonymized)
-      // can only be checked for its place in the chain; a purge record must
-      // then pin its remaining fields. Everything else verifies in full.
-      const hashOk = row.hash === hashRow(row.prevHash, unsignedRow);
-      const contentCheckable = !row.redacted || (Boolean(row.inputDigest) && hashOk);
-      if (!row.redacted && !hashOk) {
-        return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
-      }
-      if (!row.redacted && row.inputDigest && row.inputDigest !== digestInput(row.input ?? {})) {
-        return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
-      }
-      if (!row.redacted && row.nameDigest && row.nameDigest !== digestName(row.employeeName)) {
-        return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
-      }
-      if (!row.redacted && row.idDigest && row.idDigest !== digestName(row.employeeId)) {
-        return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
-      }
-      if (row.redacted) {
-        // A purge record is never redacted, and only fully checkable rows
-        // (with digests) or pinned legacy rows can be vouched for.
-        if (row.bareName === "purgeEmployee") {
-          return { ok: false, checked, legacy, firstBadId: row.id, reason: "redacted purge record" };
-        }
-        pending.set(row.id, { employeeId: row.employeeId, pin: contentCheckable ? undefined : legacyPin(row) });
-      } else if (row.bareName === "purgeEmployee" && row.inputDigest) {
-        // Only a verified purge record that comes after the rows it lists,
-        // for the same employee, can vouch for them.
-        const pins = (row.input?.legacyPins ?? {}) as Record<string, unknown>;
-        for (const id of Array.isArray(row.input?.redactedIds) ? (row.input.redactedIds as unknown[]) : []) {
-          if (typeof id !== "string") continue;
-          const seen = pending.get(id);
-          if (!seen || seen.employeeId !== row.employeeId) continue;
-          if (seen.pin && pins[id] !== seen.pin) continue;
-          pending.delete(id);
-        }
-      }
-      chainStarted = true;
-      previous = row.hash;
-      checked++;
+  for (const line of lines) {
+    let row: AuditEntry;
+    try {
+      row = JSON.parse(line) as AuditEntry;
+    } catch {
+      return { ok: false, checked, legacy, reason: "invalid JSON row" };
     }
+
+    if (!row.hash || !row.prevHash) {
+      if (!chainStarted) {
+        legacy++;
+        continue;
+      }
+      return {
+        ok: false,
+        checked,
+        legacy,
+        firstBadId: row.id,
+        reason: "missing hash fields after chain start",
+      };
+    }
+
+    const unsignedRow = { ...row };
+    delete unsignedRow.hash;
+    if (row.prevHash !== previous) {
+      return { ok: false, checked, legacy, firstBadId: row.id, reason: "previous hash mismatch" };
+    }
+    // A redacted row whose hash no longer covers what's stored (a legacy
+    // row, or a digest row from before idDigest whose id was pseudonymized)
+    // can only be checked for its place in the chain; a purge record must
+    // then pin its remaining fields. Everything else verifies in full.
+    const hashOk = row.hash === hashRow(row.prevHash, unsignedRow);
+    const contentCheckable = !row.redacted || (Boolean(row.inputDigest) && hashOk);
+    if (!row.redacted && !hashOk) {
+      return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
+    }
+    if (!row.redacted && row.inputDigest && row.inputDigest !== digestInput(row.input ?? {})) {
+      return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
+    }
+    if (!row.redacted && row.nameDigest && row.nameDigest !== digestName(row.employeeName)) {
+      return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
+    }
+    if (!row.redacted && row.idDigest && row.idDigest !== digestName(row.employeeId)) {
+      return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
+    }
+    if (row.redacted) {
+      // A purge record is never redacted, and only fully checkable rows
+      // (with digests) or pinned legacy rows can be vouched for.
+      if (row.bareName === "purgeEmployee") {
+        return { ok: false, checked, legacy, firstBadId: row.id, reason: "redacted purge record" };
+      }
+      pending.set(row.id, { employeeId: row.employeeId, pin: contentCheckable ? undefined : legacyPin(row) });
+    } else if (row.bareName === "purgeEmployee" && row.inputDigest) {
+      // Only a verified purge record that comes after the rows it lists,
+      // for the same employee, can vouch for them.
+      const pins = (row.input?.legacyPins ?? {}) as Record<string, unknown>;
+      for (const id of Array.isArray(row.input?.redactedIds) ? (row.input.redactedIds as unknown[]) : []) {
+        if (typeof id !== "string") continue;
+        const seen = pending.get(id);
+        if (!seen || seen.employeeId !== row.employeeId) continue;
+        if (seen.pin && pins[id] !== seen.pin) continue;
+        pending.delete(id);
+      }
+    }
+    chainStarted = true;
+    previous = row.hash;
+    checked++;
   }
 
   const orphan = pending.keys().next().value;
