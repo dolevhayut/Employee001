@@ -1,16 +1,30 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { timingSafeEqual } from "@/lib/mcp-server/guard";
+import { authorizeApi, authorizePage, type Caller } from "@/lib/auth/rbac";
+import { USER_EMPLOYEE_HEADER, USER_ID_HEADER, USER_ROLE_HEADER } from "@/lib/auth/request-user";
+import {
+  accountsEnabled,
+  bootstrapCookie,
+  bootstrapValid,
+  BOOTSTRAP_COOKIE,
+  resolveSession,
+  SESSION_COOKIE,
+  SESSION_MAX_MS,
+} from "@/lib/auth/store";
 
-// Employee001 runs as a single-user local app. By default it binds to
-// 127.0.0.1, in which case this proxy is a no-op — the OS itself is the
-// access boundary. When the user opts into LAN exposure with
-// EMPLOYEE001_BIND=0.0.0.0 (or any non-loopback address), every request
-// must present a shared-secret token, either as a `?token=` query param
-// (first hit, then promoted to a cookie) or as an `e001_token` cookie.
-
-const COOKIE_NAME = "e001_token";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+// Access control, in three modes:
+//   1. No accounts yet, loopback bind (the default local install): the OS is
+//      the boundary, the caller acts as the implicit local owner.
+//   2. No accounts yet, exposed bind (EMPLOYEE001_BIND=0.0.0.0 …):
+//      EMPLOYEE001_TOKEN is only a bootstrap credential. Presenting it sets
+//      a short-lived signed cookie (never the token itself) that unlocks
+//      /auth/setup, where the first owner account is created. The token stays
+//      valid as the MCP client bearer.
+//   3. Accounts exist (any bind, loopback included): every request needs a
+//      signed session (src/lib/auth/store.ts) and passes the RBAC table
+//      (src/lib/auth/rbac.ts). The proxy strips the identity headers from
+//      every incoming request and sets them only after verifying the session.
 
 // First-visit gate: send the user to /welcome unless they've dismissed it.
 // Set independently of the access token cookie so it works on loopback too.
@@ -20,6 +34,38 @@ function isLoopbackBind(bind: string | undefined): boolean {
   if (!bind) return true;
   const v = bind.trim();
   return v === "" || v === "127.0.0.1" || v === "::1" || v === "localhost";
+}
+
+const IDENTITY_HEADERS = [USER_ID_HEADER, USER_ROLE_HEADER, USER_EMPLOYEE_HEADER];
+
+/** Continue with verified identity headers (and nothing a client sent). */
+function nextWith(request: NextRequest, caller: Caller): NextResponse {
+  const headers = new Headers(request.headers);
+  for (const h of IDENTITY_HEADERS) headers.delete(h);
+  if (caller) {
+    headers.set(USER_ID_HEADER, caller.id);
+    headers.set(USER_ROLE_HEADER, caller.role);
+    if (caller.employeeId) headers.set(USER_EMPLOYEE_HEADER, caller.employeeId);
+  }
+  return NextResponse.next({ request: { headers } });
+}
+
+function jsonError(status: number, error: string, reason: string): NextResponse {
+  return new NextResponse(JSON.stringify({ error, reason }), { status, headers: { "content-type": "application/json" } });
+}
+
+function setSessionCookie(res: NextResponse, value: string, secure: boolean): void {
+  res.cookies.set({ name: SESSION_COOKIE, value, httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: Math.floor(SESSION_MAX_MS / 1000) });
+}
+
+function isHttps(request: NextRequest): boolean {
+  return request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https";
+}
+
+function bearerMatches(request: NextRequest): boolean {
+  const bearer = request.headers.get("authorization");
+  const expected = [process.env.EMPLOYEE001_MCP_TOKEN, process.env.EMPLOYEE001_TOKEN].filter((t): t is string => Boolean(t));
+  return Boolean(bearer?.startsWith("Bearer ") && expected.some((t) => timingSafeEqual(bearer.slice("Bearer ".length), t)));
 }
 
 function unauthorizedHtml(pathAndQuery: string): string {
@@ -184,32 +230,82 @@ export function proxy(request: NextRequest) {
   const welcome = firstVisitRedirect(request);
   if (welcome) return welcome;
 
-  if (loopback) {
-    return NextResponse.next();
+  if (accountsEnabled()) return gateWithAccounts(request);
+
+  // Mode 1: local single-user install.
+  if (loopback) return nextWith(request, { id: "local-owner", role: "owner" });
+
+  // Mode 2: exposed, no accounts yet.
+  return gateBootstrap(request);
+}
+
+/** Mode 3: signed session + RBAC. */
+function gateWithAccounts(request: NextRequest): NextResponse {
+  const url = request.nextUrl;
+  const resolved = resolveSession(request.cookies.get(SESSION_COOKIE)?.value);
+  const mfaPending = Boolean(resolved && !resolved.session.mfaPassed);
+  const caller: Caller = resolved && !mfaPending
+    ? { id: resolved.user.id, role: resolved.user.role, ...(resolved.user.employeeId ? { employeeId: resolved.user.employeeId } : {}) }
+    : null;
+  const finish = (res: NextResponse) => {
+    if (resolved?.rotatedCookie) setSessionCookie(res, resolved.rotatedCookie, isHttps(request));
+    return res;
+  };
+
+  if (url.pathname.startsWith("/api/")) {
+    const decision = authorizeApi(url.pathname, request.method, caller);
+    if (!decision.allow) {
+      const status = decision.status === 401 && mfaPending ? 401 : decision.status;
+      return finish(jsonError(status, status === 401 ? "unauthorized" : status === 404 ? "not_found" : "forbidden", mfaPending ? "second factor required" : decision.reason));
+    }
+    switch (decision.access.kind) {
+      case "invite":
+        return extractInviteToken(request) ? nextWith(request, null) : jsonError(401, "unauthorized", "invite token required");
+      case "webhook":
+        return request.method === "POST" && request.headers.has("webhook-signature")
+          ? nextWith(request, null)
+          : jsonError(401, "unauthorized", "signed webhook required");
+      case "bearer":
+        if (caller) return finish(nextWith(request, caller));
+        return bearerMatches(request) ? nextWith(request, { id: "mcp-client", role: "member" }) : jsonError(401, "unauthorized", "sign in or MCP bearer token required");
+      default:
+        return finish(nextWith(request, caller));
+    }
   }
+
+  const decision = authorizePage(url.pathname, caller);
+  if (decision.allow) return finish(nextWith(request, caller));
+  if (decision.status === 401) {
+    const login = url.clone();
+    login.pathname = "/login";
+    login.search = "";
+    login.searchParams.set("next", url.pathname + url.search);
+    if (mfaPending) login.searchParams.set("step", "mfa");
+    return NextResponse.redirect(login);
+  }
+  return finish(new NextResponse("You don't have access to this page.", { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } }));
+}
+
+/** Mode 2: exposed bind, no accounts yet. */
+function gateBootstrap(request: NextRequest): NextResponse {
+  const url = request.nextUrl;
 
   // Invite-token bypass: the bearer of a valid invite token can reach the
-  // employee-onboarding surface without holding the workspace's LAN token.
-  // The shape check here is structural only — full redeemability (expiry,
-  // already-used) is enforced by the route handlers themselves.
-  if (isInvitePath(request.nextUrl.pathname) && extractInviteToken(request)) {
-    return NextResponse.next();
-  }
+  // employee-onboarding surface. Full redeemability is checked by the route.
+  if (isInvitePath(url.pathname) && extractInviteToken(request)) return nextWith(request, null);
 
-  // Composio's signed email webhook can't hold the LAN cookie. Let only that
-  // POST through; the route verifies its signature itself and refuses
-  // everything when COMPOSIO_WEBHOOK_SECRET is unset.
+  // Composio's signed webhooks can't hold a cookie; the routes verify the
+  // signature (and replay window) themselves.
   if (
     request.method === "POST" &&
-    (request.nextUrl.pathname === "/api/email/composio" || request.nextUrl.pathname === "/api/slack/composio") &&
+    (url.pathname === "/api/email/composio" || url.pathname === "/api/slack/composio") &&
     request.headers.has("webhook-signature")
   ) {
-    return NextResponse.next();
+    return nextWith(request, null);
   }
 
   const expected = process.env.EMPLOYEE001_TOKEN;
-  // If exposure is enabled but no token is configured, refuse every request.
-  // Better to fail closed than to serve an unauthenticated app on the LAN.
+  // Exposed with no token: refuse everything rather than serve an open app.
   if (!expected) {
     return new NextResponse(
       "Employee001 is bound to a non-loopback address but EMPLOYEE001_TOKEN is unset. Refusing to serve. Re-run `employee001 setup` or set the token in .env.",
@@ -217,46 +313,32 @@ export function proxy(request: NextRequest) {
     );
   }
 
-  const url = request.nextUrl;
-  const bearer = request.headers.get("authorization");
-  if (
-    request.method === "POST" &&
-    url.pathname === "/api/mcp" &&
-    bearer?.startsWith("Bearer ") &&
-    timingSafeEqual(bearer.slice("Bearer ".length), expected)
-  ) {
-    return NextResponse.next();
-  }
+  if (url.pathname === "/api/mcp" && bearerMatches(request)) return nextWith(request, { id: "mcp-client", role: "member" });
 
+  // The token is traded for a signed, 30-minute bootstrap cookie that only
+  // opens the first-owner setup. The raw token is never stored in a cookie.
   const queryToken = url.searchParams.get("token");
   if (queryToken && timingSafeEqual(queryToken, expected)) {
-    const clean = url.clone();
-    clean.searchParams.delete("token");
-    const res = NextResponse.redirect(clean);
-    res.cookies.set({
-      name: COOKIE_NAME,
-      value: expected,
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: COOKIE_MAX_AGE,
-      path: "/",
-    });
+    const setup = url.clone();
+    setup.pathname = "/auth/setup";
+    setup.search = "";
+    const res = NextResponse.redirect(setup);
+    res.cookies.set({ name: BOOTSTRAP_COOKIE, value: bootstrapCookie(), httpOnly: true, sameSite: "lax", secure: isHttps(request), path: "/", maxAge: 30 * 60 });
     return res;
   }
 
-  const cookieToken = request.cookies.get(COOKIE_NAME)?.value;
-  if (cookieToken && timingSafeEqual(cookieToken, expected)) {
-    return NextResponse.next();
+  const bootstrapped = bootstrapValid(request.cookies.get(BOOTSTRAP_COOKIE)?.value);
+  if (bootstrapped && (url.pathname === "/auth/setup" || url.pathname === "/api/auth/setup")) {
+    return nextWith(request, null);
+  }
+  if (bootstrapped) {
+    const setup = url.clone();
+    setup.pathname = "/auth/setup";
+    setup.search = "";
+    return url.pathname.startsWith("/api/") ? jsonError(403, "forbidden", "create the first owner account at /auth/setup") : NextResponse.redirect(setup);
   }
 
-  const isApi = url.pathname.startsWith("/api/");
-  if (isApi) {
-    return new NextResponse(
-      JSON.stringify({ error: "unauthorized", reason: "missing or invalid token" }),
-      { status: 401, headers: { "content-type": "application/json" } },
-    );
-  }
-
+  if (url.pathname.startsWith("/api/")) return jsonError(401, "unauthorized", "missing or invalid token");
   return new NextResponse(unauthorizedHtml(url.pathname), {
     status: 401,
     headers: { "content-type": "text/html; charset=utf-8" },

@@ -25,6 +25,7 @@ import type { OrgBrainNode, OrgBrainNodeType, OrgBrainInput } from "@/lib/org-br
 import type { EmployeeGraph } from "@/lib/profile-graph-real";
 import { ObsidianGraph } from "@/components/ex/obsidian-graph";
 import { BrainGraph3D } from "@/components/ex/brain-graph-3d";
+import { UsersSection } from "@/components/settings/users-section";
 
 export default function SettingsPage() {
   const { t } = useT();
@@ -81,7 +82,7 @@ export default function SettingsPage() {
           <OrgBrainSection />
           <OrgSkillsSection />
           <CustomMcpSection />
-          <AccountSection />
+          <UsersSection />
         </div>
       </div>
     </>
@@ -2836,67 +2837,6 @@ const inputStyle: React.CSSProperties = {
 };
 
 // ─── Account ─────────────────────────────────────────────────────────────────
-
-function AccountSection() {
-  const { t } = useT();
-  const [fullName, setFullName] = useState("Admin");
-  const [email, setEmail] = useState("admin@employee001.io");
-
-  return (
-    <section style={{ marginBottom: "var(--sp-32)" }}>
-      <SectionHeader title={t("settings.account.title")} desc={t("settings.account.desc")} />
-      <div className="card" style={{ padding: "var(--sp-20)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--sp-16)", marginBottom: "var(--sp-16)" }}>
-          <Field label={t("settings.account.fullName")} value={fullName} onChange={setFullName} />
-          <Field label={t("settings.account.email")} value={email} onChange={setEmail} type="email" />
-        </div>
-
-        <div
-          className="row"
-          style={{
-            paddingTop: "var(--sp-16)",
-            borderTop: "1px solid var(--hairline)",
-            alignItems: "center",
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>{t("settings.account.password")}</div>
-            <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
-              {t("settings.account.passwordHint")}
-            </div>
-          </div>
-          <button className="btn sm">{t("settings.account.changePassword")}</button>
-        </div>
-      </div>
-
-      <div
-        className="card"
-        style={{
-          padding: "var(--sp-20)",
-          marginTop: "var(--sp-16)",
-          borderColor: "var(--danger)",
-        }}
-      >
-        <div className="row" style={{ alignItems: "center" }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600, color: "var(--danger)" }}>
-              {t("settings.account.signOut")}
-            </div>
-            <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
-              {t("settings.account.signOutDesc")}
-            </div>
-          </div>
-          <button
-            className="btn sm"
-            style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
-          >
-            {t("settings.account.signOut")}
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function SectionHeader({ title, desc }: { title: string; desc: string }) {
   return (

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 import { randomUUID } from "crypto";
 import fs from "fs/promises";
 import path from "path";
@@ -60,6 +61,12 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
+  // An employee may only withdraw consent for their own twin (the RBAC table
+  // already limits them to it); deleting for other reasons is an admin act.
+  const me = sessionUserFromHeaders(req.headers);
+  if (me?.role === "employee" && new URL(req.url).searchParams.get("reason") !== "consent_revoked") {
+    return NextResponse.json({ error: "forbidden", message: "You can withdraw consent for your own twin." }, { status: 403 });
+  }
   const located = employeeDir(id, "delete");
   if (located instanceof NextResponse) return located;
 
