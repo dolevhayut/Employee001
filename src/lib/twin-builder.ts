@@ -18,6 +18,8 @@ import {
 import { loadOrgCustomMcpServers } from "@/lib/custom-mcp";
 import { dataDir } from "@/lib/app-home";
 import { classifyTool, isReadOnlyAction } from "@/lib/tool-policy";
+import { filterProfilingContent, type FilterResult } from "@/lib/sensitive-content";
+import { appendAuditEntry } from "@/lib/audit-log";
 import {
   newBuildId,
   recordBuild,
@@ -184,10 +186,15 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
         onEvent({ type: "file_blocked", filename, reason, ts: ts() });
         return { behavior: "deny", message: reason };
       }
-      const body =
-        typeof typedInput.content === "string"
-          ? (typedInput.content as string)
-          : "";
+      // Profiling bans are enforced here, not only in the prompt: lines with
+      // special-category data, performance/loyalty judgments or work-hour
+      // patterns never reach the profile file.
+      const filtered = filterProfilingContent(
+        typeof typedInput.content === "string" ? (typedInput.content as string) : "",
+        filename,
+      );
+      const body = filtered.text;
+      if (filtered.removed.length) auditProfilingFilter(employee, buildId, filename, filtered.removed);
 
       // Snapshot whatever's at root for this filename BEFORE the SDK
       // overwrites it, so the previous version is recoverable. Best-effort.
@@ -209,7 +216,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
       // Force absolute path so the SDK writes exactly where we expect.
       return {
         behavior: "allow",
-        updatedInput: { ...typedInput, file_path: abs },
+        updatedInput: { ...typedInput, file_path: abs, content: body },
       };
     }
 
@@ -520,6 +527,10 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
     }
   }
 
+  // Backstop: scrub every profile file once more after the run (covers files
+  // written before this build, e.g. by the onboarding form).
+  scrubProfileFiles(employee, employeeDir, buildId);
+
   // Record the build manifest if anything was actually produced. Even if zero
   // new files were written this run (e.g. agent gave up), we still record
   // the manifest as long as some files exist at root — otherwise the build is
@@ -767,4 +778,40 @@ After writing each file, in 1–2 sentences state: which file you finished, whic
 
 \`Twin profile complete: 9/9 files written.\`
 `;
+}
+
+/** Audit what the profiling filter removed: categories and counts only,
+ *  never the removed text itself. */
+function auditProfilingFilter(
+  employee: { id: string; name: string },
+  buildId: string,
+  filename: string,
+  removed: FilterResult["removed"],
+): void {
+  const byCategory: Record<string, number> = {};
+  for (const r of removed) byCategory[r.category] = (byCategory[r.category] ?? 0) + 1;
+  appendAuditEntry({
+    runId: buildId,
+    employeeId: employee.id,
+    employeeName: employee.name,
+    toolName: "profilingFilter",
+    bareName: "profilingFilter",
+    input: { filename, removedLines: removed.length, byCategory },
+    verdict: "hard_blocked",
+    blockReason: "Profiling content removed from a twin profile file.",
+  });
+}
+
+function scrubProfileFiles(employee: { id: string; name: string }, employeeDir: string, buildId: string): void {
+  for (const name of TWIN_FILE_NAMES) {
+    const file = path.join(employeeDir, name);
+    try {
+      const { text, removed } = filterProfilingContent(fs.readFileSync(file, "utf8"), name);
+      if (!removed.length) continue;
+      fs.writeFileSync(file, text, "utf8");
+      auditProfilingFilter(employee, buildId, name, removed);
+    } catch {
+      /* file not written */
+    }
+  }
 }
