@@ -13,6 +13,7 @@ import { TWIN_HARD_DISALLOWED, TWIN_MODEL_PRIMARY, buildBaseOptions, buildTwinHo
 import { listCustomMcp, loadOrgCustomMcpServers } from "@/lib/custom-mcp";
 import { selectOrgBrainNodesForRun } from "@/lib/org-brain";
 import { classifyTool } from "@/lib/tool-policy";
+import { loadReadAllowlist } from "@/lib/read-allowlist";
 import type { EmployeeWithTwin } from "@/lib/employees";
 
 // "Ask the company": the organization answers with ONE voice. Unlike a team
@@ -121,8 +122,9 @@ export async function briefFromSystems(question: string, emit: (e: SourceEvent) 
   emit({ type: "source_start", id: SYSTEMS_SOURCE, name: "Company systems", title });
 
   const runId = `org_systems_${Date.now()}`;
+  const readAllowlist = loadReadAllowlist();
   const canUseTool: CanUseTool = async (toolName, input) => {
-    const readable = toolName === "ToolSearch" || (toolName.startsWith("mcp__") && classifyTool(toolName, input as Record<string, unknown>).kind === "allow");
+    const readable = toolName === "ToolSearch" || (toolName.startsWith("mcp__") && classifyTool(toolName, input as Record<string, unknown>, undefined, { readAllowlist }).kind === "allow");
     return readable
       ? { behavior: "allow", updatedInput: input }
       : { behavior: "deny", message: "Read-only lookup: only read calls to the company's connected systems are allowed." };

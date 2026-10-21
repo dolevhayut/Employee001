@@ -45,8 +45,9 @@ describe("toolkits", () => {
 });
 
 describe("acting on the employee's behalf", () => {
+  const allowlist = { servers: [], composioToolkits: ["gmail"], webSearch: false, webOverrides: false };
   const decide = (tool: string, scopes: ConsentScope[]) =>
-    applyConsent(classifyTool(tool, { to: "a@b.c" }), tool, recorded(...scopes));
+    applyConsent(classifyTool(tool, { to: "a@b.c" }, undefined, { readAllowlist: allowlist }), tool, recorded(...scopes));
 
   it("refuses actions through the employee's accounts without third-party-actions", () => {
     expect(decide(SEND, BASE)).toMatchObject({ kind: "block" });

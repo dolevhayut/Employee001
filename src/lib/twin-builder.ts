@@ -17,7 +17,7 @@ import {
 } from "@/lib/composio-client";
 import { loadOrgCustomMcpServers } from "@/lib/custom-mcp";
 import { dataDir } from "@/lib/app-home";
-import { classifyTool } from "@/lib/tool-policy";
+import { classifyTool, isReadOnlyAction } from "@/lib/tool-policy";
 import {
   newBuildId,
   recordBuild,
@@ -217,9 +217,12 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
       return { behavior: "allow", updatedInput: typedInput };
     }
 
-    // Composio + org MCP — only allow read-only patterns.
+    // Composio + org MCP: read-only actions only. Training reads the
+    // employee's own connected tools, which their recorded consent
+    // ("data-collection" + "integrations", checked before a build starts)
+    // covers, so the admin's read allowlist for twin runs doesn't apply here.
     const decision = classifyTool(toolName, typedInput);
-    if (decision.kind === "allow") {
+    if (decision.kind !== "block" && isReadOnlyAction(toolName)) {
       return { behavior: "allow", updatedInput: typedInput };
     }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyTool, describeTool } from "./tool-policy";
+import { isReadOnlyAction, classifyTool, describeTool, type ReadAllowlist } from "./tool-policy";
+
+const NONE: ReadAllowlist = { servers: [], composioToolkits: [], webSearch: false, webOverrides: false };
 
 describe("classifyTool", () => {
   it("guarantees every destructive Composio pattern is blocked before any other rule", () => {
@@ -70,7 +72,7 @@ describe("classifyTool", () => {
     })).toEqual({ kind: "allow" });
   });
 
-  it("guarantees read-only action verbs are allowed regardless of casing", () => {
+  it("recognises read-only action verbs regardless of casing", () => {
     for (const name of [
       "GITHUB_GET_ISSUE",
       "github_list_repositories",
@@ -80,7 +82,11 @@ describe("classifyTool", () => {
       "SLACK_READ_THREAD",
       "LINEAR_FIND_ISSUE",
     ]) {
-      expect(classifyTool(name, {})).toEqual({ kind: "allow" });
+      expect(isReadOnlyAction(name), name).toBe(true);
+      // Allowlisted toolkit: runs. Not allowlisted: asks, never runs silently.
+      const toolkit = name.split("_")[0].toLowerCase();
+      expect(classifyTool(name, {}, undefined, { readAllowlist: { ...NONE, composioToolkits: [toolkit] } })).toEqual({ kind: "allow" });
+      expect(classifyTool(name, {}).kind, name).toBe("ask");
     }
   });
 
@@ -94,15 +100,21 @@ describe("classifyTool", () => {
     expect(classifyTool("GMAIL_FIND_AND_DELETE_EMAIL", {}).kind).not.toBe("allow");
   });
 
-  it("still allows plain reads that carry no destructive term", () => {
-    expect(classifyTool("IDENTITY_LIST_USERS", {})).toEqual({ kind: "allow" });
+  it("still allows plain reads that carry no destructive term from an allowlisted toolkit", () => {
+    expect(classifyTool("IDENTITY_LIST_USERS", {}, undefined, { readAllowlist: { ...NONE, composioToolkits: ["identity"] } })).toEqual({ kind: "allow" });
   });
 
-  it("guarantees MCP-prefixed read-only actions are allowed", () => {
-    expect(classifyTool("mcp__composio__GITHUB_GET_ISSUE", {})).toEqual({ kind: "allow" });
-    expect(classifyTool("mcp__COMPOSIO__github_list_repositories", {})).toEqual({
-      kind: "allow",
-    });
+  it("allows MCP-prefixed reads only from an allowlisted Composio toolkit", () => {
+    const ctx = { readAllowlist: { ...NONE, composioToolkits: ["github"] } };
+    expect(classifyTool("mcp__composio__GITHUB_GET_ISSUE", {}, undefined, ctx)).toEqual({ kind: "allow" });
+    expect(classifyTool("mcp__COMPOSIO__github_list_repositories", {}, undefined, ctx)).toEqual({ kind: "allow" });
+    const ask = classifyTool("mcp__composio__GMAIL_FETCH_EMAILS", {}, undefined, ctx);
+    expect(ask).toMatchObject({ kind: "ask" });
+    expect(ask.kind === "ask" && ask.reason).toContain("Composio");
+  });
+
+  it("always allows internal scoped reads", () => {
+    expect(classifyTool("mcp__org_brain__search_org_brain", {})).toEqual({ kind: "allow" });
   });
 
   it("guarantees all explicitly local safe tools are allowed", () => {
@@ -111,7 +123,6 @@ describe("classifyTool", () => {
       "Glob",
       "Grep",
       "Write",
-      "WebSearch",
       "ToolSearch",
       "TodoWrite",
       "StructuredOutput",
@@ -197,18 +208,28 @@ describe("WebFetch gate", () => {
     expect(decision.kind === "ask" && decision.reason).toContain("attacker.example");
   });
 
-  it("lets a per-employee override re-allow WebFetch", () => {
-    expect(classifyTool("WebFetch", { url: "https://example.com" }, { WebFetch: "allow" })).toEqual({
-      kind: "allow",
-    });
+  it("ignores a per-employee allow for WebFetch/WebSearch unless the admin enabled web overrides", () => {
+    expect(classifyTool("WebFetch", { url: "https://example.com" }, { WebFetch: "allow" }).kind).toBe("ask");
+    expect(classifyTool("WebSearch", { query: "x" }, { WebSearch: "allow" }).kind).toBe("ask");
+    const admin = { readAllowlist: { ...NONE, webOverrides: true } };
+    expect(classifyTool("WebFetch", { url: "https://example.com" }, { WebFetch: "allow" }, admin)).toEqual({ kind: "allow" });
+  });
+
+  it("asks before a web search unless the admin enabled it", () => {
+    const decision = classifyTool("WebSearch", { query: "acme layoffs" });
+    expect(decision.kind === "ask" && decision.reason).toContain("acme layoffs");
+    expect(classifyTool("WebSearch", {}, undefined, { readAllowlist: { ...NONE, webSearch: true } })).toEqual({ kind: "allow" });
   });
 });
 
 describe("read-only detection", () => {
-  it("auto-allows MCP-style reads that start with the verb", () => {
-    for (const name of ["mcp__companysim__get_company", "mcp__companysim__find_projects", "list_tickets"]) {
-      expect(classifyTool(name, {}), name).toEqual({ kind: "allow" });
+  it("auto-allows MCP-style reads only from an allowlisted org server", () => {
+    const ctx = { readAllowlist: { ...NONE, servers: ["companysim"] } };
+    for (const name of ["mcp__companysim__get_company", "mcp__companysim__find_projects"]) {
+      expect(classifyTool(name, {}, undefined, ctx), name).toEqual({ kind: "allow" });
+      expect(classifyTool(name, {}).kind, name).toBe("ask");
     }
+    expect(classifyTool("mcp__other__get_company", {}, undefined, ctx).kind).toBe("ask");
   });
 
   it("never auto-allows a name that also mutates", () => {

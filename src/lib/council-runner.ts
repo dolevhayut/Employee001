@@ -58,6 +58,7 @@ import { buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
 import { getToolPolicyOverrides } from "@/lib/tool-policy-overrides";
 import { applyConsent } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
+import { loadReadAllowlist } from "@/lib/read-allowlist";
 import { withOutboundDisclosure } from "@/lib/ai-disclosure";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
@@ -664,10 +665,10 @@ export function buildToolConfig(options: RunOptions): {
     };
   }
   return {
-    // allowedTools are auto-approved and skip canUseTool. WebFetch stays
-    // available but is left out so every fetch goes through the tool policy
-    // (a URL can carry data out).
-    allowedTools: ["TodoWrite", "AskUserQuestion", "Read", "Glob", "Grep", "Write", "WebSearch", "Task"],
+    // allowedTools are auto-approved and skip canUseTool. WebFetch and
+    // WebSearch stay available but are left out so every query goes through
+    // the tool policy and the admin's read allowlist (it carries data out).
+    allowedTools: ["TodoWrite", "AskUserQuestion", "Read", "Glob", "Grep", "Write", "Task"],
     agents: buildTwinAgentDefinitions(),
   };
 }
@@ -1045,12 +1046,13 @@ export async function runSingleTwin(
     // Tool-policy gate: pause the agent when a write/external tool fires
     const policyOverrides = await getToolPolicyOverrides(employee.id).catch(() => undefined);
     const consent = loadConsentStatus(employee.id);
+    const readAllowlist = loadReadAllowlist();
     const canUseTool: CanUseTool = async (
       toolName,
       input
     ): Promise<PermissionResult> => {
       const typedInput = (input as Record<string, unknown>) ?? {};
-      const decision = applyConsent(classifyTool(toolName, typedInput, policyOverrides), toolName, consent);
+      const decision = applyConsent(classifyTool(toolName, typedInput, policyOverrides, { readAllowlist }), toolName, consent);
       const bare = toolName.replace(/^mcp__[a-z0-9_]+__/i, "");
 
       if (publicReply) {
