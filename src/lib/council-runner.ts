@@ -1410,7 +1410,10 @@ export async function runSingleTwin(
         if (isErr && !finalText) {
           const errs = (message as { errors?: string[] }).errors ?? [];
           const apiStatus = (message as { api_error_status?: number | null }).api_error_status;
-          const detail = errs.join("; ") || (apiStatus ? `API error ${apiStatus}` : "Anthropic API error");
+          // The SDK puts the API's own message in `result` (e.g. "You have
+          // reached your specified API usage limits…"); show that, not a bare code.
+          const apiText = (message as { result?: string }).result?.replace(/^API Error:\s*/i, "").trim();
+          const detail = errs.join("; ") || apiText || (apiStatus ? `API error ${apiStatus}` : "Anthropic API error");
           throw new Error(`anthropic_unavailable: ${detail}`);
         }
       }
