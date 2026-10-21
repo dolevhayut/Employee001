@@ -169,6 +169,21 @@ describe("purgeEmployee", () => {
     expect(audit.verifyAuditChain()).toMatchObject({ ok: true });
   });
 
+  it("removes only the employee's lines from the legacy debug log", async () => {
+    write(`employees/${ME}/employee.json`, JSON.stringify({ name: "Noa Friedman" }));
+    write("council-debug.log", "q for noa-friedman\nNoa Friedman said x\nitai-cohen answered\n");
+    const { purgeEmployee } = await import("./employee-purge");
+    await purgeEmployee(ME);
+    expect(read("council-debug.log")).toBe("itai-cohen answered\n");
+  });
+
+  it("drops the legacy debug log when nothing else is left in it", async () => {
+    write("council-debug.log", "q for noa-friedman\n");
+    const { purgeEmployee } = await import("./employee-purge");
+    await purgeEmployee(ME);
+    expect(exists("council-debug.log")).toBe(false);
+  });
+
   it("refuses ids that could escape the data folder", async () => {
     const { purgeEmployee } = await import("./employee-purge");
     await expect(purgeEmployee("../etc")).rejects.toThrow();

@@ -6,6 +6,9 @@ export async function register(): Promise<void> {
     return;
   }
 
+  const { removeLegacyDebugLog } = await import("@/lib/legacy-cleanup");
+  removeLegacyDebugLog();
+
   const { ensureSchedulerStarted } = await import("@/lib/routine-scheduler");
   ensureSchedulerStarted();
 }

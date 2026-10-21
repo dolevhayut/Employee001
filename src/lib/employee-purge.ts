@@ -177,6 +177,39 @@ function relayRunBelongs(dir: string, id: string): boolean {
   }
 }
 
+function employeeNameFor(id: string): string | undefined {
+  try {
+    const sidecar = JSON.parse(fs.readFileSync(dataDir("employees", id, "employee.json"), "utf8")) as { name?: unknown };
+    return typeof sidecar.name === "string" && sidecar.name.trim() ? sidecar.name.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Matches text that names the employee: their id or full name, whole-word. */
+export function mentionsOf(id: string, name?: string): RegExp {
+  const terms = [id, ...(name ? [name] : [])].map(escapeRegExp);
+  return new RegExp(`(?<![\\w-])(?:${terms.join("|")})(?![\\w-])`, "i");
+}
+
+/** Drop lines of a plain-text file that match; delete the file if none remain. */
+function filterTextLines(target: string, abs: string, match: RegExp): PurgeStep {
+  try {
+    if (!fs.existsSync(abs)) return { target, status: "absent" };
+    const lines = fs.readFileSync(abs, "utf8").split("\n").filter(Boolean);
+    const keep = lines.filter((line) => !match.test(line));
+    const count = lines.length - keep.length;
+    if (!keep.length) {
+      fs.rmSync(abs, { force: true });
+      return { target, status: count ? "removed" : "absent", count };
+    }
+    if (count) writeAtomic(abs, keep.join("\n") + "\n");
+    return { target, status: count ? "filtered" : "absent", count };
+  } catch (err) {
+    return { target, status: "error", error: message(err) };
+  }
+}
+
 function runIdsFor(id: string): Set<string> {
   const ids = new Set<string>();
   try {
@@ -196,6 +229,9 @@ function runIdsFor(id: string): Set<string> {
 /** Every on-disk location, except Composio and the audit log (handled apart). */
 export function purgeLocalData(id: string): PurgeStep[] {
   if (!isPurgeableId(id)) throw new Error(`Refusing to purge invalid id "${id}"`);
+  // Read the name before employees/<id> is removed: free-text stores mention
+  // people by name, not id.
+  const name = employeeNameFor(id);
   // Routine (rt_…) and work-item (wirun_…) run ids don't contain the employee
   // id, so collect this employee's run ids from task history first.
   const runIds = runIdsFor(id);
@@ -243,9 +279,10 @@ export function purgeLocalData(id: string): PurgeStep[] {
     editJson("slack-poll.json", dataDir("slack-poll.json"), dropFromRecord(id)),
     editJson("slack-reply-rate.json", dataDir("slack-reply-rate.json"), dropKeysWithPrefix(`${id}:`)),
     editJson("org/skill-assignments.json", dataDir("org", "skill-assignments.json"), dropFromAssignments(id)),
-    // Legacy meeting debug log (CEO questions + names, no retention). The app
-    // no longer writes it; remove it rather than edit free text.
-    removePath("council-debug.log", dataDir("council-debug.log")),
+    // Legacy meeting debug log (CEO questions + names). The app no longer
+    // writes it and startup deletes it (legacy-cleanup.ts); if one survives,
+    // drop only this employee's lines, never colleagues' entries.
+    filterTextLines("council-debug.log", dataDir("council-debug.log"), mentionsOf(id, name)),
   );
   return steps;
 }
