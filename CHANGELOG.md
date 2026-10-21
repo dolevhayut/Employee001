@@ -8,6 +8,72 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Compliance and security
+A pass against the EU AI Act, GDPR and our own security review. Details in
+SECURITY.md and docs/fixes/2026-10-compliance-plan.md.
+
+**Upgrade notes (behavior changes):**
+- **Consent is now deny-by-default.** A twin whose employee never recorded
+  consent can't be trained, gets none of their tools or meeting transcripts
+  and can't act for them. On first start, existing twins without consent are
+  marked and a banner links to each re-consent invite. The bundled demo twins
+  are exempt (`"synthetic": true`).
+- **Reads that leave the machine now ask** unless an admin allowlisted the
+  source (Settings, `/api/org/read-allowlist`). The allowlist is seeded with
+  what you had already connected; web search now asks unless turned on.
+- **Slack auto-replies need the admin's allowlist** of members and channels.
+- On an exposed bind, `EMPLOYEE001_TOKEN` no longer opens the app: it only
+  unlocks creating the first owner account (and remains the MCP bearer).
+
+**AI disclosure and approvals**
+- Every Slack message and email a twin sends starts with "🤖 AI twin of
+  <name>:", added after any human edit (EU AI Act Art. 50). With
+  `SLACK_BOT_TOKEN` replies post as the org's bot, not the employee.
+- Slack auto-replies go only to allowlisted org members in DMs or allowlisted
+  channels, never for a request to act, and are drafted with no tools, no
+  memory and only the non-confidential profile files.
+- Audit rows record who approved (`approvedBy`, `approvalChannel`), who asked
+  (`requesterId`) and the organization (`tenantId`).
+
+**Accounts, roles and sessions**
+- Real accounts with roles: owner, admin, approver, member, employee (sees
+  only their own twin, can withdraw consent). Enforced on every API route
+  from one table; unknown routes are denied.
+- Sign-in with password, TOTP two-factor, or single sign-on (OpenID Connect
+  with PKCE). SAML is not supported yet.
+- Sessions are signed random ids (no secret in the cookie), 12 hours at most,
+  rotated every 30 minutes and on sign-in, MFA and role changes. Failed
+  sign-ins are rate limited.
+- Webhooks reject stale timestamps and replayed delivery ids.
+
+**Consent and deletion**
+- Consent evidence in the audit chain: who, when, the consent text's SHA-256,
+  scopes, IP, user agent.
+- Deleting a twin also clears it from live meetings, replaces mentions in
+  other twins' memory and profiles and in the org brain, and pseudonymizes
+  its id in the audit log.
+
+**What twins keep**
+- Profile files and memory are filtered in code for special-category data,
+  performance or loyalty judgments and work-hour patterns. Memory also
+  redacts emails, phones, national ids, IBANs and cards
+  (`EMPLOYEE001_MEMORY_REDACT`).
+- The model process only gets the environment variables it needs.
+- Read scope is enforced and tested for every run type.
+
+**Data residency**
+- `EMPLOYEE001_REGION=eu`: Claude only via Bedrock eu-*, Vertex europe-* or a
+  local model; embeddings only to `EMBEDDINGS_BASE_URL`; voice off unless
+  `ELEVENLABS_BASE_URL` is the EU endpoint. `EMPLOYEE001_VOICE=off` anywhere.
+- Startup warns when Composio zero data retention isn't confirmed
+  (`COMPOSIO_ZERO_DATA_RETENTION=1`).
+- SECURITY.md lists every subprocessor with region and what reaches it.
+
+**Audit**
+- `GET /api/audit/export` and `npx employee001 audit verify [file]`.
+- Debug logs never go to disk; the old `council-debug.log` is deleted on
+  start, and a test fails if a writer comes back.
+
 ## [0.7.0] — 2026-10-21
 
 ### Three ways to work with your company

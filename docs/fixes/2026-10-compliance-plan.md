@@ -85,3 +85,13 @@ Method: one small commit per item, a failing test before each fix, and `npm test
 - **Q2 SAML.** Safe SAML needs a vetted XML-signature library, and hand-rolling it invites signature-wrapping bugs. Should we add `@node-saml/node-saml` (≥7 days old) or ship OIDC now and SAML later?
 - **Q3 Disclosure form.** Should we use a text prefix (works with today's per-employee user token) or a Slack bot identity (needs a Slack app and a bot token per workspace)?
 - **Q4 "Entitled to the data".** No org access-rule model exists. The proposal is that the auto-reply allowlist is the rule, and auto-replies use only the twin's non-confidential profile files and no tools.
+
+## Status (2026-10-21)
+
+All 20 plan steps are implemented on `main`; see the CHANGELOG `[Unreleased]` entry. The test suite grew from 343 to 462 tests. Deferred or partial:
+
+- **SAML**: not built (decision Q2). OIDC covers Google Workspace, Entra ID, Okta, Auth0 and Keycloak.
+- **Data classification**: auto-replies use a fixed list of non-confidential profile files (decision Q4), not a full access model.
+- **Composio user id**: still `employee:<slug>`, so it is name-derived. Changing it needs every connection re-made, so it is a follow-up.
+- **First-name mentions**: deletion redacts id and full name only.
+- **Tenancy**: `tenantId` is one value per install (`EMPLOYEE001_TENANT_ID`). This is not multi-tenant isolation.
