@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { elevenLabsBase, voiceEnabled } from "@/lib/data-residency";
 import { fetchSpeech } from "@/lib/tts-model";
 
 const MAX_CHARS = 5000;
@@ -24,6 +25,9 @@ function stripMarkdown(md: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  if (!voiceEnabled()) {
+    return Response.json({ error: "voice_disabled", message: "Voice is off on this install (EMPLOYEE001_VOICE=off, or EU region without an EU ElevenLabs endpoint)." }, { status: 403 });
+  }
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     return Response.json({ error: "ELEVENLABS_API_KEY is not configured" }, { status: 500 });
@@ -39,7 +43,7 @@ export async function POST(request: NextRequest) {
   const voiceId = body.voiceId ?? process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID;
 
   // Model: eleven_v4 by default (see lib/tts-model.ts), with a fallback.
-  const res = await fetchSpeech(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, apiKey, text);
+  const res = await fetchSpeech(`${elevenLabsBase()}/v1/text-to-speech/${voiceId}`, apiKey, text);
 
   if (!res.ok) {
     const errBody = await res.text();

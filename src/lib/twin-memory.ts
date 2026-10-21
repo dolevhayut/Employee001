@@ -1,4 +1,5 @@
 import fs from "fs";
+import { embeddingsEndpoint } from "@/lib/data-residency";
 import path from "path";
 import { randomUUID } from "crypto";
 import { TWIN_MODEL_FALLBACK, TWIN_MODEL_HAIKU } from "@/lib/sdk-defaults";
@@ -414,7 +415,10 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 async function createEmbedding(input: string, employeeId: string): Promise<number[] | null> {
-  if (!process.env.OPENAI_API_KEY) return null;
+  // api.openai.com by default; EMBEDDINGS_BASE_URL for an EU or local
+  // OpenAI-compatible endpoint; none in EU mode without one.
+  const endpoint = embeddingsEndpoint();
+  if (!endpoint) return null;
 
   const model = process.env.TWIN_MEMORY_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
   const dimensions = Number.parseInt(
@@ -433,11 +437,11 @@ async function createEmbedding(input: string, employeeId: string): Promise<numbe
   }
 
   try {
-    const response = await fetch("https://api.openai.com/v1/embeddings", {
+    const response = await fetch(endpoint.url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        ...(endpoint.key ? { Authorization: `Bearer ${endpoint.key}` } : {}),
       },
       body: JSON.stringify(body),
     });

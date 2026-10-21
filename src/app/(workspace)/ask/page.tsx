@@ -439,6 +439,9 @@ export default function AskPage() {
   const [busy, setBusy] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceReady, setVoiceReady] = useState(false);
+  // Voice off on this install (EMPLOYEE001_VOICE=off or EU mode): no browser
+  // speech recognition either.
+  const [voiceAllowed, setVoiceAllowed] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const turnSeq = useRef(0);
@@ -468,7 +471,10 @@ export default function AskPage() {
   useEffect(() => {
     fetch("/api/system/config")
       .then((r) => r.json())
-      .then((c: { elevenLabs?: boolean }) => setVoiceReady(Boolean(c.elevenLabs)))
+      .then((c: { voice?: boolean; voiceAllowed?: boolean }) => {
+        setVoiceReady(Boolean(c.voice));
+        setVoiceAllowed(Boolean(c.voiceAllowed));
+      })
       .catch(() => setVoiceReady(false));
   }, []);
 
@@ -722,6 +728,7 @@ export default function AskPage() {
   // the mode) exactly as if it had been typed into the orb.
   const voice = useVoiceInput({
     serverStt: voiceReady,
+    allowBrowser: voiceAllowed,
     lang: bcp47(locale),
     onTranscript: (text) => {
       viaVoiceRef.current = true;

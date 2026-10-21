@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { elevenLabsBase, voiceEnabled } from "@/lib/data-residency";
 import {
   STT_ERROR_STATUS,
   STT_FORM_OVERHEAD,
@@ -18,9 +19,12 @@ import {
 
 export const runtime = "nodejs";
 
-const UPSTREAM = "https://api.elevenlabs.io/v1/speech-to-text";
+const upstreamUrl = () => `${elevenLabsBase()}/v1/speech-to-text`;
 
 export async function POST(request: NextRequest) {
+  if (!voiceEnabled()) {
+    return Response.json({ error: "voice_disabled", message: "Voice is off on this install (EMPLOYEE001_VOICE=off, or EU region without an EU ElevenLabs endpoint)." }, { status: 403 });
+  }
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     return Response.json({ error: "ELEVENLABS_API_KEY is not configured" }, { status: 500 });
@@ -64,7 +68,7 @@ export async function POST(request: NextRequest) {
   let upstream: Response;
   try {
     // Give up after 30s, or as soon as the browser hangs up.
-    upstream = await fetch(UPSTREAM, {
+    upstream = await fetch(upstreamUrl(), {
       method: "POST",
       headers: { "xi-api-key": apiKey },
       body: upstreamForm,

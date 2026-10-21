@@ -119,6 +119,8 @@ function startMeter(
 export function useVoiceInput(opts: {
   /** True when the server has an ElevenLabs key (POST /api/stt works). */
   serverStt: boolean;
+  /** False when voice is off on this install: no browser fallback either. */
+  allowBrowser?: boolean;
   /** BCP-47 tag for the browser fallback (e.g. "he-IL"). */
   lang: string;
   onTranscript: (text: string) => void;
@@ -126,7 +128,11 @@ export function useVoiceInput(opts: {
 }) {
   const support = useSyncExternalStore(noop, supportSnapshot, () => "");
   const engine: VoiceEngine =
-    opts.serverStt && support.includes("r") ? "elevenlabs" : support.includes("s") ? "browser" : "none";
+    opts.serverStt && support.includes("r")
+      ? "elevenlabs"
+      : opts.allowBrowser !== false && support.includes("s")
+        ? "browser"
+        : "none";
 
   const [state, setState] = useState<VoiceInputState>("idle");
   const [interim, setInterim] = useState("");

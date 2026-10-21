@@ -11,6 +11,9 @@ export async function register(): Promise<void> {
   const { markTwinsConsentRequired } = await import("@/lib/consent-migration");
   markTwinsConsentRequired();
 
+  const { residencyWarnings } = await import("@/lib/data-residency");
+  for (const warning of residencyWarnings()) console.warn(`[employee001] ${warning}`);
+
   const { ensureSchedulerStarted } = await import("@/lib/routine-scheduler");
   ensureSchedulerStarted();
 }

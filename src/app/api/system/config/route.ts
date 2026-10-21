@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { voiceAllowed, voiceEnabled } from "@/lib/data-residency";
 import fs from "fs";
 import { envFilePath } from "@/lib/app-home";
 import { KEYCHAIN_PLACEHOLDER, readKeychainSecret, storeKeychainSecret, type SecretName } from "@/lib/keychain";
@@ -15,6 +16,10 @@ export type SystemConfigStatus = {
   anthropic: boolean;
   composio: boolean;
   elevenLabs: boolean;
+  /** Server voice (ElevenLabs TTS/STT) is on and configured. */
+  voice: boolean;
+  /** Any voice, the browser's speech-recognition fallback included. */
+  voiceAllowed: boolean;
   /** True iff every *required* key is set. The UI uses this to flip the
    *  Invite button between active and disabled. */
   ready: boolean;
@@ -31,7 +36,7 @@ export async function GET() {
   const composio = Boolean(process.env.COMPOSIO_API_KEY);
   const elevenLabs = Boolean(process.env.ELEVENLABS_API_KEY);
   const ready = anthropic && composio;
-  const body: SystemConfigStatus = { anthropic, composio, elevenLabs, ready };
+  const body: SystemConfigStatus = { anthropic, composio, elevenLabs, voice: voiceEnabled(), voiceAllowed: voiceAllowed(), ready };
   return NextResponse.json(body, {
     headers: { "Cache-Control": "no-store" },
   });

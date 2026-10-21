@@ -1,4 +1,5 @@
 import "server-only";
+import { euRegion, modelResidencyProblem } from "./data-residency";
 
 export const MODEL_PROVIDERS = ["anthropic", "bedrock", "vertex", "foundry", "local"] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
@@ -15,11 +16,15 @@ export function currentProvider(env: Env = process.env): ModelProvider {
 
 /** Direct SDK calls target api.anthropic.com, so boundary mode requires an explicit opt-in. */
 export function directAnthropicAllowed(env: Env = process.env): boolean {
+  // EU residency: the direct API processes in the US, so never.
+  if (euRegion(env)) return false;
   return currentProvider(env) === "anthropic" || env.EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC === "1";
 }
 
 /** Whether the selected model provider has the configuration required to run an Agent SDK call. */
 export function canRunModel(env: Env = process.env): { ok: true } | { ok: false; reason: string } {
+  const residency = modelResidencyProblem(env);
+  if (residency) return { ok: false, reason: residency };
   const required = (keys: string[]) => {
     const missing = keys.filter((key) => !env[key]?.trim());
     return missing.length ? { ok: false as const, reason: `${missing.join(", ")} is not configured` } : { ok: true as const };

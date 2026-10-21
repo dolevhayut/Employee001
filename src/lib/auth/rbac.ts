@@ -166,7 +166,7 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/org/mcp/oauth/callback": { GET: admin },
   "/api/org/read-allowlist": { GET: admin, PUT: admin },
   "/api/org/slack-autoreply": { GET: admin, PUT: admin },
-  "/api/system/config": { GET: admin, PATCH: admin },
+  "/api/system/config": { GET: member, PATCH: admin }, // GET: key presence booleans only
   "/api/ops-health": { GET: admin },
   "/api/audit": { GET: admin },
   "/api/audit/export": { GET: admin },

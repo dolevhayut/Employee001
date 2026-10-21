@@ -8,6 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useVoicePolicy } from "@/components/ex/voice/use-voice-policy";
 import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { ClarificationCard } from "@/components/ex/clarification-card";
@@ -696,11 +697,15 @@ function speechSupportedServerSnapshot(): boolean {
 function useVoiceMode(onTranscript: (text: string) => void, lang: string) {
   const [voiceState, setVoiceState] = useState<VoiceModeState>("idle");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const supported = useSyncExternalStore(
+  const { voiceAllowed } = useVoicePolicy();
+  const browserSupport = useSyncExternalStore(
     speechSupportedSubscribe,
     speechSupportedSnapshot,
     speechSupportedServerSnapshot,
   );
+  // Browser recognition sends audio to the browser vendor: only when voice
+  // is allowed on this install.
+  const supported = browserSupport && voiceAllowed;
 
   const start = useCallback(() => {
     if (!supported || typeof window === "undefined") return;
