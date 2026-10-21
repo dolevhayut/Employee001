@@ -34,6 +34,8 @@ describe("consent migration", () => {
 
     const audit = fs.readFileSync(path.join(home, "data", "audit.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     expect(audit).toHaveLength(1);
-    expect(audit[0]).toMatchObject({ bareName: "consentMigration", input: { markedConsentRequired: ["legacy-one"] } });
+    expect(audit[0]).toMatchObject({ bareName: "consentMigration" });
+    // Pseudonyms, not name-derived slugs, so a later deletion leaves no trace.
+    expect(audit[0].input.markedConsentRequired).toEqual([expect.stringMatching(/^emp_[0-9a-f]{16}$/)]);
   });
 });

@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { dataDir } from "./app-home";
 import { appendAuditEntry } from "./audit-log";
+import { pseudonymFor } from "./audit-pseudonym";
 
 export type ConsentRequiredTwin = { id: string; name: string; since?: string };
 
@@ -46,7 +47,7 @@ export function markTwinsConsentRequired(now = new Date()): string[] {
       employeeName: "system",
       toolName: "consentMigration",
       bareName: "consentMigration",
-      input: { markedConsentRequired: marked, rule: "deny-by-default: no recorded consent, no training, tools, transcripts or actions" },
+      input: { markedConsentRequired: marked.map(pseudonymFor), rule: "deny-by-default: no recorded consent, no training, tools, transcripts or actions" },
       verdict: "executed",
     });
   }

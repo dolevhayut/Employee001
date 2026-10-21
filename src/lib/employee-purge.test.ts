@@ -184,6 +184,67 @@ describe("purgeEmployee", () => {
     expect(exists("council-debug.log")).toBe(false);
   });
 
+  it("replaces the employee id in audit rows with a stable keyed pseudonym", async () => {
+    const audit = await import("./audit-log");
+    audit.appendAuditEntry({ runId: "r", employeeId: ME, employeeName: "Noa", toolName: "Read", bareName: "Read", input: {}, verdict: "executed" });
+    const { purgeEmployee } = await import("./employee-purge");
+    const { pseudonymFor } = await import("./audit-pseudonym");
+    await purgeEmployee(ME);
+    const log = read("audit.jsonl");
+    expect(log).not.toContain(ME);
+    expect(log).toContain(pseudonymFor(ME));
+    expect(pseudonymFor(ME)).toBe(pseudonymFor(ME));
+    expect(audit.verifyAuditChain()).toMatchObject({ ok: true });
+  });
+
+  it("pins digest rows written before idDigest existed and still verifies", async () => {
+    const audit = await import("./audit-log");
+    audit.appendAuditEntry({ runId: "r", employeeId: ME, employeeName: "Noa", toolName: "Read", bareName: "Read", input: { a: 1 }, verdict: "executed" });
+    // Rewrite the row the way 0.7.0 wrote it: no idDigest, hash covers the id.
+    const row = JSON.parse(read("audit.jsonl").trim());
+    delete row.idDigest;
+    delete row.hash;
+    row.hash = audit.__auditTest.hashRow(row.prevHash, row);
+    write("audit.jsonl", JSON.stringify(row) + "\n");
+    vi.resetModules();
+    const fresh = await import("./audit-log");
+    expect(fresh.verifyAuditChain()).toMatchObject({ ok: true });
+    const { purgeEmployee } = await import("./employee-purge");
+    await purgeEmployee(ME);
+    expect(read("audit.jsonl")).not.toContain(ME);
+    expect(fresh.verifyAuditChain()).toMatchObject({ ok: true });
+  });
+
+  it("redacts mentions in other twins' memory, profiles and the org brain, and logs where", async () => {
+    write(`employees/${ME}/employee.json`, JSON.stringify({ name: "Noa Friedman" }));
+    write(`memory/${PEER}/cards.jsonl`, jsonl({ id: "c1", content: "Ask Noa Friedman about pricing", embedding: [0.1] }, { id: "c2", content: "unrelated", embedding: [0.2] }));
+    write(`employees/${PEER}/PEOPLE.md`, "- Noa Friedman (noa-friedman): owns pricing\n- Dana: design\n");
+    write("org-brain/nodes/pricing.md", "Owner: Noa Friedman\n");
+    const { purgeEmployee } = await import("./employee-purge");
+    const report = await purgeEmployee(ME);
+    const mem = read(`memory/${PEER}/cards.jsonl`).trim().split("\n").map((l) => JSON.parse(l));
+    expect(mem[0]).toEqual({ id: "c1", content: "Ask [former employee] about pricing" });
+    expect(mem[1].embedding).toEqual([0.2]);
+    expect(read(`employees/${PEER}/PEOPLE.md`)).toBe("- [former employee] ([former employee]): owns pricing\n- Dana: design\n");
+    expect(read("org-brain/nodes/pricing.md")).toBe("Owner: [former employee]\n");
+    expect(report.steps.find((s) => s.target === "org brain")).toMatchObject({ status: "filtered", count: 1 });
+    const tomb = read("audit.jsonl").trim().split("\n").map((l) => JSON.parse(l)).find((r) => r.bareName === "purgeEmployee");
+    expect(tomb.input.mentionsRedactedIn).toEqual(expect.arrayContaining(["org-brain/nodes/pricing.md", `employees/${PEER}/PEOPLE.md`]));
+  });
+
+  it("blanks the employee's turns and shared files in live meetings", async () => {
+    const meetings = await import("./meeting-store");
+    const m = meetings.createMeeting([ME, PEER]);
+    meetings.appendTurn(m.id, { kind: "twin", employeeId: ME, employeeName: "Noa", text: "my private view", ts: 1 });
+    meetings.appendTurn(m.id, { kind: "twin", employeeId: PEER, employeeName: "Itai", text: "agree", ts: 2 });
+    const { purgeEmployee } = await import("./employee-purge");
+    await purgeEmployee(ME);
+    const after = meetings.getMeeting(m.id)!;
+    expect(after.participantIds).toEqual([PEER]);
+    expect(JSON.stringify(after.transcript)).not.toContain("my private view");
+    expect(after.transcript[1]).toMatchObject({ text: "agree" });
+  });
+
   it("refuses ids that could escape the data folder", async () => {
     const { purgeEmployee } = await import("./employee-purge");
     await expect(purgeEmployee("../etc")).rejects.toThrow();

@@ -361,3 +361,34 @@ export function renderSharedFilesForPrompt(files: SharedFile[]): string {
   });
   return lines.join("\n");
 }
+
+/**
+ * Remove a deleted employee from live meetings: their turns are blanked
+ * (the meeting belongs to the company, so others' turns stay), they leave
+ * the participant list, and files they shared are deleted from disk.
+ */
+export function redactEmployeeFromMeetings(employeeId: string): { turns: number; files: number } {
+  let turns = 0;
+  let files = 0;
+  for (const m of meetings.values()) {
+    m.participantIds = m.participantIds.filter((id) => id !== employeeId);
+    m.transcript = m.transcript.map((t) => {
+      if (t.kind !== "twin") return t;
+      if (t.employeeId === employeeId) {
+        turns++;
+        return { ...t, employeeId: "[deleted]", employeeName: "[deleted]", text: "[removed: this employee's data was deleted]", delegatedFromId: t.delegatedFromId === employeeId ? undefined : t.delegatedFromId };
+      }
+      if (t.delegatedFromId === employeeId) return { ...t, delegatedFromId: undefined, delegatedFromName: "[deleted]" };
+      return t;
+    });
+    m.sharedFiles = m.sharedFiles.filter((f) => {
+      if (f.sharedById !== employeeId) return true;
+      try {
+        fs.rmSync(path.join(sharedDirFor(m.id), f.filename), { force: true });
+      } catch { /* already gone */ }
+      files++;
+      return false;
+    });
+  }
+  return { turns, files };
+}

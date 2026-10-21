@@ -14,6 +14,8 @@ import { listActiveRuns } from "./active-runs";
 import { appendAuditEntry, redactEmployeeAudit, type AuditRedaction } from "./audit-log";
 import { disconnectAllToolkits } from "./composio-client";
 import { withSidecarLock } from "./sidecar-lock";
+import { pseudonymFor } from "./audit-pseudonym";
+import { redactEmployeeFromMeetings } from "./meeting-store";
 
 export type PurgeStep = {
   target: string;
@@ -210,6 +212,100 @@ function filterTextLines(target: string, abs: string, match: RegExp): PurgeStep 
   }
 }
 
+const FORMER = "[former employee]";
+
+/** Replace mentions in every string of a JSON value; true if any changed. */
+function redactJsonStrings(value: unknown, match: RegExp): { value: unknown; changed: boolean } {
+  if (typeof value === "string") {
+    const next = value.replace(match, FORMER);
+    return { value: next, changed: next !== value };
+  }
+  if (Array.isArray(value)) {
+    let changed = false;
+    const out = value.map((v) => {
+      const r = redactJsonStrings(v, match);
+      changed ||= r.changed;
+      return r.value;
+    });
+    return { value: out, changed };
+  }
+  if (value && typeof value === "object") {
+    let changed = false;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      const r = redactJsonStrings(v, match);
+      changed ||= r.changed;
+      out[k] = r.value;
+    }
+    return { value: out, changed };
+  }
+  return { value, changed: false };
+}
+
+function filesUnder(dir: string, keep: (name: string) => boolean): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...filesUnder(abs, keep));
+    else if (keep(entry.name)) out.push(abs);
+  }
+  return out;
+}
+
+/**
+ * Other twins' memory and profile files and the org brain can mention the
+ * deleted employee by id or full name. Each mention becomes
+ * "[former employee]"; a changed memory row loses its embedding (it encoded
+ * the old text). Returns one step per store and the files touched.
+ */
+export function redactMentions(id: string, name: string | undefined): { steps: PurgeStep[]; files: string[] } {
+  const match = new RegExp(mentionsOf(id, name).source, "gi");
+  const touched: string[] = [];
+  const stores: Array<{ target: string; files: string[] }> = [
+    { target: "other twins' memory", files: filesUnder(dataDir("memory"), (n) => n.endsWith(".jsonl")) },
+    { target: "other twins' profile files", files: filesUnder(dataDir("employees"), (n) => /\.(md|txt)$/i.test(n)) },
+    { target: "org brain", files: filesUnder(dataDir("org-brain"), (n) => /\.(md|json|jsonl|txt)$/i.test(n)) },
+  ];
+  const steps = stores.map(({ target, files }): PurgeStep => {
+    try {
+      let count = 0;
+      for (const file of files) {
+        const raw = fs.readFileSync(file, "utf8");
+        if (!mentionsOf(id, name).test(raw)) continue;
+        let next: string;
+        if (file.endsWith(".jsonl")) {
+          next = raw.split("\n").map((line) => {
+            if (!line) return line;
+            try {
+              const r = redactJsonStrings(JSON.parse(line), match);
+              if (!r.changed) return line;
+              const row = r.value as Record<string, unknown>;
+              delete row.embedding;
+              return JSON.stringify(row);
+            } catch {
+              return line.replace(match, FORMER);
+            }
+          }).join("\n");
+        } else if (file.endsWith(".json")) {
+          next = JSON.stringify(redactJsonStrings(JSON.parse(raw), match).value, null, 2);
+        } else {
+          next = raw.replace(match, FORMER);
+        }
+        if (next !== raw) {
+          writeAtomic(file, next);
+          touched.push(path.relative(dataDir(), file));
+          count++;
+        }
+      }
+      return { target, status: count ? "filtered" : "absent", count };
+    } catch (err) {
+      return { target, status: "error", error: message(err) };
+    }
+  });
+  return { steps, files: touched };
+}
+
 function runIdsFor(id: string): Set<string> {
   const ids = new Set<string>();
   try {
@@ -323,14 +419,30 @@ export async function purgeEmployee(id: string, reason: PurgeReason = "deleted")
     steps.push({ target: "composio connections", status: "error", error: message(err) });
   }
 
+  // Read before employees/<id> is removed, for the mention search.
+  const name = employeeNameFor(id);
   await withSidecarLock(id, async () => {
     steps.push(...purgeLocalData(id));
   });
   steps.push(await unlinkGoals(id));
 
+  // Live meetings belong to the company: blank this employee's turns, drop
+  // their shared files.
+  try {
+    const { turns, files } = redactEmployeeFromMeetings(id);
+    steps.push({ target: "meetings", status: turns || files ? "filtered" : "absent", count: turns + files });
+  } catch (err) {
+    steps.push({ target: "meetings", status: "error", error: message(err) });
+  }
+
+  const mentions = redactMentions(id, name);
+  steps.push(...mentions.steps);
+
+  // The audit log keeps a keyed-hash pseudonym instead of the name-derived id.
+  const pseudonym = pseudonymFor(id);
   let redaction: AuditRedaction = { redactedIds: [], legacyPins: {} };
   try {
-    redaction = redactEmployeeAudit(id);
+    redaction = redactEmployeeAudit(id, pseudonym);
     const count = redaction.redactedIds.length;
     steps.push({ target: "audit log inputs", status: count ? "filtered" : "absent", count });
   } catch (err) {
@@ -343,7 +455,7 @@ export async function purgeEmployee(id: string, reason: PurgeReason = "deleted")
   // rows (verifyAuditChain fails on a redacted row no tombstone lists).
   const recorded = appendAuditEntry({
     runId: `purge-${Date.now()}`,
-    employeeId: id,
+    employeeId: pseudonym,
     employeeName: "[deleted]",
     toolName: "purgeEmployee",
     bareName: "purgeEmployee",
@@ -352,7 +464,9 @@ export async function purgeEmployee(id: string, reason: PurgeReason = "deleted")
       redactedIds: redaction.redactedIds,
       legacyPins: redaction.legacyPins,
       complete,
-      steps: steps.map(({ target, status, count }) => ({ target, status, count })),
+      // Targets name per-employee paths: keep the pseudonym, not the slug.
+      steps: steps.map(({ target, status, count }) => ({ target: target.split(id).join(pseudonym), status, count })),
+      mentionsRedactedIn: mentions.files,
     },
     verdict: "executed",
   });

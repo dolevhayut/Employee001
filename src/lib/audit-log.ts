@@ -92,6 +92,9 @@ export type AuditEntry = {
   inputDigest?: string;
   /** SHA-256 of employeeName, committed by the row hash the same way. */
   nameDigest?: string;
+  /** SHA-256 of employeeId, committed the same way, so a deleted employee's
+   *  id can be replaced by a pseudonym without breaking the chain. */
+  idDigest?: string;
   /** Who approved or denied (a user id, "policy:<name>" for an automatic
    *  policy decision). */
   approvedBy?: string;
@@ -165,7 +168,8 @@ function legacyPin(row: AuditEntry): string {
 }
 
 /** What the row hash covers. Digest rows leave out the redactable fields
- *  (input, employeeName); legacy rows are hashed whole. */
+ *  (input, employeeName, and employeeId when idDigest is set); legacy rows
+ *  are hashed whole. */
 function hashedPayload(row: Omit<AuditEntry, "hash">): Omit<AuditEntry, "hash"> {
   const payload = { ...row };
   delete payload.redacted;
@@ -173,6 +177,7 @@ function hashedPayload(row: Omit<AuditEntry, "hash">): Omit<AuditEntry, "hash"> 
     delete (payload as Partial<AuditEntry>).input;
     delete (payload as Partial<AuditEntry>).employeeName;
   }
+  if (payload.idDigest) delete (payload as Partial<AuditEntry>).employeeId;
   return payload;
 }
 
@@ -262,6 +267,7 @@ export function appendAuditEntry(
       ...entry,
       inputDigest: digestInput(entry.input ?? {}),
       nameDigest: digestName(entry.employeeName),
+      idDigest: digestName(entry.employeeId),
       prevHash: previous ?? "genesis",
     };
     const row: AuditEntry = {
@@ -398,10 +404,13 @@ export function verifyAuditChain(): AuditChainVerification {
       if (row.prevHash !== previous) {
         return { ok: false, checked, legacy, firstBadId: row.id, reason: "previous hash mismatch" };
       }
-      // A redacted legacy row no longer has the input its hash covered: only
-      // its place in the chain can be checked. Digest rows verify in full.
-      const contentCheckable = !row.redacted || Boolean(row.inputDigest);
-      if (contentCheckable && row.hash !== hashRow(row.prevHash, unsignedRow)) {
+      // A redacted row whose hash no longer covers what's stored (a legacy
+      // row, or a digest row from before idDigest whose id was pseudonymized)
+      // can only be checked for its place in the chain; a purge record must
+      // then pin its remaining fields. Everything else verifies in full.
+      const hashOk = row.hash === hashRow(row.prevHash, unsignedRow);
+      const contentCheckable = !row.redacted || (Boolean(row.inputDigest) && hashOk);
+      if (!row.redacted && !hashOk) {
         return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
       }
       if (!row.redacted && row.inputDigest && row.inputDigest !== digestInput(row.input ?? {})) {
@@ -410,13 +419,16 @@ export function verifyAuditChain(): AuditChainVerification {
       if (!row.redacted && row.nameDigest && row.nameDigest !== digestName(row.employeeName)) {
         return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
       }
+      if (!row.redacted && row.idDigest && row.idDigest !== digestName(row.employeeId)) {
+        return { ok: false, checked, legacy, firstBadId: row.id, reason: "hash mismatch" };
+      }
       if (row.redacted) {
         // A purge record is never redacted, and only fully checkable rows
         // (with digests) or pinned legacy rows can be vouched for.
         if (row.bareName === "purgeEmployee") {
           return { ok: false, checked, legacy, firstBadId: row.id, reason: "redacted purge record" };
         }
-        pending.set(row.id, { employeeId: row.employeeId, pin: row.inputDigest ? undefined : legacyPin(row) });
+        pending.set(row.id, { employeeId: row.employeeId, pin: contentCheckable ? undefined : legacyPin(row) });
       } else if (row.bareName === "purgeEmployee" && row.inputDigest) {
         // Only a verified purge record that comes after the rows it lists,
         // for the same employee, can vouch for them.
@@ -457,7 +469,7 @@ export type AuditRedaction = {
  * verdict and hashes stay. The caller must then append a "purgeEmployee" row
  * with the returned ids and pins, or verification fails.
  */
-export function redactEmployeeAudit(employeeId: string): AuditRedaction {
+export function redactEmployeeAudit(employeeId: string, pseudonym: string = employeeId): AuditRedaction {
   const result: AuditRedaction = { redactedIds: [], legacyPins: {} };
   const at = new Date().toISOString();
   const files = [...listArchives().map(pathForArchive), AUDIT_FILE];
@@ -472,14 +484,21 @@ export function redactEmployeeAudit(employeeId: string): AuditRedaction {
       } catch {
         return line;
       }
-      if (row.employeeId !== employeeId || row.bareName === "purgeEmployee") return line;
+      const mine = row.employeeId === employeeId || (row.employeeId === pseudonym && Boolean(row.redacted));
+      if (!mine || row.bareName === "purgeEmployee") return line;
       let next = row;
-      if (!row.redacted) {
+      if (!row.redacted || row.employeeId !== pseudonym) {
         changed = true;
-        next = { ...row, employeeName: "[deleted]", input: { redacted: true }, redacted: { at } };
+        next = { ...row, employeeId: pseudonym, employeeName: "[deleted]", input: { redacted: true }, redacted: row.redacted ?? { at } };
       }
       result.redactedIds.push(row.id);
-      if (!row.inputDigest) result.legacyPins[row.id] = legacyPin(next);
+      // Rows whose hash still covers the stored fields verify in full; the
+      // rest (legacy rows, pre-idDigest rows now carrying the pseudonym) are
+      // pinned by the purge record.
+      const unsigned = { ...next };
+      delete unsigned.hash;
+      const hashOk = Boolean(next.inputDigest) && next.hash === hashRow(next.prevHash ?? "", unsigned);
+      if (!hashOk) result.legacyPins[row.id] = legacyPin(next);
       return next === row ? line : JSON.stringify(next);
     });
     if (changed) {
@@ -569,3 +588,6 @@ export function readAuditLog(filter: AuditFilter = {}): AuditReadResult {
     return { entries: [], totalCount: 0, page, pageSize, archives };
   }
 }
+
+/** Exposed for tests that build rows the way older versions wrote them. */
+export const __auditTest = { hashRow };
