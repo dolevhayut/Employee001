@@ -44,6 +44,9 @@ export interface MorphOrbProps {
   onReset?: () => void;
   /** Rendered at the end of the answer card's header (e.g. a speaker button). */
   answerAction?: React.ReactNode;
+  /** Drawn inside the stage, above its background and below the orb and the
+   *  answer card (e.g. a flow of the run). Must not take pointer events. */
+  backdrop?: React.ReactNode;
   copy?: Partial<MorphOrbCopy>;
   minThinkMs?: number;
   speed?: number;
@@ -1073,6 +1076,11 @@ export default function MorphOrb(props: MorphOrbProps) {
     <div className="mo-root" data-phase={phase} ref={rootRef}>
       <div className="mo-bg" aria-hidden="true" />
       <div className="mo-halo" aria-hidden="true" />
+      {props.backdrop && (
+        <div aria-hidden="true" style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none" }}>
+          {props.backdrop}
+        </div>
+      )}
 
       <div className="mo-mover" ref={moverRef}>
         {Array.from({ length: 6 }).map((_, i) => (

@@ -15,7 +15,8 @@ import { Markdown } from "@/components/ex/markdown";
 import { useRoster } from "@/components/ex/roster-context";
 import { useT } from "@/components/ex/i18n-context";
 import MorphOrb from "@/components/ex/morph-orb/morph-orb";
-import { ToolNodes, describeToolCall, words } from "@/components/ex/morph-orb/tool-nodes";
+import { describeToolCall, words } from "@/components/ex/morph-orb/tool-nodes";
+import { FlowCanvas } from "@/components/ex/morph-orb/flow-canvas";
 
 const ANSWER_STYLE =
   "Answer in the language of the question, in at most three short sentences and " +
@@ -335,7 +336,8 @@ export default function AskPage() {
   // ?twin=<id> preselects a twin (the Company brain links here when a twin is clicked).
   const linked = useSyncExternalStore(noopSubscribe, linkedTwin, () => null);
   const twinId = selected ?? (linked && twins.some((e) => e.id === linked) ? linked : null) ?? twins[0]?.id ?? null;
-  const liveTurn = turns.find((turn) => turn.answer === null);
+  // The flow stays on the stage until the CEO starts a new question.
+  const flowTurn = busy ? turns[turns.length - 1] : undefined;
   const twin = twins.find((e) => e.id === twinId);
 
   useEffect(() => {
@@ -525,6 +527,18 @@ export default function AskPage() {
         <div style={{ position: "relative", flex: 7, minWidth: 0, minHeight: 520 }}>
           <MorphOrb
             onSubmit={onSubmit}
+            // The run as an n8n-style flow around the orb: question → orb →
+            // answer, every source the twin reaches for, and the tools pulled
+            // through MCP. Inside the stage, under the orb and the answer card.
+            backdrop={
+              <FlowCanvas
+                steps={flowTurn?.steps ?? []}
+                visible={Boolean(flowTurn) && !flowTurn?.task}
+                answered={flowTurn?.answer != null}
+                questionLabel={t("ask.flow.question")}
+                answerLabel={t("ask.flow.answer")}
+              />
+            }
             onAnswered={(answer) => {
               const last = turns[turns.length - 1];
               if (voiceOn && voiceReady && last) void speak(last.id, answer, last.voiceId);
@@ -556,8 +570,7 @@ export default function AskPage() {
             }}
           />
 
-          {/* every tool, MCP server and knowledge source the twin touches lights up around the orb */}
-          <ToolNodes steps={liveTurn?.steps ?? []} visible={Boolean(liveTurn)} />
+
 
           <AnimatePresence>
             {voiceHint && (
@@ -672,6 +685,7 @@ export default function AskPage() {
         </div>
 
         {/* conversation + how the twin got there: 30% */}
+        {/* detached like the sidebar: same radius, border, shadow and gutter */}
         <aside
           style={{
             flex: 3,
@@ -679,8 +693,13 @@ export default function AskPage() {
             maxWidth: 460,
             display: "flex",
             flexDirection: "column",
-            background: "var(--bg-elevated)",
-            borderInlineStart: "1px solid var(--hairline)",
+            margin: "var(--sp-8)",
+            marginInlineStart: 0,
+            background: "var(--bg)",
+            border: "1px solid var(--hairline)",
+            borderRadius: "var(--radius-xl)",
+            boxShadow: "var(--shadow-sm)",
+            overflow: "hidden",
           }}
         >
           <div
