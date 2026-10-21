@@ -100,10 +100,12 @@ export function briefFromOrgBrain(question: string, emit: (e: SourceEvent) => vo
   if (hits.length === 0) return null;
   const title = `${hits.length} document${hits.length === 1 ? "" : "s"}`;
   emit({ type: "source_start", id: ORG_BRAIN_SOURCE, name: "Company brain", title });
+  // The card shows one clean line per document; the answer writer gets the text too.
+  const shown = hits.map(({ node }) => `- ${node.label}: ${node.description}`).join("\n");
   const brief = hits
-    .map(({ node }) => `- ${node.label} (${node.type}): ${node.description}${node.body ? ` ${node.body.replace(/\s+/g, " ").slice(0, 600)}` : ""}`)
+    .map(({ node }) => `- ${node.label} (${node.type}): ${node.description}${node.body ? ` ${node.body.replace(/^#+\s*/gm, "").replace(/\s+/g, " ").slice(0, 600)}` : ""}`)
     .join("\n");
-  emit({ type: "source_done", id: ORG_BRAIN_SOURCE, brief, empty: false });
+  emit({ type: "source_done", id: ORG_BRAIN_SOURCE, brief: shown, empty: false });
   return { id: ORG_BRAIN_SOURCE, name: "Company brain", title, brief };
 }
 

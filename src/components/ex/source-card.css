@@ -1,0 +1,44 @@
+/* Source card effects. The working border is magicui's "Shine Border"
+   (MIT, via 21st.dev): a radial gradient sliding along a masked 1.5px ring.
+   Colours come from the theme tokens. */
+
+.sc-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.sc-shine::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  background-image: radial-gradient(transparent, transparent, var(--accent), var(--twin), var(--warn), transparent, transparent);
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: sc-shine 5s linear infinite;
+  will-change: background-position;
+}
+
+@keyframes sc-shine {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+.sc-spin {
+  animation: sc-rotate 0.9s linear infinite;
+}
+
+@keyframes sc-rotate {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-shine::before, .sc-spin { animation: none; }
+}

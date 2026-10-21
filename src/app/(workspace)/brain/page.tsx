@@ -280,8 +280,8 @@ export default function AskCompanyPage() {
                       {cards.length > 0 && <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>{t("org.sources", { count: cards.length })}</span>}
                     </div>
                     {cards.length === 0 && !r.done && <Pulse label={t("org.routing")} />}
-                    {cards.map((c) => (
-                      <SourceCard key={c.id} s={c} lit={isLatest && lit.includes(c.id)} onOpen={c.kind === "twin" ? () => openTwin(c.id) : undefined} />
+                    {cards.map((c, i) => (
+                      <SourceCard key={c.id} index={i} s={c} lit={isLatest && lit.includes(c.id)} onOpen={c.kind === "twin" ? () => openTwin(c.id) : undefined} />
                     ))}
                   </section>
                 </article>
