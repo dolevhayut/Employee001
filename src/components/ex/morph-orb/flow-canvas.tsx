@@ -44,6 +44,18 @@ const CARD_MARGIN = 26;
 
 type Rect = { l: number; t: number; r: number; b: number };
 
+/** The icon inside a pulled item's chip: a file, a tool call, a search… */
+const LEAF_ICON: Record<FlowStep["kind"], (s: number) => ReactNode> = {
+  read: (s) => <Icons.Doc size={s} />,
+  brain: (s) => <Icons.Doc size={s} />,
+  search: (s) => <Icons.Search size={s} />,
+  tool: (s) => <Icons.Zap size={s} />,
+  web: (s) => <Icons.Eye size={s} />,
+  skill: (s) => <Icons.Spark size={s} />,
+  delegate: (s) => <Icons.Team size={s} />,
+  blocked: (s) => <Icons.Lock size={s} />,
+};
+
 const KIND_ICON: Record<FlowStep["kind"], (s: number) => ReactNode> = {
   read: (s) => <Icons.Doc size={s} />,
   search: (s) => <Icons.Search size={s} />,
@@ -281,9 +293,9 @@ export function FlowCanvas({
     // centre, stacked in a column (n8n style).
     const side = s.x < cx - 1 ? -1 : 1;
     const leaves = items.map((it, j) => {
-      const lx = s.x + side * (NODE / 2 + 96);
-      const ly = s.y + (j - (items.length - 1) / 2) * 34;
-      const d = wireH(s.x + side * (NODE / 2 + 2), s.y, lx - side * 66, ly);
+      const lx = s.x + side * (NODE / 2 + 118);
+      const ly = s.y + (j - (items.length - 1) / 2) * 46;
+      const d = wireH(s.x + side * (NODE / 2 + 2), s.y, lx - side * 76, ly);
       return { ...it, x: lx, y: ly, d };
     });
     return { g, s, d: wireV(fromX, fromY, s.x, toY), leaves };
@@ -410,10 +422,10 @@ export function FlowCanvas({
                             translateY: "-50%",
                             display: "inline-flex",
                             alignItems: "center",
-                            gap: 6,
-                            maxWidth: 140,
-                            padding: "5px 10px",
-                            borderRadius: 8,
+                            gap: 7,
+                            maxWidth: 160,
+                            padding: "6px 11px 6px 9px",
+                            borderRadius: 9,
                             fontSize: 11.5,
                             fontFamily: "var(--font-mono, ui-monospace, monospace)",
                             whiteSpace: "nowrap",
@@ -423,7 +435,16 @@ export function FlowCanvas({
                             boxShadow: on ? "0 0 0 3px color-mix(in oklab, var(--accent) 14%, transparent)" : "none",
                           }}
                         >
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: on ? "var(--accent)" : lf.done ? "var(--success)" : "var(--hairline-strong)" }} />
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              flexShrink: 0,
+                              color: on ? "var(--accent-deep)" : lf.done ? "var(--success)" : "var(--text-subtle)",
+                              transition: "color .3s",
+                            }}
+                          >
+                            {LEAF_ICON[l.g.kind](13)}
+                          </span>
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{lf.name}</span>
                         </motion.div>
                       );
