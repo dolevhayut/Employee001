@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listWorkItems, enqueueWorkItem, type WorkItemStatus } from "@/lib/work-items";
 import { ensureSchedulerStarted } from "@/lib/routine-scheduler";
+import { dispatchWorkTick } from "@/lib/work-dispatcher";
 
 export const runtime = "nodejs";
 
@@ -17,10 +18,12 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/work-items — manually queue a task for a twin.
-// Body: { assigneeEmployeeId, title, task, idempotencyKey? }
+// Body: { assigneeEmployeeId, title, task, idempotencyKey?, startNow? }
+// startNow: the CEO handed the task in person (Ask), so it starts right away,
+// like "Run now", instead of waiting for the autonomy scheduler's tick.
 export async function POST(req: NextRequest) {
   ensureSchedulerStarted();
-  let body: { assigneeEmployeeId?: string; title?: string; task?: string; idempotencyKey?: string };
+  let body: { assigneeEmployeeId?: string; title?: string; task?: string; idempotencyKey?: string; startNow?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -37,5 +40,6 @@ export async function POST(req: NextRequest) {
     payload: { task },
     idempotencyKey: body.idempotencyKey ?? `manual:${assigneeEmployeeId}:${title}:${Date.now()}`,
   });
+  if (body.startNow && !deduped) void dispatchWorkTick().catch(() => {});
   return NextResponse.json({ item, deduped }, { status: deduped ? 200 : 201 });
 }

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { AnimatePresence, motion } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
+import { Markdown } from "@/components/ex/markdown";
 import { useRoster } from "@/components/ex/roster-context";
 import { useT } from "@/components/ex/i18n-context";
 import MorphOrb from "@/components/ex/morph-orb/morph-orb";
@@ -35,6 +36,8 @@ type Turn = {
   steps: Step[];
   thinking: string;
   answer: string | null;
+  /** Set when the CEO handed this as a task instead of asking. */
+  task?: { itemId?: string; status: "queued" | "leased" | "done" | "failed" | "skipped"; result?: string };
 };
 
 type TraceEvent = {
@@ -317,6 +320,7 @@ export default function AskPage() {
   const roster = useRoster();
   const twins = roster.filter((e) => e.twinStatus === "ready");
   const [selected, setSelected] = useState<string | null>(null);
+  const [mode, setMode] = useState<"ask" | "task">("ask");
   const [busy, setBusy] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceReady, setVoiceReady] = useState(false);
@@ -394,7 +398,63 @@ export default function AskPage() {
   const patchTurn = (id: number, fn: (turn: Turn) => Turn) =>
     setTurns((prev) => prev.map((turn) => (turn.id === id ? fn(turn) : turn)));
 
+  // Hand the twin a task, like you would a colleague: it goes on the twin's
+  // work queue and starts now; the conversation shows its status and result.
+  const assign = async (task: string) => {
+    if (!twinId || !twin) return t("ask.noTwin");
+    const id = ++turnSeq.current;
+    setTurns((prev) => [
+      ...prev,
+      { id, twinId, twinName: twin.name, initials: twin.initials, color: twin.avatarColor, voiceId: twin.ttsVoiceId, question: task, steps: [], thinking: "", answer: null, task: { status: "queued" } },
+    ]);
+    const hebrew = /[\u0590-\u05FF]/.test(task);
+    try {
+      const res = await fetch("/api/work-items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assigneeEmployeeId: twinId,
+          title: task.replace(/\s+/g, " ").slice(0, 90),
+          task: `The CEO handed you this task directly. Do it, then end with a short summary of what you did and the result${hebrew ? ", in Hebrew" : ""}.\n\n${task}`,
+          startNow: true,
+        }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const { item } = (await res.json()) as { item: { id: string } };
+      const ack = hebrew ? `קיבלתי, אני על זה. אעדכן כאן כשאסיים.` : `On it. I'll work on this now and report back here.`;
+      patchTurn(id, (turn) => ({ ...turn, answer: ack, task: { itemId: item.id, status: "queued" } }));
+      return ack;
+    } catch {
+      patchTurn(id, (turn) => ({ ...turn, answer: t("ask.error"), task: { status: "failed" } }));
+      return t("ask.error");
+    }
+  };
+
+  // Follow handed tasks until they finish.
+  const openTasks = turns.filter((turn) => turn.task?.itemId && (turn.task.status === "queued" || turn.task.status === "leased")).length;
+  useEffect(() => {
+    if (!openTasks) return;
+    const poll = async () => {
+      try {
+        const items = (await fetch("/api/work-items", { cache: "no-store" }).then((r) => r.json())) as { id: string; status: NonNullable<Turn["task"]>["status"]; resultSummary?: string }[];
+        const byId = new Map(items.map((i) => [i.id, i]));
+        setTurns((prev) =>
+          prev.map((turn) => {
+            const item = turn.task?.itemId ? byId.get(turn.task.itemId) : undefined;
+            if (!item || (item.status === turn.task?.status && item.resultSummary === turn.task?.result)) return turn;
+            return { ...turn, task: { ...turn.task!, status: item.status, result: item.resultSummary } };
+          }),
+        );
+      } catch {
+        // try again next tick
+      }
+    };
+    const iv = setInterval(poll, 3000);
+    return () => clearInterval(iv);
+  }, [openTasks]);
+
   const onSubmit = async (question: string) => {
+    if (mode === "task") return assign(question);
     if (!twinId || !twin) return t("ask.noTwin");
     setBusy(true);
     stopAudio();
@@ -486,7 +546,7 @@ export default function AskPage() {
             }}
             minThinkMs={2600}
             copy={{
-              placeholder: twin ? t("ask.placeholder", { name: twin.firstName }) : t("ask.placeholderAny"),
+              placeholder: twin ? (mode === "task" ? t("ask.task.placeholder", { name: twin.firstName }) : t("ask.placeholder", { name: twin.firstName })) : t("ask.placeholderAny"),
               labels: [t("ask.l.thinking"), t("ask.l.searching"), t("ask.l.reading"), t("ask.l.composing")],
               done: t("ask.done"),
               answerTitle: twin ? `${twin.name} · ${twin.role}` : t("ask.answer"),
@@ -580,6 +640,34 @@ export default function AskPage() {
                 );
               })}
             </div>
+            {/* ask a question, or hand over a task, like you would a colleague */}
+            <div role="tablist" style={{ display: "flex", padding: 3, gap: 2, borderRadius: 10, background: "var(--bg-sunken)", border: "1px solid var(--hairline)" }}>
+              {(["ask", "task"] as const).map((m) => {
+                const on = mode === m;
+                return (
+                  <button
+                    key={m}
+                    role="tab"
+                    aria-selected={on}
+                    type="button"
+                    onClick={() => setMode(m)}
+                    style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", font: "inherit", fontSize: 12.5, fontWeight: 600, color: on ? "var(--text)" : "var(--text-muted)" }}
+                  >
+                    {on && (
+                      <motion.span
+                        layoutId="ask-mode"
+                        transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                        style={{ position: "absolute", inset: 0, borderRadius: 8, background: "var(--surface)", boxShadow: "0 1px 3px color-mix(in oklab, var(--text) 12%, transparent)" }}
+                      />
+                    )}
+                    <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      {m === "ask" ? <Icons.MessageSquare size={12} /> : <Icons.Zap size={12} />}
+                      {m === "ask" ? t("ask.mode.ask") : t("ask.mode.task")}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </motion.div>
         </div>
 
@@ -650,7 +738,7 @@ export default function AskPage() {
                   <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--text)" }}>{turn.twinName}</span>
                 </div>
 
-                <Trace turn={turn} live={turn.answer === null} />
+                {turn.task ? <TaskStatus task={turn.task} /> : <Trace turn={turn} live={turn.answer === null} />}
 
                 {turn.answer !== null && (
                   <motion.div
@@ -685,5 +773,37 @@ export default function AskPage() {
         </aside>
       </div>
     </div>
+  );
+}
+
+function TaskStatus({ task }: { task: NonNullable<Turn["task"]> }) {
+  const { t } = useT();
+  const running = task.status === "queued" || task.status === "leased";
+  const tone = task.status === "done" ? "var(--success)" : task.status === "failed" || task.status === "skipped" ? "var(--danger)" : "var(--accent-deep)";
+  const label =
+    task.status === "queued" ? t("ask.task.queued") : task.status === "leased" ? t("ask.task.working") : task.status === "done" ? t("ask.task.done") : t("ask.task.failed");
+  return (
+    <motion.div
+      layout
+      style={{ borderRadius: 12, border: `1px solid ${running ? "color-mix(in oklab, var(--accent) 40%, var(--hairline))" : "var(--hairline)"}`, background: "var(--surface)", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Icons.Zap size={12} />
+        <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text)" }}>{t("ask.task.title")}</span>
+        <span style={{ marginInlineStart: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 650, color: tone }}>
+          {running && <motion.span animate={{ opacity: [1, 0.25, 1] }} transition={{ duration: 1, repeat: Infinity }} style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />}
+          {task.status === "done" && <Icons.Check size={11} />}
+          {label}
+        </span>
+      </div>
+      {task.result && (
+        <motion.div dir="auto" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ fontSize: 13, lineHeight: 1.55, color: "var(--text)", maxHeight: 280, overflowY: "auto" }}>
+          <Markdown>{task.result}</Markdown>
+        </motion.div>
+      )}
+      <a href="/tasks" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--accent-deep)", textDecoration: "none" }}>
+        {t("ask.task.open")} →
+      </a>
+    </motion.div>
   );
 }
