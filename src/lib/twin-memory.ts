@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { TWIN_MODEL_FALLBACK, TWIN_MODEL_HAIKU } from "@/lib/sdk-defaults";
 import { currentProvider, directAnthropicAllowed, modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
 import { dataDir } from "@/lib/app-home";
+import { filterProfilingContent, memoryRedactionLevel, redactSensitive } from "@/lib/sensitive-content";
 
 const MEMORY_ROOT = dataDir("memory");
 const DEFAULT_LIMIT = 5;
@@ -216,14 +217,11 @@ function truncate(text: string, max: number): string {
   return `${compact.slice(0, max - 1).trim()}...`;
 }
 
+/** What memory may keep: secrets and personal identifiers redacted
+ *  (EMPLOYEE001_MEMORY_REDACT, default basic) and profiling content
+ *  (special-category data, performance judgments, work hours) dropped. */
 function sanitize(text: string): string {
-  return text
-    .replace(/sk-[a-zA-Z0-9_-]{16,}/g, "[redacted_openai_key]")
-    .replace(/sk-ant-[a-zA-Z0-9_-]{16,}/g, "[redacted_anthropic_key]")
-    .replace(/ak_[a-zA-Z0-9_-]{12,}/g, "[redacted_api_key]")
-    .replace(/Bearer\s+[a-zA-Z0-9._-]{16,}/gi, "Bearer [redacted]")
-    .replace(/(api[_-]?key["'\s:=]+)[a-zA-Z0-9._-]{12,}/gi, "$1[redacted]")
-    .replace(/(token["'\s:=]+)[a-zA-Z0-9._-]{12,}/gi, "$1[redacted]");
+  return filterProfilingContent(redactSensitive(text, memoryRedactionLevel())).text.trim();
 }
 
 function cardContent(question: string, answer: string): string {
