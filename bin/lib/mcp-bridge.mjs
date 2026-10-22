@@ -34,12 +34,44 @@ async function forwardResponse(response, write) {
   try {
     const payload = JSON.parse(body);
     for (const message of Array.isArray(payload) ? payload : [payload]) {
-      emit(message);
+      // The app's auth gate answers with plain JSON ({ error, reason }); only
+      // JSON-RPC may reach the client.
+      if (message?.jsonrpc === "2.0") emit(message);
     }
   } catch {
     // A malformed upstream response must not corrupt the client's stdio stream.
   }
   return wrote;
+}
+
+function firstSet(...values) {
+  // Empty strings and unexpanded "${VAR}" placeholders count as unset: MCP
+  // clients pass either when a configured variable has no value.
+  return values.find(
+    (value) => typeof value === "string" && value.trim() !== "" && !/^\$\{[^}]*\}$/.test(value.trim()),
+  );
+}
+
+/**
+ * Where the bridge connects and with which token. Flags win, then the
+ * environment the MCP client passes (a plugin or editor config), then the
+ * `.env` in the current directory (running from the Employee001 install).
+ * @param {{ url?: string, token?: string, processEnv?: Record<string, string | undefined>, fileEnv?: Record<string, string | undefined> }} options
+ */
+export function resolveBridgeConfig({ url, token, processEnv = {}, fileEnv = {} }) {
+  const port = firstSet(fileEnv.PORT) ?? "3000";
+  return {
+    url:
+      firstSet(url, processEnv.EMPLOYEE001_MCP_URL, fileEnv.EMPLOYEE001_MCP_URL) ??
+      `http://127.0.0.1:${port}/api/mcp`,
+    token: firstSet(
+      token,
+      processEnv.EMPLOYEE001_MCP_TOKEN,
+      processEnv.EMPLOYEE001_TOKEN,
+      fileEnv.EMPLOYEE001_MCP_TOKEN,
+      fileEnv.EMPLOYEE001_TOKEN,
+    ),
+  };
 }
 
 /**
@@ -77,10 +109,18 @@ export function createBridge({ url, token, fetchImpl = fetch, write, log }) {
           writeJson(write, {
             jsonrpc: "2.0",
             id: message.id,
-            error: {
-              code: -32002,
-              message: `Employee001 at ${url} has no usable MCP endpoint (HTTP ${response.status}). Update with: npx employee001@latest start`,
-            },
+            error:
+              response.status === 401
+                ? {
+                    code: -32004,
+                    message: `Employee001 at ${url} refused the request: missing or invalid token. Set EMPLOYEE001_MCP_TOKEN in the MCP client's env (or pass --token) to the instance's EMPLOYEE001_MCP_TOKEN or EMPLOYEE001_TOKEN.`,
+                  }
+                : response.status === 403
+                  ? { code: -32003, message: `Employee001 at ${url} refused the request (HTTP 403).` }
+                  : {
+                      code: -32002,
+                      message: `Employee001 at ${url} has no usable MCP endpoint (HTTP ${response.status}). Update with: npx employee001@latest start`,
+                    },
           });
         }
       } catch {

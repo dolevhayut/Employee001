@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { resolve } from "node:path";
-import { createBridge } from "../lib/mcp-bridge.mjs";
+import { createBridge, resolveBridgeConfig } from "../lib/mcp-bridge.mjs";
 
 function parseEnv(text) {
   const out = {};
@@ -25,10 +25,6 @@ function localEnv() {
   return existsSync(envPath) ? parseEnv(readFileSync(envPath, "utf8")) : {};
 }
 
-function defaultUrl(env) {
-  return `http://127.0.0.1:${env.PORT ?? "3000"}/api/mcp`;
-}
-
 export default async function mcp(argv) {
   const urlIndex = argv.indexOf("--url");
   if (urlIndex >= 0 && !argv[urlIndex + 1]) {
@@ -43,9 +39,12 @@ export default async function mcp(argv) {
     return;
   }
 
-  const env = localEnv();
-  const url = urlIndex >= 0 ? argv[urlIndex + 1] : defaultUrl(env);
-  const token = tokenIndex >= 0 ? argv[tokenIndex + 1] : env.EMPLOYEE001_TOKEN;
+  const { url, token } = resolveBridgeConfig({
+    url: urlIndex >= 0 ? argv[urlIndex + 1] : undefined,
+    token: tokenIndex >= 0 ? argv[tokenIndex + 1] : undefined,
+    processEnv: process.env,
+    fileEnv: localEnv(),
+  });
   const bridge = createBridge({
     url,
     token,

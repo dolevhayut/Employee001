@@ -1,0 +1,30 @@
+{
+  "name": "employee001",
+  "displayName": "Employee001",
+  "version": "0.1.0",
+  "description": "Ask your company's AI twins from Claude Code: search what colleagues decided, ask one twin, ask the whole company, or convene a short team meeting. Talks to your own self-hosted Employee001.",
+  "author": {
+    "name": "Dolev Hayut",
+    "url": "https://github.com/dolevhayut"
+  },
+  "homepage": "https://employee001.com",
+  "repository": "https://github.com/dolevhayut/Employee001",
+  "documentationUrl": "https://github.com/dolevhayut/Employee001/blob/main/plugins/claude-code/README.md",
+  "supportUrl": "https://github.com/dolevhayut/Employee001/issues",
+  "license": "MIT",
+  "keywords": ["employee001", "mcp", "digital-twins", "organizational-brain", "knowledge", "self-hosted"],
+  "userConfig": {
+    "url": {
+      "type": "string",
+      "title": "Employee001 MCP endpoint",
+      "description": "Where your Employee001 app answers MCP. Keep the default for a local install started with `npx employee001 start`.",
+      "default": "http://127.0.0.1:3000/api/mcp"
+    },
+    "token": {
+      "type": "string",
+      "title": "MCP token (optional)",
+      "description": "Needed once sign-in is on, or for a LAN/Fly instance: the value of EMPLOYEE001_MCP_TOKEN (or EMPLOYEE001_TOKEN) from that instance's .env. Leave empty for a plain local install.",
+      "sensitive": true
+    }
+  }
+}

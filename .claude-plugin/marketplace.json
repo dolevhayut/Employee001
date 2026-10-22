@@ -1,0 +1,17 @@
+{
+  "name": "employee001",
+  "description": "Employee001: AI twins of your real employees, self-hosted. Plugins for asking them from Claude Code.",
+  "owner": {
+    "name": "Dolev Hayut",
+    "url": "https://github.com/dolevhayut"
+  },
+  "plugins": [
+    {
+      "name": "employee001",
+      "source": "./plugins/claude-code",
+      "description": "Ask your company's AI twins from Claude Code: ask the company, ask one twin, or convene a team meeting.",
+      "category": "productivity",
+      "tags": ["mcp", "knowledge", "team", "self-hosted"]
+    }
+  ]
+}

@@ -153,18 +153,33 @@ Running `npx employee001` with no command prints help. `start` runs `setup` firs
 | `npx employee001 secure` | Moves plaintext `.env` secrets into your OS keychain. |
 | `npx employee001 export <path>` | Snapshots `data/` to a tar.gz (excludes secrets). `--encrypt` adds a passphrase. |
 | `npx employee001 import <path>` | Restores `data/` from a tar.gz. `--force` overwrites. |
-| `npx employee001 mcp` | stdio bridge so Claude Code, Cursor and other MCP clients can use the running app. `--url <url>` for another endpoint. |
+| `npx employee001 mcp` | stdio bridge so Claude Code, Cursor and other MCP clients can use the running app. `--url <url>` / `--token <t>` for another endpoint (or `EMPLOYEE001_MCP_URL` / `EMPLOYEE001_MCP_TOKEN`). |
 | `npx employee001 update` | Checks GitHub releases for a newer version. |
 | `npx employee001 help` | Shows help. |
 
-### Use it from Claude Code, Cursor and other MCP clients
+### Use from Claude Code / Cursor
+
+Ask your twins from the editor while you code. Start Employee001 first (`npx employee001 start`).
+
+**Claude Code plugin** (recommended). Adds `/employee001:ask-company`, `/employee001:ask-twin` and `/employee001:team-meeting`, and lets Claude check what the team decided before it builds:
+
+```text
+/plugin install employee001 --marketplace dolevhayut/Employee001
+```
+
+**Claude Code, MCP tools only:**
 
 ```bash
-npx employee001 start
 claude mcp add employee001 -- npx -y employee001 mcp
 ```
 
-The default connection is your local app at `http://127.0.0.1:3000/api/mcp`. Tools: `list_twins`, `get_twin_profile`, `search_org_brain`, `list_pending_approvals`, `list_team_meetings`, `get_team_meeting`, `ask_twin` (answer-only, rate- and cost-limited). Full reference: [docs/mcp.md](./docs/mcp.md).
+**Cursor**: add this to `.cursor/mcp.json` (Claude Desktop and other stdio clients take the same block):
+
+```json
+{ "mcpServers": { "employee001": { "command": "npx", "args": ["-y", "employee001", "mcp"] } } }
+```
+
+The default connection is your local app at `http://127.0.0.1:3000/api/mcp`. For another port or a remote instance, set `EMPLOYEE001_MCP_URL` and, once sign-in is on, `EMPLOYEE001_MCP_TOKEN` in the client's `env` (or pass `--url` / `--token`). Tools: `list_twins`, `get_twin_profile`, `search_org_brain`, `list_pending_approvals`, `list_team_meetings`, `get_team_meeting`, `ask_twin` (answer-only, rate- and cost-limited). Plugin guide: [plugins/claude-code](./plugins/claude-code/README.md). Full reference: [docs/mcp.md](./docs/mcp.md).
 
 ## Privacy and security boundaries
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createBridge } from "../../bin/lib/mcp-bridge.mjs";
+import { createBridge, resolveBridgeConfig } from "../../bin/lib/mcp-bridge.mjs";
 
 const request = JSON.stringify({ jsonrpc: "2.0", id: 7, method: "tools/list" });
 
@@ -122,5 +122,51 @@ describe("MCP stdio bridge", () => {
     releaseSlow(Response.json({ jsonrpc: "2.0", id: 1, result: {} }));
     await slow;
     expect(output.map((l) => JSON.parse(l).id)).toEqual([2, 1]);
+  });
+});
+
+describe("MCP bridge auth errors", () => {
+  it("turns the app's plain-JSON 401 into a JSON-RPC token error", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ error: "unauthorized", reason: "missing or invalid token" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const { bridge, output } = bridgeWith(fetchImpl);
+
+    await bridge.handleLine(request);
+
+    expect(output).toHaveLength(1);
+    const reply = JSON.parse(output[0]);
+    expect(reply).toMatchObject({ jsonrpc: "2.0", id: 7, error: { code: -32004 } });
+    expect(reply.error.message).toContain("EMPLOYEE001_MCP_TOKEN");
+  });
+});
+
+describe("MCP bridge config", () => {
+  it("defaults to the local app on the .env port with no token", () => {
+    expect(resolveBridgeConfig({})).toEqual({ url: "http://127.0.0.1:3000/api/mcp", token: undefined });
+    expect(resolveBridgeConfig({ fileEnv: { PORT: "3001" } }).url).toBe("http://127.0.0.1:3001/api/mcp");
+  });
+
+  it("prefers flags, then the client's environment, then ./.env", () => {
+    const fileEnv = { EMPLOYEE001_TOKEN: "file-token", EMPLOYEE001_MCP_URL: "http://file/api/mcp" };
+    const processEnv = { EMPLOYEE001_TOKEN: "app-token", EMPLOYEE001_MCP_TOKEN: "mcp-token", EMPLOYEE001_MCP_URL: "https://env/api/mcp" };
+    expect(resolveBridgeConfig({ fileEnv })).toEqual({ url: "http://file/api/mcp", token: "file-token" });
+    expect(resolveBridgeConfig({ processEnv, fileEnv })).toEqual({ url: "https://env/api/mcp", token: "mcp-token" });
+    expect(resolveBridgeConfig({ url: "http://flag/api/mcp", token: "flag-token", processEnv, fileEnv })).toEqual({
+      url: "http://flag/api/mcp",
+      token: "flag-token",
+    });
+  });
+
+  it("treats empty values from an unset client variable as missing", () => {
+    expect(
+      resolveBridgeConfig({ processEnv: { EMPLOYEE001_MCP_URL: "", EMPLOYEE001_MCP_TOKEN: " " }, fileEnv: { EMPLOYEE001_TOKEN: "file-token" } }),
+    ).toEqual({ url: "http://127.0.0.1:3000/api/mcp", token: "file-token" });
+    expect(
+      resolveBridgeConfig({ url: "${user_config.url}", processEnv: { EMPLOYEE001_MCP_TOKEN: "${user_config.token}" } }),
+    ).toEqual({ url: "http://127.0.0.1:3000/api/mcp", token: undefined });
   });
 });

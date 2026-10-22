@@ -33,7 +33,10 @@ Common flags:
   --egress        (doctor) After the health checks, list every outbound host
   --force         (import) Overwrite a non-empty data/ directory
   --encrypt       (export) Encrypt the archive with a passphrase
-  --url <u>       (mcp) MCP endpoint (default http://127.0.0.1:<PORT>/api/mcp)
+  --url <u>       (mcp) MCP endpoint (default $EMPLOYEE001_MCP_URL, else
+                  http://127.0.0.1:<PORT>/api/mcp)
+  --token <t>     (mcp) Bearer token (default $EMPLOYEE001_MCP_TOKEN, else
+                  $EMPLOYEE001_TOKEN, else the same keys in ./.env)
 
 Examples:
   employee001 export ~/Desktop/e001-backup.tar.gz

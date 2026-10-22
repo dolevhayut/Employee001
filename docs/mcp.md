@@ -16,7 +16,17 @@ http://127.0.0.1:3000/api/mcp
 
 ## Set up a client
 
-### Claude Code
+### Claude Code plugin
+
+The plugin bundles this MCP server with three commands: `/employee001:ask-company`, `/employee001:ask-twin` and `/employee001:team-meeting`. Install it once, for every project:
+
+```text
+/plugin install employee001 --marketplace dolevhayut/Employee001
+```
+
+The install asks for the endpoint (default `http://127.0.0.1:3000/api/mcp`) and an optional token; change them with `/plugin configure employee001@employee001`. Details: [plugins/claude-code](../plugins/claude-code/README.md).
+
+### Claude Code, tools only
 
 Run this in the project where you use Claude Code:
 
@@ -30,11 +40,19 @@ The `employee001 mcp` command is a stdio bridge. It forwards MCP requests to the
 npx -y employee001 mcp --url http://127.0.0.1:3001/api/mcp
 ```
 
-For a LAN or Fly instance, configure `EMPLOYEE001_TOKEN` in the bridge's current directory `.env`, or pass it with `--token`. The token is sent only as an HTTP Bearer credential and is never printed:
+A token is needed for a LAN or Fly instance, and for a local one once sign-in is on. The bridge takes the endpoint and token from, in order:
+
+1. `--url` and `--token`
+2. `EMPLOYEE001_MCP_URL` and `EMPLOYEE001_MCP_TOKEN` (falling back to `EMPLOYEE001_TOKEN`) in its environment, which is what MCP clients set through `env`
+3. the same keys in `.env` in the bridge's current directory, plus `PORT` for the default URL
+
+The token is sent only as an HTTP Bearer credential and is never printed:
 
 ```bash
-npx -y employee001 mcp --url https://employee001.example.com/api/mcp --token "$EMPLOYEE001_TOKEN"
+claude mcp add employee001 -e EMPLOYEE001_MCP_URL=https://employee001.example.com/api/mcp -e EMPLOYEE001_MCP_TOKEN=<token> -- npx -y employee001 mcp
 ```
+
+Prefer `EMPLOYEE001_MCP_TOKEN` on the instance: a separate token for MCP clients, so the app's `EMPLOYEE001_TOKEN` never leaves the server. The instance accepts either.
 
 ### Cursor
 
@@ -51,7 +69,7 @@ Create or update `.cursor/mcp.json` in your project:
 }
 ```
 
-Restart Cursor or reload its MCP servers after saving the file.
+For a remote instance, add `"env": { "EMPLOYEE001_MCP_URL": "https://…/api/mcp", "EMPLOYEE001_MCP_TOKEN": "…" }` to the entry. Restart Cursor or reload its MCP servers after saving the file.
 
 ### Claude Desktop
 
@@ -80,11 +98,11 @@ http://127.0.0.1:3000/api/mcp
 
 Use the client’s normal MCP HTTP configuration. The endpoint is stateless and returns JSON-RPC responses.
 
-For an instance bound beyond loopback, use its reachable URL and set the same `EMPLOYEE001_TOKEN` used by Employee001 as an HTTP Bearer token:
+For an instance bound beyond loopback, or once sign-in is on, use its reachable URL and send the instance's `EMPLOYEE001_MCP_TOKEN` (or `EMPLOYEE001_TOKEN`) as an HTTP Bearer token:
 
 ```text
 https://employee001.example.com/api/mcp
-Authorization: Bearer <EMPLOYEE001_TOKEN>
+Authorization: Bearer <EMPLOYEE001_MCP_TOKEN>
 ```
 
 Treat this token like a full-access credential: it grants access to every MCP tool, including `ask_twin`, which can spend money.
@@ -330,6 +348,7 @@ The HTTP endpoint can also return JSON-RPC errors before a tool runs:
 | `-32002` | The stdio bridge could not reach Employee001. It reports: `Employee001 is not running. Start it with: npx employee001 start`. |
 | `-32003` | The request has a forbidden host or origin.                                                                                   |
 | `-32004` | A non-loopback MCP request is missing its Bearer token or the token is invalid.                                               |
+| HTTP 401 `unauthorized` | Sign-in is on and the request has neither a session nor a valid MCP Bearer token.                                  |
 
 Every MCP tool call is recorded in Employee001's local audit log. Question and query previews are limited to 120 characters in that entry.
 
@@ -337,7 +356,7 @@ Every MCP tool call is recorded in Employee001's local audit log. Question and q
 
 On the default loopback bind, MCP accepts only `127.0.0.1`, `localhost`, or `[::1]` in the HTTP `Host` header, and rejects browser origins outside those local hosts. This protects the local endpoint from DNS rebinding and browser cross-site requests.
 
-When Employee001 is bound to a LAN address, `0.0.0.0`, or deployed on Fly, `/api/mcp` requires `Authorization: Bearer <EMPLOYEE001_TOKEN>`. LAN and deployment hostnames are accepted, but browser requests must still have an `Origin` matching the request Host. Keep the token private: it grants full MCP access, including `ask_twin` spending.
+When Employee001 is bound to a LAN address, `0.0.0.0`, or deployed on Fly, or once accounts exist, `/api/mcp` requires `Authorization: Bearer <token>`, where the token is `EMPLOYEE001_MCP_TOKEN` or `EMPLOYEE001_TOKEN`. A signed-in browser session also works. LAN and deployment hostnames are accepted, but browser requests must still have an `Origin` matching the request Host. Keep the token private: it grants full MCP access, including `ask_twin` spending.
 
 Run Employee001 as one local Node process. MCP rate limits, in-flight calls, Team Meetings, and pending approvals are process-local. Restarting the app clears meetings and in-memory request state.
 
@@ -359,7 +378,7 @@ The bridge expects `http://127.0.0.1:3000/api/mcp` by default. If your app runs 
 npx -y employee001 mcp --url http://127.0.0.1:3001/api/mcp
 ```
 
-For a non-loopback endpoint, also provide the matching Employee001 token using `--token`, or set `EMPLOYEE001_TOKEN` in `./.env`.
+For a non-loopback endpoint, or once sign-in is on, also provide the instance's token with `--token`, `EMPLOYEE001_MCP_TOKEN` in the client's `env`, or `EMPLOYEE001_TOKEN` in `./.env`.
 
 ### The client cannot see `ask_twin`
 

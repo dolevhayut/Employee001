@@ -1,0 +1,48 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.dolevhayut/employee001",
+  "title": "Employee001",
+  "description": "Ask self-hosted AI twins of your colleagues what the team decided, who owns what, and why.",
+  "websiteUrl": "https://employee001.com",
+  "repository": {
+    "url": "https://github.com/dolevhayut/Employee001",
+    "source": "github"
+  },
+  "version": "0.7.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "employee001",
+      "version": "0.7.1",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp",
+          "description": "Run the stdio bridge to a running Employee001 app."
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "EMPLOYEE001_MCP_URL",
+          "description": "MCP endpoint of your Employee001 app. Defaults to the local app.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string",
+          "default": "http://127.0.0.1:3000/api/mcp"
+        },
+        {
+          "name": "EMPLOYEE001_MCP_TOKEN",
+          "description": "Bearer token for a remote instance or once sign-in is on: the instance's EMPLOYEE001_MCP_TOKEN or EMPLOYEE001_TOKEN.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

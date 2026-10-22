@@ -74,6 +74,24 @@ SECURITY.md and docs/fixes/2026-10-compliance-plan.md.
 - Debug logs never go to disk; the old `council-debug.log` is deleted on
   start, and a test fails if a writer comes back.
 
+### Claude Code plugin and MCP
+- **Claude Code plugin** (`plugins/claude-code`): `/employee001:ask-company`,
+  `/employee001:ask-twin` and `/employee001:team-meeting` from inside Claude
+  Code, with the endpoint and token asked at install (the token goes to Claude
+  Code's secure storage). This repo is now a plugin marketplace:
+  `/plugin install employee001 --marketplace dolevhayut/Employee001`.
+- `npx employee001 mcp` reads `EMPLOYEE001_MCP_URL` and `EMPLOYEE001_MCP_TOKEN`
+  (then `EMPLOYEE001_TOKEN`) from the environment the MCP client passes, so
+  editor configs can reach a remote or sign-in-protected instance. Empty and
+  unexpanded `${…}` values count as unset.
+- The bridge now answers a rejected token with a JSON-RPC error that says what
+  to set, instead of passing the app's plain-JSON 401 through (the client
+  waited forever).
+- On an exposed bind, `/api/mcp` accepts `EMPLOYEE001_MCP_TOKEN` as well as
+  `EMPLOYEE001_TOKEN`, as the proxy already did.
+- `package.json` carries `mcpName` for the official MCP Registry. Listing
+  drafts and submission steps: `docs/listings/`.
+
 ## [0.7.0] — 2026-10-21
 
 ### Three ways to work with your company
