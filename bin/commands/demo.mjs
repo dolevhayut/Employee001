@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { launchServer } from "./start.mjs";
+import { findFreePort, isPortInUse } from "../lib/port.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(HERE, "..", "..");
@@ -11,6 +12,7 @@ const DEFAULT_PORT = 3100;
 /** Parse the intentionally small public demo CLI surface without spawning a server. */
 export function parseDemoArgs(argv) {
   let port = DEFAULT_PORT;
+  let portExplicit = false;
   let noOpen = false;
   let keep = false;
   let live = false;
@@ -26,12 +28,13 @@ export function parseDemoArgs(argv) {
         throw new Error("--port must be a number from 1 to 65535");
       }
       port = Number(value);
+      portExplicit = true;
     } else {
       throw new Error(`Unknown demo option: ${arg}`);
     }
   }
 
-  return { port, noOpen, keep, live };
+  return { port, portExplicit, noOpen, keep, live };
 }
 
 const BASE_ENV_KEYS = new Set(["PATH", "HOME", "USER", "TMPDIR", "LANG", "TZ", "NODE_OPTIONS"]);
@@ -94,6 +97,18 @@ export function createDemoHome({ pkgRoot = PKG_ROOT, port = DEFAULT_PORT }) {
 
 export default async function demo(argv) {
   const options = parseDemoArgs(argv);
+  // The demo is the zero-setup path: if the default port is taken, move over
+  // instead of dying with EADDRINUSE. An explicit --port is honored or refused.
+  if (await isPortInUse(options.port)) {
+    const free = options.portExplicit ? null : await findFreePort(options.port + 1);
+    if (!free) {
+      process.stderr.write(`Port ${options.port} is already in use. Try: employee001 demo --port <another port>\n`);
+      process.exitCode = 1;
+      return;
+    }
+    process.stdout.write(`Port ${options.port} is in use; using ${free} instead.\n`);
+    options.port = free;
+  }
   const home = createDemoHome({ port: options.port });
   const recordingPath = join(PKG_ROOT, "bin", "demo", "recording.json");
   const env = buildDemoChildEnv({ home, port: options.port, live: options.live, recordingPath });

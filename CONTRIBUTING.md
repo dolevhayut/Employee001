@@ -4,9 +4,9 @@ Thanks for considering a contribution. Employee001 is a local-first, MIT-license
 
 ## Ground rules
 
-1. **No telemetry. No analytics. No phone-home.** PRs that add tracking, beacons, Sentry, or any code that sends data anywhere other than the Anthropic and Composio APIs the user opted into will be closed.
+1. **No silent telemetry, analytics or phone-home.** The only telemetry is the opt-in usage counter in `src/lib/telemetry.ts`: off by default, anonymous counts only. PRs that add tracking, beacons, Sentry, or any code that sends data somewhere the user didn't configure (their model provider, Composio, and the optional services they add keys for) will be closed.
 2. **No paid feature gates, no license-key checks, no DRM.** Premium is services, not code. If you find yourself adding `if (license.tier === "pro")`, stop.
-3. **No cloud dependencies beyond Anthropic and Composio.** Everything else lives on the user's machine.
+3. **No required cloud services beyond the model provider the user picks** (Anthropic, Bedrock, Vertex AI, Azure AI Foundry or a local endpoint). Composio, OpenAI and ElevenLabs stay optional, with the user's own keys. Everything else lives on the user's machine.
 4. **Don't burn real personal info into source.** Marketplace agent templates (in `src/lib/marketplace.ts`) are fictional personas — anything resembling a real person needs explicit consent or the contribution can't merge.
 5. **Don't commit secrets.** The repo has a sync-script secret scanner; don't bypass it.
 

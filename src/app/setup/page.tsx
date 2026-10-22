@@ -263,6 +263,9 @@ const THEMES: ReadonlyArray<{
   },
 ];
 
+// Catalog keys use the theme's display name, not its id.
+const THEME_KEY: Record<ThemeId, "cream" | "studio" | "cool"> = { light: "cream", dark: "studio", cool: "cool" };
+
 function StepTheme({
   theme,
   setTheme,
@@ -455,7 +458,7 @@ function StepTheme({
                     letterSpacing: "-0.01em",
                   }}
                 >
-                  {t(`setup.theme.${themeOption.id === "light" ? "cream" : themeOption.id}` as "setup.theme.cream")}
+                  {t(`setup.theme.${THEME_KEY[themeOption.id]}` as "setup.theme.cream")}
                 </span>
                 <span
                   style={{
@@ -465,7 +468,7 @@ function StepTheme({
                     lineHeight: 1.5,
                   }}
                 >
-                  {t(`setup.theme.${themeOption.id === "light" ? "cream" : themeOption.id}Sub` as "setup.theme.creamSub")}
+                  {t(`setup.theme.${THEME_KEY[themeOption.id]}Sub` as "setup.theme.creamSub")}
                 </span>
               </div>
             </button>

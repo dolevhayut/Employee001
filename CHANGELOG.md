@@ -74,6 +74,37 @@ SECURITY.md and docs/fixes/2026-10-compliance-plan.md.
 - Debug logs never go to disk; the old `council-debug.log` is deleted on
   start, and a test fails if a writer comes back.
 
+### First run
+- `npx employee001 start` in a new folder ran setup, then booted the server
+  twice when you said "start now" (a second, failing server with an
+  `EADDRINUSE` trace). It boots once.
+- A busy port is caught up front: setup suggests a free one, `start` says
+  which flag to use, and `demo` moves to the next free port by itself.
+- Setup re-asks for an Anthropic key that Anthropic rejects, and points
+  keyless users at `npx employee001 demo`.
+- `EMPLOYEE001_HOME` now picks the install folder for `setup`, `start`,
+  `doctor`, `secure` and `mcp` too, not just `export`, `import` and `audit`.
+- A missing browser opener (headless Linux, WSL without `xdg-open`) no longer
+  kills the CLI; it prints the URL.
+- A bad key or provider error shows in the chat with the setting to fix,
+  instead of endless typing dots (Ask a twin, trial chat) or a raw code with
+  a Hebrew label (Team Meeting).
+- Inviting employees and building twins run on the configured provider
+  (Bedrock, Vertex AI, Foundry, local), so they no longer require an
+  Anthropic key; the invite panel names the provider setting that's missing.
+- Hiring a marketplace agent on a fresh install was impossible: the required
+  owner list was empty. The signed-in person is now the default owner, and
+  the launchpad links to these ready-made agents.
+- The demo's suggested questions replayed an unrelated meeting; it now offers
+  the recorded question. The Studio theme card had no name.
+- The intent planner is opt-in (`TWIN_INTENT_PLANNER=1`). In 0.7.0 it always
+  failed SDK validation, so answers already used the heuristic plan; this
+  removes the warning and the wasted call.
+- `docker build` no longer copies the unused `better-sqlite3` module or
+  installs a compiler; DEPLOY-CLOUD.md no longer describes SQLite or a
+  data-dir lock. Privacy copy now says telemetry is opt-in and off by
+  default rather than "no telemetry".
+
 ## [0.7.0] — 2026-10-21
 
 ### Three ways to work with your company

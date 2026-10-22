@@ -1,16 +1,15 @@
 # Single-tenant Employee001 container. See docs/DEPLOY-CLOUD.md.
-# Node 24 matches the app and avoids the better-sqlite3 native-build gap on newer Node.
+# Node 24 LTS matches the app. Storage is plain files under data/ (JSON, JSONL,
+# Markdown): no database and no native modules, so no build toolchain is needed.
 
 FROM node:24-bookworm-slim AS base
 # NOTE: do NOT set NODE_ENV=production here — `npm ci` would then skip
 # devDependencies (typescript, @tailwindcss/postcss, …) that `next build` needs.
 # Production mode is set only in the final `run` stage below.
 
-# ── deps: install with a toolchain so better-sqlite3 can build if no prebuilt matches ──
+# ── deps ──
 FROM base AS deps
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
@@ -24,12 +23,9 @@ RUN npm run build
 # ── run: minimal image, server.js at /app so process.cwd()=/app → data at /app/data ──
 FROM base AS run
 WORKDIR /app
-# Next.js standalone output (server.js at the standalone root).
+# Next.js standalone output (server.js at the standalone root). The post-build
+# step already copies .next/static and public/ into it.
 COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
-# Ensure the native SQLite binary is present (traced by standalone, copied explicitly to be safe).
-COPY --from=build /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 
 # server.js reads HOSTNAME/PORT; the app's proxy.ts middleware reads EMPLOYEE001_BIND
 # to enforce the token gate on a non-loopback bind. EMPLOYEE001_TOKEN comes from

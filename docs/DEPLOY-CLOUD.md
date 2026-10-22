@@ -27,7 +27,7 @@ The key idea — **no multi-tenancy code is needed**. Each organization gets its
 | Per-org boundary | What it isolates |
 |---|---|
 | Container / app | compute — one always-on instance |
-| Persistent **volume** | the entire `data/` tree (profiles, memory, audit, SQLite/JSONL) |
+| Persistent **volume** | the entire `data/` tree (profiles, memory, audit log: JSON, JSONL and Markdown files) |
 | Secrets | that org's Anthropic / Composio keys |
 | Subdomain + TLS | `acme.yourdomain.com` |
 
@@ -35,8 +35,9 @@ Isolation lives at the infrastructure boundary, not in the code. Adding an org =
 another instance. **local-first survives** in spirit: one tenant, one dataset, one owner.
 
 > [!IMPORTANT]
-> This means the storage engine does **not** change — SQLite + on-disk JSON/Markdown
-> simply live on a mounted volume. No Postgres migration, no rewrite.
+> This means the storage engine does **not** change — the on-disk JSON, JSONL and
+> Markdown files simply live on a mounted volume. There is no database: no Postgres
+> migration, no rewrite.
 
 ---
 
@@ -44,12 +45,12 @@ another instance. **local-first survives** in spirit: one tenant, one dataset, o
 
 **Recommended: [Fly.io](https://fly.io).** Per-app Machines, persistent volumes, per-app
 secrets, free TLS + custom domains, and `fly deploy` is effectively your one-command
-install. Single-writer SQLite (the app takes a data-dir lock) maps cleanly to one Machine
+install. The app is a single writer over plain files, which maps cleanly to one Machine
 + one volume.
 
 | Layer | Choice |
 |---|---|
-| Runtime | Node 24 LTS (matches the app; avoids the `better-sqlite3` native-build gap on newer Node) |
+| Runtime | Node 24 LTS (matches the app; no native modules, so no build toolchain) |
 | Packaging | Docker image, Next.js **standalone** output (`node server.js`) |
 | State | Fly **volume** mounted at `/app/data` |
 | Secrets | `fly secrets set …` (never in the image or git) |
@@ -58,7 +59,7 @@ install. Single-writer SQLite (the app takes a data-dir lock) maps cleanly to on
 
 **Alternatives:** Render or Railway (persistent disks, great UI-driven DX); or a small VM
 (Hetzner/DO) + Docker Compose for full control at the cost of manual ops. **Not Vercel /
-any serverless** — the filesystem is ephemeral there, so SQLite and the `data/` tree don't
+any serverless** — the filesystem is ephemeral there, so the `data/` tree doesn't
 survive between requests.
 
 ---
@@ -85,9 +86,10 @@ first real deploy:
 
 ---
 
-## Files to add (starting templates — validate before shipping)
+## Deploy files
 
-> These do not exist in the repo yet. Treat them as a starting point; test the build.
+> [`Dockerfile`](../Dockerfile), [`fly.toml`](../fly.toml) and [`.dockerignore`](../.dockerignore)
+> are in the repo root. The copies below are for reading; the repo files win if they differ.
 
 **`Dockerfile`** — verified: builds on Node 24, boots, and the `proxy.ts` auth gate
 enforces `401` on a non-loopback bind. See the repo root [`Dockerfile`](../Dockerfile).
@@ -103,8 +105,6 @@ FROM node:24-bookworm-slim AS base
 
 FROM base AS deps
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
@@ -116,10 +116,8 @@ RUN npm run build
 
 FROM base AS run
 WORKDIR /app
+# The post-build step already put .next/static and public/ inside standalone.
 COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
-COPY --from=build /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 # server.js reads HOSTNAME/PORT; proxy.ts middleware reads EMPLOYEE001_BIND to
 # enforce the token gate. EMPLOYEE001_TOKEN is injected at runtime via fly secrets.
 ENV NODE_ENV=production PORT=8080 HOSTNAME=0.0.0.0 EMPLOYEE001_BIND=0.0.0.0
@@ -150,12 +148,12 @@ primary_region = "iad"
   force_https = true
   auto_stop_machines = false        # single always-on writer; do NOT autoscale to 0
   min_machines_running = 1
-  max_machines_running = 1           # one writer — SQLite/data-dir lock is single-holder
+  max_machines_running = 1           # one writer over plain files in data/
 ```
 
 > [!WARNING]
-> Keep it to **one** Machine. The app takes a data-dir lock and is a single writer;
-> running two Machines against one volume will corrupt state.
+> Keep it to **one** Machine. The app is a single writer over plain files and takes
+> no cross-process lock; running two Machines against one volume will corrupt state.
 
 ---
 

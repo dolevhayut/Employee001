@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { canRunModel } from "@/lib/model-provider";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 import { spawnDetachedBuild } from "@/lib/twin-build-runner";
@@ -57,9 +58,10 @@ export async function POST(
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const model = canRunModel();
+  if (!model.ok) {
     return Response.json(
-      { error: "ANTHROPIC_API_KEY is not configured" },
+      { error: `Model provider is not configured: ${model.reason}. Fix it in .env (or re-run \`npx employee001 setup\`), then restart.` },
       { status: 500 }
     );
   }

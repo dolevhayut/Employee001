@@ -101,7 +101,7 @@ Neither product's public pages (as read on 2026-10-21) describe building an agen
 
 - "Nothing leaves your machine" / "No cloud" / "No telemetry". Use the four boundaries instead.
 - "The employee authorizes their own twin, not the CEO." Both paths exist.
-- "Bedrock/Vertex/local instead of an Anthropic key." Building twins and some features still need the Anthropic API.
+- "Bedrock/Vertex/local instead of an Anthropic key" without the caveat. Twin chat, meetings and twin building run on the chosen provider; Ask's combined answer, meeting summaries, memory rerank and knowledge proposals still need the Anthropic API.
 - "Twins debate / argue it out." They take short turns and can tag each other; the verdict is a separate summary step.
 - "What one twin learns, the others can use." Profiles and curated org-brain nodes are shared; memory and meeting learnings stay with each twin.
 - "Fine-tuned", "trained model", "replaces employees", any certification, customer or usage number.

@@ -138,8 +138,18 @@ npx employee001 start     # starts the server and opens http://localhost:3000
 
 Running `npx employee001` with no command prints help. `start` runs `setup` first if there's no `.env` in the current directory. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop.
 
+The folder you run `setup` in is your install: it holds `.env` and `data/`. Run `start` from the same folder, or set `EMPLOYEE001_HOME=/path/to/install` to use it from anywhere.
+
+### First run: if something goes wrong
+
+- **"Port 3000 is already in use".** Another app (often a dev server) has it. Run `npx employee001 start --port 3001`, or change `PORT` in `.env`. The demo moves to the next free port by itself.
+- **A twin answers with "Invalid API key".** Fix `ANTHROPIC_API_KEY` in `.env` (or run `npx employee001 setup` again) and restart. On Bedrock, Vertex AI or Foundry, check that provider's credentials on this machine.
+- **"No .env found".** You're in a different folder from the one you set up. `cd` back to it, or set `EMPLOYEE001_HOME`.
+- **The browser didn't open.** Open the URL printed in the terminal (`http://localhost:3000` by default).
+- **Anything else.** `npx employee001 doctor` checks Node, `.env`, keys, port and the build. Employee001 is tested on Node 22 and 24 LTS.
+
 > [!NOTE]
-> **Requirements.** Node.js 22+. To invite employees and build twins you need an [Anthropic API key](https://console.anthropic.com) and a [Composio API key](https://app.composio.dev). Twin chat and meetings can instead run through your own Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible endpoint; marketplace agents work without Composio.
+> **Requirements.** Node.js 22+. You need a model provider: an [Anthropic API key](https://console.anthropic.com), or your own Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible endpoint. Inviting employees and building their twins also needs a [Composio API key](https://app.composio.dev); marketplace agents work without it. No keys at all? `npx employee001 demo` runs a recorded meeting with five invented twins.
 
 ### Commands
 
@@ -173,7 +183,7 @@ Four different things, stated separately. The full table is in [SECURITY.md](SEC
 | Boundary | What | Notes |
 |---|---|---|
 | **Stored on your machine** | Profiles, knowledge files, memory, chat history, meetings, approvals, audit log, settings | Files under `./data/`. No database, no Employee001 account. Protect the folder with filesystem permissions. |
-| **Sent to your model provider** | Prompts and the profile context a twin needs | Anthropic API, or your own Bedrock / Vertex AI / Azure AI Foundry / local endpoint for twin runs. Building twins, meeting summaries, Ask's combined answer, memory rerank and knowledge proposals call the Anthropic API directly (disabled in cloud-provider mode unless `EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1`). The provider's own terms apply. |
+| **Sent to your model provider** | Prompts and the profile context a twin needs | Anthropic API, or your own Bedrock / Vertex AI / Azure AI Foundry / local endpoint for twin runs and twin building. Meeting summaries, Ask's combined answer, memory rerank and knowledge proposals call the Anthropic API directly (disabled in cloud-provider mode unless `EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1`). The provider's own terms apply. |
 | **Sent to tools you connect** | Tool calls and OAuth | Composio for employee-connected apps, plus any custom MCP server. `WebSearch` queries go out without approval; `WebFetch` waits for it. Optional: OpenAI (memory embeddings), ElevenLabs (text-to-speech, and microphone audio for speech-to-text). |
 | **Telemetry** | Off by default | Opt-in only, anonymous aggregate counts (version, OS, number of twins, meetings, approvals). No endpoint is configured out of the box. |
 

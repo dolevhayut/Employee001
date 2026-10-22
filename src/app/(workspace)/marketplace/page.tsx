@@ -636,6 +636,7 @@ function TrialChatDrawer({
               type: string;
               delta?: string;
               sessionId?: string;
+              message?: string;
             };
             if (evt.type === "text_delta" && evt.delta) {
               setMessages((m) => {
@@ -648,6 +649,16 @@ function TrialChatDrawer({
               });
             } else if (evt.type === "session" && evt.sessionId) {
               setSessionId(evt.sessionId);
+            } else if (evt.type === "error" && evt.message) {
+              const message = evt.message;
+              setMessages((m) => {
+                const next = [...m];
+                const last = next[next.length - 1];
+                if (last?.role === "agent" && !last.text) {
+                  next[next.length - 1] = { role: "agent", text: `⚠️ ${message}` };
+                }
+                return next;
+              });
             }
           } catch {
             /* ignore malformed */
@@ -922,17 +933,23 @@ export default function MarketplacePage() {
   const [pendingAgent, setPendingAgent] = useState<AgentCard | null>(null);
   const [placementDraft, setPlacementDraft] = useState<AgentPlacement | null>(null);
   const [trialAgent, setTrialAgent] = useState<AgentCard | null>(null);
+  // The signed-in person: on a fresh install there are no employees yet, so
+  // they own the hire (otherwise the required owner field has no options).
+  const [me, setMe] = useState<{ id: string; name: string } | null>(null);
 
   const fetchAgents = useCallback(async () => {
     try {
-      const [agentsRes, employeesRes] = await Promise.all([
+      const [agentsRes, employeesRes, meRes] = await Promise.all([
         fetch("/api/marketplace/agents", { cache: "no-store" }),
         fetch("/api/employees", { cache: "no-store" }),
+        fetch("/api/auth/me", { cache: "no-store" }).catch(() => null),
       ]);
       const data = (await agentsRes.json()) as AgentCard[];
       const employeeData = (await employeesRes.json()) as EmployeeOption[];
+      const meData = meRes?.ok ? ((await meRes.json()) as { user?: { id?: string; name?: string } | null }) : null;
       setAgents(data);
       setEmployees(employeeData);
+      if (meData?.user?.id) setMe({ id: meData.user.id, name: meData.user.name || "You" });
     } finally {
       setLoading(false);
     }
@@ -961,13 +978,12 @@ export default function MarketplacePage() {
 
     const owner = defaultOwnerFor(agent);
     setPendingAgent(agent);
-    // If no employees onboarded yet (fresh install, no demo), leave the
-    // responsible-employee fields empty. The dropdown lets the user pick,
-    // and the Confirm button is disabled on falsy responsibleEmployeeId.
+    // No employees onboarded yet (fresh install): the signed-in person owns
+    // the agent. The Confirm button stays disabled on a falsy owner id.
     setPlacementDraft({
       employmentKind: "external_consultant",
-      responsibleEmployeeId: owner?.id ?? "",
-      responsibleEmployeeName: owner?.name ?? "",
+      responsibleEmployeeId: owner?.id ?? me?.id ?? "",
+      responsibleEmployeeName: owner?.name ?? me?.name ?? "",
       teamName: agent.department,
       teammateIds: owner ? [owner.id] : [],
       teammateNames: owner ? [owner.name] : [],

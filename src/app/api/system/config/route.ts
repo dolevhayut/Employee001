@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { voiceAllowed, voiceEnabled } from "@/lib/data-residency";
 import fs from "fs";
 import { envFilePath } from "@/lib/app-home";
+import { canRunModel, currentProvider, providerLabel, type ModelProvider } from "@/lib/model-provider";
 import { KEYCHAIN_PLACEHOLDER, readKeychainSecret, storeKeychainSecret, type SecretName } from "@/lib/keychain";
 
 // Returns *presence* of each required API key, never the value itself.
@@ -20,6 +21,12 @@ export type SystemConfigStatus = {
   voice: boolean;
   /** Any voice, the browser's speech-recognition fallback included. */
   voiceAllowed: boolean;
+  /** The configured model provider and whether it can run a model. Twin
+   *  building runs on it, so non-Anthropic installs need no Anthropic key. */
+  modelProvider: ModelProvider;
+  modelProviderLabel: string;
+  modelReady: boolean;
+  modelProblem?: string;
   /** True iff every *required* key is set. The UI uses this to flip the
    *  Invite button between active and disabled. */
   ready: boolean;
@@ -35,8 +42,21 @@ export async function GET() {
   const anthropic = Boolean(process.env.ANTHROPIC_API_KEY);
   const composio = Boolean(process.env.COMPOSIO_API_KEY);
   const elevenLabs = Boolean(process.env.ELEVENLABS_API_KEY);
-  const ready = anthropic && composio;
-  const body: SystemConfigStatus = { anthropic, composio, elevenLabs, voice: voiceEnabled(), voiceAllowed: voiceAllowed(), ready };
+  const model = canRunModel();
+  const modelProvider = currentProvider();
+  const ready = model.ok && composio;
+  const body: SystemConfigStatus = {
+    anthropic,
+    composio,
+    elevenLabs,
+    voice: voiceEnabled(),
+    voiceAllowed: voiceAllowed(),
+    modelProvider,
+    modelProviderLabel: providerLabel(modelProvider),
+    modelReady: model.ok,
+    ...(model.ok ? {} : { modelProblem: model.reason }),
+    ready,
+  };
   return NextResponse.json(body, {
     headers: { "Cache-Control": "no-store" },
   });

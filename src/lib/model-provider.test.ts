@@ -22,6 +22,7 @@ import {
   modelForProvider,
   localProviderConfigurationError,
   providerEnvForAgentSdk,
+  modelErrorMessage,
 } from "./model-provider";
 import { buildBaseOptions, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 
@@ -144,5 +145,21 @@ describe("model provider", () => {
     expect(response.status).toBe(200);
     expect(councilMocks.runCouncil).toHaveBeenCalledOnce();
     expect(await response.text()).toContain('"meetingId":"local-meeting"');
+  });
+});
+
+describe("modelErrorMessage", () => {
+  it("names the Anthropic key to fix and drops Claude Code's CLI hint", () => {
+    expect(modelErrorMessage("anthropic_unavailable: Invalid API key · Fix external API key", { EMPLOYEE001_MODEL_PROVIDER: "anthropic" }))
+      .toBe("Invalid API key. Check ANTHROPIC_API_KEY in .env (or run `npx employee001 setup` again), then restart.");
+  });
+
+  it("points cloud providers at their own credentials", () => {
+    expect(modelErrorMessage("anthropic_unavailable: authentication_failed", { EMPLOYEE001_MODEL_PROVIDER: "bedrock" }))
+      .toBe("authentication_failed. Check the AWS Bedrock credentials on this machine, then restart.");
+  });
+
+  it("passes other failures through", () => {
+    expect(modelErrorMessage("anthropic_unavailable: Overloaded", {})).toBe("Overloaded");
   });
 });

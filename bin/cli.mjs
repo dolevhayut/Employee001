@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 
@@ -10,9 +10,12 @@ const HELP = `Employee001 — your company's organizational brain, running on yo
 Usage:
   employee001 <command> [options]
 
-Commands:
-  setup     Interactive first-run wizard (writes .env, creates data/)
-  start     Start the local server (binds to 127.0.0.1 by default)
+Get started:
+  demo      Try Employee001 with 5 invented twins — no keys, nothing touches your files
+  setup     Interactive first-run wizard for your own team (writes .env, creates data/)
+  start     Start the local server (runs setup first if there's no .env)
+
+More commands:
   update    Check GitHub releases for a newer version
   doctor    Run a health check on your install
   secure    Move plaintext .env secrets into your OS keychain
@@ -20,7 +23,6 @@ Commands:
   import    Restore data/ from a tar.gz archive
   mcp       Connect Claude Code, Cursor and other MCP clients (stdio bridge to the running app)
   audit     Verify the audit log's hash chain (audit verify [exported-file])
-  demo      Try Employee001 with 5 invented twins — no keys, nothing touches your files
   help      Show this message
 
 Common flags:
@@ -35,12 +37,18 @@ Common flags:
   --encrypt       (export) Encrypt the archive with a passphrase
   --url <u>       (mcp) MCP endpoint (default http://127.0.0.1:<PORT>/api/mcp)
 
+Environment:
+  EMPLOYEE001_HOME  Install folder (.env and data/). Default: the current folder.
+
 Examples:
+  employee001 demo
   employee001 export ~/Desktop/e001-backup.tar.gz
   employee001 import ~/Desktop/e001-backup.tar.gz
 
 Docs: https://github.com/dolevhayut/Employee001
 `;
+
+const HOME_COMMANDS = new Set(["setup", "start", "doctor", "secure", "mcp"]);
 
 const KNOWN = new Set(["setup", "start", "update", "doctor", "secure", "export", "import", "mcp", "audit", "demo", "help"]);
 
@@ -59,13 +67,25 @@ async function main() {
     return;
   }
 
-  // If the user runs `start` without ever having run `setup`, kick into setup first.
+  // EMPLOYEE001_HOME picks the install folder (.env + data/), as it already
+  // does for export, import and audit. These commands work on the current
+  // folder, so move there; path arguments of other commands stay relative to
+  // where the user typed them.
+  if (process.env.EMPLOYEE001_HOME && HOME_COMMANDS.has(cmd)) {
+    const home = resolve(process.env.EMPLOYEE001_HOME);
+    if (cmd === "setup" || cmd === "start") mkdirSync(home, { recursive: true });
+    process.chdir(home);
+  }
+
+  // If the user runs `start` without ever having run `setup`, kick into setup
+  // first. Setup doesn't launch the server itself here, so it boots once.
   if (cmd === "start" && !existsSync(resolve(process.cwd(), ".env"))) {
     process.stdout.write(
-      "\nNo .env found in the current directory. Running setup first…\n\n",
+      `\nNo .env found in ${process.cwd()}. Running setup first…\n\n`,
     );
     const setup = await import(join(HERE, "commands", "setup.mjs"));
-    await setup.default([]);
+    const configured = await setup.default([], { launch: false });
+    if (!configured) return;
   }
 
   const mod = await import(join(HERE, "commands", `${cmd}.mjs`));

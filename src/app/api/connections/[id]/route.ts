@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { canRunModel } from "@/lib/model-provider";
 import {
   refreshConnections,
   isComposioConfigured,
@@ -52,7 +53,7 @@ export async function GET(
     const pending = await readPendingBuild(id);
     if (pending && countActiveConnections(state) > 0 && !getActiveBuild(id)) {
       await clearPendingBuild(id);
-      if (process.env.ANTHROPIC_API_KEY) {
+      if (canRunModel().ok) {
         const fromDisk = await loadEmployeesFromDisk();
         const employee = fromDisk.find((e) => e.id === id);
         if (employee) {
