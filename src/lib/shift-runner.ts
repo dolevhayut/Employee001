@@ -66,7 +66,7 @@ const PROFILE_FILE_NAMES = [
 function loadProfileFiles(employeeDir: string): string {
   return PROFILE_FILE_NAMES.map((name) => {
     try {
-      const content = fs.readFileSync(path.join(employeeDir, name), "utf8");
+      const content = fs.readFileSync(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ employeeDir, name), "utf8");
       return `### ${name}\n\n${content.trim()}`;
     } catch {
       return null;

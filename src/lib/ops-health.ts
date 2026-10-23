@@ -61,7 +61,7 @@ async function hasStaleKnowledge(employeeId: string, cutoff: number): Promise<bo
   const employeeDir = dataDir("employees", employeeId);
   const mtimes = await Promise.all(PROFILE_FILES.map(async (filename) => {
     try {
-      return (await stat(path.join(employeeDir, filename))).mtimeMs;
+      return (await stat(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ employeeDir, filename))).mtimeMs;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
       throw error;

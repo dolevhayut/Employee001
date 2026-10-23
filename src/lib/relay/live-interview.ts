@@ -68,7 +68,7 @@ export function loadProfileText(employeeId: string): string {
   const dir = dataDir("employees", employeeId);
   return PROFILE_FILES.map((name) => {
     try {
-      const c = fs.readFileSync(path.join(dir, name), "utf8").trim();
+      const c = fs.readFileSync(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ dir, name), "utf8").trim();
       return c ? `### ${name}\n${c}` : null;
     } catch {
       return null;
