@@ -1136,6 +1136,8 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                   case "text_delta": return { ...m, text: m.text + evt.delta };
                   case "cite": return { ...m, trace: [...m.trace, { kind: "cite", file: evt.file, ts: evt.ts }], cited: m.cited.includes(evt.file) ? m.cited : [...m.cited, evt.file] };
                   case "done": return { ...m, streaming: false, confidence: evt.confidence, cited: evt.cited_files };
+                  // A failed run would otherwise leave an empty bubble.
+                  case "error": return evt.kind === "composio_degraded" || m.text ? m : { ...m, text: `⚠️ ${evt.message}` };
                   case "tool_approval_request": return { ...m, pendingApprovals: [...m.pendingApprovals, { approvalId: evt.approvalId, tool: evt.tool, label: evt.label, input: evt.input, reason: evt.reason, ts: evt.ts }] };
                   case "tool_approval_resolved": return { ...m, pendingApprovals: m.pendingApprovals.filter((a) => a.approvalId !== evt.approvalId) };
                   case "clarification_request": return { ...m, pendingClarifications: [...m.pendingClarifications, { approvalId: evt.approvalId, questions: evt.questions, ts: evt.ts }] };

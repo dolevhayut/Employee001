@@ -173,13 +173,18 @@ function ApiKeysSection() {
   const [composio, setComposio] = useState("");
   const [elevenLabs, setElevenLabs] = useState("");
   const [status, setStatus] = useState<Record<string, boolean>>({});
+  // Bedrock, Vertex, Foundry and local installs run without an Anthropic key.
+  const [provider, setProvider] = useState("anthropic");
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/system/config")
       .then((r) => r.json())
-      .then((d) => setStatus(d))
+      .then((d) => {
+        setStatus(d);
+        if (typeof d?.modelProvider === "string") setProvider(d.modelProvider);
+      })
       .catch(() => {});
   }, []);
 
@@ -215,7 +220,7 @@ function ApiKeysSection() {
     /** Optional guidance under the field: what to grant, plus a link to create the key. */
     hint?: { text: string; linkLabel: string; href: string };
   }[] = [
-    { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key", statusKey: "anthropic", value: anthropic, setValue: setAnthropic, required: true },
+    { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key", statusKey: "anthropic", value: anthropic, setValue: setAnthropic, required: provider === "anthropic" },
     { key: "COMPOSIO_API_KEY", label: "Composio API Key", statusKey: "composio", value: composio, setValue: setComposio, required: true },
     {
       key: "ELEVENLABS_API_KEY",

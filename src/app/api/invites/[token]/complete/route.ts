@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canRunModel } from "@/lib/model-provider";
 import fs from "fs/promises";
 import path from "path";
 import {
@@ -475,7 +476,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       });
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!canRunModel().ok) {
       // Can't run the builder, but onboarding succeeded — defer politely.
       try {
         await writePendingBuild(employeeId, {

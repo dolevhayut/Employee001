@@ -282,6 +282,22 @@ function ParticipantsBar({
 
 function EmptyState({ onChip }: { onChip: (text: string) => void }) {
   const { t } = useT();
+  // A replay demo can only answer its one recorded question, so offer that
+  // instead of chips that would replay an unrelated meeting.
+  const [replayQuestion, setReplayQuestion] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/demo", { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<{ demo: boolean; live?: boolean; question?: string }>) : null))
+      .then((status) => {
+        if (!cancelled && status?.demo && !status.live && status.question) setReplayQuestion(status.question);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const chips = replayQuestion ? [replayQuestion] : CHIP_KEYS.map((key) => t(key));
   return (
     <div
       style={{
@@ -319,11 +335,11 @@ function EmptyState({ onChip }: { onChip: (text: string) => void }) {
           maxWidth: 480,
         }}
       >
-        {CHIP_KEYS.map((key) => (
+        {chips.map((text) => (
           <button
-            key={key}
+            key={text}
             dir="auto"
-            onClick={() => onChip(t(key))}
+            onClick={() => onChip(text)}
             style={{
               padding: "10px 16px",
               background: "var(--surface)",
@@ -347,7 +363,7 @@ function EmptyState({ onChip }: { onChip: (text: string) => void }) {
               e.currentTarget.style.color = "var(--text-muted)";
             }}
           >
-            {t(key)}
+            {text}
           </button>
         ))}
       </div>
@@ -2519,7 +2535,7 @@ function CouncilPageInner() {
               ...t,
               responses: t.responses.map((r, i) =>
                 i === idx
-                  ? { ...r, text: `(שגיאה: ${event.message})`, streaming: false }
+                  ? { ...r, text: `⚠️ ${event.message}`, streaming: false }
                   : r
               ),
             };

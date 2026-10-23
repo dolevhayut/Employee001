@@ -9,7 +9,7 @@ import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
 import { bumpActivityOnDisk } from "@/lib/employees-disk";
 import { generateFollowups } from "@/lib/followup-suggestions";
 import { appendTaskRun } from "@/lib/task-history";
-import { canRunModel } from "@/lib/model-provider";
+import { canRunModel, modelErrorMessage } from "@/lib/model-provider";
 import { pickRelevantProfileFiles } from "@/lib/profile-relevance";
 import { dataDir } from "@/lib/app-home";
 
@@ -267,6 +267,7 @@ export async function POST(request: NextRequest) {
             break;
           }
           case "employee_error":
+            send({ type: "error", kind: evt.message.startsWith("anthropic_unavailable") ? "anthropic_unavailable" : "internal", message: modelErrorMessage(evt.message), ts });
             send({ type: "done", confidence: 0, cited_files: [], ts });
             if (!runDone) {
               runDone = true;

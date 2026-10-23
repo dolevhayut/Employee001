@@ -18,8 +18,8 @@ afterEach(() => {
 
 describe("employee001 demo", () => {
   it("parses its small, explicit flag surface", () => {
-    expect(parseDemoArgs([])).toEqual({ port: 3100, noOpen: false, keep: false, live: false });
-    expect(parseDemoArgs(["--port", "4123", "--no-open", "--keep", "--live"])).toEqual({ port: 4123, noOpen: true, keep: true, live: true });
+    expect(parseDemoArgs([])).toEqual({ port: 3100, portExplicit: false, noOpen: false, keep: false, live: false });
+    expect(parseDemoArgs(["--port", "4123", "--no-open", "--keep", "--live"])).toEqual({ port: 4123, portExplicit: true, noOpen: true, keep: true, live: true });
     expect(() => parseDemoArgs(["--port", "0"])).toThrow(/1 to 65535/);
     expect(() => parseDemoArgs(["--unknown"])).toThrow(/Unknown demo option/);
   });

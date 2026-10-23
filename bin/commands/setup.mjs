@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import * as p from "@clack/prompts";
 import { createKeychain, KEYCHAIN_PLACEHOLDER, SECRET_NAMES } from "../lib/keychain.mjs";
+import { findFreePort, isPortInUse } from "../lib/port.mjs";
 
 // Claude Code's brand orange (R204 G120 G92 — close to the official wordmark).
 // 24-bit ANSI works on every modern terminal we ship to; FORCE_COLOR=0 or a
@@ -50,7 +51,8 @@ function printBanner() {
     "",
     `  ${orange("Your company's organizational brain.")}`,
     "  Agent twins of every person on your team, running on your own machine.",
-    `  ${dim("No cloud. No telemetry. Yours to shape.")}`,
+    `  ${dim("Self-hosted: your files stay here; prompts go to the model provider you pick.")}`,
+    `  ${dim("Telemetry is off unless you opt in. Yours to shape.")}`,
     "",
     `  ${dim("Built by")} ${orange("Dolev Hayut")} ${dim("· github.com/dolevhayut/Employee001 · MIT")}`,
     `  ${dim("Get ready for 2030.")}`,
@@ -64,8 +66,9 @@ function generateToken() {
   return randomBytes(24).toString("hex");
 }
 
-const ENV_PATH = resolve(process.cwd(), ".env");
-const DATA_DIR = resolve(process.cwd(), "data");
+// Resolved per run: the CLI may chdir to EMPLOYEE001_HOME before calling setup.
+let ENV_PATH = resolve(process.cwd(), ".env");
+let DATA_DIR = resolve(process.cwd(), "data");
 
 function readExistingEnv() {
   if (!existsSync(ENV_PATH)) return {};
@@ -95,7 +98,15 @@ async function validateAnthropicKey(key) {
   }
 }
 
-export default async function setup() {
+/**
+ * @param {string[]} _argv
+ * @param {{ launch?: boolean }} options `launch: false` when `start` invoked
+ *   setup: it boots the server itself afterwards, so don't offer to.
+ * @returns {Promise<boolean>} whether .env was written
+ */
+export default async function setup(_argv, { launch = true } = {}) {
+  ENV_PATH = resolve(process.cwd(), ".env");
+  DATA_DIR = resolve(process.cwd(), "data");
   printBanner();
   p.intro("Employee001 — first-run setup");
 
@@ -108,7 +119,7 @@ export default async function setup() {
     });
     if (p.isCancel(overwrite) || !overwrite) {
       p.cancel("Setup cancelled. Existing .env left untouched.");
-      return;
+      return false;
     }
   }
 
@@ -125,7 +136,7 @@ export default async function setup() {
   });
   if (p.isCancel(provider)) {
     p.cancel("Setup cancelled");
-    return;
+    return false;
   }
 
   let anthropicKey = "";
@@ -139,19 +150,26 @@ export default async function setup() {
   let localSonnetModel = "";
   let localHaikuModel = "";
   if (provider === "anthropic") {
-    anthropicKey = await p.password({
-      message: "Anthropic API key (required) — get one from https://console.anthropic.com",
-      mask: "•",
-      validate(value) {
-        if (!value) return "An Anthropic API key is required";
-        if (!value.startsWith("sk-ant-")) return "Key should start with sk-ant-";
-      },
-    });
-    if (p.isCancel(anthropicKey)) { p.cancel("Setup cancelled"); return; }
-    const spin = p.spinner();
-    spin.start("Validating Anthropic key against api.anthropic.com…");
-    const valid = await validateAnthropicKey(anthropicKey);
-    spin.stop(valid ? "Key looks good." : "Key did not authenticate (saving anyway — you can fix it later).");
+    p.log.info("No key yet? Press Ctrl+C and run `npx employee001 demo`: it needs none.");
+    for (;;) {
+      anthropicKey = await p.password({
+        message: "Anthropic API key (required) — get one from https://console.anthropic.com",
+        mask: "•",
+        validate(value) {
+          if (!value) return "An Anthropic API key is required";
+          if (!value.startsWith("sk-ant-")) return "Key should start with sk-ant-";
+        },
+      });
+      if (p.isCancel(anthropicKey)) { p.cancel("Setup cancelled"); return false; }
+      const spin = p.spinner();
+      spin.start("Validating Anthropic key against api.anthropic.com…");
+      const valid = await validateAnthropicKey(anthropicKey);
+      if (valid) { spin.stop("Key looks good."); break; }
+      spin.stop("Anthropic rejected this key, so twins would fail to answer.");
+      const retry = await p.confirm({ message: "Paste a different key?", initialValue: true });
+      if (p.isCancel(retry)) { p.cancel("Setup cancelled"); return false; }
+      if (!retry) { p.log.warn("Saving it anyway. Fix ANTHROPIC_API_KEY in .env later, then restart."); break; }
+    }
   } else if (provider === "bedrock") {
     awsRegion = await p.text({ message: "AWS region", initialValue: existing.AWS_REGION ?? "", validate: (v) => v.trim() ? undefined : "AWS region is required" });
   } else if (provider === "vertex") {
@@ -179,7 +197,7 @@ export default async function setup() {
     if (!p.isCancel(localOpusModel)) localSonnetModel = await p.text({ message: "Local Sonnet-equivalent model ID (required)", initialValue: existing.ANTHROPIC_DEFAULT_SONNET_MODEL ?? "", validate: (v) => v.trim() ? undefined : "A local model ID is required; Employee001 never guesses it" });
     if (!p.isCancel(localSonnetModel)) localHaikuModel = await p.text({ message: "Local Haiku-equivalent model ID (required)", initialValue: existing.ANTHROPIC_DEFAULT_HAIKU_MODEL ?? "", validate: (v) => v.trim() ? undefined : "A local model ID is required; Employee001 never guesses it" });
   }
-  if (p.isCancel(awsRegion) || p.isCancel(vertexRegion) || p.isCancel(vertexProject) || p.isCancel(foundryResource) || p.isCancel(localBaseUrl) || p.isCancel(localAuthToken) || p.isCancel(localOpusModel) || p.isCancel(localSonnetModel) || p.isCancel(localHaikuModel)) { p.cancel("Setup cancelled"); return; }
+  if (p.isCancel(awsRegion) || p.isCancel(vertexRegion) || p.isCancel(vertexProject) || p.isCancel(foundryResource) || p.isCancel(localBaseUrl) || p.isCancel(localAuthToken) || p.isCancel(localOpusModel) || p.isCancel(localSonnetModel) || p.isCancel(localHaikuModel)) { p.cancel("Setup cancelled"); return false; }
 
   // Composio is optional at setup time. The Anthropic key alone gets you
   // a working install — you can already hire marketplace agents (Alex
@@ -196,8 +214,8 @@ export default async function setup() {
       "Gmail, GitHub, Linear, calendar).",
       "",
       "It's NOT required to get started. You can:",
-      "  • Hire any of the 9 marketplace agents (Alex Morgan / SDR, etc.)",
-      "    and chat with them right away — they have no training pipeline.",
+      "  • Hire a marketplace agent from the Hire page (Alex Morgan / SDR",
+      "    and more) and chat right away — they have no training pipeline.",
       "  • Skip Composio now and add the key later from /employees, the",
       "    moment you want to invite a real employee.",
       "",
@@ -214,7 +232,7 @@ export default async function setup() {
   });
   if (p.isCancel(composioKey)) {
     p.cancel("Setup cancelled");
-    return;
+    return false;
   }
 
   const elevenLabsKey = await p.password({
@@ -224,7 +242,7 @@ export default async function setup() {
   });
   if (p.isCancel(elevenLabsKey)) {
     p.cancel("Setup cancelled");
-    return;
+    return false;
   }
 
   p.note(
@@ -245,22 +263,38 @@ export default async function setup() {
   });
   if (p.isCancel(openaiKey)) {
     p.cancel("Setup cancelled");
-    return;
+    return false;
   }
 
-  const port = await p.text({
-    message: "Port for the local server",
-    placeholder: "3000",
-    initialValue: existing.PORT ?? "3000",
-    validate(v) {
-      const n = Number(v);
-      if (!Number.isInteger(n) || n < 1024 || n > 65535)
-        return "Port must be an integer between 1024 and 65535";
-    },
-  });
-  if (p.isCancel(port)) {
-    p.cancel("Setup cancelled");
-    return;
+  // 3000 is every dev server's default; catch a clash now instead of at boot.
+  // Typing a busy port a second time keeps it (it may be this app, running).
+  let suggestedPort = existing.PORT ?? "3000";
+  let warnedPort = null;
+  let port;
+  for (;;) {
+    port = await p.text({
+      message: "Port for the local server",
+      placeholder: "3000",
+      initialValue: suggestedPort,
+      validate(v) {
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 1024 || n > 65535)
+          return "Port must be an integer between 1024 and 65535";
+      },
+    });
+    if (p.isCancel(port)) {
+      p.cancel("Setup cancelled");
+      return false;
+    }
+    if (port === warnedPort || !(await isPortInUse(port))) break;
+    const free = await findFreePort(Number(port) + 1);
+    warnedPort = port;
+    if (!free) {
+      p.log.warn(`Port ${port} is in use right now. Stop that process before \`employee001 start\`.`);
+      break;
+    }
+    p.log.warn(`Port ${port} is in use right now (another dev server?). ${free} is free; enter ${port} again to keep it.`);
+    suggestedPort = String(free);
   }
 
   const telemetryConsent = await p.confirm({
@@ -269,7 +303,7 @@ export default async function setup() {
   });
   if (p.isCancel(telemetryConsent)) {
     p.cancel("Setup cancelled");
-    return;
+    return false;
   }
 
   // Always generate (or preserve) an access token. It's a no-op when bound
@@ -288,10 +322,10 @@ export default async function setup() {
   const keychainFailures = [];
   if (keychain.available && secretsToStore.length) {
     const storeInKeychain = await p.confirm({
-      message: "Store API keys in your macOS Keychain? (recommended)",
+      message: `Store API keys in your ${keychain.kind === "linux" ? "system keyring (Secret Service)" : "macOS Keychain"}? (recommended)`,
       initialValue: true,
     });
-    if (p.isCancel(storeInKeychain)) { p.cancel("Setup cancelled"); return; }
+    if (p.isCancel(storeInKeychain)) { p.cancel("Setup cancelled"); return false; }
     if (storeInKeychain) {
       for (const name of secretsToStore) {
         const value = secretValues[name];
@@ -375,7 +409,7 @@ export default async function setup() {
   if (keychainFailures.length) {
     p.note(`Could not store ${keychainFailures.join(", ")} in the OS keychain; those values remain in .env.`, "Keychain");
   }
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
 
   // Consent belongs with other local workspace settings, not in .env. Keep
   // unrelated settings if setup is run again, and only mint an install id
@@ -402,6 +436,11 @@ export default async function setup() {
     "All set",
   );
 
+  if (!launch) {
+    p.outro("Starting Employee001…");
+    return true;
+  }
+
   // Offer to launch the server right away — saves a context switch
   // ("now type employee001 start") for the >99% case.
   const startNow = await p.confirm({
@@ -418,7 +457,7 @@ export default async function setup() {
         "Then open http://localhost:" + port,
       ].join("\n"),
     );
-    return;
+    return true;
   }
 
   p.outro("Booting…");
@@ -428,4 +467,5 @@ export default async function setup() {
   // thing setup does. Forward whatever CLI flags came in (e.g. --port).
   const start = await import("./start.mjs");
   await start.default([]);
+  return true;
 }

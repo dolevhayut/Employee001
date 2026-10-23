@@ -280,6 +280,23 @@ export default function LaunchpadPage() {
             </motion.button>
           ))}
         </div>
+
+        {/* Inviting a real employee needs Composio and their sign-off; a
+            marketplace agent answers with just the model provider. */}
+        <button
+          onClick={() => router.push("/marketplace")}
+          style={{
+            marginTop: 28,
+            background: "transparent",
+            border: "none",
+            color: PALETTE.inkMuted,
+            fontSize: 14,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          {t("launch.tryAgent")} <span style={{ color: PALETTE.copper }}>→</span>
+        </button>
       </motion.div>
     </main>
   );

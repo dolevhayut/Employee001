@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { checkNodeVersion } from "../lib/node-version.mjs";
 import { adoptData } from "../lib/adopt-data.mjs";
 import { createKeychain, resolveEnvPlaceholders } from "../lib/keychain.mjs";
+import { findFreePort, isPortInUse } from "../lib/port.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // bin/commands/start.mjs → ../../  is the package root
@@ -32,7 +33,11 @@ function openInBrowser(url) {
         ? "start"
         : "xdg-open";
   try {
-    spawn(opener, [url], { stdio: "ignore", detached: true }).unref();
+    // A missing opener (headless Linux, WSL without xdg-utils) fails
+    // asynchronously; without a listener that error would kill the CLI.
+    const child = spawn(opener, [url], { stdio: "ignore", detached: true });
+    child.on("error", () => process.stdout.write(`  Open ${url} in your browser.\n`));
+    child.unref();
   } catch {
     // ignore — user can open manually
   }
@@ -157,7 +162,7 @@ export default async function start(argv) {
 
   if (!existsSync(envPath)) {
     process.stderr.write(
-      "No .env found. Run `employee001 setup` first.\n",
+      `No .env found in ${cwd}. Run \`employee001 setup\` first (or set EMPLOYEE001_HOME to your install folder).\n`,
     );
     process.exitCode = 1;
     return;
@@ -176,6 +181,17 @@ export default async function start(argv) {
 
   const port = portArg ?? resolved.env.PORT ?? process.env.PORT ?? "3000";
   const bind = resolved.env.EMPLOYEE001_BIND ?? process.env.EMPLOYEE001_BIND ?? "127.0.0.1";
+
+  if (await isPortInUse(port, bind)) {
+    const free = await findFreePort(Number(port) + 1, bind);
+    process.stderr.write(
+      `Port ${port} is already in use (another Employee001 or dev server?).\n` +
+        (free ? `Stop that process, or run: employee001 start --port ${free}\n` : "Stop that process, or pick another port with --port <n>.\n") +
+        "To change it for good, edit PORT in .env.\n",
+    );
+    process.exitCode = 1;
+    return;
+  }
 
   launchServer({ home: cwd, port, bind, env: resolved.env, noOpen, strict });
 }

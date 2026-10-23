@@ -1,7 +1,7 @@
 const LTS_MAJOR_VERSIONS = new Set([22, 24]);
 
 /**
- * Report whether a Node.js version is supported by Employee001's native modules.
+ * Report whether Employee001 is tested on this Node.js version (the LTS lines).
  *
  * @param {string} version
  * @returns {{ ok: boolean, level: "ok" | "warn" | "error", message: string }}
@@ -33,6 +33,6 @@ export function checkNodeVersion(version = process.versions.node) {
   return {
     ok: true,
     level: "warn",
-    message: `Node ${major} is not supported yet (native modules); use Node 24 LTS, e.g. \`nvm install 24 && nvm use 24\``,
+    message: `Node ${major} isn't an LTS release; Employee001 is tested on Node 22 and 24. If something misbehaves, switch to Node 24 LTS (e.g. \`nvm install 24 && nvm use 24\`).`,
   };
 }

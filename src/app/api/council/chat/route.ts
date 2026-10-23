@@ -5,7 +5,7 @@ import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 import { hasEmployeeFiles } from "@/lib/employees-files";
 import { createDemoReplayResponse } from "@/lib/demo-replay";
-import { canRunModel } from "@/lib/model-provider";
+import { canRunModel, modelErrorMessage } from "@/lib/model-provider";
 import { pickTwins } from "@/lib/org-ask";
 
 export async function POST(request: NextRequest) {
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
           question,
           meetingId: body.meetingId,
           allParticipants,
-          onEvent: send,
+          onEvent: (event) => send(event.type === "employee_error" ? { ...event, message: modelErrorMessage(event.message) } : event),
           requesterId: sessionUserFromHeaders(request.headers)?.id,
         });
         // Echo the resolved meeting id so the client can persist it across

@@ -8,7 +8,7 @@ import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
 import type { EmployeeWithTwin } from "@/lib/employees";
 import { TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 import { dataDir } from "@/lib/app-home";
-import { canRunModel } from "@/lib/model-provider";
+import { canRunModel, modelErrorMessage } from "@/lib/model-provider";
 
 /**
  * Trial chat for marketplace agents — lets a CEO talk to an agent before
@@ -134,6 +134,7 @@ export async function POST(request: NextRequest) {
             send({ type: "done", confidence: evt.confidence, cited_files: [], ts });
             break;
           case "employee_error":
+            send({ type: "error", kind: evt.message.startsWith("anthropic_unavailable") ? "anthropic_unavailable" : "internal", message: modelErrorMessage(evt.message), ts });
             send({ type: "done", confidence: 0, cited_files: [], ts });
             break;
           default:
@@ -153,13 +154,7 @@ export async function POST(request: NextRequest) {
         );
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
-        send({
-          type: "tool_result",
-          name: "error",
-          summary: msg,
-          files: [],
-          ts: Date.now() - start,
-        });
+        send({ type: "error", kind: "internal", message: modelErrorMessage(msg), ts: Date.now() - start });
         send({ type: "done", confidence: 0, cited_files: [], ts: Date.now() - start });
       } finally {
         try {

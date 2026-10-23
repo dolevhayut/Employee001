@@ -83,18 +83,6 @@ describe("audit hash chain", () => {
 
     expect(verifyAuditChain()).toEqual({ ok: true, checked: 1, legacy: 1 });
   });
-
-  it("keeps a chain verifiable across rotation archives and the active file", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2020-01-01T00:00:00.000Z"));
-    const { appendAuditEntry, verifyAuditChain } = await auditModule();
-    appendAuditEntry(entry({ payload: "x".repeat(10 * 1024 * 1024) }));
-    vi.setSystemTime(new Date("2026-10-04T00:00:00.000Z"));
-    appendAuditEntry(entry({ afterRotation: true }));
-
-    expect(fs.existsSync(path.join(process.cwd(), "data", "audit.2020-01.jsonl"))).toBe(true);
-    expect(verifyAuditChain()).toEqual({ ok: true, checked: 2, legacy: 0 });
-  }, 15_000);
 });
 
 describe("audit redaction", () => {

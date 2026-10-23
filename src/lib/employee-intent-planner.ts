@@ -1,6 +1,7 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { ARTIFACT_TOOL_FULL_NAME } from "@/lib/artifacts-mcp";
 import { TWIN_MODEL_FALLBACK } from "@/lib/sdk-defaults";
+import { directAnthropicAllowed } from "@/lib/model-provider";
 
 export type ResponseIntentPlan = {
   intent: string;
@@ -283,7 +284,11 @@ export async function planEmployeeResponseIntent(
   ctx: ResponseIntentContext
 ): Promise<ResponseIntentPlan> {
   const fallback = fallbackPlan(question, ctx);
-  if (!process.env.ANTHROPIC_API_KEY || process.env.TWIN_INTENT_PLANNER === "0") {
+  // Opt-in: the model planner is awaited before every answer, which adds a
+  // model round-trip to time-to-first-token. (In 0.7.0 it never ran: the SDK
+  // rejected its identical model/fallback pair.) It calls api.anthropic.com
+  // directly, so it stays off in boundary mode and under EU residency.
+  if (process.env.TWIN_INTENT_PLANNER !== "1" || !directAnthropicAllowed() || !process.env.ANTHROPIC_API_KEY) {
     return fallback;
   }
 
@@ -311,7 +316,8 @@ export async function planEmployeeResponseIntent(
       prompt,
       options: {
         model,
-        fallbackModel: TWIN_MODEL_FALLBACK,
+        // No fallbackModel: the planner already runs on the fallback model, the
+        // SDK rejects an identical pair, and the heuristic plan covers failures.
         systemPrompt: [
           "You are an invisible response planner for Employee001 digital twins.",
           "Analyze the user input and return a structured intent plan.",

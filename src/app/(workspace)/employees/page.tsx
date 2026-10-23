@@ -656,6 +656,11 @@ function inviteUrl(token: string): string {
 type SystemConfig = {
   anthropic: boolean;
   composio: boolean;
+  /** Absent on a failed fetch; treated as the Anthropic API. */
+  modelProvider?: string;
+  modelProviderLabel?: string;
+  modelReady?: boolean;
+  modelProblem?: string;
   ready: boolean;
 };
 
@@ -726,7 +731,17 @@ function MissingKeysCard({
         {t("twins.keys.bodyAfter")}
       </div>
 
-      {!config.anthropic && (
+      {config.modelProvider && config.modelProvider !== "anthropic" && !config.modelReady && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontWeight: 600 }}>{config.modelProviderLabel}</div>
+          <div style={{ color: "var(--text-subtle)" }}>
+            {config.modelProblem}. Fix it in <span className="mono"><bdi>.env</bdi></span> or run{" "}
+            <span className="mono"><bdi>npx employee001 setup</bdi></span>, then restart.
+          </div>
+        </div>
+      )}
+
+      {(config.modelProvider ?? "anthropic") === "anthropic" && !config.anthropic && (
         <KeyRow
           label={t("twins.keys.anthropic")}
           hint={

@@ -7,11 +7,11 @@ describe("checkNodeVersion", () => {
     expect(checkNodeVersion(version)).toEqual({ ok: true, level: "ok", message: `Node ${major} is supported` });
   });
 
-  it.each(["23.0.0", "25.0.0", "26.0.0"])("warns for unsupported Node %s", (version) => {
+  it.each(["23.0.0", "25.0.0", "26.0.0"])("warns for non-LTS Node %s", (version) => {
     const result = checkNodeVersion(version);
     expect(result.level).toBe("warn");
     expect(result.ok).toBe(true);
-    expect(result.message).toContain("use Node 24 LTS");
+    expect(result.message).toContain("switch to Node 24 LTS");
   });
 
   it("rejects Node versions below 22", () => {
