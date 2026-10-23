@@ -161,6 +161,22 @@ describe("guard and runner policy", () => {
 });
 
 describe("MCP tools", () => {
+  it("marks every tool read-only and only ask_twin as open-world", async () => {
+    const connection = await connect();
+    const tools = (await connection.client.listTools()).tools;
+    await Promise.all([connection.client.close(), connection.server.close()]);
+    for (const tool of tools) {
+      expect(tool.annotations, tool.name).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+      expect(tool.annotations?.openWorldHint, tool.name).toBe(tool.name === "ask_twin");
+    }
+  });
+
+  it("returns structured content alongside the text", async () => {
+    const result = (await call("list_twins", {})) as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent).toBeTruthy();
+    expect(typeof result.structuredContent).toBe("object");
+  });
+
   it("lists seven tools, or six when ask_twin is off", async () => {
     let connection = await connect();
     expect((await connection.client.listTools()).tools).toHaveLength(7);

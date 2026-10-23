@@ -183,27 +183,40 @@ Start Employee001 first (`npx employee001 start`), then connect a client.
 /plugin install employee001 --marketplace dolevhayut/Employee001
 ```
 
-**Claude Code, MCP tools only:**
+**Claude Code, MCP tools only** (connects straight to the app over HTTP):
 
 ```bash
-claude mcp add employee001 -- npx -y employee001 mcp
+claude mcp add --transport http employee001 http://127.0.0.1:3000/api/mcp
 ```
 
 **Codex:**
 
 ```bash
-codex mcp add employee001 -- npx -y employee001 mcp
+codex mcp add employee001 --url http://127.0.0.1:3000/api/mcp
 ```
 
-**Cursor**: add this to `.cursor/mcp.json` (Claude Desktop and other stdio clients take the same block):
+**Cursor**: add this to `.cursor/mcp.json`:
+
+```json
+{ "mcpServers": { "employee001": { "url": "http://127.0.0.1:3000/api/mcp" } } }
+```
+
+**Claude Desktop and other clients that only launch a local command** use the stdio bridge:
 
 ```json
 { "mcpServers": { "employee001": { "command": "npx", "args": ["-y", "employee001", "mcp"] } } }
 ```
 
-**Teammates on other machines.** If Employee001 runs on a shared server for the team, each person points their client at it and uses the instance's MCP token: set `EMPLOYEE001_MCP_URL` and `EMPLOYEE001_MCP_TOKEN` in the client's `env` (with Codex: `codex mcp add employee001 --env EMPLOYEE001_MCP_URL=https://… --env EMPLOYEE001_MCP_TOKEN=… -- npx -y employee001 mcp`), or pass `--url` / `--token`. The default is your local app at `http://127.0.0.1:3000/api/mcp`.
+**Teammates on other machines.** If Employee001 runs on a shared server for the team, each person points their client at its URL and sends the instance's MCP token (`EMPLOYEE001_MCP_TOKEN`, kept in their own environment, never in a committed file):
 
-**What an agent can do.** Read: `list_twins`, `get_twin_profile`, `search_org_brain`, `list_pending_approvals`, `list_team_meetings`, `get_team_meeting`. Ask: `ask_twin`, answer-only, rate- and cost-limited. Agents get member access: no settings, no approvals, no external actions. Plugin guide: [plugins/claude-code](./plugins/claude-code/README.md). Full reference: [docs/mcp.md](./docs/mcp.md).
+```bash
+claude mcp add --transport http employee001 https://e001.example.com/api/mcp --header "Authorization: Bearer $EMPLOYEE001_MCP_TOKEN"
+codex mcp add employee001 --url https://e001.example.com/api/mcp --bearer-token-env-var EMPLOYEE001_MCP_TOKEN
+```
+
+With the stdio bridge, set `EMPLOYEE001_MCP_URL` and `EMPLOYEE001_MCP_TOKEN` in the client's `env`, or pass `--url` / `--token`.
+
+**What an agent can do.** Read: `list_twins`, `get_twin_profile`, `search_org_brain`, `list_pending_approvals`, `list_team_meetings`, `get_team_meeting`. Ask: `ask_twin`, answer-only, rate- and cost-limited. Every tool is marked read-only for the client, and results come back as structured data. Agents get member access: no settings, no approvals, no external actions. Plugin guide: [plugins/claude-code](./plugins/claude-code/README.md). Full reference: [docs/mcp.md](./docs/mcp.md).
 
 ## Privacy and security boundaries
 

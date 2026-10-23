@@ -7,8 +7,13 @@ type ToolDefinition = {
   name: ToolName;
   description: string;
   inputSchema: z.ZodType;
+  /** Hints for clients deciding when to ask the user (MCP tool annotations). */
+  annotations: { title?: string; readOnlyHint: boolean; destructiveHint: boolean; idempotentHint?: boolean; openWorldHint: boolean };
   enabled?: boolean;
 };
+
+// Every tool only reads this install's data; none changes anything.
+const LOCAL_READ = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 
 export function isLoopbackBind(bind: string | undefined): boolean {
   // Keep this in sync with proxy.ts without importing middleware into the route.
@@ -47,42 +52,51 @@ function toolDefinitions(): ToolDefinition[] {
       description:
         "Use this to find colleagues and their ownership before you build or ask a question.",
       inputSchema: noArgs,
+      annotations: { title: "List twins", ...LOCAL_READ },
     },
     {
       name: "get_twin_profile",
       description:
         "Use this to read a colleague's grounded profile and decisions before you build.",
       inputSchema: profile,
+      annotations: { title: "Read a twin's profile", ...LOCAL_READ },
     },
     {
       name: "search_org_brain",
       description:
         "Use this first to find what colleagues decided or own before you build; it searches local profiles and the org brain.",
       inputSchema: search,
+      annotations: { title: "Search the org brain", ...LOCAL_READ },
     },
     {
       name: "list_pending_approvals",
       description:
         "Use this to see pending Employee001 approvals without exposing raw tool input.",
       inputSchema: noArgs,
+      annotations: { title: "List pending approvals", ...LOCAL_READ },
     },
     {
       name: "list_team_meetings",
       description:
         "Use this to list active in-memory team meetings for this Employee001 process; meetings reset on restart.",
       inputSchema: noArgs,
+      annotations: { title: "List team meetings", ...LOCAL_READ },
     },
     {
       name: "get_team_meeting",
       description:
         "Use this to inspect an active in-memory team meeting, its latest transcript, and shared files.",
       inputSchema: meeting,
+      annotations: { title: "Read a team meeting", ...LOCAL_READ },
     },
     {
       name: "ask_twin",
       description:
         "Use search_org_brain first. Ask a ready colleague for an answer when retrieval is insufficient; this costs money (up to $0.50 per call) and takes 10–60 seconds.",
       inputSchema: ask,
+      // Answer-only (no actions), but each call runs the model provider and
+      // costs money, and the answer varies: not idempotent, open world.
+      annotations: { title: "Ask a twin", readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       enabled: process.env.EMPLOYEE001_MCP_ASK_TWIN !== "off",
     },
   ];

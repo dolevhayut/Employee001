@@ -28,7 +28,15 @@ The install asks for the endpoint (default `http://127.0.0.1:3000/api/mcp`) and 
 
 ### Claude Code, tools only
 
-Run this in the project where you use Claude Code:
+Run this in the project where you use Claude Code. It connects to the app directly over HTTP:
+
+```bash
+claude mcp add --transport http employee001 http://127.0.0.1:3000/api/mcp
+```
+
+For a shared or sign-in-protected instance, add `--header "Authorization: Bearer $EMPLOYEE001_MCP_TOKEN"`.
+
+Or use the stdio bridge, which also works in clients without HTTP support:
 
 ```bash
 claude mcp add employee001 -- npx -y employee001 mcp
@@ -56,17 +64,17 @@ Prefer `EMPLOYEE001_MCP_TOKEN` on the instance: a separate token for MCP clients
 
 ### Codex
 
+Codex connects to the app directly over HTTP:
+
 ```bash
-codex mcp add employee001 -- npx -y employee001 mcp
+codex mcp add employee001 --url http://127.0.0.1:3000/api/mcp
 ```
 
-For a shared or sign-in-protected instance, pass its address and MCP token:
+For a shared or sign-in-protected instance, keep the token in your environment and let Codex send it:
 
 ```bash
-codex mcp add employee001 \
-  --env EMPLOYEE001_MCP_URL=https://employee001.example.com/api/mcp \
-  --env EMPLOYEE001_MCP_TOKEN=<the instance's EMPLOYEE001_MCP_TOKEN> \
-  -- npx -y employee001 mcp
+export EMPLOYEE001_MCP_TOKEN=<the instance's EMPLOYEE001_MCP_TOKEN>
+codex mcp add employee001 --url https://employee001.example.com/api/mcp --bearer-token-env-var EMPLOYEE001_MCP_TOKEN
 ```
 
 ### Cursor

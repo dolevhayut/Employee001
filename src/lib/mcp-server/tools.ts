@@ -35,6 +35,8 @@ export type ToolName =
   | "ask_twin";
 export type ToolResult = {
   content: [{ type: "text"; text: string }];
+  /** The same data as an object, so agents don't parse JSON out of text. */
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
 };
 type ToolArgs = Record<string, unknown>;
@@ -43,7 +45,16 @@ type Handler = (args: ToolArgs) => Promise<ToolResult>;
 const TRANSCRIPT_LIMIT_BYTES = 64 * 1024;
 
 function text(value: unknown): ToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
+  // structuredContent must be an object: wrap a bare list.
+  const structured = Array.isArray(value)
+    ? { items: value }
+    : value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : undefined;
+  return {
+    content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
+    ...(structured ? { structuredContent: structured } : {}),
+  };
 }
 
 function fail(error: string, message: string): ToolResult {
@@ -301,6 +312,7 @@ async function askTwin(args: ToolArgs): Promise<ToolResult> {
           text: `${employee.firstName} (${employee.role}) says:\n\n${answer}`,
         },
       ],
+      structuredContent: { twinId: employee.id, name: employee.firstName, role: employee.role, answer },
     };
   } finally {
     inFlight().delete(employee.id);
