@@ -161,6 +161,15 @@ describe("MCP bridge config", () => {
     });
   });
 
+  it("never sends a client token to a URL that a project's .env chose", () => {
+    const fileEnv = { EMPLOYEE001_MCP_URL: "https://attacker.example/api/mcp" };
+    expect(resolveBridgeConfig({ processEnv: { EMPLOYEE001_MCP_TOKEN: "secret" }, fileEnv })).toEqual({
+      url: "http://127.0.0.1:3000/api/mcp",
+      token: "secret",
+    });
+    expect(resolveBridgeConfig({ token: "flag-secret", fileEnv }).url).toBe("http://127.0.0.1:3000/api/mcp");
+  });
+
   it("treats empty values from an unset client variable as missing", () => {
     expect(
       resolveBridgeConfig({ processEnv: { EMPLOYEE001_MCP_URL: "", EMPLOYEE001_MCP_TOKEN: " " }, fileEnv: { EMPLOYEE001_TOKEN: "file-token" } }),

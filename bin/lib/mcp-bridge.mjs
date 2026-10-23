@@ -56,21 +56,22 @@ function firstSet(...values) {
  * Where the bridge connects and with which token. Flags win, then the
  * environment the MCP client passes (a plugin or editor config), then the
  * `.env` in the current directory (running from the Employee001 install).
+ *
+ * The `.env` sits in whatever folder the client was started in, which can be
+ * any repository. So its URL is used only together with its own token: a
+ * token from a flag or the client's environment is never sent to a URL that
+ * a project's `.env` chose.
  * @param {{ url?: string, token?: string, processEnv?: Record<string, string | undefined>, fileEnv?: Record<string, string | undefined> }} options
  */
 export function resolveBridgeConfig({ url, token, processEnv = {}, fileEnv = {} }) {
   const port = firstSet(fileEnv.PORT) ?? "3000";
+  const trustedToken = firstSet(token, processEnv.EMPLOYEE001_MCP_TOKEN, processEnv.EMPLOYEE001_TOKEN);
+  const fileToken = firstSet(fileEnv.EMPLOYEE001_MCP_TOKEN, fileEnv.EMPLOYEE001_TOKEN);
+  const trustedUrl = firstSet(url, processEnv.EMPLOYEE001_MCP_URL);
+  const fileUrl = trustedToken ? undefined : firstSet(fileEnv.EMPLOYEE001_MCP_URL);
   return {
-    url:
-      firstSet(url, processEnv.EMPLOYEE001_MCP_URL, fileEnv.EMPLOYEE001_MCP_URL) ??
-      `http://127.0.0.1:${port}/api/mcp`,
-    token: firstSet(
-      token,
-      processEnv.EMPLOYEE001_MCP_TOKEN,
-      processEnv.EMPLOYEE001_TOKEN,
-      fileEnv.EMPLOYEE001_MCP_TOKEN,
-      fileEnv.EMPLOYEE001_TOKEN,
-    ),
+    url: trustedUrl ?? fileUrl ?? `http://127.0.0.1:${port}/api/mcp`,
+    token: trustedToken ?? fileToken,
   };
 }
 
