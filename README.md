@@ -6,6 +6,8 @@
 
 **Employee001 builds an AI twin of each employee from their own work: the expertise, decisions and tools they choose to connect.** Ask the twin of the person who knows, ask the whole company for one cited answer, or convene the right twins in a Team Meeting. External actions wait for a person's approval. Open source, self-hosted.
 
+**Every install is also your organization's own MCP server**, so your team can ask the twins from the agents they already use: Claude Code, Codex, Cursor, Claude Desktop.
+
 ```bash
 npx employee001 setup     # first-run wizard
 npx employee001 start     # opens http://localhost:3000
@@ -18,7 +20,7 @@ npx employee001 start     # opens http://localhost:3000
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg?style=flat-square)](https://nodejs.org)
 [![Discussions](https://img.shields.io/github/discussions/dolevhayut/Employee001?style=flat-square)](https://github.com/dolevhayut/Employee001/discussions)
 
-[**Why**](#why-it-exists) · [**What's different**](#what-makes-it-different) · [**How it works**](#how-it-works) · [**Features**](#features-shipped-today) · [**Install**](#installation) · [**Privacy & security**](#privacy-and-security-boundaries) · [**Compare**](#how-it-compares) · [**Roadmap**](#cloud-and-roadmap)
+[**Why**](#why-it-exists) · [**What's different**](#what-makes-it-different) · [**How it works**](#how-it-works) · [**Features**](#features-shipped-today) · [**Install**](#installation) · [**MCP for your agents**](#your-twins-inside-every-agent-mcp) · [**Privacy & security**](#privacy-and-security-boundaries) · [**Compare**](#how-it-compares) · [**Roadmap**](#cloud-and-roadmap)
 
 </div>
 
@@ -116,7 +118,7 @@ Everything below is in the current npm release ([0.7.0](CHANGELOG.md)) unless ma
 - **Voice**: listen to answers via ElevenLabs. Speaking a question in Ask is on `main`, not yet released.
 
 **Platform**
-- **MCP server**: ask your twins from Claude Code, Cursor and other MCP clients ([docs/mcp.md](./docs/mcp.md)).
+- **Your org's own MCP server**: every install includes one, so anyone on the team can ask the twins from Claude Code, Codex, Cursor and other MCP clients ([below](#your-twins-inside-every-agent-mcp), [docs/mcp.md](./docs/mcp.md)).
 - **Custom MCP servers** with Bearer auth or OAuth, from `/settings`.
 - **Marketplace**: 14 generic role agents (SDR, DevOps, Writer, Analyst, CSM and more) that need no invite.
 - **Backup**: `export` / `import` of the whole `data/` folder, optionally encrypted.
@@ -167,9 +169,13 @@ The folder you run `setup` in is your install: it holds `.env` and `data/`. Run 
 | `npx employee001 update` | Checks GitHub releases for a newer version. |
 | `npx employee001 help` | Shows help. |
 
-### Use from Claude Code / Cursor
+### Your twins, inside every agent (MCP)
 
-Ask your twins from the editor while you code. Start Employee001 first (`npx employee001 start`).
+Every Employee001 install includes an MCP server. It belongs to your organization: it runs inside your installation, answers from your twins and your org brain, and is not published anywhere. Each person on the team connects their own local agent to it, the same way they would connect any MCP tool.
+
+That makes the twins useful beyond the people who open the web app. A developer in Claude Code checks what product decided before building; an engineer in Codex asks the sales twin what a customer actually requires; a support lead in Claude Desktop asks who owns a migration. Each answer comes from the twin of the colleague who knows.
+
+Start Employee001 first (`npx employee001 start`), then connect a client.
 
 **Claude Code plugin** (recommended). Adds `/employee001:ask-company`, `/employee001:ask-twin` and `/employee001:team-meeting`, and lets Claude check what the team decided before it builds:
 
@@ -183,13 +189,21 @@ Ask your twins from the editor while you code. Start Employee001 first (`npx emp
 claude mcp add employee001 -- npx -y employee001 mcp
 ```
 
+**Codex:**
+
+```bash
+codex mcp add employee001 -- npx -y employee001 mcp
+```
+
 **Cursor**: add this to `.cursor/mcp.json` (Claude Desktop and other stdio clients take the same block):
 
 ```json
 { "mcpServers": { "employee001": { "command": "npx", "args": ["-y", "employee001", "mcp"] } } }
 ```
 
-The default connection is your local app at `http://127.0.0.1:3000/api/mcp`. For another port or a remote instance, set `EMPLOYEE001_MCP_URL` and, once sign-in is on, `EMPLOYEE001_MCP_TOKEN` in the client's `env` (or pass `--url` / `--token`). Tools: `list_twins`, `get_twin_profile`, `search_org_brain`, `list_pending_approvals`, `list_team_meetings`, `get_team_meeting`, `ask_twin` (answer-only, rate- and cost-limited). Plugin guide: [plugins/claude-code](./plugins/claude-code/README.md). Full reference: [docs/mcp.md](./docs/mcp.md).
+**Teammates on other machines.** If Employee001 runs on a shared server for the team, each person points their client at it and uses the instance's MCP token: set `EMPLOYEE001_MCP_URL` and `EMPLOYEE001_MCP_TOKEN` in the client's `env` (with Codex: `codex mcp add employee001 --env EMPLOYEE001_MCP_URL=https://… --env EMPLOYEE001_MCP_TOKEN=… -- npx -y employee001 mcp`), or pass `--url` / `--token`. The default is your local app at `http://127.0.0.1:3000/api/mcp`.
+
+**What an agent can do.** Read: `list_twins`, `get_twin_profile`, `search_org_brain`, `list_pending_approvals`, `list_team_meetings`, `get_team_meeting`. Ask: `ask_twin`, answer-only, rate- and cost-limited. Agents get member access: no settings, no approvals, no external actions. Plugin guide: [plugins/claude-code](./plugins/claude-code/README.md). Full reference: [docs/mcp.md](./docs/mcp.md).
 
 ## Privacy and security boundaries
 

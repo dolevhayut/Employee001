@@ -54,6 +54,21 @@ claude mcp add employee001 -e EMPLOYEE001_MCP_URL=https://employee001.example.co
 
 Prefer `EMPLOYEE001_MCP_TOKEN` on the instance: a separate token for MCP clients, so the app's `EMPLOYEE001_TOKEN` never leaves the server. The instance accepts either.
 
+### Codex
+
+```bash
+codex mcp add employee001 -- npx -y employee001 mcp
+```
+
+For a shared or sign-in-protected instance, pass its address and MCP token:
+
+```bash
+codex mcp add employee001 \
+  --env EMPLOYEE001_MCP_URL=https://employee001.example.com/api/mcp \
+  --env EMPLOYEE001_MCP_TOKEN=<the instance's EMPLOYEE001_MCP_TOKEN> \
+  -- npx -y employee001 mcp
+```
+
 ### Cursor
 
 Create or update `.cursor/mcp.json` in your project:
