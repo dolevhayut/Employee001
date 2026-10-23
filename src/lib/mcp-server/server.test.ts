@@ -408,6 +408,22 @@ describe("MCP route", () => {
     );
     expect(response.status).toBe(200);
     expect(((await response.json()) as { result: { tools: unknown[] } }).result.tools).toHaveLength(7);
+    // A separate MCP token is accepted alongside the app token, as in the proxy.
+    process.env.EMPLOYEE001_MCP_TOKEN = "mcp-only-token";
+    response = await POST(
+      new Request("http://lan-hostname.local/api/mcp", {
+        method: "POST",
+        headers: {
+          host: "lan-hostname.local",
+          authorization: "Bearer mcp-only-token",
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body,
+      }),
+    );
+    expect(response.status).toBe(200);
+    delete process.env.EMPLOYEE001_MCP_TOKEN;
     response = await POST(
       new Request("http://lan-hostname.local/api/mcp", {
         method: "POST",

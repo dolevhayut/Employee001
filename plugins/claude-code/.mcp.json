@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "employee001": {
+      "command": "npx",
+      "args": ["-y", "employee001", "mcp", "--url", "${user_config.url}"],
+      "env": {
+        "EMPLOYEE001_MCP_TOKEN": "${user_config.token}"
+      }
+    }
+  }
+}

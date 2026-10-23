@@ -19,12 +19,14 @@ export async function POST(request: Request): Promise<Response> {
   const rejected = checkLocalRequest(request);
   if (rejected) return rejected;
   if (!isLoopbackBind(process.env.EMPLOYEE001_BIND)) {
-    const expected = process.env.EMPLOYEE001_TOKEN;
+    // Same tokens the proxy accepts: the MCP-only token, else the app token.
+    const expected = [process.env.EMPLOYEE001_MCP_TOKEN, process.env.EMPLOYEE001_TOKEN].filter(
+      (token): token is string => Boolean(token),
+    );
     const bearer = request.headers.get("authorization");
     if (
-      !expected ||
       !bearer?.startsWith("Bearer ") ||
-      !timingSafeEqual(bearer.slice("Bearer ".length), expected)
+      !expected.some((token) => timingSafeEqual(bearer.slice("Bearer ".length), token))
     ) {
       return rpcError(-32004, "missing or invalid token", 401);
     }

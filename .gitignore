@@ -29,4 +29,6 @@ docs/local/
 
 # Local Claude Code MCP config (e.g. the companysim dev server). Per-machine, not shipped.
 .mcp.json
+# …except the Claude Code plugin's server config, which is the plugin.
+!plugins/claude-code/.mcp.json
 .metadata_never_index

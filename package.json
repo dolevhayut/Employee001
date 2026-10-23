@@ -5,6 +5,7 @@
   "license": "MIT",
   "author": "Dolev Hayut",
   "homepage": "https://employee001.com",
+  "mcpName": "io.github.dolevhayut/employee001",
   "repository": {
     "type": "git",
     "url": "https://github.com/dolevhayut/Employee001.git"
