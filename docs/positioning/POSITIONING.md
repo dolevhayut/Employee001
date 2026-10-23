@@ -1,6 +1,6 @@
 # Employee001 positioning
 
-Last reviewed: 2026-10-21. Every claim below was checked against the code on `main` (paths given) or against the competitor's own public pages (URLs given). If the code changes, re-check the claim before reusing the copy.
+Last reviewed: 2026-10-23 (ICP revised; compliance features as of v0.8.0). Every claim below was checked against the code on `main` (paths given) or against the competitor's own public pages (URLs given). If the code changes, re-check the claim before reusing the copy.
 
 ## Old vs new
 
@@ -16,13 +16,33 @@ Last reviewed: 2026-10-21. Every claim below was checked against the code on `ma
 
 ## Primary ICP
 
-**Growing companies, roughly 15 to 200 people, where a few people hold the answers.** Founder-led or ops-led teams that run on Slack, Gmail, Linear/Jira, GitHub and a CRM, with at least one technical person who can run `npx` or a small server.
+**Technology companies of roughly 30 to 150 people with a substantial engineering team.** They run on Slack, Jira or Linear and GitHub, their developers already use Claude Code, Cursor or Codex, and they sit in Israel or Europe, where security review and regulation are part of every tool decision.
 
-- **Economic buyer:** founder, CEO or COO who feels the bottleneck personally (everyone asks them, or the same three senior people).
-- **Technical evaluator:** CTO or a senior engineer who reads the README, SECURITY.md and the code before anything gets connected.
-- **Why them first:** the pain is acute (expertise is concentrated), the setup cost is acceptable (self-host, own keys), and they don't yet have an internal knowledge team or an enterprise search contract.
+- **Champion (who installs):** the CTO or VP R&D. Employee001 grows bottom-up: the person who runs `npx employee001`, reads SECURITY.md and connects the MCP server to the team's coding agents.
+- **Daily users:** developers asking twins from their editor over MCP ("why did we build it this way", "who owns this"), plus anyone using Ask, Ask the company or Team Meeting.
+- **Economic buyer (later):** the CEO or COO, once usage exists and they want Cloud or paid setup and support.
 
-**Not the ICP yet:** regulated enterprises needing SSO/SCIM, certifications or a managed SaaS (Cloud is a waitlist; SSO/RBAC/MFA are not shipped), and non-technical teams who can't self-host.
+**Why them first**
+
+1. **The pain is sharpest there.** In a growing software company, "why we built it this way" and "who decides what" live with three or four senior people, and everyone else waits for them.
+2. **A daily habit to attach to.** MCP inside Claude Code and Codex gives a developer a reason to use the twins every day without opening the web app. That is the PLG engine.
+3. **They can self-host and they check.** They run it themselves and read the code and SECURITY.md. Consent, audit, roles, EU mode and self-hosting are what they look for.
+4. **Clear trigger events:** a senior engineer leaving, fast hiring and onboarding, and questions that cross product, sales and engineering.
+
+## Secondary ICP (paid Cloud, after the gate)
+
+**Regulated mid-market companies of 100 to 500 people in fintech, insurtech, health-tech and cyber, in Israel and Europe.** This is where revenue comes from, not adoption. Self-hosting or a dedicated instance, EU data residency, a verifiable audit trail, recorded consent and RBAC are requirements for them, which is why the cloud runs on the Agent SDK in our own runtime rather than a managed agent platform.
+
+## Not the ICP now
+
+- **Enterprises of 1,000+:** long procurement, SAML (not supported yet), SCIM and certifications.
+- **Companies under ~20 people:** everyone talks to everyone; there is no knowledge silo to solve.
+- **Non-technical businesses:** they can't self-host, and Cloud is a waitlist.
+
+## Validating the ICP
+
+- The waitlist and setup form should ask for **role** and **company size**.
+- Ten conversations with people who installed it: who installed, why, what they asked first, and who else in the company used it.
 
 ## Problem statement
 
@@ -50,7 +70,7 @@ In growing companies, the knowledge that runs the business lives in a few people
 - **Ask a twin** (`/flow`): one twin, with its run shown as a workflow.
 - **Ask the company** (`/ask`): routes the question to 1 to 3 relevant twins, the Org Brain and org MCP systems in parallel, read-only, then writes one answer citing each claim (`src/lib/org-ask.ts`, `src/lib/org-router.ts`, `src/lib/org-answer.ts`).
 - **Team Meeting** (`/council`): selected or @mentioned twins take turns on a question, can tag colleagues in, and a "Summarize & decide" step returns a decision, owned actions and open questions (`src/lib/council-runner.ts`, `src/lib/meeting-summary.ts`).
-- **From the editor:** an MCP server exposes `list_twins`, `get_twin_profile`, `search_org_brain`, `ask_twin` and more to Claude Code or Cursor (`src/lib/mcp-server/`, `docs/mcp.md`).
+- **From any agent:** every install is the organization's own MCP server. Teammates connect Claude Code, Codex, Cursor or Claude Desktop and use `list_twins`, `get_twin_profile`, `search_org_brain`, `ask_twin` and more; tools are marked read-only and answer-only, and a Claude Code plugin adds `/employee001:ask-company`, `ask-twin` and `team-meeting` (`src/lib/mcp-server/`, `plugins/claude-code/`, `docs/mcp.md`).
 
 ### 3. People stay in control of what leaves
 
@@ -58,18 +78,25 @@ In growing companies, the knowledge that runs the business lives in a few people
 - Every executed tool call goes to a SHA-256 hash-chained audit log with a verify endpoint (`src/lib/audit-log.ts`, `/api/audit/verify`).
 - Twins cannot run shell commands (`Bash` is hard-disallowed twice, `src/lib/sdk-defaults.ts`).
 - Deleting an employee or revoking consent purges their twin's data and Composio connections (`src/lib/employee-purge.ts`).
+- Consent comes first: a twin whose employee hasn't recorded consent can't be trained, use their tools or transcripts, or act for them; consent evidence is in the audit chain (`src/lib/consent-policy.ts`, `src/lib/consent-evidence.ts`).
+- Every Slack message and email a twin sends carries an AI disclosure that can't be removed (`src/lib/ai-disclosure.ts`).
+- Accounts with roles (owner, admin, approver, member, employee), TOTP two-factor and OIDC single sign-on; the audit records who approved and who asked (`src/lib/auth/`).
+- `EMPLOYEE001_REGION=eu` keeps model calls, embeddings and voice in the EU or off (`src/lib/data-residency.ts`).
 - Data is files under `data/` on your machine; no database, no Employee001 account.
 
 ## Buyer objections, with evidence-based answers
 
 **1. "Is this surveillance of my employees?"**
-The employee is part of the process: they open the invite, see a consent screen with required and opt-in scopes, and connect their own tools. Acting through their accounts or transcripts are separate opt-in scopes (`src/lib/employees.ts`, `src/lib/consent-policy.ts`). The twin's profile is nine plain files anyone authorized can read, and deletion purges everything tied to that person. Be honest about the limits: an admin can also start a tool connection for an employee from `/connections`, and only the admin can revoke today.
+The employee is part of the process: they open the invite, see a consent screen with required and opt-in scopes, and connect their own tools. Acting through their accounts or transcripts are separate opt-in scopes (`src/lib/employees.ts`, `src/lib/consent-policy.ts`). The twin's profile is nine plain files anyone authorized can read, and deletion purges everything tied to that person. Without recorded consent the twin gets no tools, transcripts or actions, and an employee with the employee role can see their own twin and withdraw consent themselves; the consent itself (time, wording hash, scopes) is evidence in the audit chain. Be honest about the limits: an admin can also start a tool connection for an employee from `/connections`.
 
 **2. "Where does our data go?"**
-Stored locally: profiles, knowledge, memory, chats, approvals, audit log (`data/`). Sent to your model provider: prompts with the profile context a twin needs, to the Anthropic API or your own Bedrock / Vertex AI / Azure AI Foundry / local endpoint (`src/lib/model-provider.ts`). Note: building a twin, meeting summaries and the combined answer in Ask the company currently call the Anthropic API directly. Sent to connected tools: tool calls via Composio and any custom MCP server. Optional: OpenAI embeddings for memory, ElevenLabs for voice (text and microphone audio). Telemetry: opt-in only, aggregate counts, no endpoint configured by default (`src/lib/telemetry.ts`). `npx employee001 doctor --egress` prints the hosts for your configuration. Don't promise provider non-retention or non-training; point to the provider's own terms.
+Stored locally: profiles, knowledge, memory, chats, approvals, audit log (`data/`). Sent to your model provider: prompts with the profile context a twin needs, to the Anthropic API or your own Bedrock / Vertex AI / Azure AI Foundry / local endpoint (`src/lib/model-provider.ts`). Note: meeting summaries, the combined answer in Ask the company, memory rerank and knowledge proposals call the Anthropic API directly; twin chat, meetings and twin building run on the provider you chose. `EMPLOYEE001_REGION=eu` turns the direct calls off and keeps embeddings and voice in the EU or off. Sent to connected tools: tool calls via Composio and any custom MCP server. Optional: OpenAI embeddings for memory, ElevenLabs for voice (text and microphone audio). Telemetry: opt-in only, aggregate counts, no endpoint configured by default (`src/lib/telemetry.ts`). `npx employee001 doctor --egress` prints the hosts for your configuration. Don't promise provider non-retention or non-training; point to the provider's own terms.
 
 **3. "Will a twin do something on its own?"**
-Not by default. External writes and web fetches wait for approval (10 minutes in chat, 6 hours for background work, then denied). Scheduled routines only run when Autonomy is on, which defaults to off (`src/lib/workspace-mode.ts`). An admin can loosen this per employee and per tool, and can opt a twin into direct Slack replies; those are explicit choices, and every call is audited.
+Not by default. External writes and web fetches wait for approval (10 minutes in chat, 6 hours for background work, then denied). Scheduled routines only run when Autonomy is on, which defaults to off (`src/lib/workspace-mode.ts`). Approvals need the approver role. An admin can loosen this per employee and per tool; direct Slack replies need an admin allowlist of members and channels, are drafted from the twin's public profile only, and carry the AI disclosure. Every call is audited with who approved it.
+
+**4. "We're regulated. Can this pass our security review?"**
+It runs inside your environment, so it's in your compliance scope, not ours. What helps the review: SECURITY.md lists every subprocessor with region and what reaches it; an EU mode; consent deny-by-default with evidence; roles, two-factor and OIDC sign-in; a hash-chained audit log you can export and verify offline (`npx employee001 audit verify`); deletion that pseudonymizes the employee in the audit log. Be honest about the limits: no SOC 2 or ISO certification, no SAML yet, and Composio has no EU region.
 
 ## Headline test
 
@@ -101,11 +128,11 @@ Neither product's public pages (as read on 2026-10-21) describe building an agen
 
 - "Nothing leaves your machine" / "No cloud" / "No telemetry". Use the four boundaries instead.
 - "The employee authorizes their own twin, not the CEO." Both paths exist.
-- "Bedrock/Vertex/local instead of an Anthropic key" without the caveat. Twin chat, meetings and twin building run on the chosen provider; Ask's combined answer, meeting summaries, memory rerank and knowledge proposals still need the Anthropic API.
+- "Bedrock/Vertex/local instead of an Anthropic key" without the caveat. Twin chat, meetings and twin building run on the chosen provider; Ask's combined answer, meeting summaries, memory rerank and knowledge proposals still need the Anthropic API (or stay off in EU mode).
 - "Twins debate / argue it out." They take short turns and can tag each other; the verdict is a separate summary step.
 - "What one twin learns, the others can use." Profiles and curated org-brain nodes are shared; memory and meeting learnings stay with each twin.
 - "Fine-tuned", "trained model", "replaces employees", any certification, customer or usage number.
-- Consent deny-by-default, AI disclosure on outbound Slack/email, the Slack auto-reply allowlist, SSO/RBAC/MFA: in progress on `main`, not in a release. Don't market them until they ship.
+- "SAML", "SCIM", "enterprise SSO" or any certification. Shipped in v0.8.0: consent deny-by-default, AI disclosure, the Slack auto-reply allowlist, roles, TOTP two-factor, OIDC sign-in, EU mode. Not shipped: SAML, SCIM, SOC 2 / ISO.
 
 ## Suggested GitHub metadata (not applied)
 
