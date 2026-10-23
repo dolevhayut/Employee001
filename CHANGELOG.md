@@ -8,6 +8,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-23
+
 ### Compliance and security
 A pass against the EU AI Act, GDPR and our own security review. Details in
 SECURITY.md and docs/fixes/2026-10-compliance-plan.md.
