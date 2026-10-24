@@ -58,8 +58,9 @@ Talking to a twin in Ask is now a conversation instead of record, stop, wait.
 - The answer is spoken while the twin is still writing it, sentence by
   sentence, in the twin's own voice (ElevenLabs Eleven v4 Turbo). Before, it
   played only after the whole answer was in.
-- Talk over the twin and it stops. If you ask something while it's still
-  working, it asks that next.
+- Talk over the twin and it stops, or press "Stop speaking", which shows
+  while it talks. If you ask something while it's still working, it asks
+  that next.
 - A spoken question gets a spoken "Let me check." right away (about 1.8
   seconds after you stop talking, in the twin's voice), and a quicker answer:
   unless it names a connected system or asks for an action, the twin answers

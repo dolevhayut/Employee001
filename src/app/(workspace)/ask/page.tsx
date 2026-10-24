@@ -1186,6 +1186,43 @@ export default function AskPage() {
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
         {/* stage: 70% */}
         <div style={{ position: "relative", flex: 7, minWidth: 0, minHeight: 520 }}>
+          {/* While the twin talks: one click silences it; the mic stays open.
+              Outside the composer, which is inert while the answer streams. */}
+          <AnimatePresence>
+            {audio?.status === "playing" && (
+              <motion.button
+                type="button"
+                onClick={stopAudio}
+                aria-label={t("ask.stopSpeaking")}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.18 }}
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  bottom: 104,
+                  translateX: "-50%",
+                  zIndex: 30,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "7px 14px 7px 12px",
+                  borderRadius: 999,
+                  border: "1px solid var(--hairline)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  boxShadow: "0 6px 20px rgba(0,0,0,.25)",
+                  cursor: "pointer",
+                }}
+              >
+                <span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, background: "currentColor" }} />
+                {t("ask.stopSpeaking")}
+              </motion.button>
+            )}
+          </AnimatePresence>
           <MorphOrb
             ref={orbRef}
             onSubmit={onSubmit}
