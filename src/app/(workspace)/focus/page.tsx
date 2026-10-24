@@ -13,7 +13,7 @@ const SUGGESTIONS: { slug: string; args: Record<string, unknown>; label: string 
   { slug: "GITHUB_LIST_PULL_REQUESTS", args: { state: "open" }, label: "My open PRs" },
   { slug: "LINEAR_LIST_ISSUES", args: { limit: 10 }, label: "Linear queue" },
   { slug: "GMAIL_FETCH_EMAILS", args: { max_results: 10, query: "is:unread" }, label: "Unread email" },
-  { slug: "SLACK_LIST_CHANNELS", args: {}, label: "Slack channels" },
+  { slug: "SLACK_LIST_ALL_CHANNELS", args: {}, label: "Slack channels" },
   { slug: "GOOGLECALENDAR_LIST_EVENTS", args: { max_results: 10 }, label: "Upcoming calendar" },
 ];
 

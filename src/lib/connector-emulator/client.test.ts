@@ -136,6 +136,8 @@ describe("AI disclosure against the captured contracts", () => {
     GMAIL_CREATE_EMAIL_DRAFT: "body",
     OUTLOOK_SEND_EMAIL: "body",
     SLACK_SEND_MESSAGE: "markdown_text",
+    OUTLOOK_REPLY_EMAIL: "comment",
+    MICROSOFT_TEAMS_TEAMS_POST_CHANNEL_MESSAGE: "content",
   };
   const check = async (slug: string, field: string) => {
     const { discloseOutbound, disclosureLine } = await import("@/lib/ai-disclosure");
@@ -145,7 +147,12 @@ describe("AI disclosure against the captured contracts", () => {
     expect(String(out[field])).toMatch(new RegExp(`^${disclosureLine("Ana Lee")}`));
   };
   for (const [slug, field] of Object.entries(MESSAGE_FIELD)) it(`${slug} discloses in "${field}"`, () => check(slug, field));
-  // Known gaps (follow-ups): these send without the disclosure today. Flip to `it` once fixed.
-  it.fails('OUTLOOK_REPLY_EMAIL discloses in "comment"', () => check("OUTLOOK_REPLY_EMAIL", "comment"));
-  it.fails('MICROSOFT_TEAMS_TEAMS_POST_CHANNEL_MESSAGE discloses in "content"', () => check("MICROSOFT_TEAMS_TEAMS_POST_CHANNEL_MESSAGE", "content"));
+  it("every captured send contract is recognised as a send", async () => {
+    const { isOutboundMessageTool } = await import("@/lib/ai-disclosure");
+    const fs = await import("node:fs");
+    const { contractsDir } = await import("./state");
+    const sends = fs.readdirSync(contractsDir()).filter((f) => /(?:SEND|REPLY|POST|DRAFT)/.test(f)).map((f) => f.replace(/\.json$/, ""));
+    expect(sends.length).toBeGreaterThan(0);
+    for (const slug of sends) expect(isOutboundMessageTool(slug), slug).toBe(true);
+  });
 });

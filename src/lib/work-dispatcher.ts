@@ -243,7 +243,8 @@ async function fetchSlackThread(employeeId: string, payload: SlackPayload): Prom
   try {
     const result = await getComposio().tools.execute("SLACK_FETCH_MESSAGE_THREAD_FROM_A_CONVERSATION", {
       userId: composioUserIdFor(employeeId),
-      arguments: { channel_id: payload.channel, thread_ts: payload.threadTs ?? payload.ts },
+      // Composio's current schema: "channel" and "ts" (the thread's parent).
+      arguments: { channel: payload.channel, ts: payload.threadTs ?? payload.ts },
     }) as { data?: unknown; successful?: boolean };
     if (result.successful === false) return [];
     const data = result.data as { messages?: unknown[] } | undefined;
@@ -296,7 +297,8 @@ async function postSlack(employeeId: string, employeeName: string, payload: Slac
     if (!json.ok) throw new Error(`Slack bot post failed: ${json.error ?? res.status}`);
     return "bot";
   }
-  await getComposio().tools.execute("SLACK_SEND_MESSAGE", { userId: composioUserIdFor(employeeId), arguments: { channel: payload.channel, text: body, thread_ts: threadTs } });
+  // The current SLACK_SEND_MESSAGE schema takes the message as "markdown_text" (it has no "text").
+  await getComposio().tools.execute("SLACK_SEND_MESSAGE", { userId: composioUserIdFor(employeeId), arguments: { channel: payload.channel, markdown_text: body, thread_ts: threadTs } });
   return "user";
 }
 

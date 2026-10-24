@@ -25,6 +25,23 @@ describe("AI disclosure on outbound messages", () => {
     expect(mail.to).toBe("a@b.co");
   });
 
+  it("recognises every chat and email send, and never a read", () => {
+    for (const t of ["MICROSOFT_TEAMS_TEAMS_POST_CHANNEL_MESSAGE", "MICROSOFT_TEAMS_CHATS_POST_MESSAGE", "OUTLOOK_REPLY_EMAIL", "OUTLOOK_CREATE_DRAFT_REPLY", "GMAIL_FORWARD_MESSAGE", "GMAIL_CREATE_EMAIL_DRAFT", "SLACK_UPDATE_A_MESSAGE", "SLACK_SCHEDULE_MESSAGE", "DISCORD_SEND_MESSAGE"]) {
+      expect(isOutboundMessageTool(t), t).toBe(true);
+    }
+    for (const t of ["GMAIL_LIST_DRAFTS", "GMAIL_DELETE_DRAFT", "SLACK_GET_SCHEDULED_MESSAGES", "OUTLOOK_QUERY_EMAILS", "MICROSOFT_TEAMS_TEAMS_LIST_CHANNELS", "SLACK_FETCH_MESSAGE_THREAD_FROM_A_CONVERSATION", "SLACK_SEARCH_MESSAGES"]) {
+      expect(isOutboundMessageTool(t), t).toBe(false);
+    }
+  });
+
+  it("discloses an Outlook reply's comment and a Teams post's content, as HTML when marked HTML", () => {
+    expect(discloseOutbound("OUTLOOK_REPLY_EMAIL", { message_id: "m1", comment: "Thanks" }, "Noa").comment).toBe("🤖 AI twin of Noa: Thanks");
+    expect(discloseOutbound("OUTLOOK_REPLY_EMAIL", { comment: "<p>Thanks</p>", is_html: true }, "Noa").comment).toBe("<p><strong>🤖 AI twin of Noa</strong></p><p>Thanks</p>");
+    const teams = discloseOutbound("MICROSOFT_TEAMS_TEAMS_POST_CHANNEL_MESSAGE", { team_id: "t", channel_id: "c", content: "<b>Done</b>", content_type: "html" }, "Noa");
+    expect(teams.content).toBe("<p><strong>🤖 AI twin of Noa</strong></p><b>Done</b>");
+    expect(discloseOutbound("MICROSOFT_TEAMS_TEAMS_POST_CHANNEL_MESSAGE", { team_id: "t", channel_id: "c" }, "Noa").content).toBe("🤖 AI twin of Noa: ");
+  });
+
   it("adds a text field when a send carries no recognisable body", () => {
     expect(discloseOutbound("SLACK_SEND_MESSAGE", { channel: "C1", blocks: [] }, "Noa").text).toBe("🤖 AI twin of Noa: ");
   });
