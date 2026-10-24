@@ -24,7 +24,7 @@ const SYSTEMS: [RegExp, string][] = [
   [/\b(google )?(drive|docs|sheets)\b|\bshare-?point\b|\bdropbox\b|דרייב|שרפוינט|דרופבוקס/i, "Drive"],
   [/\bhub-?spot\b|\bsalesforce\b|\bcrm\b|הבספוט|סיילספורס/i, "the CRM"],
   [/\bzendesk\b|\bintercom\b|זנדסק|אינטרקום/i, "support"],
-  [/\b(asana|trello|monday|click-?up|airtable)\b|אסאנה|טרלו|מאנדיי|מנדיי/i, "your task board"],
+  [/\b(asana|trello|click-?up|airtable)\b|\bmonday(\.com| board)\b|אסאנה|טרלו|מאנדיי|מנדיי/i, "your task board"],
   [/\b(stripe|shopify)\b|סטרייפ|שופיפיי/i, "billing"],
   [/\bwhats-?app\b|וואטסאפ|ווטסאפ/i, "WhatsApp"],
   [/\bzoom\b|זום/i, "Zoom"],
@@ -41,8 +41,14 @@ const SYSTEMS: [RegExp, string][] = [
  *  carry a ו/ש/ל prefix, and "can you" questions use the infinitive. */
 const ACTIONS = new RegExp(
   [
-    String.raw`\b(send|post|reply to|forward|re-?schedule|schedule (a|an|the|my)|book|create|open (a|an) (ticket|issue)|assign|update (the|my|a)|remind|tell (?!me\b)|message|ping|cancel|add (a|an|the)|invite|draft|delete|move (the|my)|look (it )?up in|check (my|in))\b`,
-    String.raw`(^|\s)[וש]?(תשלח|שלח|שלחי|תשלחי|לשלוח|תענה|לענות|תזמן|לתזמן|תקבע|קבעי|לקבוע|תיצור|ליצור|צור לי|תפתח|לפתוח|תעדכן|לעדכן|תבטל|לבטל|תזכיר|להזכיר|תגיד ל(?!י)|תודיע|להודיע|תבדוק ב|בדוק ב|לבדוק ב)`,
+    String.raw`\b(send|post (?!-)(a|an|the|it|this|to|in|on)|reply to|forward|re-?schedule|schedule (a|an|the|my)|book (a|an|the)|create|open (a|an) (ticket|issue)|assign|update (the|my|a)|remind (?!me\b)|tell (?!(me|us)\b)|message|ping|add (a|an|the)|invite|draft|delete|move (the|my)|look (it )?up in|check (my|in))\b`,
+    // "Cancel ..." as a request, not "why did we cancel ...".
+    String.raw`(^|\b(please|can you|could you|let's)\s+)cancel\b`,
+    // Imperatives and future forms end at a word boundary ("שלחנו" is past tense);
+    // infinitives count only after "can you" (אפשר / תוכל / אתה יכול).
+    String.raw`(^|\s)[וש]?(תשלח|שלח|שלחי|תשלחי|תענה|תזמן|תקבע|קבעי|תיצור|צור לי|תפתח|תעדכן|תבטל|תזכיר|תודיע)(?=\s|$|[?.,!])`,
+    String.raw`(אפשר|תוכל|תוכלי|יכול|יכולה)\s+(ל|גם ל)?(שלוח|ענות|תזמן|קבוע|יצור|פתוח|עדכן|בטל|הזכיר|הודיע|בדוק ב)`,
+    String.raw`(^|\s)(תגיד ל(?!י)|תבדוק ב|בדוק ב)`,
   ].join("|"),
   "i",
 );
@@ -60,10 +66,12 @@ export function spokenWords(question: string): string {
 export function voiceLane(question: string, systems: string[] = []): VoiceLane {
   const words = spokenWords(question);
   for (const [re, system] of SYSTEMS) if (re.test(words)) return { fast: false, system };
-  const lower = words.toLowerCase();
+  // An org server matches by any word of its name of 4+ letters ("Priority
+  // ERP" ← "in Priority").
+  const said = new Set(words.toLowerCase().split(/[^\p{L}\p{N}]+/u));
   for (const name of systems) {
-    const n = name.trim().toLowerCase();
-    if (n.length >= 3 && lower.includes(n)) return { fast: false, system: name.trim() };
+    const parts = name.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4);
+    if (parts.some((w) => said.has(w))) return { fast: false, system: name.trim() };
   }
   if (ACTIONS.test(words)) return { fast: false, system: "your systems" };
   return { fast: true };

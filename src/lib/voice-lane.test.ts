@@ -17,6 +17,14 @@ describe("voiceLane", () => {
     "Tell me about the onboarding project",
     "תגיד לי מי אחראי על ההשקה",
     "Who created the pricing deck?",
+    "What did we decide on Monday?",
+    "Any updates from Monday?",
+    "Remind me what we decided about pricing",
+    "Tell us about the roadmap",
+    "Why did we cancel the launch?",
+    "What did the post-mortem say?",
+    "מה שלחנו ללקוח?",
+    "למה החלטנו לבטל את הפרויקט?",
   ])("answers %s on the fast lane", (q) => {
     expect(voiceLane(q)).toEqual({ fast: true });
   });
@@ -65,6 +73,7 @@ describe("voiceLane", () => {
 
   it("counts the org's own MCP servers as systems", () => {
     expect(voiceLane("What's the stock level in Priority?", ["Priority"])).toEqual({ fast: false, system: "Priority" });
+    expect(voiceLane("What's the stock level in Priority?", ["Priority ERP"])).toEqual({ fast: false, system: "Priority ERP" });
     expect(voiceLane("What's our priority this quarter?", [])).toEqual({ fast: true });
   });
 

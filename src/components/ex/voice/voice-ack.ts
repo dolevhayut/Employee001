@@ -22,6 +22,7 @@ async function synthesize(voiceId: string | undefined, phrase: string): Promise<
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: phrase, voiceId }),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return null;
     const { audioContent } = (await res.json()) as { audioContent?: string };

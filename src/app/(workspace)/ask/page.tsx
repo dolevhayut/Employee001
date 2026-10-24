@@ -940,7 +940,8 @@ export default function AskPage() {
     onPartial: (text) => {
       if (!speakerRef.current?.playing && !audioRef.current && !ackRef.current) return;
       if (!heardSpeech(text) || looksLikeEcho(text, echoSource())) return;
-      if (ackRef.current && !speakerRef.current?.playing && !audioRef.current) {
+      // While "Let me check." is still sounding (the answer queues behind it).
+      if (ackRef.current && (playbackContext()?.currentTime ?? Infinity) < ackRef.current.endsAt) {
         // Talking over "Let me check." ("okay") cuts only that; the answer
         // still comes, right away.
         ackRef.current.stop();
