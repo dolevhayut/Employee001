@@ -117,6 +117,13 @@ export function findInvite(token: string): Invite | undefined {
   return i ? withLookbackDefault(i) : undefined;
 }
 
+/** True while an invite-linked directory is still waiting for /complete. */
+export function inviteOnboardingInProgress(token: unknown): boolean {
+  if (typeof token !== "string") return false;
+  const invite = findInvite(token);
+  return Boolean(invite && !invite.completedAt);
+}
+
 /**
  * Returns the invite if it's valid for use right now (exists, unexpired,
  * not already completed). Used by both the proxy (for LAN bypass) and the
@@ -279,6 +286,9 @@ const PROFILE_FILES_LITERAL = [
 ] as const;
 type ProfileFileKey = (typeof PROFILE_FILES_LITERAL)[number];
 
+/** Identifies transient invite markdown so completion can replace every file. */
+export const INVITE_PROFILE_PLACEHOLDER_MARKER = "<!-- employee001 invite placeholder -->";
+
 function slugifyForId(s: string): string {
   return s
     .toLowerCase()
@@ -295,15 +305,16 @@ function slugifyForId(s: string): string {
 function placeholderMarkdown(name: string, role: string): Record<ProfileFileKey, string> {
   const today = new Date().toISOString().slice(0, 10);
   const out = {} as Record<ProfileFileKey, string>;
-  out.EMPLOYMENT = `# Employment — ${name}\n\n- Name: ${name}\n${role ? `- Role: ${role}\n` : ""}- Onboarded: ${today}\n`;
-  out.EXPERTISE = `# Expertise — ${name}\n\n_To be filled in during onboarding._\n`;
-  out.BOUNDARIES = `# Boundaries — ${name}\n\n_To be filled in during onboarding._\n`;
-  out.CONTEXT = `# Context — ${name}\n\n_To be filled in during onboarding._\n`;
-  out.DECISIONS = `# Decisions — ${name}\n\n_To be filled in during onboarding._\n`;
-  out.PEOPLE = `# People — ${name}\n\n_To be filled in during onboarding._\n`;
-  out.PROJECTS = `# Projects — ${name}\n\n_To be filled in during onboarding._\n`;
-  out.PREFERENCES = `# Preferences — ${name}\n\n_To be filled in during onboarding._\n`;
-  out.TONE = `# Tone — ${name}\n\n_To be filled in during onboarding._\n`;
+  const marker = `\n${INVITE_PROFILE_PLACEHOLDER_MARKER}\n`;
+  out.EMPLOYMENT = `# Employment — ${name}\n\n- Name: ${name}\n${role ? `- Role: ${role}\n` : ""}- Onboarded: ${today}${marker}`;
+  out.EXPERTISE = `# Expertise — ${name}\n\n_To be filled in during onboarding._${marker}`;
+  out.BOUNDARIES = `# Boundaries — ${name}\n\n_To be filled in during onboarding._${marker}`;
+  out.CONTEXT = `# Context — ${name}\n\n_To be filled in during onboarding._${marker}`;
+  out.DECISIONS = `# Decisions — ${name}\n\n_To be filled in during onboarding._${marker}`;
+  out.PEOPLE = `# People — ${name}\n\n_To be filled in during onboarding._${marker}`;
+  out.PROJECTS = `# Projects — ${name}\n\n_To be filled in during onboarding._${marker}`;
+  out.PREFERENCES = `# Preferences — ${name}\n\n_To be filled in during onboarding._${marker}`;
+  out.TONE = `# Tone — ${name}\n\n_To be filled in during onboarding._${marker}`;
   return out;
 }
 
@@ -390,7 +401,9 @@ export async function materializeEmployeeFromInvite(
         createdAt: new Date().toISOString(),
         lastActiveAt: new Date().toISOString(),
         via: { invite: token },
-        pendingProfile: !nameRaw, // hint for /complete to overwrite the synthetic name
+        // Connections can materialize the directory before onboarding completes,
+        // even with an invite name. Never expose its starter files as a live twin.
+        pendingProfile: true,
       },
       null,
       2,

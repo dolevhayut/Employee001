@@ -10,6 +10,7 @@ import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin, RetentionConsent, 
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 import { withSidecarLock } from "./sidecar-lock";
 import { dataDir } from "./app-home";
+import { inviteOnboardingInProgress } from "./invites";
 
 const AVATAR_PALETTE = [
   "#A8B4C4", "#C4A8B8", "#B8C4A8", "#A8C4B8", "#C4B8A8",
@@ -71,6 +72,7 @@ type DiskSidecar = {
    * the flag.
    */
   pendingProfile?: boolean;
+  via?: { invite?: string };
 };
 
 /** Returns the ISO week string for a given date, e.g. "2026-W20". */
@@ -141,7 +143,9 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
     // wizard reconciles the sidecar (drops pendingProfile + rewrites the
     // markdown). Otherwise the placeholder content scores as "ready" and
     // shows a ghost row in /employees and the org chart.
-    if (sidecar.pendingProfile) continue;
+    // `via.invite` covers materializations written before pendingProfile was
+    // consistently set for named invites.
+    if (sidecar.pendingProfile || inviteOnboardingInProgress(sidecar.via?.invite)) continue;
 
     let complete = 0;
     for (const base of PROFILE_BASES) {

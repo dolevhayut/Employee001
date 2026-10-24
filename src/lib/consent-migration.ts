@@ -9,10 +9,11 @@ import path from "path";
 import { dataDir } from "./app-home";
 import { appendAuditEntry } from "./audit-log";
 import { pseudonymFor } from "./audit-pseudonym";
+import { inviteOnboardingInProgress } from "./invites";
 
 export type ConsentRequiredTwin = { id: string; name: string; since?: string };
 
-type Sidecar = { name?: string; consent?: { scopes?: unknown }; synthetic?: unknown; consentState?: string; consentRequiredSince?: string };
+type Sidecar = { name?: string; consent?: { scopes?: unknown }; synthetic?: unknown; pendingProfile?: unknown; via?: { invite?: unknown }; consentState?: string; consentRequiredSince?: string };
 
 function readSidecars(): Array<{ id: string; file: string; sidecar: Sidecar }> {
   const root = dataDir("employees");
@@ -27,7 +28,14 @@ function readSidecars(): Array<{ id: string; file: string; sidecar: Sidecar }> {
   return out;
 }
 
-const needsConsent = (s: Sidecar) => s.synthetic !== true && !Array.isArray(s.consent?.scopes);
+// An invite can materialize a directory to connect a toolkit before the
+// onboarding form is submitted. Consent is expected to be absent at that
+// point, so it is not a consent-required twin yet.
+const needsConsent = (s: Sidecar) =>
+  s.synthetic !== true &&
+  s.pendingProfile !== true &&
+  !inviteOnboardingInProgress(s.via?.invite) &&
+  !Array.isArray(s.consent?.scopes);
 
 /** Mark twins with no consent record. Returns the ids marked this time. */
 export function markTwinsConsentRequired(now = new Date()): string[] {

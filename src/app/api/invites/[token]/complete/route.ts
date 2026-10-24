@@ -10,6 +10,7 @@ import {
   tryClaimInvite,
   releaseInviteClaim,
   materializeEmployeeFromInvite,
+  INVITE_PROFILE_PLACEHOLDER_MARKER,
 } from "@/lib/invites";
 import { readState } from "@/lib/composio-client";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
@@ -358,8 +359,9 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const profile = buildProfileMarkdown(body, { name, role });
     // Write a markdown file ONLY if it doesn't already exist or still looks
-    // like the synthetic placeholder produced by materializeEmployeeFromInvite
-    // (which always ends with "_To be filled in during onboarding._\n").
+    // like the synthetic placeholder produced by materializeEmployeeFromInvite.
+    // This includes EMPLOYMENT: it has factual-looking starter text, but is not
+    // employee-provided content and must not contribute to completeness.
     await Promise.all(
       PROFILE_FILES.map(async (key) => {
         const filePath = path.join(dir, `${key}.md`);
@@ -371,6 +373,9 @@ export async function POST(request: NextRequest, { params }: Params) {
         }
         const looksLikePlaceholder =
           existing === null ||
+          existing.includes(INVITE_PROFILE_PLACEHOLDER_MARKER) ||
+          // Backward compatibility for placeholder files written before the
+          // marker was added. (EMPLOYMENT was not a placeholder in that form.)
           existing.trim().endsWith("_To be filled in during onboarding._");
         if (looksLikePlaceholder) {
           await fs.writeFile(filePath, profile[key], "utf8");
