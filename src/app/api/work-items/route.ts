@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { listWorkItems, enqueueWorkItem, type WorkItemStatus } from "@/lib/work-items";
 import { ensureSchedulerStarted } from "@/lib/routine-scheduler";
 import { dispatchWorkTick } from "@/lib/work-dispatcher";
+import { isRetiredSync } from "@/lib/twin-lifecycle";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,11 @@ export async function POST(req: NextRequest) {
   const { assigneeEmployeeId, title, task } = body;
   if (!assigneeEmployeeId || !title || !task) {
     return NextResponse.json({ error: "missing_fields" }, { status: 400 });
+  }
+  // Someone who has left takes no tasks. Refuse here rather than queue an item
+  // the dispatcher would only skip.
+  if (isRetiredSync(assigneeEmployeeId)) {
+    return NextResponse.json({ error: "This person has left. Ask their twin instead; it takes no tasks." }, { status: 409 });
   }
   const { item, deduped } = enqueueWorkItem({
     type: "task",

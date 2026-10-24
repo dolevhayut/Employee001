@@ -507,7 +507,7 @@ export default function AskPage() {
   const roster = useRoster();
   const twins = roster.filter((e) => e.twinStatus === "ready");
   const [selected, setSelected] = useState<string | null>(null);
-  const [mode, setMode] = useState<"ask" | "task">("ask");
+  const [modePick, setMode] = useState<"ask" | "task">("ask");
   const panelWidth = useSyncExternalStore(panelSubscribe, panelSnapshot, () => PANEL_DEFAULT);
   const [dragging, setDragging] = useState(false);
   useEffect(() => {
@@ -567,6 +567,9 @@ export default function AskPage() {
   // The flow stays on the stage until the CEO starts a new question.
   const flowTurn = busy ? turns[turns.length - 1] : undefined;
   const twin = twins.find((e) => e.id === twinId);
+  // Someone who has left takes no tasks (the work queue refuses them): ask only.
+  const retired = twin?.lifecycle === "retired";
+  const mode = retired ? "ask" : modePick;
 
   // Your last conversation with each twin comes back when you pick it; each
   // person sees only what they asked. "New conversation" starts a fresh one.
@@ -1351,7 +1354,7 @@ export default function AskPage() {
             </div>
             {/* ask a question, or hand over a task, like you would a colleague */}
             <div role="tablist" style={{ display: "flex", padding: 3, gap: 2, borderRadius: 10, background: "var(--bg-sunken)", border: "1px solid var(--hairline)" }}>
-              {(["ask", "task"] as const).map((m) => {
+              {(retired ? (["ask"] as const) : (["ask", "task"] as const)).map((m) => {
                 const on = mode === m;
                 return (
                   <button
