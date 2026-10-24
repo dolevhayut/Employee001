@@ -139,6 +139,24 @@ describe("purgeEmployee", () => {
     expect(exists(`memory/${ME}`)).toBe(false);
   });
 
+  it("removes what the employee asked other twins, and only that", async () => {
+    write("auth/users.json", JSON.stringify([
+      { id: "u-noa", email: "noa@x.test", name: "Noa", role: "member", employeeId: ME, createdAt: "x" },
+      { id: "u-dana", email: "dana@x.test", name: "Dana", role: "member", createdAt: "x" },
+    ]));
+    write(`employees/${PEER}/chat-history.jsonl`, jsonl(
+      { role: "user", id: "1", text: "noa's question", ts: 1, askedBy: "u-noa", surface: "ask" },
+      { role: "twin", id: "2", text: "answer to noa", ts: 1, askedBy: "u-noa", surface: "ask" },
+      { role: "user", id: "3", text: "dana's question", ts: 2, askedBy: "u-dana", surface: "ask" },
+    ));
+    const { purgeEmployee } = await import("./employee-purge");
+    await purgeEmployee(ME);
+    const left = read(`employees/${PEER}/chat-history.jsonl`);
+    expect(left).not.toContain("noa's question");
+    expect(left).not.toContain("answer to noa");
+    expect(left).toContain("dana's question");
+  });
+
   it("never deletes another employee's runs whose id contains this one", async () => {
     write("run-logs/council/run_noa-friedman-2_9.ndjson", "{}\n");
     write(`run-logs/council/run_${PEER}_9__consult_${ME}_d1.ndjson`, "{}\n");

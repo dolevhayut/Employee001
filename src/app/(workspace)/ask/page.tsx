@@ -111,6 +111,42 @@ type Turn = {
   };
 };
 
+/** A step as saved in the twin's history (ids and live state aren't kept). */
+type SavedStep = { kind: StepKind; label: string; detail?: string; logo?: string };
+type SavedMessage = { role: "user" | "twin"; text: string; ts?: number; conversationId?: string; steps?: SavedStep[]; viaVoice?: boolean };
+
+/** When "New conversation" was clicked for a twin, so a reload doesn't bring the old one back. */
+const freshKey = (twinId: string) => `e001.ask.fresh.${twinId}`;
+function markFresh(twinId: string) {
+  try {
+    localStorage.setItem(freshKey(twinId), String(Date.now()));
+  } catch {
+    // not remembered across a reload; the view still starts fresh
+  }
+}
+function freshSince(twinId: string): number {
+  try {
+    return Number(localStorage.getItem(freshKey(twinId))) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+const newConversationId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `c${Date.now()}${Math.random().toString(36).slice(2)}`;
+
+/** Save a question and its answer to the twin's history, in one request so they stay in order. */
+function saveExchange(twinId: string, messages: (SavedMessage & { id: string })[]) {
+  const ts = Date.now();
+  void fetch(`/api/employees/${encodeURIComponent(twinId)}/chat-history`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages: messages.map((m) => ({ ...m, surface: "ask", ts })) }),
+  }).catch(() => {
+    // History is a convenience: the answer is already on screen.
+  });
+}
+
 type TraceEvent = {
   type?: string;
   delta?: string;
@@ -532,6 +568,53 @@ export default function AskPage() {
   const flowTurn = busy ? turns[turns.length - 1] : undefined;
   const twin = twins.find((e) => e.id === twinId);
 
+  // Your last conversation with each twin comes back when you pick it; each
+  // person sees only what they asked. "New conversation" starts a fresh one.
+  const conversationRef = useRef<Record<string, string>>({});
+  const loadedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!twin || loadedRef.current.has(twin.id)) return;
+    let alive = true;
+    fetch(`/api/employees/${encodeURIComponent(twin.id)}/chat-history?surface=ask`, { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<SavedMessage[]>) : []))
+      .then((loaded) => {
+        let rows = loaded;
+        // Marked only once applied: a run React cancels (StrictMode) loads again.
+        if (!alive || loadedRef.current.has(twin.id)) return;
+        loadedRef.current.add(twin.id);
+        // Started fresh after the last saved message: keep it fresh.
+        if (rows.length && (rows[rows.length - 1].ts ?? 0) < freshSince(twin.id)) rows = [];
+        conversationRef.current[twin.id] = rows.find((m) => m.conversationId)?.conversationId ?? newConversationId();
+        const restored: Turn[] = [];
+        for (const m of rows) {
+          if (m.role === "user") {
+            restored.push({ id: ++turnSeq.current, twinId: twin.id, twinName: twin.name, initials: twin.initials, color: twin.avatarColor, voiceId: twin.ttsVoiceId, question: m.text, viaVoice: m.viaVoice, steps: [], thinking: "", answer: null });
+          } else if (restored.length && restored[restored.length - 1].answer === null) {
+            const last = restored[restored.length - 1];
+            last.answer = m.text;
+            last.steps = (m.steps ?? []).map((st) => ({ ...st, id: ++stepSeq.current, done: true }));
+          }
+        }
+        const complete = restored.filter((r) => r.answer !== null);
+        // Earlier answers go above anything already asked on this visit.
+        if (complete.length) setTurns((prev) => [...complete, ...prev]);
+      })
+      .catch(() => {
+        conversationRef.current[twin.id] ??= newConversationId();
+      });
+    return () => {
+      alive = false;
+    };
+  }, [twin]);
+
+  const newConversation = () => {
+    if (!twinId || busy) return;
+    stopAudio();
+    conversationRef.current[twinId] = newConversationId();
+    markFresh(twinId);
+    setTurns((prev) => prev.filter((turn) => turn.twinId !== twinId || turn.task));
+  };
+
   useEffect(() => {
     fetch("/api/system/config")
       .then((r) => r.json())
@@ -885,11 +968,17 @@ export default function AskPage() {
       setBusy(false);
     };
     signal.addEventListener("abort", onAbort, { once: true });
+    // The steps as they'll be saved with the answer (same folding as on screen).
+    const savedSteps: SavedStep[] = [];
     let answer: string;
+    let answered = false;
     try {
       answer =
         (await askTwin(twinId, question, history, {
-          step: (s) =>
+          step: (s) => {
+            const lastSaved = savedSteps[savedSteps.length - 1];
+            if (s.label === "Read profile" && lastSaved?.label === "Read profile") lastSaved.detail = t("ask.trace.profileFiles");
+            else savedSteps.push({ kind: s.kind, label: s.label, detail: s.detail, logo: s.logo });
             patchTurn(id, (turn) => {
               // The route reports the twin's pre-loaded profile as a burst of Reads: fold them.
               const last = turn.steps[turn.steps.length - 1];
@@ -897,7 +986,8 @@ export default function AskPage() {
                 return { ...turn, steps: [...turn.steps.slice(0, -1), { ...last, detail: t("ask.trace.profileFiles"), done: true }] };
               }
               return { ...turn, steps: [...turn.steps, { ...s, id: ++stepSeq.current, done: false }] };
-            }),
+            });
+          },
           stepDone: () =>
             patchTurn(id, (turn) => ({
               ...turn,
@@ -907,6 +997,7 @@ export default function AskPage() {
           text: (d) => sayStreamed(d),
         }, signal, viaVoice)) || t("ask.empty");
       answer = tidyCites(answer);
+      answered = true;
     } catch {
       answer = signal.aborted ? t("ask.stopped") : t("ask.error");
     } finally {
@@ -915,6 +1006,13 @@ export default function AskPage() {
     }
     if (!signal.aborted) sayStreamed("", true);
     patchTurn(id, (turn) => ({ ...turn, answer }));
+    if (answered && !signal.aborted) {
+      const conversationId = (conversationRef.current[twinId] ??= newConversationId());
+      saveExchange(twinId, [
+        { id: `q${id}-${conversationId}`, role: "user", text: question, conversationId, viaVoice },
+        { id: `a${id}-${conversationId}`, role: "twin", text: answer, conversationId, steps: savedSteps },
+      ]);
+    }
     return answer;
   };
 
@@ -1335,6 +1433,17 @@ export default function AskPage() {
           >
             <Icons.MessageSquare size={12} />
             {t("ask.conversation")}
+            {twinId && turns.some((turn) => turn.twinId === twinId && !turn.task) && (
+              <button
+                type="button"
+                onClick={newConversation}
+                disabled={busy}
+                title={t("ask.newConversationTitle")}
+                style={{ marginInlineStart: "auto", padding: "3px 8px", borderRadius: 6, border: "1px solid var(--hairline)", background: "transparent", color: "var(--text-muted)", fontSize: 11, fontWeight: 500, letterSpacing: 0, textTransform: "none", cursor: busy ? "default" : "pointer" }}
+              >
+                {t("ask.newConversation")}
+              </button>
+            )}
           </div>
           <div
             ref={listRef}

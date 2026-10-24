@@ -15,6 +15,7 @@ import { appendAuditEntry, redactEmployeeAudit, type AuditRedaction } from "./au
 import { disconnectAllToolkits } from "./composio-client";
 import { withSidecarLock } from "./sidecar-lock";
 import { pseudonymFor } from "./audit-pseudonym";
+import { listUsers } from "./auth/store";
 import { redactEmployeeFromMeetings } from "./meeting-store";
 
 export type PurgeStep = {
@@ -355,6 +356,20 @@ export function purgeLocalData(id: string): PurgeStep[] {
     for (const surface of fs.readdirSync(runLogs)) {
       const dir = path.join(runLogs, surface);
       if (fs.statSync(dir).isDirectory()) steps.push(removeMatching(`run-logs/${surface}/`, dir, runFile));
+    }
+  }
+
+  // What this person asked other twins (Ask and chat history rows carry the
+  // asking user's id, not the employee id).
+  const askers = new Set(listUsers().filter((u) => u.employeeId === id).map((u) => u.id));
+  if (askers.size && fs.existsSync(dataDir("employees"))) {
+    for (const other of fs.readdirSync(dataDir("employees"))) {
+      if (other === id || other.startsWith(".")) continue;
+      steps.push(
+        filterJsonl(`employees/${other}/chat-history.jsonl`, dataDir("employees", other, "chat-history.jsonl"), (row) =>
+          typeof row.askedBy === "string" && askers.has(row.askedBy),
+        ),
+      );
     }
   }
 
