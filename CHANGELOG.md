@@ -24,6 +24,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   now, an invite with at least one connected tool was the only way to make a
   twin, and with a Claude subscription, where invites are off, that left no
   way at all.
+- **Interview me**: instead of writing, answer a short interview of about
+  eight questions, asked one at a time. It follows up when an answer is vague
+  and asks for a few messages you actually sent. The transcript becomes the
+  twin's material.
 - The twin builder now builds from what the person wrote and uploaded
   (`knowledge/`) when no tools are connected. Where that material doesn't
   cover a file, the builder says so; it doesn't fill the file in. Connected

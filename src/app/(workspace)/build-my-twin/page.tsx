@@ -40,6 +40,112 @@ const fieldStyle = {
 const labelStyle = { display: "block", color: "var(--text)", fontSize: "var(--fs-sm)", fontWeight: 600, marginBottom: "var(--sp-6)" };
 
 type Stage = "idle" | "creating" | "uploading" | "starting";
+type Mode = "write" | "interview";
+type Turn = { question: string; answer: string };
+
+/** Same shape the server's interviewTranscript writes (self-interview.ts). */
+const transcript = (turns: Turn[]) => turns.map((x) => `**Q:** ${x.question.trim()}\n\n**A:** ${x.answer.trim()}`).join("\n\n");
+
+/** "Interview me": a short interview, one question at a time; the
+ *  transcript becomes the twin's notes. */
+function InterviewPanel({ name, role, onTranscript }: { name: string; role: string; onTranscript: (text: string) => void }) {
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [question, setQuestion] = useState<string | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function ask(next: Turn[]) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/twins/self/interview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, role, turns: next }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { question?: string; done?: boolean; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `The interviewer couldn't continue (${res.status}).`);
+      if (body.done || !body.question) {
+        setQuestion(null);
+        setDone(true);
+      } else {
+        setQuestion(body.question);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function submit() {
+    if (!question || !answer.trim()) return;
+    const next = [...turns, { question, answer: answer.trim() }];
+    setTurns(next);
+    setAnswer("");
+    onTranscript(transcript(next));
+    void ask(next);
+  }
+
+  function finish() {
+    setQuestion(null);
+    setDone(true);
+  }
+
+  if (!name.trim() || !role.trim()) {
+    return <div className="subtle" style={{ fontSize: "var(--fs-sm)" }}>Fill in your name and role first.</div>;
+  }
+
+  return (
+    <div className="card" style={{ padding: "var(--sp-16)", display: "grid", gap: "var(--sp-12)" }}>
+      {turns.map((x, i) => (
+        <div key={i} style={{ display: "grid", gap: "var(--sp-4)", fontSize: "var(--fs-sm)" }}>
+          <div style={{ color: "var(--text-muted)" }}>{x.question}</div>
+          <div style={{ whiteSpace: "pre-wrap" }}>{x.answer}</div>
+        </div>
+      ))}
+      {!question && !done && turns.length === 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-12)", flexWrap: "wrap" }}>
+          <button type="button" className="btn primary sm" disabled={busy} onClick={() => void ask([])}>
+            {busy ? "Starting…" : "Start the interview"}
+          </button>
+          <span className="subtle" style={{ fontSize: "var(--fs-sm)" }}>About eight short questions. Answer the way you&apos;d tell a new colleague.</span>
+        </div>
+      )}
+      {question && (
+        <div style={{ display: "grid", gap: "var(--sp-8)" }}>
+          <label htmlFor="interview-answer" style={{ fontWeight: 600, fontSize: "var(--fs-ui)" }}>{question}</label>
+          <textarea
+            id="interview-answer"
+            style={{ ...fieldStyle, minHeight: 110, resize: "vertical", lineHeight: 1.55 }}
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit(); }}
+            disabled={busy}
+          />
+          <div style={{ display: "flex", gap: "var(--sp-8)", alignItems: "center" }}>
+            <button type="button" className="btn primary sm" disabled={busy || !answer.trim()} onClick={submit}>
+              {busy ? "Thinking…" : "Next"}
+            </button>
+            {turns.length >= 3 && (
+              <button type="button" className="btn ghost sm" disabled={busy} onClick={finish}>That&apos;s enough</button>
+            )}
+            <span className="subtle" style={{ fontSize: "var(--fs-sm)" }}>Question {turns.length + 1}</span>
+          </div>
+        </div>
+      )}
+      {busy && !question && turns.length > 0 && <div className="subtle" style={{ fontSize: "var(--fs-sm)" }}>Thinking…</div>}
+      {done && (
+        <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
+          Interview done: {turns.length} answer{turns.length === 1 ? "" : "s"}. Add documents if you like, agree below and build.
+        </div>
+      )}
+      {error && <div role="alert" style={{ color: "var(--danger)", fontSize: "var(--fs-sm)" }}>{error}</div>}
+    </div>
+  );
+}
 
 export default function BuildMyTwinPage() {
   const router = useRouter();
@@ -47,6 +153,7 @@ export default function BuildMyTwinPage() {
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [notes, setNotes] = useState("");
+  const [mode, setMode] = useState<Mode>("write");
   const [files, setFiles] = useState<File[]>([]);
   const [consent, setConsent] = useState(false);
   const [stage, setStage] = useState<Stage>("idle");
@@ -141,27 +248,48 @@ export default function BuildMyTwinPage() {
           </div>
 
           <div>
-            <label htmlFor="notes" style={labelStyle}>About your work</label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "var(--sp-12)", alignItems: "start" }}>
-              <textarea
-                id="notes"
-                style={{ ...fieldStyle, minHeight: 320, resize: "vertical", lineHeight: 1.55 }}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Write freely, in any language. Bullet points are fine."
-              />
-              <div className="card" style={{ padding: "var(--sp-14)", fontSize: "var(--fs-sm)", background: "var(--surface-soft)" }}>
-                <div style={{ fontWeight: 600, marginBottom: "var(--sp-8)" }}>Worth covering</div>
-                <ul style={{ margin: 0, paddingInlineStart: "var(--sp-16)", lineHeight: 1.6, color: "var(--text-muted)" }}>
-                  {PROMPTS.map((p) => <li key={p}>{p}</li>)}
-                </ul>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-12)", marginBottom: "var(--sp-6)", flexWrap: "wrap" }}>
+              <span style={{ ...labelStyle, marginBottom: 0 }}>About your work</span>
+              <div role="tablist" aria-label="How to brief your twin" style={{ display: "flex", gap: "var(--sp-4)" }}>
+                {(["write", "interview"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === m}
+                    className={mode === m ? "btn sm" : "btn ghost sm"}
+                    onClick={() => { setMode(m); setNotes(""); }}
+                  >
+                    {m === "write" ? "Write it" : "Interview me"}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>
-              {notesShort ? `${notes.trim().length} / ${MIN_NOTES} characters minimum` : `${notes.trim().length.toLocaleString("en-US")} characters`}
-            </div>
+{mode === "interview" ? (
+              <InterviewPanel name={name} role={role} onTranscript={setNotes} />
+            ) : (
+              <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "var(--sp-12)", alignItems: "start" }}>
+                  <textarea
+                    id="notes"
+                    style={{ ...fieldStyle, minHeight: 320, resize: "vertical", lineHeight: 1.55 }}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Write freely, in any language. Bullet points are fine."
+                  />
+                  <div className="card" style={{ padding: "var(--sp-14)", fontSize: "var(--fs-sm)", background: "var(--surface-soft)" }}>
+                    <div style={{ fontWeight: 600, marginBottom: "var(--sp-8)" }}>Worth covering</div>
+                    <ul style={{ margin: 0, paddingInlineStart: "var(--sp-16)", lineHeight: 1.6, color: "var(--text-muted)" }}>
+                      {PROMPTS.map((p) => <li key={p}>{p}</li>)}
+                    </ul>
+                  </div>
+                </div>
+                <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>
+                  {notesShort ? `${notes.trim().length} / ${MIN_NOTES} characters minimum` : `${notes.trim().length.toLocaleString("en-US")} characters`}
+                </div>
+              </>
+            )}
           </div>
-
           <div>
             <span style={labelStyle}>Documents (optional)</span>
             <div

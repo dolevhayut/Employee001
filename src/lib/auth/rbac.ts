@@ -97,6 +97,7 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/connections/toolkits": { GET: member },
   "/api/twin-builder/[employeeId]": { POST: admin },
   "/api/twins/self": { POST: admin },
+  "/api/twins/self/interview": { POST: admin },
   "/api/twin-builder/[employeeId]/active": { GET: member },
   "/api/twin-builder/[employeeId]/stream": { GET: member },
   "/api/twin-builder/active": { GET: member },
