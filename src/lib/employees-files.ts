@@ -95,6 +95,13 @@ export function writeEmployeeFileBody(
   return next;
 }
 
+/** Whether the employee exists on disk: profile files, or just its sidecar
+ *  (a twin whose builder hasn't written the profile yet). */
+export function employeeExists(employeeId: string): boolean {
+  if (!/^[a-z0-9][a-z0-9_-]*$/i.test(employeeId)) return false;
+  return hasEmployeeFiles(employeeId) || fs.existsSync(path.join(EMPLOYEES_DATA_DIR, employeeId, "employee.json"));
+}
+
 /** Check whether real profile files exist on disk for an employee. */
 export function hasEmployeeFiles(employeeId: string): boolean {
   const dir = path.join(EMPLOYEES_DATA_DIR, employeeId);

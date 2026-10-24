@@ -61,7 +61,10 @@ export function buildBlockReason(status: ConsentStatus, name: string): string | 
   if (status.kind === "consent_required") {
     return `${name} hasn't recorded consent, so the twin can't be trained on their data. Request consent from their profile first.`;
   }
-  if (!status.scopes.has("data-collection") || !status.scopes.has("integrations")) {
+  // Training needs data-collection. Reading their connected tools also needs
+  // "integrations", but that's enforced per toolkit (toolkitAllowed), so a
+  // twin built only from what the person wrote and uploaded doesn't need it.
+  if (!status.scopes.has("data-collection")) {
     return `${name}'s consent doesn't cover training on their work data.`;
   }
   return null;

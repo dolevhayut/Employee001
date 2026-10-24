@@ -16,6 +16,7 @@ import {
   readState as readComposioState,
 } from "@/lib/composio-client";
 import { loadOrgCustomMcpServers } from "@/lib/custom-mcp";
+import { listKnowledgeFiles } from "@/lib/knowledge-files";
 import { dataDir } from "@/lib/app-home";
 import { classifyTool, isReadOnlyAction } from "@/lib/tool-policy";
 import { filterProfilingContent, type FilterResult } from "@/lib/sensitive-content";
@@ -132,13 +133,17 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
     ts: ts(),
   });
 
-  if (!composioMcp && Object.keys(orgMcpServers).length === 0) {
+  // What the person wrote and uploaded (knowledge/): enough on its own to
+  // build from, so a twin doesn't need connected tools ("Build my twin").
+  const materialFiles = listKnowledgeFiles(employee.id).map((f) => f.name);
+
+  if (!composioMcp && Object.keys(orgMcpServers).length === 0 && materialFiles.length === 0) {
     onEvent({
       type: "error",
       message:
-        "No connected systems. Connect at least one toolkit at /connections/" +
+        "Nothing to build from. Connect at least one toolkit at /connections/" +
         employee.id +
-        " before building the twin.",
+        ", or add notes and documents to the twin's knowledge, then build again.",
       ts: ts(),
     });
     onEvent({
@@ -274,6 +279,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
     employeeDir,
     activeToolkits,
     orgMcpNames: Object.keys(orgMcpServers),
+    materialFiles,
     existingFiles: present,
     lookbackDays,
   });
@@ -614,6 +620,8 @@ function buildBuilderSystemPrompt(args: {
   employeeDir: string;
   activeToolkits: string[];
   orgMcpNames: string[];
+  /** Files in knowledge/ (cwd-relative), the person's own material. */
+  materialFiles: string[];
   existingFiles: TwinFileName[];
   lookbackDays: number;
 }): string {
@@ -623,9 +631,11 @@ function buildBuilderSystemPrompt(args: {
     employeeDir,
     activeToolkits,
     orgMcpNames,
+    materialFiles,
     existingFiles,
     lookbackDays,
   } = args;
+  const toolsConnected = activeToolkits.length > 0 || orgMcpNames.length > 0;
   const firstName = employee.firstName;
 
   const fileSpecs: { name: TwinFileName; spec: string }[] = [
@@ -722,7 +732,8 @@ All evidence gathering should focus on the **last ${lookbackDays} days** of ${fi
 
 # Available systems
 
-${activeToolkits.length > 0 ? `- **Composio MCP** (\`mcp__composio__*\`) — ${firstName}'s personal SaaS connections currently ACTIVE: ${activeToolkits.join(", ")}.\n  - Discover with the toolkit-specific list/search tools, then read.\n  - Pattern: \`mcp__composio__<TOOLKIT>_<VERB>_<OBJECT>\` — e.g. \`mcp__composio__GITHUB_LIST_PULL_REQUESTS\`, \`mcp__composio__SLACK_SEARCH_MESSAGES\`, \`mcp__composio__GMAIL_FETCH_EMAILS\`, \`mcp__composio__GOOGLECALENDAR_LIST_EVENTS\`.` : "- (No Composio toolkits active — rely on org-level MCP only.)"}
+${materialFiles.length > 0 ? `- **What ${firstName} wrote and uploaded** — \`knowledge/\` in your cwd: ${materialFiles.map((f) => `\`knowledge/${f}\``).join(", ")}. Authored, first-person material: the strongest signal you have, for every file including TONE.md (quote their own sentences). Read all of it with Read before writing anything.${toolsConnected ? "" : ` There are no connected tools: build only from these files, and the lookback window doesn't apply. Where they don't cover a file, say so (rule 4) instead of filling it in.`}` : ""}
+${activeToolkits.length > 0 ? `- **Composio MCP** (\`mcp__composio__*\`) — ${firstName}'s personal SaaS connections currently ACTIVE: ${activeToolkits.join(", ")}.\n  - Discover with the toolkit-specific list/search tools, then read.\n  - Pattern: \`mcp__composio__<TOOLKIT>_<VERB>_<OBJECT>\` — e.g. \`mcp__composio__GITHUB_LIST_PULL_REQUESTS\`, \`mcp__composio__SLACK_SEARCH_MESSAGES\`, \`mcp__composio__GMAIL_FETCH_EMAILS\`, \`mcp__composio__GOOGLECALENDAR_LIST_EVENTS\`.` : (toolsConnected ? "- (No Composio toolkits active — rely on org-level MCP only.)" : "")}
 ${orgMcpNames.length > 0 ? `- **Org-wide MCP servers** — workspace-level tools: ${orgMcpNames.map((n) => `\`mcp__${n}__*\``).join(", ")}.` : ""}
 - **Local Read/Write/Glob/Grep** — write the 9 markdown files into \`${employeeDir}\`. The Write tool is sandboxed to that directory and to the 9 known filenames; any other path will be denied.
 

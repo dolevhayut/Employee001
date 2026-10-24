@@ -10,7 +10,7 @@ const SANS_FONT =
   'var(--font-geist), ui-sans-serif, system-ui, sans-serif';
 
 type Action = {
-  id: "knowledge" | "invite" | "budgets";
+  id: "self" | "knowledge" | "invite" | "budgets";
   title: string;
   blurb: string;
   cta: string;
@@ -37,7 +37,23 @@ function Glyph({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Budgets stay in the sidebar: the first moves are the ones that get a twin
+// answering. Your own twin first, it needs nothing but you.
 const ACTIONS: Action[] = [
+  {
+    id: "self",
+    title: "Build your own twin",
+    blurb: "Tell it about your work and drop in a few documents. No tools to connect, about five minutes.",
+    cta: "Build my twin →",
+    href: "/build-my-twin",
+    glyph: (
+      <Glyph>
+        <circle cx="13" cy="13" r="5" />
+        <circle cx="23" cy="13" r="5" strokeDasharray="2 2" />
+        <path d="M4 30c0-5 4-9 9-9 2 0 3.6.5 5 1.4M32 30c0-5-4-9-9-9" />
+      </Glyph>
+    ),
+  },
   {
     id: "knowledge",
     title: "Add organizational knowledge",
@@ -65,20 +81,6 @@ const ACTIONS: Action[] = [
         <circle cx="14" cy="14" r="5" />
         <path d="M5 30c0-5 4-9 9-9s9 4 9 9" />
         <path d="M26 13v7M22.5 16.5h7" />
-      </Glyph>
-    ),
-  },
-  {
-    id: "budgets",
-    title: "Set spend budgets",
-    blurb:
-      "Choose monthly caps per twin so AI runs are predictable. You can always adjust later.",
-    cta: "Configure budgets →",
-    href: "/budgets",
-    glyph: (
-      <Glyph>
-        <circle cx="18" cy="18" r="11" />
-        <path d="M18 11v14M22 14h-6a2 2 0 100 4h4a2 2 0 110 4h-6" />
       </Glyph>
     ),
   },

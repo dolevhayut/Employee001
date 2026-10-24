@@ -96,6 +96,7 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/connections/[id]/initiate": { POST: role("admin", "id") },
   "/api/connections/toolkits": { GET: member },
   "/api/twin-builder/[employeeId]": { POST: admin },
+  "/api/twins/self": { POST: admin },
   "/api/twin-builder/[employeeId]/active": { GET: member },
   "/api/twin-builder/[employeeId]/stream": { GET: member },
   "/api/twin-builder/active": { GET: member },
@@ -188,7 +189,7 @@ const PUBLIC_PAGES = [/^\/login(\/|$)/, /^\/signup(\/|$)/, /^\/forgot-password(\
 /** Pages an employee-role user may open. */
 const EMPLOYEE_PAGES = [/^\/$/, /^\/profile(\/|$)/, /^\/account(\/|$)/, /^\/handover\/interview(\/|$)/];
 /** Admin-only pages. */
-const ADMIN_PAGES = [/^\/settings(\/|$)/, /^\/audit(\/|$)/, /^\/connections(\/|$)/, /^\/budgets(\/|$)/, /^\/handover\/?$/];
+const ADMIN_PAGES = [/^\/build-my-twin(\/|$)/, /^\/settings(\/|$)/, /^\/audit(\/|$)/, /^\/connections(\/|$)/, /^\/budgets(\/|$)/, /^\/handover\/?$/];
 
 type Compiled = { pattern: string; re: RegExp; params: string[]; methods: Methods };
 

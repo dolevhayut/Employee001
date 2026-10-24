@@ -30,11 +30,12 @@ export function consentTextDigest(locale: "en" | "he"): string {
 export type ConsentEvidenceInput = {
   employeeId: string;
   employeeName: string;
-  inviteToken: string;
+  /** The invite it came through; absent when the owner built their own twin. */
+  inviteToken?: string;
   consent: EmployeeConsent;
   locale?: string;
   headers: Headers;
-  channel?: "invite";
+  channel?: "invite" | "self";
 };
 
 /** First hop of X-Forwarded-For, else X-Real-IP. Empty when direct/local. */
@@ -48,7 +49,7 @@ export function buildConsentEvidence(input: ConsentEvidenceInput): Record<string
   return {
     employeeId: input.employeeId,
     employeeName: input.employeeName,
-    inviteTokenSha256: sha256(input.inviteToken),
+    ...(input.inviteToken ? { inviteTokenSha256: sha256(input.inviteToken) } : {}),
     grantedAt: input.consent.grantedAt,
     consentVersion: input.consent.version,
     consentTextLocale: locale,
@@ -71,7 +72,7 @@ export function recordConsentEvidence(input: ConsentEvidenceInput): boolean {
     bareName: "consentRecorded",
     input: evidence,
     verdict: "executed",
-    requesterId: `invite:${String(evidence.inviteTokenSha256).slice(0, 16)}`,
+    requesterId: input.inviteToken ? `invite:${String(evidence.inviteTokenSha256).slice(0, 16)}` : `self:${input.employeeId}`,
     approvalChannel: "ui",
     approvedBy: `employee:${input.employeeId}`,
   });

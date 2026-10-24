@@ -19,11 +19,15 @@ describe("consentStatusFor", () => {
 });
 
 describe("training", () => {
-  it("needs recorded consent to data collection and integrations", () => {
+  it("needs recorded consent to data collection; connected tools need integrations too", () => {
     expect(buildBlockReason(recorded(...BASE), "Noa")).toBeNull();
     expect(buildBlockReason(consentStatusFor({}, true), "Alex")).toBeNull();
     expect(buildBlockReason(consentStatusFor({}, false), "Noa")).toContain("hasn't recorded consent");
-    expect(buildBlockReason(recorded("data-collection"), "Noa")).toContain("doesn't cover training");
+    // A twin built only from what the person wrote and uploaded: training is
+    // allowed, reading their tools isn't (toolkitAllowed below).
+    expect(buildBlockReason(recorded("data-collection"), "Noa")).toBeNull();
+    expect(toolkitAllowed(recorded("data-collection"), "gmail")).toBe(false);
+    expect(buildBlockReason(recorded("integrations"), "Noa")).toContain("doesn't cover training");
   });
 });
 

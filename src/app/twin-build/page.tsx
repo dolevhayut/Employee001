@@ -251,11 +251,11 @@ function TwinBuildContent() {
             id: `info-${evt.ts}`,
             kind: "info" as const,
             action:
-              evt.activeToolkits.length > 0 ? "Connected" : "No connections",
+              evt.activeToolkits.length > 0 ? "Connected" : "No personal tools connected",
             detail:
               evt.activeToolkits.length > 0
                 ? evt.activeToolkits.join(" · ")
-                : "Using org-level MCP only",
+                : "Building from what was written and uploaded, plus any company systems",
             ts: evt.ts,
           },
         ]);

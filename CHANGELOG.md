@@ -8,6 +8,25 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Build your own twin, no tools to connect
+- A new **Build my twin** page (`/build-my-twin`, first on the Launchpad) lets
+  the person running Employee001 brief their own twin. You give it your name,
+  your role, a few paragraphs about your work (what you own, how you decide,
+  the questions people ask you, a few messages you wrote) and any documents.
+  You agree to it there, and the builder writes the 9 profile files from that
+  material while you watch. There's no invite, no Composio and no OAuth. Until
+  now, an invite with at least one connected tool was the only way to make a
+  twin, and with a Claude subscription, where invites are off, that left no
+  way at all.
+- The twin builder now builds from what the person wrote and uploaded
+  (`knowledge/`) when no tools are connected. Where that material doesn't
+  cover a file, the builder says so; it doesn't fill the file in. Connected
+  tools still deepen the twin.
+- Training needs consent to data collection. Reading the person's connected
+  tools still needs the integrations scope, as before, checked per toolkit.
+- The Launchpad's first three moves are now: your own twin, company knowledge,
+  inviting an employee. Budgets stay in the sidebar.
+
 ### `npx employee001` is the whole install
 - With no command, `npx employee001` now starts the app, running setup first
   in a folder without `.env`. It used to print help. `npx employee001 help`

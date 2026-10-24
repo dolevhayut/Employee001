@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { hasEmployeeFiles } from "@/lib/employees-files";
+import { employeeExists } from "@/lib/employees-files";
 import {
   extractUploadedKnowledgeFile,
   listKnowledgeFiles,
@@ -38,7 +38,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  if (!hasEmployeeFiles(id)) {
+  if (!employeeExists(id)) {
     return jsonResponse({ error: "employee not found" }, 404);
   }
   const files = listKnowledgeFiles(id);
@@ -51,7 +51,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  if (!hasEmployeeFiles(id)) {
+  if (!employeeExists(id)) {
     return jsonResponse({ error: "employee not found" }, 404);
   }
 
