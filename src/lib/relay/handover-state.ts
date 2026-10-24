@@ -6,7 +6,7 @@ import { dataDir } from "../app-home";
 import { loadLifecycle, type LifecycleState } from "../twin-lifecycle";
 import { scoreCoverage, type CoverageResult } from "./coverage";
 import { relayModelReady } from "./model";
-import { loadInterview, loadPackage, type InterviewMessage } from "./package-store";
+import { loadInterview, loadPackage, packageDigest, type InterviewMessage } from "./package-store";
 import type { RoleContextPackage } from "./rcp.types";
 
 export type HandoverState = LifecycleState & {
@@ -15,6 +15,8 @@ export type HandoverState = LifecycleState & {
   role: string;
   messages: InterviewMessage[];
   package: RoleContextPackage | null;
+  /** Sent back with an approval: the server refuses if the notes changed. */
+  packageDigest: string | null;
   coverage: CoverageResult | null;
   model: { ok: true } | { ok: false; reason: string };
 };
@@ -42,6 +44,7 @@ export async function loadHandoverState(employeeId: string): Promise<HandoverSta
     role: sidecar.role || "",
     messages,
     package: rcp,
+    packageDigest: rcp ? packageDigest(rcp) : null,
     coverage: rcp ? scoreCoverage(rcp) : null,
     model: relayModelReady(),
   };

@@ -4,6 +4,7 @@
 
 import "server-only";
 import fs from "fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "path";
 import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin, RetentionConsent, TwinLifecycle } from "./employees";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
@@ -96,8 +97,10 @@ export async function bumpActivityOnDisk(employeeId: string): Promise<void> {
     const thisWeek = isoWeek(new Date());
     const count =
       sidecar.weekOf === thisWeek ? (sidecar.questionsThisWeek ?? 0) + 1 : 1;
+    // Temp file + rename: lifecycle checks read this file without the lock.
+    const tmp = `${sidecarPath}.${randomUUID()}.tmp`;
     await fs.writeFile(
-      sidecarPath,
+      tmp,
       JSON.stringify(
         { ...sidecar, lastActiveAt: new Date().toISOString(), questionsThisWeek: count, weekOf: thisWeek },
         null,
@@ -105,6 +108,7 @@ export async function bumpActivityOnDisk(employeeId: string): Promise<void> {
       ),
       "utf8",
     );
+    await fs.rename(tmp, sidecarPath);
     });
   } catch {
     // Non-critical — never crash the chat for a stats write failure.
@@ -141,14 +145,19 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
 
     let complete = 0;
     for (const base of PROFILE_BASES) {
-      try {
-        const txt = await fs.readFile(
-          path.join(root, id, `${base}.md`),
-          "utf8",
-        );
-        if (txt.trim().length > 16) complete++;
-      } catch {
-        // missing file — don't count
+      // A retired twin's private files moved to retired-withheld/ (twin-lifecycle.ts).
+      const candidates = sidecar.lifecycle === "retired"
+        ? [path.join(root, id, `${base}.md`), path.join(root, id, "retired-withheld", `${base}.md`)]
+        : [path.join(root, id, `${base}.md`)];
+      for (const file of candidates) {
+        try {
+          if ((await fs.readFile(file, "utf8")).trim().length > 16) {
+            complete++;
+            break;
+          }
+        } catch {
+          // missing file — don't count
+        }
       }
     }
 

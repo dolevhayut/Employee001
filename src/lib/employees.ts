@@ -229,6 +229,9 @@ export type RetentionConsent = {
   /** sha256 of the consent text shown, so the wording can be proven later. */
   textDigest: string;
   locale: "en" | "he";
+  /** Recorded by an admin for the employee (e.g. no accounts, or no account
+   *  for them), not by the employee signed in themself. */
+  onBehalf?: boolean;
 };
 
 /** The role as people should see it: "Former <role>" once the person left. */

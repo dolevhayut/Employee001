@@ -85,12 +85,17 @@ Composio-managed apps are covered by ZDR only on Composio Enterprise.
 
 A departing employee's twin is kept only if they agree, during the handover, to
 keep it after they leave. That answer is recorded with the date and a SHA-256
-of the consent wording in the audit log. Without it the twin can't be retired;
-it is deleted.
+of the consent wording in the audit log, marked "on behalf" when an admin
+records it rather than the employee signed in as themself. Without it the twin
+can't be retired; it is deleted. Approving the notes is tied to the exact
+version the admin reviewed, and nothing the interview writes lands after the
+handover is closed.
 
 A retired twin answers colleagues from its EXPERTISE, DECISIONS, CONTEXT,
 PROJECTS, TONE and BOUNDARIES files and the handover notes an admin approved.
-PEOPLE, PREFERENCES and EMPLOYMENT stay out, and so do its memory, the org
+PEOPLE, PREFERENCES and EMPLOYMENT move out of the profile folder when it
+retires, so neither it, colleagues' twins, the org brain nor the profile pages
+can read them. Its memory, the org
 brain and every tool: it runs with no built-in tools and no MCP servers, takes
 no work items, routines, shifts or tasks, can't approve another twin's request,
 and writes no new memory. It is labelled as a former employee wherever it

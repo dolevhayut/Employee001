@@ -9,7 +9,8 @@
 import "server-only";
 import fs from "fs/promises";
 import { readFileSync } from "fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import path from "path";
 import { dataDir } from "./app-home";
 import { appendAuditEntry } from "./audit-log";
 import { withSidecarLock } from "./sidecar-lock";
@@ -71,6 +72,37 @@ async function readSidecar(id: string): Promise<Sidecar> {
   return JSON.parse(await fs.readFile(sidecarPath(id), "utf8")) as Sidecar;
 }
 
+/** Write via a temp file and rename, so a reader never sees a half-written record. */
+async function writeSidecar(id: string, value: Sidecar): Promise<void> {
+  const tmp = `${sidecarPath(id)}.${randomUUID()}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(value, null, 2), "utf8");
+  await fs.rename(tmp, sidecarPath(id));
+}
+
+const isMissing = (err: unknown) => (err as NodeJS.ErrnoException)?.code === "ENOENT";
+
+/** Profile files a retired twin's colleagues and the org brain must no longer
+ *  reach. On retirement they move here: four path segments deep, outside the
+ *  peer read scope, the org-brain index and the profile file API. Deleting
+ *  the twin deletes them with everything else. */
+export const WITHHELD_DIR = "retired-withheld";
+export const WITHHELD_FILES = ["PEOPLE.md", "PREFERENCES.md", "EMPLOYMENT.md"] as const;
+
+async function withholdPrivateFiles(id: string): Promise<string[]> {
+  const dir = dataDir("employees", id);
+  const moved: string[] = [];
+  await fs.mkdir(path.join(dir, WITHHELD_DIR), { recursive: true });
+  for (const name of WITHHELD_FILES) {
+    try {
+      await fs.rename(path.join(dir, name), path.join(dir, WITHHELD_DIR, name));
+      moved.push(name);
+    } catch (err) {
+      if (!isMissing(err)) throw err;
+    }
+  }
+  return moved;
+}
+
 function stateOf(s: Sidecar): LifecycleState {
   return {
     lifecycle: s.lifecycle === "handover" || s.lifecycle === "retired" ? s.lifecycle : "active",
@@ -81,22 +113,34 @@ function stateOf(s: Sidecar): LifecycleState {
   };
 }
 
-/** The twin's lifecycle; a missing or unreadable record counts as active. */
+/**
+ * The twin's lifecycle. A missing record is active (nothing to restrict). A
+ * record that exists but can't be read fails closed as retired: the run loses
+ * its tools rather than a retired twin getting them back.
+ */
 export async function loadLifecycle(id: string): Promise<LifecycleState> {
-  try {
-    return stateOf(await readSidecar(id));
-  } catch {
-    return { lifecycle: "active" };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return stateOf(await readSidecar(id));
+    } catch (err) {
+      if (isMissing(err)) return { lifecycle: "active" };
+      await new Promise((r) => setTimeout(r, 25));
+    }
   }
+  return { lifecycle: "retired" };
 }
 
-/** Synchronous check for code paths that can't await (intake, routing). */
+/** Synchronous check for code paths that can't await (intake, routing).
+ *  Fails closed the same way as loadLifecycle. */
 export function isRetiredSync(id: string): boolean {
-  try {
-    return (JSON.parse(readFileSync(sidecarPath(id), "utf8")) as Sidecar).lifecycle === "retired";
-  } catch {
-    return false;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return (JSON.parse(readFileSync(sidecarPath(id), "utf8")) as Sidecar).lifecycle === "retired";
+    } catch (err) {
+      if (isMissing(err)) return false;
+    }
   }
+  return true;
 }
 
 export type Actor = { userId?: string; role?: string };
@@ -140,10 +184,11 @@ export async function applyLifecycleAction(
       delete updated.retention;
       delete updated.retentionDeclinedAt;
     }
+    const withheld = action === "retire" ? await withholdPrivateFiles(id) : [];
     if (action === "retire") updated.retiredAt = now;
-    await fs.writeFile(sidecarPath(id), JSON.stringify(updated, null, 2), "utf8");
+    await writeSidecar(id, updated);
 
-    audit(id, sidecar.name ?? id, `relay.${action}`, { from: before.lifecycle, to: next.lifecycle }, actor);
+    audit(id, sidecar.name ?? id, `relay.${action}`, { from: before.lifecycle, to: next.lifecycle, ...(withheld.length ? { withheld } : {}) }, actor);
     return { ok: true as const, state: stateOf(updated) };
   });
 }
@@ -152,7 +197,7 @@ export async function applyLifecycleAction(
  *  clears any earlier "yes", so retiring is refused and the twin gets deleted. */
 export async function recordRetentionConsent(
   id: string,
-  args: { agree: boolean; locale: "en" | "he"; actor?: Actor; headers?: Headers },
+  args: { agree: boolean; locale: "en" | "he"; actor?: Actor; headers?: Headers; onBehalf?: boolean },
 ): Promise<{ ok: true; state: LifecycleState } | { ok: false; error: string; status: number }> {
   return withSidecarLock(id, async () => {
     let sidecar: Sidecar;
@@ -168,17 +213,18 @@ export async function recordRetentionConsent(
     const textDigest = retentionConsentDigest(args.locale);
     const now = new Date().toISOString();
     if (args.agree) {
-      updated.retention = { grantedAt: now, textDigest, locale: args.locale };
+      updated.retention = { grantedAt: now, textDigest, locale: args.locale, ...(args.onBehalf ? { onBehalf: true } : {}) };
       delete updated.retentionDeclinedAt;
     } else {
       delete updated.retention;
       updated.retentionDeclinedAt = now;
     }
-    await fs.writeFile(sidecarPath(id), JSON.stringify(updated, null, 2), "utf8");
+    await writeSidecar(id, updated);
 
     const forwarded = args.headers?.get("x-forwarded-for")?.split(",")[0]?.trim();
     audit(id, sidecar.name ?? id, args.agree ? "relay.retentionConsentGranted" : "relay.retentionConsentDeclined", {
       consentTextLocale: args.locale,
+      onBehalf: args.onBehalf === true,
       consentTextSha256: textDigest,
       ip: (forwarded || args.headers?.get("x-real-ip") || "").slice(0, 64),
       userAgent: (args.headers?.get("user-agent") ?? "").slice(0, 300),

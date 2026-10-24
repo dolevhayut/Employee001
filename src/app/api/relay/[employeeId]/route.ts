@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 import { applyLifecycleAction, type LifecycleAction } from "@/lib/twin-lifecycle";
 import { loadHandoverState } from "@/lib/relay/handover-state";
-import { deleteHandover } from "@/lib/relay/package-store";
+import { deleteHandover, withHandoverLock } from "@/lib/relay/package-store";
 
 export const runtime = "nodejs";
 
@@ -27,6 +27,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ employeeId
   const result = await applyLifecycleAction(employeeId, action, { userId: me?.id, role: me?.role });
   if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
   // A cancelled handover leaves nothing behind: transcript and draft go too.
-  if (action === "cancel-handover") await deleteHandover(employeeId);
+  if (action === "cancel-handover") await withHandoverLock(employeeId, () => deleteHandover(employeeId));
   return Response.json(await loadHandoverState(employeeId));
 }

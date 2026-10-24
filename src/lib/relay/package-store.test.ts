@@ -76,4 +76,14 @@ describe("handover package", () => {
     expect(await loadPackage("dana")).toBeNull();
     expect(await loadInterview("dana")).toEqual([]);
   });
+
+  it("an edit is redacted, marked unconfirmed, and changes the approval digest", async () => {
+    const { applyItemEdit, packageDigest, approvePackage } = await import("./package-store");
+    const before = rcp();
+    const edited = applyItemEdit(before, { op: "update", field: "decision_rules", itemId: "r1", body: "Mail dana@corp.com first" })!;
+    expect(edited.decision_rules[0]).toMatchObject({ body: "Mail [REDACTED-EMAIL] first", verified: false });
+    expect(packageDigest(edited)).not.toBe(packageDigest(before));
+    expect(packageDigest(approvePackage(before))).toBe(packageDigest(before));
+  });
 });
+

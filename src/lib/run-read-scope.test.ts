@@ -66,7 +66,7 @@ describe("read scope per run type", () => {
 
   it("a retired twin runs with no tools, no MCP servers and no memory write", () => {
     const text = source("lib/council-runner.ts");
-    expect(text).toMatch(/isRetired\(lifecycle\)\) options = \{ \.\.\.options, retired: true \}/);
+    expect(text).toMatch(/isRetired\(lifecycle\)\) options = \{ \.\.\.options, retired: true, resumeSessionId: undefined/);
     expect(text).toMatch(/\.\.\.\(retired \? \{ tools: \[\] \} : \{\}\)/);
     expect(text).toMatch(/const mcpServers = publicReply \? \{\}/);
     expect(text).toMatch(/if \(!retired\) void rememberTwinRun/);

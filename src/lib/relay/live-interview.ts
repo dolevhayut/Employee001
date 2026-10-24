@@ -22,7 +22,8 @@ import { scoreCoverage, type CoverageResult } from "./coverage";
 import { redactPii } from "./redact";
 import { verifyRcpEvidence } from "./evidence";
 import { relayTurn } from "./model";
-import { loadInterview, loadPackage, saveInterview, savePackage, type InterviewMessage } from "./package-store";
+import { loadLifecycle } from "../twin-lifecycle";
+import { loadInterview, loadPackage, saveInterview, savePackage, withHandoverLock, type InterviewMessage } from "./package-store";
 import {
   RCP_SCHEMA_VERSION,
   type CapturedItem,
@@ -64,6 +65,26 @@ function transcriptText(messages: ChatMessage[]): string {
     .join("\n\n");
 }
 
+/**
+ * Model calls take seconds to minutes. Save only if the same handover is
+ * still open: after a retire, cancel or delete nothing may be written back.
+ */
+async function whileOpen(employeeId: string, startedAt: string | undefined, save: () => Promise<void>): Promise<void> {
+  await withHandoverLock(employeeId, async () => {
+    const now = await loadLifecycle(employeeId);
+    if (now.lifecycle !== "handover" || now.handoverStartedAt !== startedAt) {
+      throw new Error("This handover was closed while the model was working. Nothing was saved.");
+    }
+    await save();
+  });
+}
+
+async function openHandoverStart(employeeId: string): Promise<string | undefined> {
+  const state = await loadLifecycle(employeeId);
+  if (state.lifecycle !== "handover") throw new Error("No handover is open for this twin.");
+  return state.handoverStartedAt;
+}
+
 const OPENING =
   "Open the interview now. Greet them warmly and specifically, grounded in their profile. In a sentence, say what this is: a conversation of about 20 to 30 minutes so their know-how keeps helping the team, which they can pause any time and review before it's used. Then ask your first question.";
 
@@ -76,10 +97,15 @@ export async function interviewerTurn(
   answer: string | undefined,
   onDelta: (delta: string) => void,
 ): Promise<ChatMessage[]> {
-  const messages = await loadInterview(employeeId);
+  const startedAt = await openHandoverStart(employeeId);
+  let messages = await loadInterview(employeeId);
   const text = answer?.trim();
-  if (text) messages.push({ role: "user", content: text.slice(0, 8000) });
-  if (text) await saveInterview(employeeId, messages);
+  if (text) {
+    await whileOpen(employeeId, startedAt, async () => {
+      messages = [...(await loadInterview(employeeId)), { role: "user", content: text.slice(0, 8000) }];
+      await saveInterview(employeeId, messages);
+    });
+  }
 
   const draft = await loadPackage(employeeId);
   const gaps = draft ? scoreCoverage(draft).gaps.join(", ") : "";
@@ -90,9 +116,12 @@ export async function interviewerTurn(
 
   const reply = await relayTurn({ employeeId, model: CAPTURE_MODEL, system, prompt, onDelta });
   if (!reply) throw new Error("The interviewer returned an empty message. Try again.");
-  messages.push({ role: "assistant", content: reply });
-  await saveInterview(employeeId, messages);
-  return messages;
+  let saved = messages;
+  await whileOpen(employeeId, startedAt, async () => {
+    saved = [...(await loadInterview(employeeId)), { role: "assistant", content: reply }];
+    await saveInterview(employeeId, saved);
+  });
+  return saved;
 }
 
 // ─── Synthesis (opus) ─────────────────────────────────────────────────────────
@@ -192,6 +221,7 @@ function clamp01(n: number): number {
 export async function synthesizeHandover(
   employeeId: string,
 ): Promise<{ rcp: RoleContextPackage; coverage: CoverageResult }> {
+  const startedAt = await openHandoverStart(employeeId);
   const messages = await loadInterview(employeeId);
   if (!messages.some((m) => m.role === "user" && m.content.trim())) {
     throw new Error("No answers yet. Answer a few questions first.");
@@ -263,7 +293,7 @@ export async function synthesizeHandover(
   const coverage = scoreCoverage(rcp);
   rcp.status = coverage.status;
 
-  await savePackage(employeeId, rcp);
+  await whileOpen(employeeId, startedAt, () => savePackage(employeeId, rcp));
 
   return { rcp, coverage };
 }

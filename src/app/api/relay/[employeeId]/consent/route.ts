@@ -16,7 +16,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ employeeId
   const body = (await req.json().catch(() => ({}))) as { agree?: unknown; locale?: unknown };
   if (typeof body.agree !== "boolean") return Response.json({ error: "agree must be true or false" }, { status: 400 });
   const me = sessionUserFromHeaders(req.headers);
+  // Only the employee signed in as themself gives it first-hand; anything else
+  // (an admin, or a workspace without accounts) is recorded as on their behalf.
+  const onBehalf = me?.employeeId !== employeeId;
   const result = await recordRetentionConsent(employeeId, {
+    onBehalf,
     agree: body.agree,
     locale: body.locale === "he" ? "he" : "en",
     actor: { userId: me?.id, role: me?.role },

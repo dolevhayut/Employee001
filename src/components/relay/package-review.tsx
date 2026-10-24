@@ -29,10 +29,11 @@ export type HandoverState = {
   name: string;
   role: string;
   lifecycle: "active" | "handover" | "retired";
-  retention?: { grantedAt: string };
+  retention?: { grantedAt: string; onBehalf?: boolean };
   retentionDeclinedAt?: string;
   messages: Message[];
   package: HandoverPackage | null;
+  packageDigest: string | null;
   model: { ok: boolean; reason?: string };
 };
 

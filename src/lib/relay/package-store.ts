@@ -9,9 +9,12 @@
 
 import "server-only";
 import fs from "fs/promises";
+import { createHash, randomUUID } from "node:crypto";
 import path from "path";
 import { dataDir } from "../app-home";
+import { withSidecarLock } from "../sidecar-lock";
 import type { CapturedItem, RoleContextPackage, ToolingRef } from "./rcp.types";
+import { redactPii } from "./redact";
 
 export type InterviewMessage = { role: "user" | "assistant"; content: string };
 
@@ -50,7 +53,7 @@ async function readJson<T>(file: string): Promise<T | null> {
 
 async function writeJson(file: string, value: unknown): Promise<void> {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
+  const tmp = `${file}.${randomUUID()}.tmp`;
   await fs.writeFile(/*turbopackIgnore: true*/ tmp, JSON.stringify(value, null, 2), "utf8");
   await fs.rename(tmp, file);
 }
@@ -66,6 +69,11 @@ export async function saveInterview(id: string, messages: InterviewMessage[]): P
     .map((m) => ({ role: m.role, content: m.content.slice(0, 20_000) }))
     .slice(-400);
   await writeJson(interviewPath(id), { updatedAt: new Date().toISOString(), messages: clean });
+}
+
+/** Serialize read-modify-write of one twin's handover files in this process. */
+export function withHandoverLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
+  return withSidecarLock(`handover:${id}`, fn);
 }
 
 export async function loadPackage(id: string): Promise<RoleContextPackage | null> {
@@ -95,24 +103,28 @@ export function applyItemEdit(rcp: RoleContextPackage, edit: ItemEdit): RoleCont
     next.splice(index, 1);
   } else {
     const item = next[index];
+    // An edited item is no longer what the interview said word for word.
+    const edited = { verified: false, verificationReason: "Edited by a reviewer." };
+    const title = edit.title !== undefined ? redactPii(edit.title.slice(0, 300)) : undefined;
+    const body = edit.body !== undefined ? redactPii(edit.body.slice(0, 4000)) : undefined;
     if ("system" in item) {
-      next[index] = {
-        ...item,
-        ...(edit.title !== undefined ? { system: edit.title.slice(0, 300) } : {}),
-        ...(edit.body !== undefined ? { location: edit.body.slice(0, 4000) } : {}),
-      };
+      next[index] = { ...item, ...edited, ...(title !== undefined ? { system: title } : {}), ...(body !== undefined ? { location: body } : {}) };
     } else {
-      next[index] = {
-        ...item,
-        ...(edit.title !== undefined ? { title: edit.title.slice(0, 300) } : {}),
-        ...(edit.body !== undefined ? { body: edit.body.slice(0, 4000) } : {}),
-      };
+      next[index] = { ...item, ...edited, ...(title !== undefined ? { title } : {}), ...(body !== undefined ? { body } : {}) };
     }
   }
   const { review: _review, ...rest } = rcp;
   void _review;
   const itemCount = PACKAGE_FIELDS.reduce((n, f) => n + (f === edit.field ? next.length : rcp[f].length), 0);
   return { ...rest, [edit.field]: next, provenance: { ...rcp.provenance, itemCount } } as RoleContextPackage;
+}
+
+/** Fingerprint of the package content (not its review), so an approval can
+ *  be tied to exactly what the reviewer saw. */
+export function packageDigest(rcp: RoleContextPackage): string {
+  const { review: _review, ...content } = rcp;
+  void _review;
+  return createHash("sha256").update(JSON.stringify(content)).digest("hex");
 }
 
 export function approvePackage(rcp: RoleContextPackage, approvedBy?: string): RoleContextPackage {

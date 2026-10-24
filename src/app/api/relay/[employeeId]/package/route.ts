@@ -6,8 +6,10 @@ import {
   PACKAGE_FIELDS,
   applyItemEdit,
   approvePackage,
+  packageDigest,
   packageMarkdown,
   savePackage,
+  withHandoverLock,
   type ItemEdit,
   type PackageField,
 } from "@/lib/relay/package-store";
@@ -57,15 +59,27 @@ const isField = (v: unknown): v is PackageField => PACKAGE_FIELDS.includes(v as 
  */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ employeeId: string }> }) {
   const { employeeId } = await ctx.params;
+  const me = sessionUserFromHeaders(req.headers);
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  // Two reviewers editing at once must not overwrite each other's edits.
+  return withHandoverLock(employeeId, () => applyEdit(employeeId, body, me));
+}
+
+async function applyEdit(
+  employeeId: string,
+  body: Record<string, unknown>,
+  me: ReturnType<typeof sessionUserFromHeaders>,
+): Promise<Response> {
   const state = await loadHandoverState(employeeId);
   if (!state?.package) return Response.json({ error: "No handover package yet" }, { status: 404 });
   if (state.lifecycle !== "handover") return Response.json({ error: "The package can be changed only during the handover." }, { status: 409 });
-  const me = sessionUserFromHeaders(req.headers);
-  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
   let next = null;
   if (body.op === "approve") {
-    if (me?.role === "employee") return Response.json({ error: "An admin approves the package." }, { status: 403 });
+    if (me && me.role !== "owner" && me.role !== "admin") return Response.json({ error: "An admin approves the package." }, { status: 403 });
+    if (body.digest !== packageDigest(state.package)) {
+      return Response.json({ error: "The notes changed since you opened them. Review them again, then approve." }, { status: 409 });
+    }
     next = approvePackage(state.package, me?.id);
   } else if ((body.op === "remove" || body.op === "update") && isField(body.field) && typeof body.itemId === "string") {
     const edit: ItemEdit = body.op === "remove"

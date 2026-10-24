@@ -65,7 +65,7 @@ function HandoverCard({ twin, onChanged, setError }: { twin: Twin; onChanged: ()
   if (!state) return <div style={card}>Loading…</div>;
   const pkg = state.package;
   const answers = state.messages.filter((m) => m.role === "user").length;
-  const consent = state.retention ? "agreed to keep their twin" : state.retentionDeclinedAt ? "declined: delete the twin when they leave" : "hasn't chosen yet whether their twin stays";
+  const consent = state.retention ? `agreed to keep their twin${state.retention.onBehalf ? " (recorded by an admin on their behalf)" : ""}` : state.retentionDeclinedAt ? "declined: delete the twin when they leave" : "hasn't chosen yet whether their twin stays";
   const link = `/handover/interview?employee=${encodeURIComponent(twin.id)}`;
 
   async function act(method: string, url: string, body?: unknown, confirmText?: string) {
@@ -102,7 +102,7 @@ function HandoverCard({ twin, onChanged, setError }: { twin: Twin; onChanged: ()
           {copied ? "Copied" : "Copy link for the employee"}
         </button>
         {pkg && <button style={btn} onClick={() => setShowNotes((v) => !v)}>{showNotes ? "Hide the notes" : "Review the notes"}</button>}
-        {pkg && !pkg.review && <button style={btn} onClick={() => act("PATCH", `${base}/package`, { op: "approve" })}>Approve the notes</button>}
+        {pkg && !pkg.review && <button style={btn} onClick={() => act("PATCH", `${base}/package`, { op: "approve", digest: state.packageDigest })}>Approve the notes</button>}
         {state.retention ? (
           <button
             style={primary}

@@ -80,4 +80,30 @@ describe("lifecycle on disk", () => {
     expect(retentionConsentText("en")).toContain("relayConsent.agree=");
     expect(retentionConsentDigest("en")).not.toBe(retentionConsentDigest("he"));
   });
+
+  it("fails closed: an unreadable record counts as retired, a missing one as active", async () => {
+    fs.mkdirSync(path.dirname(sidecar("broken")), { recursive: true });
+    fs.writeFileSync(sidecar("broken"), "{ half-writ");
+    const { loadLifecycle, isRetiredSync } = await import("./twin-lifecycle");
+    expect((await loadLifecycle("broken")).lifecycle).toBe("retired");
+    expect(isRetiredSync("broken")).toBe(true);
+    expect((await loadLifecycle("nobody")).lifecycle).toBe("active");
+    expect(isRetiredSync("nobody")).toBe(false);
+  });
+
+  it("retiring moves PEOPLE, PREFERENCES and EMPLOYMENT out of the peer-readable profile", async () => {
+    twin("rina");
+    const dir = path.dirname(sidecar("rina"));
+    for (const f of ["PEOPLE.md", "EMPLOYMENT.md", "EXPERTISE.md"]) fs.writeFileSync(path.join(dir, f), `${f} content`);
+    const { applyLifecycleAction, recordRetentionConsent } = await import("./twin-lifecycle");
+    await applyLifecycleAction("rina", "start-handover");
+    await recordRetentionConsent("rina", { agree: true, locale: "en", onBehalf: true });
+    expect(read("rina").retention.onBehalf).toBe(true);
+    await applyLifecycleAction("rina", "retire");
+    expect(fs.existsSync(path.join(dir, "PEOPLE.md"))).toBe(false);
+    expect(fs.existsSync(path.join(dir, "EXPERTISE.md"))).toBe(true);
+    expect(fs.readFileSync(path.join(dir, "retired-withheld", "EMPLOYMENT.md"), "utf8")).toBe("EMPLOYMENT.md content");
+    expect(auditRows().at(-1).input.withheld).toEqual(["PEOPLE.md", "EMPLOYMENT.md"]);
+  });
 });
+

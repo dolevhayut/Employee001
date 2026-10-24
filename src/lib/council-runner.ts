@@ -843,7 +843,9 @@ export async function runSingleTwin(
   // The record on disk decides, not the caller: a retired twin always runs
   // without tools, whichever surface asked it.
   const lifecycle = await loadLifecycle(employee.id);
-  if (isRetired(lifecycle)) options = { ...options, retired: true };
+  // No session resume either: a session from before retirement carries tool
+  // results and profile reads a retired twin must not see.
+  if (isRetired(lifecycle)) options = { ...options, retired: true, resumeSessionId: undefined, forkSession: undefined };
   const retired = options.retired === true;
 
   // Pre-create the scratch directory so Glob(`scratch/<id>/*`) returns the dir

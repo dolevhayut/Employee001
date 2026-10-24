@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { canRunModel } from "@/lib/model-provider";
 import fs from "fs/promises";
 import path from "path";
+import { randomUUID } from "node:crypto";
+import { withSidecarLock } from "@/lib/sidecar-lock";
 import {
   classifyInvite,
   markInviteCompleted,
@@ -380,30 +382,43 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Always overwrite the sidecar: name/role may have started as placeholders
     // (e.g. "Pending (abc123)") and the wizard's final values are authoritative.
     const sidecarPath = path.join(dir, "employee.json");
-    let existingSidecar: { createdAt?: string } = {};
-    try {
-      existingSidecar = JSON.parse(await fs.readFile(sidecarPath, "utf8"));
-    } catch {
-      existingSidecar = {};
-    }
-    await fs.writeFile(
-      sidecarPath,
-      JSON.stringify(
-        {
-          id: employeeId,
-          name,
-          role: role || null,
-          integrations: (body.integrations ?? []).filter(Boolean),
-          createdAt: existingSidecar.createdAt ?? new Date().toISOString(),
-          lastActiveAt: new Date().toISOString(),
-          via: { invite: token },
-          consent,
-        },
-        null,
-        2,
-      ),
-      "utf8",
-    );
+    // Under the sidecar lock and via temp file + rename: a retire or another
+    // writer can't interleave, and readers never see a half-written file.
+    await withSidecarLock(employeeId, async () => {
+      let existingSidecar: Record<string, unknown> & { createdAt?: string } = {};
+      try {
+        existingSidecar = JSON.parse(await fs.readFile(sidecarPath, "utf8"));
+      } catch {
+        existingSidecar = {};
+      }
+      const tmp = `${sidecarPath}.${randomUUID()}.tmp`;
+      await fs.writeFile(
+        tmp,
+        JSON.stringify(
+          {
+            id: employeeId,
+            name,
+            role: role || null,
+            integrations: (body.integrations ?? []).filter(Boolean),
+            createdAt: existingSidecar.createdAt ?? new Date().toISOString(),
+            lastActiveAt: new Date().toISOString(),
+            via: { invite: token },
+            consent,
+            // Relay state belongs to the twin, not the wizard: a re-consent
+            // must not bring a retired twin back or drop its retention consent.
+            ...Object.fromEntries(
+              ["lifecycle", "handoverStartedAt", "retiredAt", "retention", "retentionDeclinedAt"]
+                .filter((k) => existingSidecar[k] !== undefined)
+                .map((k) => [k, existingSidecar[k]]),
+            ),
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+      await fs.rename(tmp, sidecarPath);
+    });
 
     // Immutable evidence of the consent (hash-chained audit row).
     recordConsentEvidence({

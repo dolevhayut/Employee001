@@ -22,12 +22,15 @@ export type Access =
   | { kind: "invite" }
   | { kind: "webhook" }
   | { kind: "bearer" }
-  | { kind: "role"; min: Role; self?: string };
+  | { kind: "role"; min: Role; self?: string; selfAnyRole?: boolean };
 
 const pub: Access = { kind: "public" };
 const invite: Access = { kind: "invite" };
 const webhook: Access = { kind: "webhook" };
 const role = (min: Role, self?: string): Access => ({ kind: "role", min, ...(self ? { self } : {}) });
+/** Like role(min, self), but the person's own record is open to them whatever
+ *  their role (a departing member or approver does their own handover). */
+const ownOrRole = (min: Role, self: string): Access => ({ kind: "role", min, self, selfAnyRole: true });
 const employee = role("employee");
 const member = role("member");
 const approver = role("approver");
@@ -100,11 +103,11 @@ export const API_ROUTES: Record<string, Methods> = {
   // Relay: admins run the lifecycle; the departing employee does their own
   // interview, consent and review (approval itself is admin-only, in-route).
   "/api/relay": { GET: admin },
-  "/api/relay/[employeeId]": { GET: role("admin", "employeeId"), POST: admin },
-  "/api/relay/[employeeId]/interview": { POST: role("admin", "employeeId") },
-  "/api/relay/[employeeId]/synthesize": { POST: role("admin", "employeeId") },
-  "/api/relay/[employeeId]/consent": { POST: role("admin", "employeeId") },
-  "/api/relay/[employeeId]/package": { GET: admin, PATCH: role("admin", "employeeId") },
+  "/api/relay/[employeeId]": { GET: ownOrRole("admin", "employeeId"), POST: admin },
+  "/api/relay/[employeeId]/interview": { POST: ownOrRole("admin", "employeeId") },
+  "/api/relay/[employeeId]/synthesize": { POST: ownOrRole("admin", "employeeId") },
+  "/api/relay/[employeeId]/consent": { POST: ownOrRole("admin", "employeeId") },
+  "/api/relay/[employeeId]/package": { GET: admin, PATCH: ownOrRole("admin", "employeeId") },
 
   // Using the product
   "/api/twin/chat": { POST: member },
@@ -232,7 +235,7 @@ export function authorizeApi(pathname: string, method: string, caller: Caller): 
   if (access.kind !== "role") return { allow: true, access };
   if (!caller) return { allow: false, status: 401, reason: "sign in required" };
   if (ROLE_RANK[caller.role] >= ROLE_RANK[access.min]) return { allow: true, access };
-  if (access.self && caller.role === "employee" && caller.employeeId && route.params[access.self] === caller.employeeId) {
+  if (access.self && (caller.role === "employee" || access.selfAnyRole) && caller.employeeId && route.params[access.self] === caller.employeeId) {
     return { allow: true, access };
   }
   return { allow: false, status: 403, reason: `${route.pattern} needs the ${access.min} role` };

@@ -105,3 +105,28 @@ describe("authorizePage", () => {
     expect(authorizePage("/council", member).allow).toBe(true);
   });
 });
+
+describe("Relay access", () => {
+  const dana = { id: "u-dana", role: "member" as const, employeeId: "dana" };
+  const omerEmployee = { id: "u-omer", role: "employee" as const, employeeId: "omer" };
+  const admin = { id: "u-admin", role: "admin" as const };
+
+  it("a departing person does their own handover whatever their role, and only theirs", () => {
+    for (const [m, p] of [["GET", "/api/relay/dana"], ["POST", "/api/relay/dana/interview"], ["POST", "/api/relay/dana/consent"], ["PATCH", "/api/relay/dana/package"]] as const) {
+      expect(authorizeApi(p, m, dana).allow, `${m} ${p}`).toBe(true);
+      expect(authorizeApi(p.replace("dana", "noa"), m, dana).allow, `${m} other`).toBe(false);
+    }
+    expect(authorizeApi("/api/relay/omer/interview", "POST", omerEmployee).allow).toBe(true);
+  });
+
+  it("retiring, downloading and the twin list stay admin-only", () => {
+    expect(authorizeApi("/api/relay/dana", "POST", dana).allow).toBe(false);
+    expect(authorizeApi("/api/relay/dana/package", "GET", dana).allow).toBe(false);
+    expect(authorizeApi("/api/relay", "GET", dana).allow).toBe(false);
+    expect(authorizeApi("/api/relay/dana", "POST", admin).allow).toBe(true);
+  });
+
+  it("the member self-access is limited to Relay routes", () => {
+    expect(authorizeApi("/api/employees/dana", "DELETE", dana).allow).toBe(false);
+  });
+});
