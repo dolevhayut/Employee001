@@ -1157,7 +1157,9 @@ export default function AskPage() {
           : t("ask.mic.stop");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    // minHeight 0: the shell panel is shorter than the viewport (inset, plus
+    // the consent banner), so the page must shrink or the composer is cut off.
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", minHeight: 0 }}>
       <Topbar
         crumbs={[t("nav.ask")]}
         actions={
