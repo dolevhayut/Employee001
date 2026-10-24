@@ -24,6 +24,7 @@ import {
   judgeCapture,
   judgeInterview,
   judgeAnswer,
+  groundTruthText,
   type HiddenKnowledge,
   type CaptureVerdict,
   type InterviewVerdict,
@@ -156,7 +157,7 @@ async function runPerson(d: Dossier, log: (m: string) => void): Promise<PersonRe
     const answer = await runSingleTwin(twin, q.question, (e) => {
       if (e.type === "employee_done" && typeof e.costUsd === "number") twinSpendUsd += e.costUsd;
     }, [], { surface: "chat", maxBudgetUsd: 0.5 });
-    qa.push({ ...q, answer, verdict: await judgeAnswer(q.question, q.expected, answer) });
+    qa.push({ ...q, answer, verdict: await judgeAnswer(q.question, q.expected, answer, groundTruthText(d, knowledge)) });
   }
   log(`${d.firstName}: ${qa.length} questions answered by the retired twin`);
 

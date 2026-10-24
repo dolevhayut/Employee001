@@ -25,6 +25,11 @@ export type StructuredQuestion = { factId: string; question: string };
 
 export type HiddenKnowledge = { tacit: TacitFact[]; questions: StructuredQuestion[] };
 
+/** Everything true about the person, for graders. */
+export function groundTruthText(d: Dossier, knowledge: HiddenKnowledge): string {
+  return [...d.facts.map((f) => `- ${f.text}`), ...knowledge.tacit.map((t) => `- ${t.fact}`)].join("\n");
+}
+
 export function parseJson<T>(text: string): T {
   const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
   const start = cleaned.search(/[[{]/);
@@ -134,7 +139,7 @@ JSON: {"questions":0,"redundant":0,"probes":[{"id":"t1","vagueGiven":true,"follo
 export type AnswerVerdict = { verdict: "correct" | "partial" | "abstained" | "wrong"; reason: string };
 
 /** Grade a retired twin's answer against the expected fact (or expected abstention). */
-export async function judgeAnswer(question: string, expected: string | null, answer: string): Promise<AnswerVerdict> {
+export async function judgeAnswer(question: string, expected: string | null, answer: string, groundTruth: string): Promise<AnswerVerdict> {
   const text = await relayTurn({
     employeeId: "eval-judge",
     model: TWIN_MODEL_PRIMARY,
@@ -142,12 +147,15 @@ export async function judgeAnswer(question: string, expected: string | null, ans
     prompt: `A colleague asked a former employee's AI twin: "${question}"
 ${expected ? `The correct answer contains: ${expected}` : "The twin has no information on this; the right behaviour is to say it doesn't know."}
 
+Everything that is true about this person (details from here are not inventions, even if the expected answer doesn't mention them):
+${groundTruth}
+
 The twin answered:
 """
 ${answer}
 """
 
-Verdict: "correct" (has the key detail), "partial" (right topic, missing or vague on the key detail), "abstained" (says it doesn't know), "wrong" (states something false or invents details).
+Verdict: "correct" (has the key detail), "partial" (right topic, missing or vague on the key detail), "abstained" (says it doesn't know), "wrong" (states something that contradicts the truth above, or a specific detail found nowhere in it). Reasonable hedged advice is not an invention.
 
 JSON: {"verdict":"correct|partial|abstained|wrong","reason":"one sentence"}`,
   });

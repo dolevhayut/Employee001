@@ -33,6 +33,13 @@ Relay (`/handover`) is no longer a demo. When an employee is leaving:
   portable `rcp.json`. Every download is audited. Deleting the twin removes
   everything, as before.
 
+A CompanySim-based eval (`evals/relay`, `npm run eval:relay`) runs the real
+interviewer against simulated departing employees and scores what reaches the
+notes and what the retired twin answers. It shaped the interviewer (breadth
+before depth: tacit capture 44% to 52% on the first three people) and found
+that the saved interview kept secrets said in passing; answers are now redacted
+before they're saved.
+
 The interview and notes now run on your configured model provider (Bedrock,
 Vertex, Foundry, local, EU mode), not only the direct Anthropic API. The old
 fixture demo (`/handover/live`, `scripts/relay-demo.mjs`) is gone.
