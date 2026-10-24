@@ -296,7 +296,9 @@ function SpeakButton({ state, onClick, label, size = 26 }: { state: "idle" | "lo
 
 function Trace({ turn, live }: { turn: Turn; live: boolean }) {
   const { t } = useT();
-  const [open, setOpen] = useState(true);
+  // Open while the twin works; once the answer is in, the steps fold away
+  // behind their count (click to open) so the answer stays in front.
+  const [open, setOpen] = useState(false);
   const visible = live || open;
   if (!turn.steps.length && !turn.thinking) return null;
   return (
@@ -314,6 +316,7 @@ function Trace({ turn, live }: { turn: Turn; live: boolean }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         disabled={live}
+        aria-expanded={visible}
         style={{
           alignSelf: "flex-start",
           display: "flex",
@@ -332,6 +335,11 @@ function Trace({ turn, live }: { turn: Turn; live: boolean }) {
       >
         {live ? <Icons.Loader size={11} /> : <Icons.Check size={11} />}
         {live ? t("ask.trace.working") : t("ask.trace.steps", { count: turn.steps.length })}
+        {!live && (
+          <span aria-hidden style={{ display: "inline-flex", transition: "transform 160ms ease", transform: `rotate(${open ? 90 : 0}deg)` }}>
+            <Icons.Chevron size={11} />
+          </span>
+        )}
       </button>
       <AnimatePresence initial={false}>
         {visible &&
