@@ -1,0 +1,38 @@
+{
+  "slug": "SLACK_WHO_AM_I",
+  "name": "Who Am I",
+  "description": "Return the identity (user + workspace) of the connected Slack account. Slack user ids are workspace-scoped, so the workspace is part of the label.",
+  "toolkit": "slack",
+  "version": "20261023_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {},
+    "title": "WhoAmIRequest",
+    "description": "The current connected account's identity. Takes no parameters."
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/WhoAmIResponse_SlackWhoAmIData_"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "WhoAmIResponse[SlackWhoAmIData]Wrapper"
+  }
+}

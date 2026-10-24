@@ -1,0 +1,184 @@
+{
+  "slug": "OUTLOOK_QUERY_EMAILS",
+  "name": "Query Emails",
+  "description": "Query one Outlook mail folder with a validated raw OData filter. Best for precise server-side metadata conditions when validation and corrective guidance for OData syntax are useful. Returns 100 messages by default, up to 1000 per request, with projection, sorting, offset, and opaque continuation-token pagination. • Searches SINGLE folder only (inbox, sentitems, etc.) - NOT across all folders • For mailbox-wide OData filtering or full-text search: Use OUTLOOK_LIST_MESSAGES with folder='allfolders' • Server-side filters: dates, importance, isRead, hasAttachments, subjects, conversationId • Pagination: use the returned next_page_token (pass it back as page_token) until it is absent • Limitations: Recipient/body filtering requires OUTLOOK_SEARCH_MESSAGES",
+  "toolkit": "outlook",
+  "version": "20261022_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "top": {
+        "type": "integer",
+        "description": "Maximum number of messages to return per request (1-1000). Default is 100. IMPORTANT: For large mailboxes, paginate using `next_page_token`. Pagination example: 1) Call with top=100, 2) Read `next_page_token` from the response, 3) If present, call again passing it back as `page_token`, 4) Repeat until `next_page_token` is absent.",
+        "title": "Top",
+        "default": 100,
+        "minimum": 1,
+        "maximum": 1000,
+        "examples": [
+          10,
+          50,
+          100,
+          500
+        ]
+      },
+      "skip": {
+        "type": "integer",
+        "description": "Number of messages to skip for pagination. NOTE: For large result sets, prefer the returned `next_page_token` (pass it back as `page_token`) over manual skip.",
+        "title": "Skip",
+        "default": 0,
+        "minimum": 0,
+        "examples": [
+          0,
+          100,
+          200
+        ]
+      },
+      "filter": {
+        "type": "string",
+        "description": "OData $filter query string to filter email messages. Syntax: 'field operator value' combined with 'and', 'or', 'not'.\n\n        **Operators:** eq, ne, lt, le, gt, ge, startswith(), contains(), any()\n\n        **String Functions:**\n        - subject: contains(), startswith()\n        - from/sender: startswith() and eq only. contains() is NOT supported on sender/from fields\n        - endswith() is NOT reliably supported by Microsoft Graph API for message filtering\n\n        **Filterable Fields:**\n        - `isRead` - Boolean: true/false\n        - `importance` - String: 'low', 'normal', 'high'\n        - `subject` - String (exact match or startswith)\n        - `hasAttachments` - Boolean: true/false\n        - `receivedDateTime`, `sentDateTime` - DateTime (ISO 8601: 2025-10-01T00:00:00Z, NOT enclosed in quotes)\n        - `conversationId` - String (exact match)\n        - `categories` - Array (use any() operator: `categories/any(a:a eq 'CategoryName')`)\n        - `isDraft`, `flag/flagStatus` - Boolean/String flags\n        - `from/emailAddress/address`, `sender/emailAddress/address` - Sender email (ONLY 'address' is filterable, NOT 'name')\n\n        **NOT filterable:** toRecipients, ccRecipients, bccRecipients, body/content, id — use OUTLOOK_SEARCH_MESSAGES for these.\n\n        **Categories Filtering:**\n        - Single: `categories/any(a:a eq 'CategoryName')`\n        - Multiple (OR): Use SEPARATE any() calls: `categories/any(a:a eq 'Cat1') or categories/any(b:b eq 'Cat2')`\n        - For category names containing single quotes, escape them by doubling: `categories/any(a:a eq 'Owner''s Category')`\n\n        **Date Filtering:**\n        - ISO 8601 format: 2025-10-01T00:00:00Z (no quotes around datetime values)\n        - Operators: ge, gt, le, lt\n",
+        "title": "Filter",
+        "examples": [
+          "isRead eq false",
+          "importance eq 'high'",
+          "hasAttachments eq true",
+          "receivedDateTime ge 2025-10-01T00:00:00Z",
+          "receivedDateTime ge 2025-10-01T00:00:00Z and receivedDateTime lt 2025-10-08T00:00:00Z",
+          "isRead eq false and receivedDateTime ge 2025-10-01T00:00:00Z",
+          "importance eq 'high' and hasAttachments eq true",
+          "startswith(subject, '[Task Update]')",
+          "startswith(subject, 'Re:') and hasAttachments eq true",
+          "subject eq 'Weekly Report'",
+          "conversationId eq 'AQQkADAwATY3ZmYAZS1hYQAzNC1lODkwLTAwAi0wMAoAEADJzjh8m93SQbP6BUCZcIuc'",
+          "sentDateTime gt 2025-10-01T14:30:00Z and sentDateTime lt 2025-10-01T18:00:00Z",
+          "isDraft eq false and isRead eq false and importance eq 'high'",
+          "(isRead eq false or importance eq 'high') and receivedDateTime ge 2025-10-01T00:00:00Z",
+          "(isRead eq false or importance eq 'high') and hasAttachments eq true",
+          "from/emailAddress/address eq 'user@example.com'",
+          "startswith(from/emailAddress/address, 'support@')",
+          "from/emailAddress/address eq 'boss@company.com' and isRead eq false",
+          "categories/any(a:a eq 'Priority')",
+          "categories/any(a:a eq 'Priority') or categories/any(b:b eq 'Urgent')",
+          "categories/any(a:a eq 'Priority') and isRead eq false"
+        ]
+      },
+      "folder": {
+        "type": "string",
+        "description": "SINGLE mail folder to search within (cannot search across all folders). Well-known names (case-insensitive): 'inbox', 'sentitems', 'drafts', 'deleteditems', 'outbox', 'junkemail', 'archive', 'clutter', 'recoverableitemsdeletions'. For custom folders (e.g., 'Billing', 'Projects'), you MUST provide the folder ID (a long base64-like string like 'AAMkAGU0NTRiNDA4...'). Use OUTLOOK_LIST_MAIL_FOLDERS to get folder IDs for custom folders. Do NOT pass folder URLs or display names. IMPORTANT: To search across ALL folders, use OUTLOOK_SEARCH_MESSAGES instead (searches entire mailbox without folder restriction). NOTE: This parameter also accepts 'folder_id' as an alias for backwards compatibility.",
+        "title": "Folder",
+        "default": "inbox",
+        "examples": [
+          "inbox",
+          "sentitems",
+          "drafts",
+          "AAMkAGI0ZjExAAA="
+        ]
+      },
+      "select": {
+        "type": "array",
+        "description": "List of message properties to include in the response (accepts comma-separated string or list). Field names are automatically normalized to correct camelCase (e.g., 'bodypreview' -> 'bodyPreview', 'hasattachments' -> 'hasAttachments'). Valid fields: id, subject, from, sender, toRecipients, ccRecipients, bccRecipients, replyTo, receivedDateTime, sentDateTime, createdDateTime, lastModifiedDateTime, hasAttachments, importance, isRead, isDraft, body, bodyPreview, uniqueBody, categories, conversationId, conversationIndex, parentFolderId, changeKey, internetMessageId, internetMessageHeaders, webLink, flag, attachments, inferenceClassification, isReadReceiptRequested, isDeliveryReceiptRequested. NOTE: 'inReplyTo' is NOT a valid property for email messages in Microsoft Graph v1.0. When not specified, returns metadata without body. Include 'body' for full content. Pass [] for all fields.",
+        "title": "Select",
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "id",
+            "subject",
+            "from",
+            "receivedDateTime"
+          ],
+          [
+            "id",
+            "subject",
+            "from",
+            "receivedDateTime",
+            "webLink"
+          ],
+          [
+            "id",
+            "subject",
+            "from",
+            "toRecipients",
+            "receivedDateTime",
+            "hasAttachments",
+            "webLink"
+          ],
+          [
+            "subject",
+            "from",
+            "bodyPreview",
+            "receivedDateTime",
+            "internetMessageHeaders"
+          ],
+          [
+            "id",
+            "subject",
+            "from",
+            "body",
+            "receivedDateTime"
+          ]
+        ]
+      },
+      "orderby": {
+        "type": "string",
+        "description": "Sort order as comma-separated string or list (accepts 'field asc/desc' format or JSON-serialized arrays). Input is automatically normalized to correct format. Common fields: receivedDateTime, sentDateTime, subject, importance, from. NOTE: Ordering may be automatically disabled by Microsoft Graph API when using certain filters (e.g., subject exact match, conversationId) to avoid 'InefficientFilter' errors. In those cases, results will be unsorted.",
+        "title": "Orderby",
+        "default": "receivedDateTime desc",
+        "examples": [
+          "receivedDateTime desc",
+          "sentDateTime desc",
+          "subject asc",
+          "importance desc,receivedDateTime desc",
+          "receivedDateTime asc"
+        ]
+      },
+      "user_id": {
+        "type": "string",
+        "description": "Target user's email or 'me' for authenticated user. IMPORTANT: 'me' uses the currently connected account. For shared or delegated mailbox access, ensure the connected user has mailbox access and the app has Mail.Read.Shared. 403 errors indicate insufficient delegated/application permissions.",
+        "title": "User Id",
+        "default": "me",
+        "examples": [
+          "me",
+          "user@example.com"
+        ]
+      },
+      "page_token": {
+        "type": "string",
+        "description": "Opaque continuation token for the next page. Omit for the first page; then pass back the `next_page_token` from the previous response, unmodified, until it is absent. Do not construct or edit it. When set, it drives pagination; resend any required identifier fields from the first call (the token supersedes their values). Optional filter, sort and timezone params need not be repeated; the token carries them.",
+        "title": "Page Token"
+      },
+      "include_sensitivity_label": {
+        "type": "boolean",
+        "description": "When true, retrieves and normalizes Microsoft Purview sensitivity labels in the same Graph request. Requires Mail.Read or Mail.ReadWrite. Treat status unknown as fail-closed before using a message's content. The setting is preserved in next_page_token.",
+        "title": "Include Sensitivity Label",
+        "default": false
+      }
+    },
+    "title": "QueryEmailsRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/QueryEmailsResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "QueryEmailsResponseWrapper"
+  }
+}

@@ -12,6 +12,7 @@ import { toolkitAllowed } from "./consent-policy";
 import { loadConsentStatus } from "./consent-status";
 import { disableEmailTrigger, ensureEmailTrigger } from "@/lib/email-intake-trigger";
 import { ensureSlackTrigger, disableSlackTrigger } from "@/lib/slack-intake-trigger";
+import { connectorEmulatorEnabled, emulatedComposio } from "@/lib/connector-emulator/client";
 
 // ─── Toolkit allow-list per role ─────────────────────────────────────────────
 // Curated so each twin can't act outside its functional area.
@@ -108,6 +109,10 @@ export async function writeState(
 let _composio: Composio<ClaudeAgentSDKProvider> | null = null;
 
 export function getComposio(): Composio<ClaudeAgentSDKProvider> {
+  // Tests and evals only (EMPLOYEE001_CONNECTORS=emulator, never in a
+  // production build): Composio's contract answered from CompanySim, so
+  // consent, approvals, disclosure and the builder run unchanged.
+  if (connectorEmulatorEnabled()) return emulatedComposio() as unknown as Composio<ClaudeAgentSDKProvider>;
   if (_composio) return _composio;
   if (!process.env.COMPOSIO_API_KEY) {
     throw new Error("COMPOSIO_API_KEY is not set");
@@ -120,7 +125,7 @@ export function getComposio(): Composio<ClaudeAgentSDKProvider> {
 }
 
 export function isComposioConfigured(): boolean {
-  return Boolean(process.env.COMPOSIO_API_KEY);
+  return connectorEmulatorEnabled() || Boolean(process.env.COMPOSIO_API_KEY);
 }
 
 // ─── Auth config + connection lifecycle ──────────────────────────────────────

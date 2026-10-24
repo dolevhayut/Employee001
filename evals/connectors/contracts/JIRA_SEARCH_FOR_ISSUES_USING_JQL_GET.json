@@ -1,0 +1,140 @@
+{
+  "slug": "JIRA_SEARCH_FOR_ISSUES_USING_JQL_GET",
+  "name": "Search Issues Using JQL (GET)",
+  "description": "Searches for Jira issues using JQL with pagination and field selection.",
+  "toolkit": "jira",
+  "version": "20261001_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "jql": {
+        "type": "string",
+        "description": "Jira Query Language (JQL) string for searching issues. REQUIRED if `next_page_token` is not provided. Provide this parameter to start a search. To continue a paginated search with a raw Jira token, provide both the original JQL and `next_page_token`; tokens returned by this action already include that context. IMPORTANT: JQL must include at least one search restriction (filter condition such as project, status, assignee, issuetype, labels, created, updated, etc.). Unbounded queries containing only ORDER BY clauses (e.g., 'order by created DESC') are rejected by the API. Always include a filter like 'project = X' or 'status = Open'. NOTE: This action uses Jira's enhanced search API which has stricter JQL syntax requirements than the Jira UI.",
+        "title": "Jql",
+        "examples": [
+          "project = HSP",
+          "assignee = currentUser() AND status = 'In Progress'",
+          "project = TEST ORDER BY created DESC",
+          "status = Open ORDER BY priority DESC"
+        ]
+      },
+      "expand": {
+        "type": "string",
+        "description": "Comma-separated list of entities to expand within issues (e.g., `renderedFields`, `changelog`).",
+        "title": "Expand",
+        "examples": [
+          "renderedFields",
+          "transitions,changelog",
+          "names,schema",
+          "operations"
+        ]
+      },
+      "fields": {
+        "type": "array",
+        "description": "Specific issue fields to retrieve (e.g., `summary`, `customfield_10010`, `*all`, `*navigable`). Defaults if omitted.",
+        "title": "Fields",
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          "[\"summary\", \"status\", \"assignee\"]",
+          "[\"*all\"]",
+          "[\"comment\", \"watches\", \"created\"]",
+          "[\"customfield_10010\", \"resolution\"]"
+        ]
+      },
+      "fail_fast": {
+        "type": "boolean",
+        "description": "Fail early on certain errors during search.",
+        "title": "Fail Fast",
+        "examples": [
+          true,
+          false
+        ]
+      },
+      "properties": {
+        "type": "array",
+        "description": "List of issue property keys (key-value metadata) to retrieve.",
+        "title": "Properties",
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          "[\"jira.meta.comms.chat.link\", \"my.app.property.id\"]",
+          "[\"workflow.step.id\"]"
+        ]
+      },
+      "max_results": {
+        "type": "integer",
+        "description": "Maximum issues to retrieve per page. Must be at least 1. Note: Jira Cloud typically limits results to 100 per request for performance reasons.",
+        "title": "Max Results",
+        "default": 50,
+        "minimum": 1,
+        "examples": [
+          "25",
+          "50",
+          "100"
+        ]
+      },
+      "fields_by_keys": {
+        "type": "boolean",
+        "description": "Set to `True` to identify fields by keys (e.g., 'customfield_10000') instead of IDs.",
+        "title": "Fields By Keys",
+        "default": false,
+        "examples": [
+          true,
+          false
+        ]
+      },
+      "next_page_token": {
+        "type": "string",
+        "description": "Pagination token from a previous enhanced search response. Use the token returned by this action to continue without resending JQL. If you pass a raw Jira nextPageToken, also pass the original JQL.",
+        "title": "Next Page Token",
+        "examples": [
+          "eyJwYWdlIjoyfQ=="
+        ]
+      },
+      "reconcile_issues": {
+        "type": "array",
+        "description": "List of issue IDs to enable read-after-write reconciliation during search.",
+        "title": "Reconcile Issues",
+        "items": {
+          "type": "integer"
+        },
+        "examples": [
+          [
+            10000,
+            10001
+          ]
+        ]
+      }
+    },
+    "title": "SearchForIssuesUsingJqlGetRequest",
+    "description": "Parameters for searching Jira issues using a JQL query (enhanced search)."
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/SearchForIssuesUsingJqlGetResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "SearchForIssuesUsingJqlGetResponseWrapper"
+  }
+}

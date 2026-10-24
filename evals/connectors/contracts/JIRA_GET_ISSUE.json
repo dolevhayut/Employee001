@@ -1,0 +1,112 @@
+{
+  "slug": "JIRA_GET_ISSUE",
+  "name": "Get Issue",
+  "description": "Retrieves a Jira issue by ID or key with customizable fields and expansions. Request only needed fields and expansions to avoid large responses. Use specific `customfield_*` keys in `fields` to verify updated values programmatically.",
+  "toolkit": "jira",
+  "version": "20261001_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "expand": {
+        "type": "string",
+        "description": "A comma-separated list of entities to include with the issue. To retrieve update history, include 'changelog' in this list (e.g., 'changelog'). Other common expansions include 'renderedFields' (HTML content), 'transitions' (available workflows), and 'operations' (available actions).",
+        "title": "Expand",
+        "examples": [
+          "renderedFields,names,schema,transitions,operations,editmeta,changelog",
+          "changelog",
+          "renderedFields"
+        ]
+      },
+      "fields": {
+        "type": "array",
+        "description": "A list of field names or IDs to return for the issue. If omitted or empty, a default set of fields (often all fields or all navigable fields) is returned. For specific fields, provide a list like `[\"summary\", \"status\"]`.",
+        "title": "Fields",
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          "[\"summary\", \"description\", \"status\"]",
+          "[\"assignee\", \"reporter\", \"customfield_10001\"]"
+        ]
+      },
+      "fail_fast": {
+        "type": "boolean",
+        "description": "Whether Jira should return immediately after the first issue-related error. Defaults to false.",
+        "title": "Fail Fast",
+        "examples": [
+          "true",
+          "false"
+        ]
+      },
+      "properties": {
+        "type": "array",
+        "description": "A list of issue property keys to include in the response. Issue properties are extra key-value data attached to an issue, often by apps. Example: `[\"jira.meta.data\", \"com.example.custom.info\"]`.",
+        "title": "Properties",
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          "[\"jira.issue.tools.v1.attachmentHandles\", \"com.atlassian.jira.plugin.devstatus.phasetracking\"]",
+          "[\"my.custom.property\"]"
+        ]
+      },
+      "fields_by_keys": {
+        "type": "boolean",
+        "description": "If true, the strings in the `fields` parameter are interpreted as field keys (e.g., 'summary') instead of field IDs (e.g., 'customfield_10000'). Default is false (uses field IDs).",
+        "title": "Fields By Keys",
+        "examples": [
+          "false",
+          "true"
+        ]
+      },
+      "update_history": {
+        "type": "boolean",
+        "description": "Controls whether viewing the issue adds it to the user's 'Recently viewed' list. This does not control inclusion of update history in the response. To include update history, use the 'expand' parameter with 'changelog'.",
+        "title": "Update History",
+        "examples": [
+          "true",
+          "false"
+        ]
+      },
+      "issue_id_or_key": {
+        "type": "string",
+        "description": "The ID (e.g., '10000') or key (e.g., 'PROJ-123') of the Jira issue to retrieve.",
+        "title": "Issue Id Or Key",
+        "examples": [
+          "PROJ-123",
+          "10000"
+        ]
+      }
+    },
+    "required": [
+      "issue_id_or_key"
+    ],
+    "title": "GetIssueRequest",
+    "description": "Request model for the JIRA_GET_ISSUE action."
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/GetIssueResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "GetIssueResponseWrapper"
+  }
+}

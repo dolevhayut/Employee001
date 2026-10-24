@@ -1,0 +1,137 @@
+{
+  "slug": "SLACK_SEARCH_MESSAGES",
+  "name": "Search messages",
+  "description": "Workspace‑wide Slack message search with date ranges and filters. Use `query` modifiers (e.g., in:#channel, from:@user, before/after:YYYY-MM-DD), sorting (score/timestamp), and pagination.",
+  "toolkit": "slack",
+  "version": "20261023_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "description": "Page number for manual pagination control. Cannot be used with auto_paginate - choose either automatic collection OR manual page control, not both.",
+        "title": "Page",
+        "examples": [
+          1,
+          2,
+          3
+        ]
+      },
+      "sort": {
+        "type": "string",
+        "description": "Sort results by `score` (relevance) or `timestamp` (chronological).",
+        "title": "Sort",
+        "examples": [
+          "score",
+          "timestamp"
+        ]
+      },
+      "count": {
+        "type": "integer",
+        "description": "Without auto_paginate: Number of messages per page (max 100). With auto_paginate: Total messages desired. Set count=500 to get 500 messages with automatic pagination handling.",
+        "title": "Count",
+        "default": 1,
+        "examples": [
+          20,
+          50,
+          100,
+          500,
+          1000
+        ]
+      },
+      "query": {
+        "type": "string",
+        "description": "Search query supporting various modifiers for precise filtering:\n\n        **Location Modifiers:**\n        - `in:#channel-name` - Messages in specific channel\n        - `in:@username` - Direct messages with user\n\n        **User Modifiers:**\n        - `from:@username` - Messages from specific user\n        - `from:botname` - Messages from bot\n\n        **Content Modifiers:**\n        - `has:link` - Messages with links\n        - `has:file` - Messages with files\n        - `has::star:` - Starred messages\n        - `has::pin:` - Pinned messages\n\n        **Special Characters:**\n        - `\"exact phrase\"` - Search exact phrase\n        - `*wildcard` - Wildcard matching\n        - `-exclude` - Exclude words\n\n        **Combinations:** Mix modifiers with date filters like `\"project update\" on:2025-09-25 in:#marketing from:@john`",
+        "title": "Query",
+        "examples": [
+          "on:2025-09-25",
+          "after:2025-01-01 before:2025-12-31",
+          "during:september",
+          "during:2025-09-25",
+          "product launch in:#marketing",
+          "bug report from:@jane has:file",
+          "\"meeting notes\" on:2024-07-20",
+          "urgent -resolved in:#support",
+          "\"project update\" on:2025-09-25 from:@john in:#team-updates",
+          "has:link during:august from:@bot",
+          "deployment after:2025-09-20 in:#engineering"
+        ]
+      },
+      "cursor": {
+        "type": "string",
+        "description": "Cursor for cursor-mark pagination. Use `*` for the first call, then use `next_cursor` from the previous response for subsequent calls. This is the modern pagination approach recommended by Slack. Cannot be used with `page` parameter - choose either cursor-based or page-based pagination.",
+        "title": "Cursor",
+        "examples": [
+          "*",
+          "dXNlcjpVMEc5V0ZYTlo="
+        ]
+      },
+      "team_id": {
+        "type": "string",
+        "description": "ID of the Slack workspace (team) to operate on, e.g. T0123456789. Use only with org-level Enterprise Grid tokens when you need to target a specific workspace; omit for single-workspace tokens.",
+        "title": "Team Id",
+        "examples": [
+          "T1234567890"
+        ]
+      },
+      "sort_dir": {
+        "type": "string",
+        "description": "Sort direction: `asc` (ascending) or `desc` (descending).",
+        "title": "Sort Dir",
+        "examples": [
+          "asc",
+          "desc"
+        ]
+      },
+      "highlight": {
+        "type": "boolean",
+        "description": "Enable highlighting of search terms in results.",
+        "title": "Highlight",
+        "examples": [
+          true,
+          false
+        ]
+      },
+      "auto_paginate": {
+        "type": "boolean",
+        "description": "When enabled, 'count' becomes the total messages desired instead of per-page limit. System automatically handles pagination to collect the specified total. Cannot be used with 'page' parameter - choose either automatic collection or manual page control. Usage: If you fetched 100 messages but pagination shows 500 total available, set auto_paginate=true and count=500 to get all results at once.",
+        "title": "Auto Paginate",
+        "default": false,
+        "examples": [
+          true,
+          false
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "title": "SearchMessagesRequest",
+    "description": "Request schema for `SearchMessages`"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/SearchMessagesResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "SearchMessagesResponseWrapper"
+  }
+}

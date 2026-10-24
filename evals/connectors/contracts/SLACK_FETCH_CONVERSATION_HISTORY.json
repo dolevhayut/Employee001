@@ -1,0 +1,105 @@
+{
+  "slug": "SLACK_FETCH_CONVERSATION_HISTORY",
+  "name": "Fetch conversation history",
+  "description": "Fetches a chronological list of messages and events from a specified Slack conversation, accessible by the authenticated user/bot, with options for pagination and time range filtering. IMPORTANT LIMITATION: This action only returns messages from the main channel timeline. Threaded replies are NOT returned by this endpoint. To retrieve threaded replies, use the SLACK_FETCH_MESSAGE_THREAD_FROM_A_CONVERSATION action (conversations.replies API) instead. The oldest/latest timestamp filters work reliably for filtering the main channel timeline, but cannot be used to retrieve individual threaded replies - even if you know the exact reply timestamp, setting oldest=latest to that timestamp will return an empty messages array. To get threaded replies: 1. Use this action to get parent messages (which include thread_ts, reply_count, latest_reply fields) 2. Use SLACK_FETCH_MESSAGE_THREAD_FROM_A_CONVERSATION with the parent's thread_ts to fetch all replies in that thread",
+  "toolkit": "slack",
+  "version": "20261023_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "type": "integer",
+        "description": "Maximum number of messages to request in this single Slack API call (1-1000). Defaults to 100. Slack may return fewer than requested, especially for non-Marketplace apps where Slack can cap each page at 15 messages. This action does not internally paginate; use response_metadata.next_cursor in the cursor parameter of a follow-up call to fetch more messages.",
+        "title": "Limit",
+        "default": 100,
+        "minimum": 1,
+        "maximum": 1000,
+        "examples": [
+          "100",
+          "200"
+        ]
+      },
+      "cursor": {
+        "type": "string",
+        "description": "Pagination cursor from `response_metadata.next_cursor` of a previous response. Omit this for the first page; pass the returned cursor in a follow-up call to fetch the next page.",
+        "title": "Cursor",
+        "examples": [
+          "dXNlcjpVMDYxTkZUVDA="
+        ]
+      },
+      "latest": {
+        "type": "string",
+        "description": "End of the time range of messages to include in results. Accepts a Unix timestamp or a Slack timestamp (e.g., '1234567890.000000'). NOTE: This filter only applies to main channel messages, not threaded replies. Use SLACK_FETCH_MESSAGE_THREAD_FROM_A_CONVERSATION to retrieve replies.",
+        "title": "Latest",
+        "examples": [
+          "1609459200.000000"
+        ]
+      },
+      "oldest": {
+        "type": "string",
+        "description": "Start of the time range of messages to include in results. Accepts a Unix timestamp or a Slack timestamp (e.g., '1234567890.000000'). NOTE: This filter only applies to main channel messages, not threaded replies. Use SLACK_FETCH_MESSAGE_THREAD_FROM_A_CONVERSATION to retrieve replies.",
+        "title": "Oldest",
+        "examples": [
+          "1609372800.000000"
+        ]
+      },
+      "channel": {
+        "type": "string",
+        "description": "The ID of the public channel, private channel, direct message, or multi-person direct message to fetch history from.",
+        "title": "Channel",
+        "examples": [
+          "C1234567890",
+          "G0123456789",
+          "D0123456789"
+        ]
+      },
+      "inclusive": {
+        "type": "boolean",
+        "description": "When true, includes messages at the exact 'oldest' or 'latest' boundary timestamps in results. When false (default), excludes boundary messages. Only applies when 'oldest' or 'latest' is specified.",
+        "title": "Inclusive",
+        "examples": [
+          true,
+          false
+        ]
+      },
+      "include_all_metadata": {
+        "type": "boolean",
+        "description": "Return all metadata associated with messages in the conversation history. When true, includes additional metadata fields that may be present on messages.",
+        "title": "Include All Metadata",
+        "examples": [
+          true
+        ]
+      }
+    },
+    "required": [
+      "channel"
+    ],
+    "title": "FetchConversationHistoryRequest",
+    "description": "Request schema for fetching conversation history from Slack."
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/FetchConversationHistoryResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "FetchConversationHistoryResponseWrapper"
+  }
+}

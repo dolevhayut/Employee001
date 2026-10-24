@@ -1,0 +1,240 @@
+{
+  "slug": "GOOGLEDRIVE_FIND_FILE",
+  "name": "Find file",
+  "description": "The comprehensive Google Drive search tool that handles all file and folder discovery needs. Use this for any file finding task - from simple name searches to complex queries with date filters, MIME types, permissions, custom properties, folder scoping, and more. Searches across My Drive and shared drives with full metadata support. Examples: - Find PDFs: q=\"mimeType = 'application/pdf'\" - Find recent files: q=\"modifiedTime > '2024-01-01T00:00:00'\" - Search by name: q=\"name contains 'report'\" - Files in folder: folderId=\"abc123\" or q=\"'FOLDER_ID' in parents\"",
+  "toolkit": "googledrive",
+  "version": "20261022_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "q": {
+        "type": "string",
+        "description": "Query string to filter file results. Accepts both simple text searches and full Google Drive query syntax.\n\n        **Simple Text Search:** Bare text (e.g., \"SAM RFP\") is auto-converted to fullText search. Bare email addresses are auto-converted to owner search.\n\n        **Full Query Syntax:** 'field operator value' combined with 'and', 'or', 'not'\n\n        **Operators:** =, !=, <, >, <=, >=, contains, in\n\n        **Common Fields:**\n        - `name` - File name (exact match with = or partial match with contains)\n        - `fullText` - File content search\n        - `mimeType` - File type (e.g., 'application/pdf', 'application/vnd.google-apps.folder')\n        - `modifiedTime`, `createdTime` - Dates (RFC 3339: '2024-01-01T00:00:00')\n        - `parents` - Folder IDs containing the file\n        - `owners`, `writers` - User email addresses (MUST use 'in' operator, NOT colon syntax)\n        - `properties`, `appProperties` - Custom metadata\n\n        **Boolean Filter Fields (sharedWithMe, trashed, starred):**\n        These fields require explicit `= true` or `= false` syntax:\n        - `sharedWithMe = true` - Find files shared with you by others\n        - `sharedWithMe = false` - Find files NOT shared with you (your own files)\n        - `trashed = true` - Find files in trash\n        - `trashed = false` - Exclude trashed files from results\n        - `starred = true` - Find starred/favorited files\n        - `starred = false` - Find non-starred files\n\n        Combine with other conditions using 'and':\n        - \"sharedWithMe = true and name contains 'report'\" - Find shared files with 'report' in name\n        - \"sharedWithMe = true and mimeType = 'application/pdf'\" - Find shared PDF files\n        - \"starred = true and modifiedTime > '2024-01-01T00:00:00'\" - Find recently modified starred files\n\n        **Query Complexity Limits:**\n        Queries with many OR clauses (typically >5-10) may fail with 'The query is too complex' error.\n\n        **Name Field Usage:**\n        Wildcards (*) are NOT supported. Use 'contains' operator for partial matching.\n\n        **User Email Searches:**\n        - CORRECT: \"'user@example.com' in owners\" or \"'user@example.com' in writers\" or \"'user@example.com' in readers\"\n        - INCORRECT: \"owner:user@example.com\" (colon syntax is NOT supported and will cause errors)\n        - Always use the 'in' operator with quoted email addresses for user-based searches\n\n        **Special Syntax:**\n        - Dates: RFC 3339 format (time zone defaults to UTC)\n        - Apostrophes/quotes in values: Automatically escaped. You can write \"name = 'Jan'26'\" or \"name = 'Valentine's Day'\" without manual escaping.\n        - Grouping: Use parentheses for OR: \"(mimeType contains 'image/' or mimeType contains 'video/')\"\n        - Custom properties: \"properties has { key='department' and value='sales' }\"\n\n        **IMPORTANT - Root Folder ('My Drive'):**\n        'My Drive' is NOT a searchable folder name. To work with the root folder, use the 'root' alias: folder_id='root' or \"'root' in parents\" in your query.\n        ",
+        "title": "Q",
+        "examples": [
+          "name = 'Budget 2024'",
+          "name = 'Valentine's Day'",
+          "name contains 'Jan'26 Schedule'",
+          "name contains 'report'",
+          "mimeType = 'application/pdf'",
+          "mimeType = 'application/vnd.google-apps.folder'",
+          "'FOLDER_ID' in parents",
+          "modifiedTime > '2024-01-01T00:00:00'",
+          "modifiedTime > '2024-10-01T14:30:00' and modifiedTime < '2024-10-01T18:00:00'",
+          "createdTime > '2024-10-02T00:00:00' and createdTime < '2024-10-02T23:59:59'",
+          "sharedWithMe = true",
+          "sharedWithMe = true and name contains 'report'",
+          "sharedWithMe = true and mimeType = 'application/pdf'",
+          "starred = true and mimeType = 'application/pdf'",
+          "trashed = false",
+          "'user@example.com' in owners",
+          "'user@example.com' in writers",
+          "fullText contains 'quarterly results'",
+          "name contains 'report' and not name contains 'draft'",
+          "(mimeType contains 'image/' or mimeType contains 'video/')",
+          "name contains 'invoice' and modifiedTime > '2024-01-01T00:00:00' and trashed = false"
+        ]
+      },
+      "fields": {
+        "type": "string",
+        "description": "Selector specifying which fields to include in a partial response. Use '*' for all fields.\n\n**Default Behavior (Recommended for Discovery):**\nWhen omitted, returns essential file discovery fields: id, name, mimeType, size, modifiedTime, createdTime, parents, webViewLink, trashed, starred. This lightweight default is optimized for file search/discovery use cases without verbose permission or capability metadata.\n\n**Format:** For file fields, use 'files(field1,field2,...)' format. For example: 'files(id,name,mimeType)'.\nTop-level response fields (kind, nextPageToken, incompleteSearch) can be used directly.\n\n**Note:** Bare field names like 'id,name,mimeType' will be automatically wrapped in 'files()' for convenience.\nThe 'editors' field is not valid in Drive API v3; use 'permissions' instead for access control information.",
+        "title": "Fields",
+        "examples": [
+          "*",
+          "files(id,name,mimeType)",
+          "id,name,mimeType",
+          "nextPageToken,files(id,name,mimeType)",
+          "files(id,name,modifiedTime,size,webViewLink)",
+          "nextPageToken,files(id,name,parents,permissions)"
+        ]
+      },
+      "spaces": {
+        "type": "string",
+        "description": "A comma-separated list of spaces to query. Supported values are 'drive', 'appDataFolder' and 'photos'.",
+        "title": "Spaces",
+        "default": "drive",
+        "examples": [
+          "drive",
+          "appDataFolder",
+          "photos",
+          "drive,appDataFolder"
+        ]
+      },
+      "corpora": {
+        "type": "string",
+        "description": "Specifies which collections of files to search. Defaults to 'allDrives' (searches My Drive + all accessible shared drives).\n\n        **Values:**\n        - `user` - Search only user's personal My Drive\n        - `domain` - Search all files shared within Google Workspace domain\n        - `drive` - Search specific shared drive (requires 'driveId' parameter and 'includeItemsFromAllDrives' must be true)\n        - `allDrives` - Search My Drive + all accessible shared drives (DEFAULT, requires 'includeItemsFromAllDrives' to be true)\n\n        **When to Use:**\n        - Personal files only: Use 'user'\n        - Organization-wide: Use 'domain'\n        - Specific shared drive: Use 'drive' with 'driveId'\n        - Maximum coverage: Use 'allDrives' (auto-enables supportsAllDrives and includeItemsFromAllDrives)\n        ",
+        "title": "Corpora",
+        "default": "allDrives",
+        "enum": [
+          "user",
+          "drive",
+          "domain",
+          "allDrives"
+        ],
+        "examples": [
+          "user",
+          "domain",
+          "drive",
+          "allDrives"
+        ]
+      },
+      "driveId": {
+        "type": "string",
+        "description": "ID of the shared drive to search. When provided, 'corpora' will automatically be set to 'drive' (mutually exclusive with corpora='allDrives'). Required if 'corpora' is 'drive'.",
+        "title": "Drive Id"
+      },
+      "orderBy": {
+        "type": "string",
+        "description": "Comma-separated sort keys. Ascending by default; add 'desc' for descending. Cannot be used when query (q) contains fullText search terms.\n\n        **Valid Keys:**\n        - `createdTime`, `modifiedTime`, `modifiedByMeTime` - Dates\n        - `viewedByMeTime`, `sharedWithMeTime` - Activity dates\n        - `name`, `name_natural` - File name (natural: file1, file2, file10)\n        - `folder` - Folder hierarchy\n        - `quotaBytesUsed` - Storage size (NOTE: 'size' is NOT valid, use 'quotaBytesUsed')\n        - `starred` - Starred status\n        - `recency` - Recent activity (combines view time and modification time for relevance-based sorting)\n\n        **Important:** 'size' is NOT a valid sort key. Use 'quotaBytesUsed' to sort by file size.\n\n        **Restriction:** Sorting is not supported when the query contains fullText searches (e.g., \"fullText contains 'keyword'\"). Omit orderBy when using fullText queries.\n        ",
+        "title": "Order By",
+        "examples": [
+          "modifiedTime desc",
+          "createdTime",
+          "name",
+          "name_natural",
+          "viewedByMeTime desc",
+          "quotaBytesUsed desc",
+          "folder,modifiedTime desc,name",
+          "starred desc,name",
+          "recency desc"
+        ]
+      },
+      "pageSize": {
+        "type": "integer",
+        "description": "The maximum number of files to return per page.",
+        "title": "Page Size",
+        "default": 100,
+        "minimum": 1,
+        "maximum": 1000,
+        "examples": [
+          10,
+          50,
+          100,
+          500,
+          1000
+        ]
+      },
+      "folder_id": {
+        "type": "string",
+        "description": "ID of a specific folder to search within. This automatically adds \"'folder_id' in parents\" to the query. Can be combined with the 'q' parameter to further filter results within the folder. Use 'root' to search within the user's root folder (My Drive). Note: 'My Drive' is not a searchable folder name - use 'root' alias instead.",
+        "title": "Folder Id",
+        "examples": [
+          "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+          "root"
+        ]
+      },
+      "pageToken": {
+        "type": "string",
+        "description": "The token for continuing a previous list request on the next page. IMPORTANT: This must be the exact opaque string from a previous response's 'nextPageToken' field - do not modify, truncate, URL-encode, or construct tokens manually. Invalid or corrupted tokens will result in API errors.",
+        "title": "Page Token"
+      },
+      "include_labels": {
+        "type": "string",
+        "description": "A comma-separated list of label IDs to include in the `labelInfo` part of the response for each file. Empty strings are automatically treated as omitted.",
+        "title": "Include Labels",
+        "examples": [
+          "label_abc123",
+          "label_xyz789,label_def456",
+          "priority_label,status_label,department_label"
+        ]
+      },
+      "pagetoken_dropped": {
+        "type": "boolean",
+        "description": "Indicates whether the page token was dropped from the request.",
+        "title": "Pagetoken Dropped",
+        "default": false
+      },
+      "supportsAllDrives": {
+        "type": "boolean",
+        "description": "Whether the requesting application supports both My Drives and shared drives. If 'includeItemsFromAllDrives' is true, this must also be true.",
+        "title": "Supports All Drives",
+        "default": true
+      },
+      "original_email_query": {
+        "type": "string",
+        "description": "The original email query before transformation.",
+        "title": "Original Email Query"
+      },
+      "editors_field_removed": {
+        "type": "boolean",
+        "description": "Indicates whether the editors field was removed from the request.",
+        "title": "Editors Field Removed",
+        "default": false
+      },
+      "email_query_transformed": {
+        "type": "boolean",
+        "description": "Indicates whether an email query was transformed into a search filter.",
+        "title": "Email Query Transformed",
+        "default": false
+      },
+      "orderby_size_transformed": {
+        "type": "boolean",
+        "description": "Indicates whether the orderBy size value was transformed.",
+        "title": "Orderby Size Transformed",
+        "default": false
+      },
+      "original_bare_text_query": {
+        "type": "string",
+        "description": "The original bare text query before transformation.",
+        "title": "Original Bare Text Query"
+      },
+      "includeItemsFromAllDrives": {
+        "type": "boolean",
+        "description": "Whether both My Drive and shared drive items should be included in results. Must be true when corpora is 'drive' or 'allDrives'. If true, 'supportsAllDrives' should also be true.",
+        "title": "Include Items From All Drives",
+        "default": true
+      },
+      "emailaddress_field_removed": {
+        "type": "boolean",
+        "description": "Indicates whether the email address field was removed from the request.",
+        "title": "Emailaddress Field Removed",
+        "default": false
+      },
+      "original_invalid_pagetoken": {
+        "type": "string",
+        "description": "The original invalid page token that was dropped.",
+        "title": "Original Invalid Pagetoken"
+      },
+      "bare_text_query_transformed": {
+        "type": "boolean",
+        "description": "Indicates whether a bare text query was transformed into a search filter.",
+        "title": "Bare Text Query Transformed",
+        "default": false
+      },
+      "include_permissions_for_view": {
+        "type": "string",
+        "description": "Specifies which additional view's permissions to include in the response. Must be either omitted entirely or set to 'published'. Empty strings are automatically treated as omitted.",
+        "title": "Include Permissions For View",
+        "examples": [
+          "published"
+        ]
+      }
+    },
+    "title": "FindFileRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/FindFileResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "FindFileResponseWrapper"
+  }
+}

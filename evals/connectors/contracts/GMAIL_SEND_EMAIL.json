@@ -1,0 +1,230 @@
+{
+  "slug": "GMAIL_SEND_EMAIL",
+  "name": "Send Email",
+  "description": "Sends an email via Gmail API using the authenticated user's Google profile display name. Sends immediately and is irreversible — confirm recipients, subject, body, and attachments before calling. At least one of 'to' (or 'recipient_email'), 'cc', or 'bcc' must be provided. At least one of subject or body must be provided. Requires `is_html=True` if the body contains HTML. All common file types including PNG, JPG, PDF, MP4, etc. are supported as attachments. Gmail API limits total message size to ~25 MB after base64 encoding. To reply in an existing thread, use GMAIL_REPLY_TO_THREAD instead. No scheduled send support; enforce timing externally.",
+  "toolkit": "gmail",
+  "version": "20261023_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "cc": {
+        "type": "array",
+        "description": "Carbon Copy (CC) recipients' email addresses. At least one of 'to'/'recipient_email', 'cc', or 'bcc' must be provided.",
+        "title": "Cc",
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "manager@example.com",
+            "teamlead@example.com"
+          ]
+        ]
+      },
+      "bcc": {
+        "type": "array",
+        "description": "Blind Carbon Copy (BCC) recipients' email addresses. At least one of 'to'/'recipient_email', 'cc', or 'bcc' must be provided.",
+        "title": "Bcc",
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "auditor@example.com"
+          ]
+        ]
+      },
+      "body": {
+        "type": "string",
+        "description": "Email content (plain text or HTML). Either subject or body must be provided for the email to be sent. If HTML, `is_html` must be `True`.",
+        "title": "Body",
+        "examples": [
+          "Hello team, let's discuss the project updates tomorrow.",
+          "<h1>Welcome!</h1><p>Thank you for signing up.</p>",
+          ""
+        ]
+      },
+      "is_html": {
+        "type": "boolean",
+        "description": "Set to `True` if the email body contains HTML tags.",
+        "title": "Is Html",
+        "default": false
+      },
+      "subject": {
+        "type": "string",
+        "description": "Subject line of the email. Either subject or body must be provided for the email to be sent.",
+        "title": "Subject",
+        "examples": [
+          "Project Update Meeting",
+          "Your Weekly Newsletter"
+        ]
+      },
+      "user_id": {
+        "type": "string",
+        "description": "User's email address; the literal 'me' refers to the authenticated user.",
+        "title": "User Id",
+        "default": "me",
+        "examples": [
+          "user@example.com",
+          "me"
+        ]
+      },
+      "attachment": {
+        "description": "File(s) to attach. Accepts a single file or a list of files. IMPORTANT: mimetype MUST contain a '/' separator - single words like 'pdf' or 'new' are invalid. Gmail API limits: total message size must not exceed ~25 MB after base64 encoding. Omit or set to null for no attachment. Empty attachment objects (with all fields empty/whitespace) are treated as no attachment.",
+        "anyOf": [
+          {
+            "type": "object",
+            "title": "FileUploadable",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The filename that will be used when uploading the file to the destination service",
+                "title": "Name",
+                "examples": [
+                  "document.pdf",
+                  "image.jpg",
+                  "report.docx"
+                ]
+              },
+              "s3key": {
+                "type": "string",
+                "description": "The S3 key of a publicly accessible file, typically returned from a previous download action that stored the file in S3. This key references an existing file that can be uploaded to another service.",
+                "title": "S3Key",
+                "examples": [
+                  "47563/gmail/GET_ATTACHMENT/response/12345"
+                ]
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "The MIME type of the file",
+                "title": "Mimetype",
+                "examples": [
+                  "application/pdf",
+                  "image/jpeg",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "mimetype",
+              "s3key"
+            ],
+            "file_uploadable": true
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "title": "FileUploadable",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The filename that will be used when uploading the file to the destination service",
+                  "title": "Name",
+                  "examples": [
+                    "document.pdf",
+                    "image.jpg",
+                    "report.docx"
+                  ]
+                },
+                "s3key": {
+                  "type": "string",
+                  "description": "The S3 key of a publicly accessible file, typically returned from a previous download action that stored the file in S3. This key references an existing file that can be uploaded to another service.",
+                  "title": "S3Key",
+                  "examples": [
+                    "47563/gmail/GET_ATTACHMENT/response/12345"
+                  ]
+                },
+                "mimetype": {
+                  "type": "string",
+                  "description": "The MIME type of the file",
+                  "title": "Mimetype",
+                  "examples": [
+                    "application/pdf",
+                    "image/jpeg",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "mimetype",
+                "s3key"
+              ],
+              "file_uploadable": true
+            }
+          }
+        ],
+        "title": "Attachment"
+      },
+      "from_email": {
+        "type": "string",
+        "description": "Sender email address for the 'From' header. Provide the connected account's primary email address or a verified alias configured in Gmail's 'Send mail as' settings. When omitted, the action attempts to resolve the primary email address from the authenticated Gmail profile.",
+        "title": "From Email",
+        "examples": [
+          "alias@example.com",
+          "marketing@company.com"
+        ]
+      },
+      "recipient_email": {
+        "type": "string",
+        "description": "Primary recipient's email address. You can also use 'to' as an alias for this parameter. At least one of 'to'/'recipient_email', 'cc', or 'bcc' must be provided. Use extra_recipients if you want to send to multiple recipients. Use the special value 'me' to send to your own authenticated email address. Must be a full user@domain address; 'me' is not valid here and will fail.",
+        "title": "Recipient Email",
+        "examples": [
+          "john@doe.com",
+          "me"
+        ]
+      },
+      "extra_recipients": {
+        "type": "array",
+        "description": "Additional 'To' recipients' email addresses (not Cc or Bcc). Should only be used if recipient_email is also provided.",
+        "title": "Extra Recipients",
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "jane.doe@example.com",
+            "support@example.com"
+          ]
+        ]
+      },
+      "include_signature": {
+        "type": "boolean",
+        "description": "Append the sender's Gmail signature (the 'Send mail as' signature configured in Gmail settings) to the message body, ahead of any quoted or forwarded content. Skipped when the body already ends with that signature, when no signature is configured, or when the connection lacks permission to read Gmail settings. Set to false to send the body exactly as provided.",
+        "title": "Include Signature",
+        "default": true
+      }
+    },
+    "title": "SendEmailRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/GmailMessageResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "GmailMessageResponseWrapper"
+  }
+}

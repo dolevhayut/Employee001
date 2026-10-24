@@ -1,0 +1,100 @@
+{
+  "slug": "JIRA_ADD_COMMENT",
+  "name": "Add Comment",
+  "description": "Adds a comment using Atlassian Document Format (ADF) for rich text to an existing Jira issue.",
+  "toolkit": "jira",
+  "version": "20261001_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "comment": {
+        "type": "string",
+        "description": "The comment text. Supports Markdown formatting including **bold**, *italic*, `code`, links [text](url), lists, and @mentions. To mention users, use @username for single-word names or @\"Display Name\" for names with spaces. Plain URLs are not hyperlinked; use `[text](url)` format for clickable links.",
+        "title": "Comment",
+        "examples": [
+          "This issue is now ready for testing.",
+          "Found a **critical** bug in the *login functionality*. `user.login()` method fails. @john.doe please review.",
+          "Completed implementation. Next steps:\n1. Code review\n2. Testing\n3. Deployment\n\nSee [documentation](https://docs.example.com) for details.",
+          "Please review this, @\"QA Team\""
+        ]
+      },
+      "issue_id_or_key": {
+        "type": "string",
+        "description": "The ID or key of the issue to add the comment to.",
+        "title": "Issue Id Or Key",
+        "examples": [
+          "PROJ-123",
+          "10000"
+        ]
+      },
+      "visibility_type": {
+        "type": "string",
+        "description": "Specifies the type of visibility restriction for the comment. Valid values are 'group' or 'role'. If this field is used, `visibility_value` must also be provided. IMPORTANT: 'group' visibility requires group-level visibility to be enabled in the Jira instance settings by an administrator. For 'role' visibility, use JIRA_GET_PROJECT_ROLES action to discover valid role names for the project.",
+        "title": "Visibility Type",
+        "examples": [
+          "group",
+          "role"
+        ]
+      },
+      "visibility_value": {
+        "type": "string",
+        "description": "Name of the group or role that can view the comment (required if visibility_type is set). IMPORTANT: These values are instance-specific and vary by Jira configuration. For role visibility: Use JIRA_GET_PROJECT_ROLES with your project key to discover valid role names (e.g., 'Administrator', 'Member', 'Viewer'). For group visibility: Use JIRA_GET_ALL_GROUPS to list available groups. Common roles include 'Administrator', 'Member', 'Viewer' but actual names depend on your project configuration.",
+        "title": "Visibility Value",
+        "examples": [
+          "Administrator",
+          "Member",
+          "Viewer"
+        ]
+      },
+      "additional_properties": {
+        "type": "object",
+        "description": "Additional properties to include in the comment request body. This can be used to pass extra fields supported by the Jira API that are not explicitly defined, such as 'properties' for EntityProperty objects. Format: {'properties': [{'key': 'myKey', 'value': {'myValue': 123}}]}.",
+        "title": "Additional Properties",
+        "additionalProperties": true,
+        "examples": [
+          {
+            "properties": [
+              {
+                "key": "sd.public.comment",
+                "value": {
+                  "internal": true
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "required": [
+      "issue_id_or_key",
+      "comment"
+    ],
+    "title": "AddCommentRequest",
+    "description": "Request model for adding a comment to an issue."
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/AddCommentResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "AddCommentResponseWrapper"
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "slug": "SLACK_FETCH_MESSAGE_THREAD_FROM_A_CONVERSATION",
+  "name": "Retrieve conversation replies",
+  "description": "Retrieves replies to a specific parent message in a Slack conversation, using the channel ID and the parent message's timestamp (`ts`). Note: The parent message in the response contains metadata (reply_count, reply_users, latest_reply) that indicates expected thread activity. If the returned messages array contains fewer replies than reply_count indicates, check: (1) has_more=true means pagination is needed, (2) recently posted replies may have timing delays, (3) some replies may be filtered by permissions or deleted. The composio_execution_message field will warn about any detected mismatches.",
+  "toolkit": "slack",
+  "version": "20261023_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "ts": {
+        "type": "string",
+        "description": "Timestamp of the parent message in the thread. Must be an existing message. If no replies, only the parent message itself is returned. Must be the exact full timestamp string of the root/parent message — not a reply's ts, a truncated value, a permalink, or an integer; these silently return wrong results.",
+        "title": "Ts",
+        "examples": [
+          "1234567890.123456"
+        ]
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Maximum number of messages to return. Fewer may be returned even if more are available.",
+        "title": "Limit",
+        "examples": [
+          100
+        ]
+      },
+      "cursor": {
+        "type": "string",
+        "description": "Pagination cursor from `response_metadata.next_cursor` of a previous response to get subsequent pages. If omitted, fetches the first page.",
+        "title": "Cursor",
+        "examples": [
+          "dXNlcjpVMEc5V0ZYTlo="
+        ]
+      },
+      "latest": {
+        "type": "string",
+        "description": "Latest message timestamp in the time range to include results.",
+        "title": "Latest",
+        "examples": [
+          "1678886400.000000"
+        ]
+      },
+      "oldest": {
+        "type": "string",
+        "description": "Oldest message timestamp in the time range to include results. Must be a UTC-based Slack ts string; incorrect timezone conversion or rounding can produce empty result windows.",
+        "title": "Oldest",
+        "examples": [
+          "1678836000.000000"
+        ]
+      },
+      "channel": {
+        "type": "string",
+        "description": "ID of the conversation (channel, direct message, etc.) to fetch the thread from. Must be a channel ID, not a channel name. Token must have membership in private channels or DMs, otherwise returns empty results or `not_in_channel`/`channel_not_found`.",
+        "title": "Channel",
+        "examples": [
+          "C0123456789"
+        ]
+      },
+      "inclusive": {
+        "type": "boolean",
+        "description": "Whether to include messages with `latest` or `oldest` timestamps in results. Effective only if `latest` or `oldest` is specified.",
+        "title": "Inclusive",
+        "examples": [
+          true
+        ]
+      },
+      "include_all_metadata": {
+        "type": "boolean",
+        "description": "Return all metadata associated with messages in the thread. When true, includes additional metadata fields that may be present on messages.",
+        "title": "Include All Metadata",
+        "examples": [
+          true
+        ]
+      }
+    },
+    "required": [
+      "channel",
+      "ts"
+    ],
+    "title": "FetchMessageThreadFromAConversationRequest",
+    "description": "Request schema for `FetchMessageThreadFromAConversation`"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/FetchMessageThreadFromAConversationResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "FetchMessageThreadFromAConversationResponseWrapper"
+  }
+}

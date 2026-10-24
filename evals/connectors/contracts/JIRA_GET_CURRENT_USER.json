@@ -1,0 +1,49 @@
+{
+  "slug": "JIRA_GET_CURRENT_USER",
+  "name": "Get Current User",
+  "description": "Retrieves detailed information about the currently authenticated Jira user. The returned `accountId` is the correct identifier for fields like `lead_account_id` in JIRA_CREATE_PROJECT, JIRA_ADD_WATCHER_TO_ISSUE, and JIRA_REMOVE_WATCHER_FROM_ISSUE — never use email or username in those fields.",
+  "toolkit": "jira",
+  "version": "20261001_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "expand": {
+        "type": "string",
+        "description": "Comma-separated list of user properties to expand, e.g., 'groups', 'applicationRoles'. Omitting this parameter returns only the base user profile without group membership or role data.",
+        "title": "Expand",
+        "examples": [
+          "groups,applicationRoles",
+          "groups",
+          "applicationRoles"
+        ]
+      }
+    },
+    "title": "GetMyselfRequest",
+    "description": "Defines the request parameters for retrieving details of the currently authenticated Jira user."
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/GetMyselfResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "GetMyselfResponseWrapper"
+  }
+}

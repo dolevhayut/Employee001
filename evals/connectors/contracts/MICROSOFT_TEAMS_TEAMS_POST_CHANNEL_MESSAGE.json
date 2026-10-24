@@ -1,0 +1,287 @@
+{
+  "slug": "MICROSOFT_TEAMS_TEAMS_POST_CHANNEL_MESSAGE",
+  "name": "Send Channel Message",
+  "description": "Posts a new top-level message to a channel in Microsoft Teams (does NOT reply to an existing message). Despite the file name 'reply_to_channel_chat', this action creates a brand-new message in the channel via POST /teams/{id}/channels/{id}/messages. To reply to an existing message thread, use the dedicated reply action instead.",
+  "toolkit": "microsoft_teams",
+  "version": "20261022_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "locale": {
+        "type": "string",
+        "description": "Locale of the channel message. Microsoft Teams currently documents this as client-set and always 'en-us'; only 'en-us' is supported.",
+        "title": "Locale",
+        "const": "en-us"
+      },
+      "content": {
+        "type": "string",
+        "description": "The content of the message to be sent. Can be plain text or HTML, determined by `content_type`. To @mention someone, this must be HTML containing an <at id=\"0\">Name</at> tag with a matching entry in `mentions`. To @mention a user, send content_type=\"html\", wrap the name in an <at> tag, and add a matching mentions entry whose id equals the <at> id. For example: content_type=\"html\", content='Hello <at id=\"0\">Jane Smith</at>, please review.', mentions=[{\"id\": 0, \"mentionText\": \"Jane Smith\", \"mentioned\": {\"user\": {\"id\": \"ef1c916a-3135-4417-ba27-8eb7bd084193\", \"displayName\": \"Jane Smith\", \"userIdentityType\": \"aadUser\"}}}]. The mentioned user id must be the Microsoft Entra (Azure AD) object ID (a GUID), not an email or display name; resolve it first with a user-lookup action. Typing '@Name' into content does nothing: Graph still returns 201 but the name renders as plain text with no notification.",
+        "title": "Content",
+        "examples": [
+          "Hello <at id=\"0\">Jane Smith</at>, please review."
+        ]
+      },
+      "subject": {
+        "type": "string",
+        "description": "The subject of the chat message, in plaintext. Optional field typically used for channel messages.",
+        "title": "Subject"
+      },
+      "summary": {
+        "type": "string",
+        "description": "Summary text for push notifications and summary views. Applies to channel chat messages.",
+        "title": "Summary"
+      },
+      "team_id": {
+        "type": "string",
+        "description": "The unique identifier of the Microsoft Teams team containing the channel.",
+        "title": "Team Id"
+      },
+      "mentions": {
+        "type": "array",
+        "description": "Entities to @mention in the message. Each entry must pair with an <at> tag in `content` carrying the same id, and `content_type` must be 'html'. To @mention a user, send content_type=\"html\", wrap the name in an <at> tag, and add a matching mentions entry whose id equals the <at> id. For example: content_type=\"html\", content='Hello <at id=\"0\">Jane Smith</at>, please review.', mentions=[{\"id\": 0, \"mentionText\": \"Jane Smith\", \"mentioned\": {\"user\": {\"id\": \"ef1c916a-3135-4417-ba27-8eb7bd084193\", \"displayName\": \"Jane Smith\", \"userIdentityType\": \"aadUser\"}}}]. The mentioned user id must be the Microsoft Entra (Azure AD) object ID (a GUID), not an email or display name; resolve it first with a user-lookup action. Typing '@Name' into content does nothing: Graph still returns 201 but the name renders as plain text with no notification.",
+        "title": "Mentions",
+        "items": {
+          "type": "object",
+          "description": "A single @mention to send with a message (Graph chatMessageMention).",
+          "title": "ChatMessageMentionInput",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "description": "Index of this mention. Must equal the id in the matching <at id=\"{id}\"> tag in the message content. Number mentions from 0.",
+              "title": "Id",
+              "examples": [
+                0
+              ]
+            },
+            "mentioned": {
+              "type": "object",
+              "description": "The entity (user, conversation, or application) to @mention.",
+              "title": "Mentioned",
+              "properties": {
+                "user": {
+                  "type": "object",
+                  "description": "A user @mentioned in a message (chatMessageMentionedIdentitySet.user).",
+                  "title": "MentionedUser",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Microsoft Entra (Azure AD) object ID (GUID) of the mentioned user. Must be the directory object ID, not an email address or display name.",
+                      "title": "Id",
+                      "examples": [
+                        "ef1c916a-3135-4417-ba27-8eb7bd084193"
+                      ]
+                    },
+                    "tenantId": {
+                      "type": "string",
+                      "description": "Microsoft Entra tenant ID for the mentioned user. Optional for identities in the current tenant.",
+                      "title": "Tenant Id",
+                      "examples": [
+                        "2432b57b-0abd-43db-aa7b-16eadd115d34"
+                      ]
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "description": "Display name of the mentioned user. Should match the text inside the corresponding <at> tag.",
+                      "title": "Display Name",
+                      "examples": [
+                        "Jane Smith"
+                      ]
+                    },
+                    "userIdentityType": {
+                      "type": "string",
+                      "description": "Type of user identity. Use 'aadUser' for a normal member of the tenant.",
+                      "title": "User Identity Type",
+                      "default": "aadUser",
+                      "examples": [
+                        "aadUser"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                "application": {
+                  "type": "object",
+                  "description": "An application or bot @mentioned in a message.",
+                  "title": "MentionedApplication",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "ID of the mentioned application or bot.",
+                      "title": "Id"
+                    },
+                    "tenantId": {
+                      "type": "string",
+                      "description": "Microsoft Entra tenant ID for the mentioned application or bot.",
+                      "title": "Tenant Id"
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "description": "Display name of the mentioned application or bot.",
+                      "title": "Display Name"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                "conversation": {
+                  "type": "object",
+                  "description": "A team, channel, or chat @mentioned in a message.",
+                  "title": "MentionedConversation",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "ID of the mentioned conversation. Use the team ID for a team mention and the channel ID for a channel mention.",
+                      "title": "Id"
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "description": "Display name of the mentioned team, channel, or chat.",
+                      "title": "Display Name"
+                    },
+                    "conversationIdentityType": {
+                      "type": "string",
+                      "description": "Type of conversation being mentioned.",
+                      "title": "Conversation Identity Type",
+                      "enum": [
+                        "team",
+                        "channel",
+                        "chat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "conversationIdentityType"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "minProperties": 1,
+              "maxProperties": 1,
+              "additionalProperties": false
+            },
+            "mentionText": {
+              "type": "string",
+              "description": "Text representing the mention, such as the user's display name. Should match the text inside the matching <at> tag.",
+              "title": "Mention Text",
+              "examples": [
+                "Jane Smith"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "mentionText",
+            "mentioned"
+          ]
+        }
+      },
+      "channel_id": {
+        "type": "string",
+        "description": "The unique identifier of the channel within the specified team where the message will be posted.",
+        "title": "Channel Id"
+      },
+      "importance": {
+        "type": "string",
+        "description": "The importance of the chat message. Possible values: 'normal', 'high', 'urgent'. Defaults to 'normal' if not specified.",
+        "title": "Importance",
+        "enum": [
+          "normal",
+          "high",
+          "urgent"
+        ]
+      },
+      "attachments": {
+        "type": "array",
+        "description": "References to attached objects like files, tabs, meetings, etc. Each attachment is a chatMessageAttachment object.",
+        "title": "Attachments",
+        "items": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "content_type": {
+        "type": "string",
+        "description": "The format of the message content. Defaults to 'text'. Must be 'html' to @mention anyone; if `mentions` is provided this is automatically upgraded to 'html', since Graph only renders <at> tags in an HTML body.",
+        "title": "Content Type",
+        "default": "text",
+        "enum": [
+          "text",
+          "html"
+        ],
+        "examples": [
+          "text",
+          "html"
+        ]
+      },
+      "hosted_contents": {
+        "type": "array",
+        "description": "Hosted content objects to upload with the message. Reference each item from HTML or attachment content using ../hostedContents/{temporary_id}/$value.",
+        "title": "Hosted Contents",
+        "items": {
+          "type": "object",
+          "description": "Hosted content to upload while posting a Microsoft Teams chat message.",
+          "title": "ChatMessageHostedContentInput",
+          "properties": {
+            "content_type": {
+              "type": "string",
+              "description": "Media type of the hosted content, such as image/png. Maps to contentType.",
+              "title": "Content Type"
+            },
+            "temporary_id": {
+              "type": "string",
+              "description": "Temporary identifier used in message HTML or attachment content as ../hostedContents/{temporary_id}/$value. Maps to @microsoft.graph.temporaryId.",
+              "title": "Temporary Id"
+            },
+            "content_bytes": {
+              "type": "string",
+              "description": "Base64-encoded bytes of the hosted content payload. Maps to contentBytes.",
+              "title": "Content Bytes"
+            }
+          },
+          "required": [
+            "temporary_id",
+            "content_bytes",
+            "content_type"
+          ]
+        }
+      }
+    },
+    "required": [
+      "team_id",
+      "channel_id",
+      "content"
+    ],
+    "title": "PostChannelMessageRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/PostChannelMessageResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "PostChannelMessageResponseWrapper"
+  }
+}

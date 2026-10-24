@@ -1,0 +1,81 @@
+{
+  "slug": "GOOGLEDRIVE_DOWNLOAD_FILE",
+  "name": "Download a file from Google Drive",
+  "description": "Downloads a Drive file's content and returns it in `downloaded_file_content`. For native blob files such as PDFs, images, videos, and Office files, it returns the original bytes without conversion; leave `mime_type` unset. For Google Workspace documents, it exports the content and `mime_type` optionally selects the export format.",
+  "toolkit": "googledrive",
+  "version": "20261022_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "fileId": {
+        "type": "string",
+        "description": "The unique identifier of the file to be downloaded from Google Drive. Must be a valid Google Drive file ID containing only alphanumeric characters, hyphens, and underscores. File paths with slashes (/) are not valid. This ID can typically be found in the file's URL in Google Drive or obtained from API calls that list files.",
+        "title": "File Id",
+        "examples": [
+          "1aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789"
+        ]
+      },
+      "mime_type": {
+        "type": "string",
+        "description": "ONLY for Google Workspace documents (Docs, Sheets, Slides, Drawings). Specifies the export format. Has NO effect on regular files (PDFs, images, videos, Office documents, etc.) - they are always downloaded in their native format. Google Forms and Maps cannot be downloaded as they do not support exports through the Drive API. If omitted for Google Workspace files, defaults to PDF. Different Workspace types support different formats. Use application/pdf for universal compatibility.",
+        "title": "MimeType",
+        "enum": [
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.oasis.opendocument.text",
+          "application/rtf",
+          "application/pdf",
+          "text/plain",
+          "application/zip",
+          "application/epub+zip",
+          "text/html",
+          "text/markdown",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.oasis.opendocument.spreadsheet",
+          "text/csv",
+          "text/tab-separated-values",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          "application/vnd.oasis.opendocument.presentation",
+          "image/jpeg",
+          "image/png",
+          "image/svg+xml",
+          "application/vnd.google-apps.script+json",
+          "application/vnd.google-apps.vid"
+        ],
+        "examples": [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "text/csv"
+        ]
+      }
+    },
+    "required": [
+      "fileId"
+    ],
+    "title": "DownloadFileRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/DownloadFileResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "DownloadFileResponseWrapper"
+  }
+}

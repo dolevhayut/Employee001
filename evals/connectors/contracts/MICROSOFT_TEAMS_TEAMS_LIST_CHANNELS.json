@@ -1,0 +1,80 @@
+{
+  "slug": "MICROSOFT_TEAMS_TEAMS_LIST_CHANNELS",
+  "name": "List team channels",
+  "description": "Retrieves channels for a specified Microsoft Teams team ID (must be valid and for an existing team), with options to include shared channels, filter results, and select properties.",
+  "toolkit": "microsoft_teams",
+  "version": "20261022_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "filter": {
+        "type": "string",
+        "description": "OData v4 query string to filter channels (e.g., `startswith(displayName,'Sales')` or `membershipType eq 'private'`).",
+        "title": "Filter",
+        "default": "",
+        "examples": [
+          "startswith(displayName,'Sales')",
+          "membershipType eq 'private'"
+        ]
+      },
+      "select": {
+        "type": "string",
+        "description": "Comma-separated channel properties to return (e.g., 'id,displayName,description'); empty for default properties. Common: `id`, `displayName`, `description`, `email`, `membershipType`, `webUrl`.",
+        "title": "Select",
+        "default": "",
+        "examples": [
+          "id,displayName,description"
+        ]
+      },
+      "team_id": {
+        "type": "string",
+        "description": "Unique identifier (GUID/UUID) of the Microsoft Teams team. Must be in UUID format (e.g., '87b0560f-fc0d-4442-add8-b380ca926707'). Team names are not accepted. Use MICROSOFT_TEAMS_LIST_USER_JOINED_TEAMS to get team IDs.",
+        "title": "Team Id",
+        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+        "examples": [
+          "87b0560f-fc0d-4442-add8-b380ca926707"
+        ]
+      },
+      "page_token": {
+        "type": "string",
+        "description": "Opaque continuation token for the next page. Omit for the first page; then pass back the `next_page_token` from the previous response, unmodified, until it is absent. Do not construct or edit it. When set, it drives pagination; resend the same required identifier (team_id), but filter/select params need not be repeated — the token carries them.",
+        "title": "Page Token"
+      },
+      "include_shared_channels": {
+        "type": "boolean",
+        "description": "If true, include channels shared with the team (uses allChannels endpoint). If false, exclude shared channels from results by filtering on membershipType.",
+        "title": "Include Shared Channels",
+        "default": false
+      }
+    },
+    "required": [
+      "team_id"
+    ],
+    "title": "ListChannelsRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/ListChannelsResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "ListChannelsResponseWrapper"
+  }
+}

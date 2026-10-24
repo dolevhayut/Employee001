@@ -1,0 +1,246 @@
+{
+  "slug": "OUTLOOK_SEND_EMAIL",
+  "name": "Send email",
+  "description": "Sends an email with subject, body, recipients, and optional attachments via Microsoft Graph API. Supports comma-separated email addresses in the to_email field for multiple recipients. Accepts either a single file or a list of files as attachments. Attachments require a non-empty file with valid name and mimetype.",
+  "toolkit": "outlook",
+  "version": "20261022_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "to": {
+        "type": "string",
+        "description": "The primary recipient's email address(es). You can provide a single email or multiple emails separated by commas. Valid email addresses will be extracted from strings containing extra text. Format: name@domain.com",
+        "title": "To",
+        "examples": [
+          "recipient@example.com",
+          "john.doe@company.com",
+          "alice@example.com, bob@example.com"
+        ]
+      },
+      "body": {
+        "type": "string",
+        "description": "The content of the email body as a plain string (plain text or HTML based on `is_html`). Do not pass structured objects; provide only the raw text/HTML content.",
+        "title": "Body",
+        "examples": [
+          "Hello team, please find the attached report.",
+          "<h1>Project Phoenix</h1><p>Initial proposal attached.</p>"
+        ]
+      },
+      "is_html": {
+        "type": "boolean",
+        "description": "Specifies if the email body is HTML; `True` for HTML, `False` for plain text.",
+        "title": "Is Html",
+        "default": false,
+        "examples": [
+          "true",
+          "false"
+        ]
+      },
+      "subject": {
+        "type": "string",
+        "description": "The subject line of the email.",
+        "title": "Subject",
+        "minLength": 1,
+        "maxLength": 255,
+        "examples": [
+          "Project Update",
+          "Important Announcement"
+        ]
+      },
+      "to_name": {
+        "type": "string",
+        "description": "The display name of the primary recipient.",
+        "title": "To Name",
+        "examples": [
+          "Valued Customer",
+          "John Doe"
+        ]
+      },
+      "user_id": {
+        "type": "string",
+        "description": "The user's email address or the alias 'me' to represent the authenticated user.",
+        "title": "User Id",
+        "default": "me",
+        "examples": [
+          "me",
+          "specific.user@example.com"
+        ]
+      },
+      "cc_emails": {
+        "type": "array",
+        "description": "List of email addresses for CC recipients. Each email should be a separate string in the array. Do NOT pass comma-separated values as a single string.",
+        "title": "Cc Emails",
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "jane.doe@example.com",
+            "cc.recipient@example.com"
+          ],
+          [
+            "team@company.com"
+          ]
+        ]
+      },
+      "attachment": {
+        "description": "File(s) to attach. Accepts a single file or a list of files.",
+        "anyOf": [
+          {
+            "type": "object",
+            "title": "FileUploadable",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The filename that will be used when uploading the file to the destination service",
+                "title": "Name",
+                "examples": [
+                  "document.pdf",
+                  "image.jpg",
+                  "report.docx"
+                ]
+              },
+              "s3key": {
+                "type": "string",
+                "description": "The S3 key of a publicly accessible file, typically returned from a previous download action that stored the file in S3. This key references an existing file that can be uploaded to another service.",
+                "title": "S3Key",
+                "examples": [
+                  "47563/gmail/GET_ATTACHMENT/response/12345"
+                ]
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "The MIME type of the file",
+                "title": "Mimetype",
+                "examples": [
+                  "application/pdf",
+                  "image/jpeg",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "mimetype",
+              "s3key"
+            ],
+            "file_uploadable": true
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "title": "FileUploadable",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The filename that will be used when uploading the file to the destination service",
+                  "title": "Name",
+                  "examples": [
+                    "document.pdf",
+                    "image.jpg",
+                    "report.docx"
+                  ]
+                },
+                "s3key": {
+                  "type": "string",
+                  "description": "The S3 key of a publicly accessible file, typically returned from a previous download action that stored the file in S3. This key references an existing file that can be uploaded to another service.",
+                  "title": "S3Key",
+                  "examples": [
+                    "47563/gmail/GET_ATTACHMENT/response/12345"
+                  ]
+                },
+                "mimetype": {
+                  "type": "string",
+                  "description": "The MIME type of the file",
+                  "title": "Mimetype",
+                  "examples": [
+                    "application/pdf",
+                    "image/jpeg",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "mimetype",
+                "s3key"
+              ],
+              "file_uploadable": true
+            }
+          }
+        ],
+        "title": "Attachment"
+      },
+      "bcc_emails": {
+        "type": "array",
+        "description": "List of email addresses for BCC recipients. Each email should be a separate string in the array. Do NOT pass comma-separated values as a single string.",
+        "title": "Bcc Emails",
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "manager@example.com",
+            "supervisor@example.com"
+          ],
+          [
+            "hr@company.com"
+          ]
+        ]
+      },
+      "from_address": {
+        "type": "string",
+        "description": "Optional From address to set on the message (send as/on behalf). Provide a single email address. Requires appropriate mailbox permissions.",
+        "title": "From Address",
+        "examples": [
+          "shared.mailbox@contoso.com",
+          "alias@example.com"
+        ]
+      },
+      "save_to_sent_items": {
+        "type": "boolean",
+        "description": "Indicates if the email should be saved in 'Sent Items'.",
+        "title": "Save To Sent Items",
+        "default": true,
+        "examples": [
+          "true",
+          "false"
+        ]
+      }
+    },
+    "required": [
+      "subject",
+      "body",
+      "to"
+    ],
+    "title": "SendEmailRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/SendEmailResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "SendEmailResponseWrapper"
+  }
+}

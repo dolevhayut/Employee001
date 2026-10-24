@@ -1,0 +1,296 @@
+{
+  "slug": "OUTLOOK_LIST_MESSAGES",
+  "name": "List Messages",
+  "description": "List or query Outlook messages from one folder (Inbox by default) or mailbox-wide with folder='allfolders'. Use simple filter fields for common conditions, filter for a raw OData expression, or search for full-text matching. Supports field selection, sorting, page size, offset, and opaque continuation tokens. Microsoft Graph does not allow search with filter, orderby, or skip; use OUTLOOK_QUERY_EMAILS only when you want its stricter single-folder OData validation.",
+  "toolkit": "outlook",
+  "version": "20261022_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "top": {
+        "type": "integer",
+        "description": "Maximum number of messages to return per request (1-1000). To page through more, use the `next_page_token` from the response (pass it back as `page_token`), repeating until it is absent. For large mailboxes (1000+ messages), always paginate.",
+        "title": "Top",
+        "default": 10,
+        "examples": [
+          "10",
+          "50",
+          "100"
+        ]
+      },
+      "skip": {
+        "type": "integer",
+        "description": "Number of messages to skip from the beginning of the result set, for pagination.",
+        "title": "Skip",
+        "default": 0,
+        "examples": [
+          "0",
+          "10",
+          "20"
+        ]
+      },
+      "filter": {
+        "type": "string",
+        "description": "Raw OData $filter expression for server-side message filtering, for example \"sentDateTime ge 2026-01-01T00:00:00Z\". Use this for sentDateTime ge/le and conditions not covered by the simple filter parameters. If both are provided, this expression and the simple filters are combined with 'and'. Quote strings and enums with single quotes and double embedded apostrophes, for example subject eq 'Bob''s update'. Do not quote booleans or dates. Valid quoted DateTimeOffset literals are unquoted automatically only for receivedDateTime and sentDateTime. Do not combine filter with search. When using orderby, start filter with every sort property in the same order. Prefer from_address over a raw from/emailAddress/address filter when sorting because Graph can reject the nested filter as InefficientFilter; provider rejections are retried without sorting and reported in composio_execution_message.",
+        "title": "Filter",
+        "examples": [
+          "sentDateTime ge 2026-01-01T00:00:00Z",
+          "sentDateTime le 2026-01-31T23:59:59Z",
+          "isRead eq false",
+          "receivedDateTime ge 2026-01-01T00:00:00Z",
+          "from/emailAddress/address eq 'sender@example.com'"
+        ]
+      },
+      "folder": {
+        "type": "string",
+        "description": "ID or well-known name of the mail folder. Well-known names (case-insensitive): archive, clutter, conflicts, conversationhistory, deleteditems, drafts, inbox, junkemail, localfailures, msgfolderroot, outbox, recoverableitemsdeletions, scheduled, searchfolders, sentitems, serverfailures, syncissues. Use 'allfolders' to search across all mail folders (uses /messages endpoint without folder filter). Or use a valid folder ID (base64-like string, e.g., 'AAMkAGI0ZjExAAA='). Accepts both raw folder IDs and percent-encoded folder IDs (with %XX sequences).",
+        "title": "Folder",
+        "default": "inbox",
+        "examples": [
+          "inbox",
+          "sentitems",
+          "allfolders",
+          "AAMkAGI0ZjExAAA="
+        ]
+      },
+      "search": {
+        "type": "string",
+        "description": "Full-text search query using Microsoft Graph $search syntax. Searches across subject, body, and sender fields server-side. Cannot be combined with filter, orderby, or skip; those parameters are omitted when search is set. Example: 'budget report' or 'from:john@example.com'",
+        "title": "Search",
+        "examples": [
+          "budget report",
+          "quarterly review"
+        ]
+      },
+      "select": {
+        "type": "array",
+        "description": "Message properties to include. Accepts a list of strings or a comma-separated string (e.g., 'id,subject,from'). Valid properties: id, subject, from, toRecipients, ccRecipients, bccRecipients, receivedDateTime, sentDateTime, hasAttachments, importance, isRead, body, bodyPreview, categories, conversationId, conversationIndex, flag, internetMessageHeaders, parentFolderId, replyTo, sender, webLink, isDraft, isReadReceiptRequested, isDeliveryReceiptRequested, changeKey, createdDateTime, lastModifiedDateTime, inferenceClassification, internetMessageId. Note: attachments is not selectable.",
+        "title": "Select",
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "subject",
+            "from",
+            "receivedDateTime"
+          ]
+        ]
+      },
+      "is_read": {
+        "type": "boolean",
+        "description": "Filter by read status: 'true' for read, 'false' for unread. Unspecified means no filter by read status.",
+        "title": "Is Read",
+        "examples": [
+          true,
+          false
+        ]
+      },
+      "orderby": {
+        "type": "array",
+        "description": "Properties to sort by, such as 'receivedDateTime desc'. Default is 'receivedDateTime desc'. When combined with filter, every orderby property must also appear first in filter in the same order; for example filter='sentDateTime ge 2026-01-01T00:00:00Z' requires orderby=['sentDateTime desc']. The action reorders its simple filter clauses when the sort property is already filtered. If Graph rejects a filter/order combination as InefficientFilter, the action retries without sorting and reports that fallback.",
+        "title": "Orderby",
+        "default": [
+          "receivedDateTime desc"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "receivedDateTime desc"
+          ],
+          [
+            "receivedDateTime desc",
+            "subject asc"
+          ]
+        ]
+      },
+      "subject": {
+        "type": "string",
+        "description": "Filter by exact match of the subject line. Special characters like apostrophes, brackets will be automatically escaped. For complex subject searches, consider using 'Search Messages' instead.",
+        "title": "Subject",
+        "examples": [
+          "Project Update Q3",
+          "Invoice #123",
+          "Meeting Notes"
+        ]
+      },
+      "user_id": {
+        "type": "string",
+        "description": "Target user's email or 'me' for authenticated user. For delegated access, use shared mailbox or delegated user's email.",
+        "title": "User Id",
+        "default": "me",
+        "examples": [
+          "me",
+          "user@example.com"
+        ]
+      },
+      "categories": {
+        "type": "array",
+        "description": "Filter by categories (case-sensitive); matches if tagged with any specified category.",
+        "title": "Categories",
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "Work",
+            "Urgent"
+          ]
+        ]
+      },
+      "importance": {
+        "type": "string",
+        "description": "Filter by importance: 'low', 'normal', or 'high'.",
+        "title": "Importance",
+        "examples": [
+          "high",
+          "normal",
+          "low"
+        ]
+      },
+      "page_token": {
+        "type": "string",
+        "description": "Opaque continuation token for fetching the next page. Omit it for the first page; then pass back the `next_page_token` from the previous response, unmodified, repeating until it is absent. Do not construct or edit this value. When set, it drives pagination; resend any required identifier fields from the first call (the token supersedes their values). Optional filter, sort and paging params need not be repeated; the token carries them.",
+        "title": "Page Token"
+      },
+      "from_address": {
+        "type": "string",
+        "description": "Filter by the sender's exact email address. NOTE: This filter is applied client-side on the returned results, not server-side.",
+        "title": "From Address",
+        "examples": [
+          "sender@example.com"
+        ]
+      },
+      "conversation_id": {
+        "type": "string",
+        "description": "Filter messages by conversation ID to retrieve all messages in a specific email thread. NOTE: This filter is applied client-side on the returned results.",
+        "title": "Conversation Id",
+        "examples": [
+          "AQQkADAwATY3ZmYAZS1hYQAzNC1lODkwLTAwAi0wMAoAEADJzjh8m93SQbP6BUCZcIuc"
+        ]
+      },
+      "has_attachments": {
+        "type": "boolean",
+        "description": "Filter by attachment presence: 'true' for messages with attachments, 'false' for those without. NOTE: This filter is applied client-side on the returned results.",
+        "title": "Has Attachments"
+      },
+      "response_detail": {
+        "type": "string",
+        "description": "Level of detail in the response. 'minimal' (default) applies a default $select projection that excludes the heavy 'body', 'uniqueBody', and 'internetMessageHeaders' fields to keep responses small — typical for listing/search use cases. 'full' returns the complete message payload from Microsoft Graph, including the full HTML body. Note: an explicit `select` list always wins over `response_detail` — pass select=['body','subject',...] to control the fields directly.",
+        "title": "Response Detail",
+        "default": "minimal",
+        "enum": [
+          "minimal",
+          "full"
+        ]
+      },
+      "subject_contains": {
+        "type": "string",
+        "description": "Filter messages where the subject contains the specified case-insensitive substring. NOTE: This filter is applied client-side on the returned results. For better performance, use 'Search Messages' instead.",
+        "title": "Subject Contains",
+        "examples": [
+          "budget",
+          "report"
+        ]
+      },
+      "subject_endswith": {
+        "type": "string",
+        "description": "Filter messages where the subject ends with the specified case-insensitive string. NOTE: This filter is applied client-side on the returned results. For better performance, use 'Search Messages' instead.",
+        "title": "Subject Endswith",
+        "examples": [
+          "- Confidential"
+        ]
+      },
+      "sent_date_time_gt": {
+        "type": "string",
+        "description": "Filter messages sent after this ISO 8601 DateTimeOffset timestamp. Include a timezone, for example 2023-01-10T14:30:00Z. For inclusive ge/le comparisons, use filter with an unquoted date literal.",
+        "title": "Sent Date Time Gt",
+        "examples": [
+          "2023-01-10T14:30:00Z"
+        ]
+      },
+      "sent_date_time_lt": {
+        "type": "string",
+        "description": "Filter messages sent before this ISO 8601 DateTimeOffset timestamp. Include a timezone, for example 2023-02-20T10:00:00Z. For inclusive ge/le comparisons, use filter with an unquoted date literal.",
+        "title": "Sent Date Time Lt",
+        "examples": [
+          "2023-02-20T10:00:00Z"
+        ]
+      },
+      "subject_startswith": {
+        "type": "string",
+        "description": "Filter messages where the subject starts with the specified case-insensitive string.",
+        "title": "Subject Startswith",
+        "examples": [
+          "[Action Required]"
+        ]
+      },
+      "received_date_time_ge": {
+        "type": "string",
+        "description": "Filter messages received on or after this ISO 8601 DateTimeOffset timestamp. Include a timezone, for example 2023-03-15T08:00:00Z.",
+        "title": "Received Date Time Ge",
+        "examples": [
+          "2023-03-15T08:00:00Z"
+        ]
+      },
+      "received_date_time_gt": {
+        "type": "string",
+        "description": "Filter messages received after this ISO 8601 DateTimeOffset timestamp. Include a timezone, for example 2023-01-01T00:00:00Z.",
+        "title": "Received Date Time Gt",
+        "examples": [
+          "2023-01-01T00:00:00Z"
+        ]
+      },
+      "received_date_time_le": {
+        "type": "string",
+        "description": "Filter messages received on or before this ISO 8601 DateTimeOffset timestamp. Include a timezone, for example 2023-03-31T23:59:59Z.",
+        "title": "Received Date Time Le",
+        "examples": [
+          "2023-03-31T23:59:59Z"
+        ]
+      },
+      "received_date_time_lt": {
+        "type": "string",
+        "description": "Filter messages received before this ISO 8601 DateTimeOffset timestamp. Include a timezone, for example 2023-04-01T00:00:00Z.",
+        "title": "Received Date Time Lt",
+        "examples": [
+          "2023-04-01T00:00:00Z"
+        ]
+      },
+      "include_sensitivity_label": {
+        "type": "boolean",
+        "description": "When true, retrieves and normalizes Microsoft Purview sensitivity labels in the same Graph request. Requires Mail.Read or Mail.ReadWrite. Treat status unknown as fail-closed before using a message's content. The setting is preserved in next_page_token.",
+        "title": "Include Sensitivity Label",
+        "default": false
+      }
+    },
+    "title": "ListMessagesRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/ListMessagesResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "ListMessagesResponseWrapper"
+  }
+}

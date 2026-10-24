@@ -1,0 +1,74 @@
+{
+  "slug": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+  "name": "Fetch message by message ID",
+  "description": "Fetches a specific email message by its ID, provided the `message_id` exists and is accessible to the authenticated `user_id`. Spam/trash messages are excluded unless upstream list/search calls used `include_spam_trash=true`. Use `internalDate` (milliseconds since epoch) rather than header `Date` for recency checks.",
+  "toolkit": "gmail",
+  "version": "20261023_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "format": {
+        "type": "string",
+        "description": "Format for message content. 'minimal': lightest (ID, thread ID, labels only). 'metadata': headers and message metadata without body content - ideal for summarization, analysis, or when you only need subject/sender/timestamp (recommended for most use cases). 'full': complete MIME structure with 50+ headers, nested parts, and base64url-encoded body data - heavy payload, only use when you need the complete raw MIME structure for parsing attachments or body content. 'raw': entire RFC 2822 formatted message as base64url string.",
+        "title": "Format",
+        "default": "full",
+        "examples": [
+          "metadata",
+          "minimal",
+          "full",
+          "raw"
+        ]
+      },
+      "user_id": {
+        "type": "string",
+        "description": "User's email address or 'me' for the authenticated user.",
+        "title": "User Id",
+        "default": "me",
+        "examples": [
+          "user@example.com",
+          "me"
+        ]
+      },
+      "message_id": {
+        "type": "string",
+        "description": "The Gmail API message ID (hexadecimal string, typically 15-16 characters like '19b11732c1b578fd'). Must be obtained from Gmail API responses (e.g., List Messages, Search Messages). Do NOT use email subjects, dates, sender names, or custom identifiers. Do NOT use `threadId` (use GMAIL_FETCH_MESSAGE_BY_THREAD_ID for threads), the Message-ID email header, or any fabricated value — only IDs from Gmail API list/search responses.",
+        "title": "Message Id",
+        "minLength": 1,
+        "examples": [
+          "19b11732c1b578fd",
+          "18c5e5b5f5d5e5b5",
+          "1736ccf5d7b4d452"
+        ]
+      }
+    },
+    "required": [
+      "message_id"
+    ],
+    "title": "FetchMessageByMessageIdRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/MessageBody"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "MessageBodyWrapper"
+  }
+}

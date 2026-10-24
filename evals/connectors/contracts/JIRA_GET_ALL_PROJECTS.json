@@ -1,0 +1,168 @@
+{
+  "slug": "JIRA_GET_ALL_PROJECTS",
+  "name": "Get all projects",
+  "description": "Retrieves all visible projects using the modern paginated Jira API with server-side filtering and pagination support. Results reflect only projects the authenticated user can access — small or empty result sets may indicate permission restrictions, not absence of projects. An empty `values` array means no projects matched the filters; relax `query`, `status`, or `categoryId` if unexpected. Project keys are mutable; prefer the stable numeric project ID for durable references in follow-up calls.",
+  "toolkit": "jira",
+  "version": "20261001_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "DEPRECATED: Use 'query' parameter instead. The project name (or part of it) to filter the results. This will be mapped to the 'query' parameter.",
+        "title": "Name",
+        "examples": [
+          "My Test Project",
+          "Platform",
+          "API Integration"
+        ]
+      },
+      "query": {
+        "type": "string",
+        "description": "Filter the results using a query string. Projects with a name or key that contains the query string are returned. The search is case-insensitive. May return multiple partial matches — verify the correct project by exact name or key before using the result. Use the returned project ID or key to pass to tools like JIRA_GET_PROJECT that require a stable identifier.",
+        "title": "Query",
+        "examples": [
+          "My Project",
+          "PROJ",
+          "Platform API"
+        ]
+      },
+      "action": {
+        "type": "string",
+        "description": "Action types for filtering projects by user permissions.",
+        "title": "ProjectAction",
+        "default": "view",
+        "enum": [
+          "view",
+          "browse",
+          "edit",
+          "create"
+        ],
+        "examples": [
+          "view",
+          "browse",
+          "edit",
+          "create"
+        ]
+      },
+      "expand": {
+        "type": "string",
+        "description": "A comma-separated list of entities to expand in the response for additional project details. Valid options include: `description` (to include the project description), `issueTypes` (to include all issue types associated with the project), `lead` (to include information about the project lead), and `projectKeys` (to include all project keys associated with the project).",
+        "title": "Expand",
+        "examples": [
+          "description",
+          "lead,issueTypes",
+          "description,issueTypes,lead,projectKeys"
+        ]
+      },
+      "status": {
+        "type": "array",
+        "description": "EXPERIMENTAL. Filter results by project status. Valid values: 'live', 'archived', 'deleted'.",
+        "title": "Status",
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "live"
+          ],
+          [
+            "live",
+            "archived"
+          ],
+          [
+            "deleted"
+          ]
+        ]
+      },
+      "orderBy": {
+        "type": "string",
+        "description": "Order the results by a field. Valid values: 'category', 'issueCount', 'key', 'lastIssueUpdatedTime', 'name', 'owner', 'archivedDate', 'deletedDate'. Prefix with '-' for descending order.",
+        "title": "Order By",
+        "default": "name",
+        "examples": [
+          "name",
+          "-lastIssueUpdatedTime",
+          "key",
+          "-issueCount"
+        ]
+      },
+      "startAt": {
+        "type": "integer",
+        "description": "The index of the first item to return in a page of results (page offset). The base index is 0.",
+        "title": "Start At",
+        "default": 0,
+        "examples": [
+          0,
+          50,
+          100
+        ]
+      },
+      "categoryId": {
+        "type": "integer",
+        "description": "The ID of the project category to filter by.",
+        "title": "Category Id",
+        "examples": [
+          10000,
+          10001
+        ]
+      },
+      "maxResults": {
+        "type": "integer",
+        "description": "The maximum number of projects to return per page. Maximum allowed value is 100.",
+        "title": "Max Results",
+        "default": 50,
+        "examples": [
+          10,
+          25,
+          50,
+          100
+        ]
+      },
+      "properties": {
+        "type": "array",
+        "description": "A list of project property keys to include in the response for each project, allowing retrieval of custom project entity properties. For example, if a project has a property with key 'com.example.property', including this key here as part of the list will return its value. Provide as a list of strings, e.g., `['property1', 'property2']`.",
+        "title": "Properties",
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "jira.home",
+            "com.example.custom.id"
+          ],
+          [
+            "my.custom.property"
+          ]
+        ]
+      }
+    },
+    "title": "GetAllProjectsRequest",
+    "description": "Request schema for `GetAllProjects`"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/GetAllProjectsResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "GetAllProjectsResponseWrapper"
+  }
+}

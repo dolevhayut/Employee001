@@ -1,0 +1,77 @@
+{
+  "slug": "SLACK_LIST_ALL_USERS",
+  "name": "List all users",
+  "description": "Retrieves a paginated list of all users with profile details, status, and team memberships in a Slack workspace; data may not be real-time. Filter response fields `is_bot`, `is_app_user`, and `deleted` to build human-only rosters. Profile fields like `email` and `phone` may be absent depending on OAuth scopes and workspace privacy settings. Guest/restricted accounts may be omitted based on scopes—do not treat results as a complete directory. High-frequency calls risk HTTP 429; honor the `Retry-After` header and throttle to ~1–2 requests/second. Use stable user IDs rather than display names for mapping. Prefer SLACK_FIND_USERS for targeted lookups; cache results to avoid full-workspace fetches.",
+  "toolkit": "slack",
+  "version": "20261023_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "type": "integer",
+        "description": "Maximum number of items to return per page; fewer may be returned if the end of the list is reached. Recommended to set a value (e.g., 100) as Slack may error for large workspaces if omitted.",
+        "title": "Limit",
+        "default": 1,
+        "examples": [
+          "20",
+          "100",
+          "200"
+        ]
+      },
+      "cursor": {
+        "type": "string",
+        "description": "Pagination cursor for fetching subsequent pages. Set to `next_cursor` from a previous response's `response_metadata`. Omit for the first page. Paginate until `next_cursor` is empty—stopping early silently undercounts users. Page size is capped at ~200 users.",
+        "title": "Cursor",
+        "examples": [
+          "dXNlcjpVMDYxREk0STM=",
+          "dXNlcjpVMDYxREk0STQ="
+        ]
+      },
+      "team_id": {
+        "type": "string",
+        "description": "ID of the Slack workspace (team) to operate on, e.g. T0123456789. Use only with org-level Enterprise Grid tokens when you need to target a specific workspace; omit for single-workspace tokens.",
+        "title": "Team Id",
+        "examples": [
+          "T0984H91R2N",
+          "T1234567890"
+        ]
+      },
+      "include_locale": {
+        "type": "boolean",
+        "description": "Include the `locale` field for each user. Defaults to `false`.",
+        "title": "Include Locale",
+        "examples": [
+          "true",
+          "false"
+        ]
+      }
+    },
+    "title": "ListAllUsersRequest",
+    "description": "Request schema for `ListAllUsers`."
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/UsersListResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "UsersListResponseWrapper"
+  }
+}

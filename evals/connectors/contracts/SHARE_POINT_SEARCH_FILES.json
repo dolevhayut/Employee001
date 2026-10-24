@@ -1,0 +1,94 @@
+{
+  "slug": "SHARE_POINT_SEARCH_FILES",
+  "name": "Search Files Across All Sites",
+  "description": "Search for files across all SharePoint sites and OneDrive using Keyword Query Language. Returns files matching the query with metadata like title, path, size, author, and modification time. Use this action when you need to discover files broadly across an organization without knowing specific drive IDs or site locations. Results are automatically filtered to show only document content types. A site_name changes the endpoint context but does not isolate results unless restrict_to_site_path is enabled or query contains an equivalent Path restriction. Use from_index and row_limit parameters to paginate through large result sets.",
+  "toolkit": "share_point",
+  "version": "20261020_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "The search query text. Can use Keyword Query Language (KQL) syntax for advanced filtering. Examples: 'Q4 report', 'budget proposal', 'FileType:docx', 'Author:\"John Doe\"'. Use KQL properties like FileType, Author, LastModifiedTime, or Path to narrow results.",
+        "title": "Query",
+        "examples": [
+          "project report",
+          "budget.xlsx",
+          "FileType:pdf Author:Smith"
+        ]
+      },
+      "row_limit": {
+        "type": "integer",
+        "description": "Maximum number of file results to return per request. Default is 25.",
+        "title": "Row Limit",
+        "default": 25,
+        "minimum": 1,
+        "maximum": 500,
+        "examples": [
+          25
+        ]
+      },
+      "site_name": {
+        "type": "string",
+        "description": "Optional per-call site override. Provide the complete server-relative path to the SharePoint site or subsite web root, such as '/sites/marketing/archive' or '/teams/engineering', or provide a same-origin full URL to that web root. Do not pass a page, library, list, folder, or other resource URL. A bare name such as 'marketing' maps to '/sites/marketing', so nested subsites require their complete path. If omitted, the site configured on the connection is used; if none is configured, the tenant root site is used. This changes the SharePoint Search endpoint context but does not strictly isolate results; set restrict_to_site_path to true for strict site isolation.",
+        "title": "Site Name",
+        "examples": [
+          "Finance"
+        ]
+      },
+      "from_index": {
+        "type": "integer",
+        "description": "Zero-based index of the first result to return. Use for pagination (e.g., from_index=0 for page 1, from_index=25 for page 2 with row_limit=25). Compare TotalRows vs RowCount in the response to determine if additional pages exist.",
+        "title": "From Index",
+        "minimum": 0,
+        "examples": [
+          0
+        ]
+      },
+      "select_properties": {
+        "type": "string",
+        "description": "Comma-separated list of managed property names to return in results. Common file properties: Title, Author, Path, Size, LastModifiedTime, FileType, FileName, FileExtension. If not specified, SharePoint returns a default set.",
+        "title": "Select Properties",
+        "examples": [
+          "Title,Path,Size,LastModifiedTime,FileType"
+        ]
+      },
+      "restrict_to_site_path": {
+        "type": "boolean",
+        "description": "Limit results to the effective subsite URL using a KQL Path restriction. Requires site_name on the request or in the connection configuration.",
+        "title": "Restrict To Site Path",
+        "default": false
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "title": "SearchFilesRequest",
+    "description": "Request parameters for searching files across all SharePoint sites and OneDrive."
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/SearchFilesResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "SearchFilesResponseWrapper"
+  }
+}

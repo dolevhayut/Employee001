@@ -1,0 +1,198 @@
+{
+  "slug": "OUTLOOK_REPLY_EMAIL",
+  "name": "Reply to Email",
+  "description": "Sends a reply to an Outlook email message with optional HTML formatting, attachments, CC, and BCC recipients.",
+  "toolkit": "outlook",
+  "version": "20261022_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "comment": {
+        "type": "string",
+        "description": "The body content of the reply email. Can be plain text or HTML based on is_html flag.",
+        "title": "Comment",
+        "minLength": 1,
+        "examples": [
+          "Thank you for your email. I'll review and respond shortly."
+        ]
+      },
+      "is_html": {
+        "type": "boolean",
+        "description": "Whether the comment body should be rendered as HTML (true) or plain text (false). When false, HTML tags in the comment will be displayed as literal text.",
+        "title": "Is Html",
+        "default": false,
+        "examples": [
+          false,
+          true
+        ]
+      },
+      "user_id": {
+        "type": "string",
+        "description": "The user's email address or 'me' to indicate the authenticated user. This specifies the mailbox from which the reply will be sent.",
+        "title": "User Id",
+        "default": "me",
+        "examples": [
+          "user@example.com",
+          "me"
+        ]
+      },
+      "cc_emails": {
+        "type": "array",
+        "description": "List of email addresses for CC recipients.",
+        "title": "Cc Emails",
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "jane.doe@example.com",
+            "other@example.com"
+          ]
+        ]
+      },
+      "attachment": {
+        "description": "File(s) to attach to the reply. Accepts a single file or a list of files.",
+        "anyOf": [
+          {
+            "type": "object",
+            "title": "FileUploadable",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The filename that will be used when uploading the file to the destination service",
+                "title": "Name",
+                "examples": [
+                  "document.pdf",
+                  "image.jpg",
+                  "report.docx"
+                ]
+              },
+              "s3key": {
+                "type": "string",
+                "description": "The S3 key of a publicly accessible file, typically returned from a previous download action that stored the file in S3. This key references an existing file that can be uploaded to another service.",
+                "title": "S3Key",
+                "examples": [
+                  "47563/gmail/GET_ATTACHMENT/response/12345"
+                ]
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "The MIME type of the file",
+                "title": "Mimetype",
+                "examples": [
+                  "application/pdf",
+                  "image/jpeg",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "mimetype",
+              "s3key"
+            ],
+            "file_uploadable": true
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "title": "FileUploadable",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The filename that will be used when uploading the file to the destination service",
+                  "title": "Name",
+                  "examples": [
+                    "document.pdf",
+                    "image.jpg",
+                    "report.docx"
+                  ]
+                },
+                "s3key": {
+                  "type": "string",
+                  "description": "The S3 key of a publicly accessible file, typically returned from a previous download action that stored the file in S3. This key references an existing file that can be uploaded to another service.",
+                  "title": "S3Key",
+                  "examples": [
+                    "47563/gmail/GET_ATTACHMENT/response/12345"
+                  ]
+                },
+                "mimetype": {
+                  "type": "string",
+                  "description": "The MIME type of the file",
+                  "title": "Mimetype",
+                  "examples": [
+                    "application/pdf",
+                    "image/jpeg",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "mimetype",
+                "s3key"
+              ],
+              "file_uploadable": true
+            }
+          }
+        ],
+        "title": "Attachment"
+      },
+      "bcc_emails": {
+        "type": "array",
+        "description": "List of email addresses for BCC recipients.",
+        "title": "Bcc Emails",
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "examples": [
+          [
+            "manager@example.com",
+            "supervisor@example.com"
+          ]
+        ]
+      },
+      "message_id": {
+        "type": "string",
+        "description": "The Microsoft Graph message ID (NOT an email address). This is a Base64-encoded string typically starting with 'AAMk' (e.g., 'AAMkAGI2TAAA='). Do NOT pass email addresses like 'user@example.com'. Obtain this ID from the 'id' field returned by `OUTLOOK_LIST_MESSAGES`, `OUTLOOK_GET_MESSAGE`, or `OUTLOOK_SEARCH_MESSAGES` actions.",
+        "title": "Message Id",
+        "examples": [
+          "AAMkAGI2TAAA="
+        ]
+      }
+    },
+    "required": [
+      "message_id",
+      "comment"
+    ],
+    "title": "ReplyToEmailRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/ReplyToEmailResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "ReplyToEmailResponseWrapper"
+  }
+}

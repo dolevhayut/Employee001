@@ -1,0 +1,85 @@
+{
+  "slug": "SLACK_LIST_ALL_CHANNELS",
+  "name": "List all channels",
+  "description": "Lists conversations available to the user with various filters and search options. Always use resolved `channel_id` (not display names) for downstream operations, as names may be non-unique. The `created` field in results is a Unix epoch timestamp (UTC). Pagination across large workspaces may return HTTP 429 with a `Retry-After` header; honor the delay and resume from the last successful cursor.",
+  "toolkit": "slack",
+  "version": "20261023_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "type": "integer",
+        "description": "Maximum number of channels to return per page (1 to 1000). Fewer channels may be returned than requested. This schema defaults to 1 if omitted.",
+        "title": "Limit",
+        "default": 1,
+        "examples": [
+          100,
+          500,
+          1000
+        ]
+      },
+      "types": {
+        "type": "string",
+        "description": "Comma-separated list of conversation types to include: `public_channel` (regular #channels everyone can join), `private_channel` (invite-only channels), `im` (1-on-1 direct messages), `mpim` (group direct messages with 3+ people). Defaults to `public_channel` if omitted. Private channels, IMs, and MPIMs only appear if the authenticated user/bot is a member and the token has the required scopes; absence from results reflects access limits, not non-existence.",
+        "title": "Types",
+        "examples": [
+          "public_channel,private_channel",
+          "im,mpim"
+        ]
+      },
+      "cursor": {
+        "type": "string",
+        "description": "Pagination cursor (from a previous response's `next_cursor`) for the next page of results. Omit for the first page. Loop on `response_metadata.next_cursor` until it is empty to retrieve all channels; stopping early silently omits results.",
+        "title": "Cursor",
+        "examples": [
+          "dXNlcjpVMDYxTkZUVDI=",
+          "bmV4dF90czoxNTEyMDg1ODYxMDAwNTQ5"
+        ]
+      },
+      "team_id": {
+        "type": "string",
+        "description": "ID of the Slack workspace (team) to operate on, e.g. T0123456789. Use only with org-level Enterprise Grid tokens when you need to target a specific workspace; omit for single-workspace tokens.",
+        "title": "Team Id",
+        "examples": [
+          "T1234567890"
+        ]
+      },
+      "exclude_archived": {
+        "type": "boolean",
+        "description": "Excludes archived channels if true. The API defaults to false (archived channels are included).",
+        "title": "Exclude Archived",
+        "examples": [
+          true,
+          false
+        ]
+      }
+    },
+    "title": "ListAllChannelsRequest",
+    "description": "Request schema for listing Slack team channels with various filtering options."
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/ListAllChannelsResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "ListAllChannelsResponseWrapper"
+  }
+}

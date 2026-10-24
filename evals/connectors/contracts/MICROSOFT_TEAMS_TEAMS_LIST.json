@@ -1,0 +1,82 @@
+{
+  "slug": "MICROSOFT_TEAMS_TEAMS_LIST",
+  "name": "List Teams",
+  "description": "Retrieves Microsoft Teams accessible by the authenticated user, allowing filtering, property selection, and pagination.",
+  "toolkit": "microsoft_teams",
+  "version": "20261022_00",
+  "inputParameters": {
+    "type": "object",
+    "properties": {
+      "top": {
+        "type": "integer",
+        "description": "Maximum number of teams to return per page (1-999). Used for pagination; see `next_link` in response.",
+        "title": "Top",
+        "default": 100,
+        "examples": [
+          "50",
+          "200"
+        ]
+      },
+      "count": {
+        "type": "boolean",
+        "description": "When true, includes the total count of items in the @odata.count property in the response. The count is only returned in the first page of results.",
+        "title": "Count",
+        "default": false,
+        "examples": [
+          true,
+          false
+        ]
+      },
+      "filter": {
+        "type": "string",
+        "description": "OData v4.0 filter string to refine results based on team properties (e.g., `startsWith(displayName,'A')`). Consult OData v4.0 documentation for syntax.",
+        "title": "Filter",
+        "default": "",
+        "examples": [
+          "startsWith(displayName,'Project')"
+        ]
+      },
+      "select": {
+        "type": "string",
+        "description": "Comma-separated team properties to retrieve (e.g., 'id,displayName,description'). If empty or omitted, standard properties are returned. Supported properties include `id`, `displayName`, `description`, `visibility`.",
+        "title": "Select",
+        "default": "",
+        "examples": [
+          "id,displayName",
+          "description,visibility"
+        ]
+      },
+      "page_token": {
+        "type": "string",
+        "description": "Opaque continuation token for the next page. Omit for the first page; then pass back the `next_page_token` from the previous response, unmodified, until it is absent. Do not construct or edit it. When set, it drives pagination; resend the same required identifier(s) (none), but filter/sort/search params need not be repeated — the token carries them.",
+        "title": "Page Token"
+      }
+    },
+    "title": "ListTeamsRequest"
+  },
+  "outputParameters": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "description": "Data from the action execution",
+        "title": "Data",
+        "$ref": "#/$defs/ListTeamsResponse"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error if any occurred during the execution of the action",
+        "title": "Error"
+      },
+      "successful": {
+        "type": "boolean",
+        "description": "Whether or not the action execution was successful or not",
+        "title": "Successful"
+      }
+    },
+    "required": [
+      "data",
+      "successful"
+    ],
+    "title": "ListTeamsResponseWrapper"
+  }
+}
