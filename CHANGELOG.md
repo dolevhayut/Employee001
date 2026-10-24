@@ -31,6 +31,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - With no command, `npx employee001` now starts the app, running setup first
   in a folder without `.env`. It used to print help. `npx employee001 help`
   still lists the commands.
+- The setup wizard asks only what a first answer needs. On a Claude
+  subscription that's the provider and telemetry. It no longer asks for
+  Composio, ElevenLabs or OpenAI keys; add them from Settings when you need
+  them. It no longer asks for a port either: it takes the next free one if
+  3000 is busy. Running setup again keeps the keys it doesn't ask about. It
+  used to blank any of those that weren't in the keychain.
 - Ask and Ask the company now say why a twin couldn't answer: an invalid key,
   Claude Code signed out, or a demo question with no recording. Before, they
   showed "didn't find an answer" or "No one on the team had anything on this".

@@ -244,102 +244,22 @@ export default async function setup(_argv, { launch = true } = {}) {
   }
   if (p.isCancel(awsRegion) || p.isCancel(vertexRegion) || p.isCancel(vertexProject) || p.isCancel(foundryResource) || p.isCancel(localBaseUrl) || p.isCancel(localAuthToken) || p.isCancel(localOpusModel) || p.isCancel(localSonnetModel) || p.isCancel(localHaikuModel)) { p.cancel("Setup cancelled"); return false; }
 
-  // Composio is optional at setup time. The Anthropic key alone gets you
-  // a working install — you can already hire marketplace agents (Alex
-  // Morgan etc.) and chat with them. Composio is only needed when you
-  // invite a real employee to onboard their twin (the training pipeline
-  // backfills from Slack/Gmail/GitHub/Linear/calendar through Composio
-  // MCP). The /employees invite panel surfaces a one-click "add Composio
-  // key" affordance the moment you actually need one — no .env edits, no
-  // server restart.
-  p.note(
-    [
-      "Composio powers the autonomous training pipeline that builds new",
-      "employee twins from 30-360 days of their real work signal (Slack,",
-      "Gmail, GitHub, Linear, calendar).",
-      "",
-      "It's NOT required to get started. You can:",
-      "  • Hire a marketplace agent from the Hire page (Alex Morgan / SDR",
-      "    and more) and chat right away — they have no training pipeline.",
-      "  • Skip Composio now and add the key later from /employees, the",
-      "    moment you want to invite a real employee.",
-      "",
-      "If you already have a Composio key handy, pasting it now saves a",
-      "round-trip. Otherwise hit Enter to skip.",
-    ].join("\n"),
-    "Composio — optional, only for inviting real employees",
-  );
+  // Only what's needed to get a first answer. Composio (inviting
+  // colleagues), ElevenLabs (voice) and OpenAI (sharper memory recall) are
+  // added later from Settings, the moment they're needed; values already in
+  // .env are kept as they are.
 
-  const composioKey = await p.password({
-    message:
-      "Composio API key (optional — leave blank to add later) — https://app.composio.dev",
-    mask: "•",
-  });
-  if (p.isCancel(composioKey)) {
-    p.cancel("Setup cancelled");
-    return false;
-  }
-
-  const elevenLabsKey = await p.password({
-    message:
-      "ElevenLabs API key (optional, for twin voices) — leave blank to skip",
-    mask: "•",
-  });
-  if (p.isCancel(elevenLabsKey)) {
-    p.cancel("Setup cancelled");
-    return false;
-  }
-
-  p.note(
-    [
-      "An OpenAI key optimizes your agents' memory — they recall the most",
-      "relevant context more accurately, so their answers stay sharp and",
-      "consistent over time.",
-      "",
-      "Optional. Everything works without it — this just makes memory better.",
-    ].join("\n"),
-    "Memory boost — optional",
-  );
-
-  const openaiKey = await p.password({
-    message:
-      "OpenAI API key (optional — sharpens your agents' memory) — leave blank to skip",
-    mask: "•",
-  });
-  if (p.isCancel(openaiKey)) {
-    p.cancel("Setup cancelled");
-    return false;
-  }
-
-  // 3000 is every dev server's default; catch a clash now instead of at boot.
-  // Typing a busy port a second time keeps it (it may be this app, running).
-  let suggestedPort = existing.PORT ?? "3000";
-  let warnedPort = null;
-  let port;
-  for (;;) {
-    port = await p.text({
-      message: "Port for the local server",
-      placeholder: "3000",
-      initialValue: suggestedPort,
-      validate(v) {
-        const n = Number(v);
-        if (!Number.isInteger(n) || n < 1024 || n > 65535)
-          return "Port must be an integer between 1024 and 65535";
-      },
-    });
-    if (p.isCancel(port)) {
-      p.cancel("Setup cancelled");
-      return false;
-    }
-    if (port === warnedPort || !(await isPortInUse(port))) break;
+  // No port question: 3000 (or the saved port) unless something already
+  // listens there, then the next free one. `--port` on start still wins.
+  let port = existing.PORT ?? "3000";
+  if (await isPortInUse(port)) {
     const free = await findFreePort(Number(port) + 1);
-    warnedPort = port;
-    if (!free) {
-      p.log.warn(`Port ${port} is in use right now. Stop that process before \`employee001 start\`.`);
-      break;
+    if (free) {
+      p.log.info(`Port ${port} is busy (another dev server?), so Employee001 will use ${free}.`);
+      port = String(free);
+    } else {
+      p.log.warn(`Port ${port} is busy right now. Stop that process before starting, or run with --port.`);
     }
-    p.log.warn(`Port ${port} is in use right now (another dev server?). ${free} is free; enter ${port} again to keep it.`);
-    suggestedPort = String(free);
   }
 
   const telemetryConsent = await p.confirm({
@@ -355,17 +275,22 @@ export default async function setup(_argv, { launch = true } = {}) {
   // to 127.0.0.1; it becomes the LAN gate the moment the user flips bind to
   // 0.0.0.0, with no second setup step required.
   const token = existing.EMPLOYEE001_TOKEN || generateToken();
+  // Keys the wizard doesn't ask for keep their current value (a re-run used
+  // to blank any that weren't in the keychain). The Anthropic key is only
+  // kept for the Anthropic provider.
   const secretValues = {
-    ANTHROPIC_API_KEY: anthropicKey || (existing.ANTHROPIC_API_KEY === KEYCHAIN_PLACEHOLDER ? KEYCHAIN_PLACEHOLDER : ""),
-    COMPOSIO_API_KEY: composioKey || (existing.COMPOSIO_API_KEY === KEYCHAIN_PLACEHOLDER ? KEYCHAIN_PLACEHOLDER : ""),
-    ELEVENLABS_API_KEY: elevenLabsKey || (existing.ELEVENLABS_API_KEY === KEYCHAIN_PLACEHOLDER ? KEYCHAIN_PLACEHOLDER : ""),
-    OPENAI_API_KEY: openaiKey || (existing.OPENAI_API_KEY === KEYCHAIN_PLACEHOLDER ? KEYCHAIN_PLACEHOLDER : ""),
+    ANTHROPIC_API_KEY: anthropicKey || (provider === "anthropic" ? existing.ANTHROPIC_API_KEY ?? "" : ""),
+    COMPOSIO_API_KEY: existing.COMPOSIO_API_KEY ?? "",
+    ELEVENLABS_API_KEY: existing.ELEVENLABS_API_KEY ?? "",
+    OPENAI_API_KEY: existing.OPENAI_API_KEY ?? "",
     EMPLOYEE001_TOKEN: token,
   };
   const keychain = createKeychain();
   const secretsToStore = SECRET_NAMES.filter((name) => secretValues[name] && secretValues[name] !== KEYCHAIN_PLACEHOLDER);
   const keychainFailures = [];
-  if (keychain.available && secretsToStore.length) {
+  // Ask only when there's an API key to protect; the local access token
+  // alone stays in .env (chmod 600).
+  if (keychain.available && secretsToStore.some((name) => name !== "EMPLOYEE001_TOKEN")) {
     const storeInKeychain = await p.confirm({
       message: `Store API keys in your ${keychain.kind === "linux" ? "system keyring (Secret Service)" : "macOS Keychain"}? (recommended)`,
       initialValue: true,
@@ -478,6 +403,10 @@ export default async function setup(_argv, { launch = true } = {}) {
     [
       `Wrote ${ENV_PATH}`,
       `Created ${DATA_DIR}`,
+      "",
+      "First move in the browser: Build your own twin (about five minutes).",
+      "Later, from Settings, when you need them: Composio to invite colleagues,",
+      "ElevenLabs for voice, OpenAI for sharper memory recall.",
     ].join("\n"),
     "All set",
   );
