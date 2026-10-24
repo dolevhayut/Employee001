@@ -22,7 +22,7 @@ const wrappedByScope = new Map<string, WrappedSandbox>();
 export function twinSandboxEnabled(env: Env = process.env): boolean { return env.EMPLOYEE001_SANDBOX === "1"; }
 function scopeEmployeeId(scope: string): string | null {
   if (scope === SYSTEM_SCOPE) return "system";
-  return /^(builder|chat|meeting|routine|relay):([a-z0-9][a-z0-9-]*)$/.exec(scope)?.[2] ?? null;
+  return /^(builder|chat|meeting|routine|relay):([A-Za-z0-9][A-Za-z0-9_-]*)$/.exec(scope)?.[2] ?? null;
 }
 function localLiterals(url: string | undefined): string[] {
   try {

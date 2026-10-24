@@ -1,4 +1,5 @@
 import { access, readFile } from "fs/promises";
+import os from "os";
 import path from "path";
 import { describe, expect, it } from "vitest";
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -9,12 +10,18 @@ describe.skipIf(process.env.SRT_E2E !== "1")("twin sandbox macOS integration", (
     process.env.EMPLOYEE001_SANDBOX = "1";
     process.env.EMPLOYEE001_MODEL_PROVIDER = "claude-code";
     await ensureTwinSandbox("system");
-    const prompt = `Reply with exactly: sandbox-ok. Quotes: '$' ${"x".repeat(20_000)}`;
+    // Quotes, $' and a long string in argv (the system prompt), where a
+    // shell-quoting bug would break the command line.
+    const systemPrompt = `Quotes: '$' "$&" \`x\` $'tail'. ${"filler words ".repeat(1_500)}`;
+    const prompt = "Reply with exactly: sandbox-ok";
     let result = "";
     const stream = query({
       prompt,
       options: {
         model: "claude-haiku-4-5",
+        systemPrompt,
+        // Outside any repository: a repo's .claude settings change what loads.
+        cwd: os.tmpdir(),
         tools: [],
         allowedTools: [],
         maxTurns: 1,
