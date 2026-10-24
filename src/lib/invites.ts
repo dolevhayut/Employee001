@@ -117,6 +117,12 @@ export function findInvite(token: string): Invite | undefined {
   return i ? withLookbackDefault(i) : undefined;
 }
 
+/** Tokens of invites still waiting for /complete, read once (a roster load
+ *  checks every twin against it). */
+export function pendingInviteTokens(): Set<string> {
+  return new Set(readAll().filter((i) => !i.completedAt).map((i) => i.token));
+}
+
 /** True while an invite-linked directory is still waiting for /complete. */
 export function inviteOnboardingInProgress(token: unknown): boolean {
   if (typeof token !== "string") return false;

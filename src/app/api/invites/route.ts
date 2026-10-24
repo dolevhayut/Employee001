@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addPersonProblem, canRunModel, currentProvider, providerLabel } from "@/lib/model-provider";
 import { createInvite, listInvites } from "@/lib/invites";
+import { purgeAbandonedInviteTwins } from "@/lib/invite-cleanup";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  // Expired invites never get a revoke call: sweep their abandoned folders
+  // when the invite list is read (the admin's Twins page).
+  void purgeAbandonedInviteTwins().catch(() => {});
   return NextResponse.json({ invites: listInvites() });
 }
 

@@ -74,6 +74,9 @@ function InterviewPanel({ name, role, onTranscript }: { name: string; role: stri
         setQuestion(body.question);
       }
     } catch (err) {
+      // Drop the question that was answered, so a retry asks again instead
+      // of recording the same question twice.
+      setQuestion(null);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
@@ -142,7 +145,14 @@ function InterviewPanel({ name, role, onTranscript }: { name: string; role: stri
           Interview done: {turns.length} answer{turns.length === 1 ? "" : "s"}. Add documents if you like, agree below and build.
         </div>
       )}
-      {error && <div role="alert" style={{ color: "var(--danger)", fontSize: "var(--fs-sm)" }}>{error}</div>}
+      {error && (
+        <div role="alert" style={{ color: "var(--danger)", fontSize: "var(--fs-sm)", display: "flex", gap: "var(--sp-8)", alignItems: "center", flexWrap: "wrap" }}>
+          <span>{error}</span>
+          {!done && (
+            <button type="button" className="btn ghost sm" disabled={busy} onClick={() => void ask(turns)}>Try again</button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -152,8 +162,11 @@ export default function BuildMyTwinPage() {
   const { t } = useT();
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
-  const [notes, setNotes] = useState("");
+  // Each mode keeps its own text, so switching never loses what was written.
+  const [written, setWritten] = useState("");
+  const [interviewed, setInterviewed] = useState("");
   const [mode, setMode] = useState<Mode>("write");
+  const notes = mode === "write" ? written : interviewed;
   const [files, setFiles] = useState<File[]>([]);
   const [consent, setConsent] = useState(false);
   const [stage, setStage] = useState<Stage>("idle");
@@ -258,23 +271,25 @@ export default function BuildMyTwinPage() {
                     role="tab"
                     aria-selected={mode === m}
                     className={mode === m ? "btn sm" : "btn ghost sm"}
-                    onClick={() => { setMode(m); setNotes(""); }}
+                    onClick={() => setMode(m)}
                   >
                     {m === "write" ? "Write it" : "Interview me"}
                   </button>
                 ))}
               </div>
             </div>
-{mode === "interview" ? (
-              <InterviewPanel name={name} role={role} onTranscript={setNotes} />
-            ) : (
+{/* Kept mounted while hidden, so the interview survives a switch. */}
+            <div hidden={mode !== "interview"}>
+              <InterviewPanel name={name} role={role} onTranscript={setInterviewed} />
+            </div>
+            {mode === "write" && (
               <>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "var(--sp-12)", alignItems: "start" }}>
                   <textarea
                     id="notes"
                     style={{ ...fieldStyle, minHeight: 320, resize: "vertical", lineHeight: 1.55 }}
                     value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
+                    onChange={(e) => setWritten(e.target.value)}
                     placeholder="Write freely, in any language. Bullet points are fine."
                   />
                   <div className="card" style={{ padding: "var(--sp-14)", fontSize: "var(--fs-sm)", background: "var(--surface-soft)" }}>
@@ -284,11 +299,16 @@ export default function BuildMyTwinPage() {
                     </ul>
                   </div>
                 </div>
-                <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>
-                  {notesShort ? `${notes.trim().length} / ${MIN_NOTES} characters minimum` : `${notes.trim().length.toLocaleString("en-US")} characters`}
-                </div>
               </>
             )}
+            {/* Both modes: the build needs MIN_NOTES characters of material. */}
+            <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>
+              {notesShort
+                ? mode === "interview"
+                  ? `${notes.trim().length} / ${MIN_NOTES} characters so far: answer a little more to build`
+                  : `${notes.trim().length} / ${MIN_NOTES} characters minimum`
+                : `${notes.trim().length.toLocaleString("en-US")} characters`}
+            </div>
           </div>
           <div>
             <span style={labelStyle}>Documents (optional)</span>

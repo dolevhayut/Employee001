@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findInvite, isInviteRedeemable, revokeInvite } from "@/lib/invites";
+import { purgeAbandonedInviteTwins } from "@/lib/invite-cleanup";
 
 export const runtime = "nodejs";
 
@@ -45,5 +46,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { token } = await params;
   const ok = revokeInvite(token);
   if (!ok) return NextResponse.json({ status: "not_found" }, { status: 404 });
-  return NextResponse.json({ status: "revoked" });
+  // A person who connected a tool before finishing left a folder with live
+  // connections and no consent: remove it with the invite.
+  const purged = await purgeAbandonedInviteTwins();
+  return NextResponse.json({ status: "revoked", purged });
 }

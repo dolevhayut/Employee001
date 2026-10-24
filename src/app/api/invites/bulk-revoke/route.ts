@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bulkRevokeInvites, type BulkRevokeScope } from "@/lib/invites";
+import { purgeAbandonedInviteTwins } from "@/lib/invite-cleanup";
 
 export const runtime = "nodejs";
 
@@ -20,5 +21,6 @@ export async function POST(request: NextRequest) {
     );
   }
   const result = bulkRevokeInvites(scope as BulkRevokeScope);
-  return NextResponse.json(result);
+  const purged = await purgeAbandonedInviteTwins();
+  return NextResponse.json({ ...result, purged });
 }
