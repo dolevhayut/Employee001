@@ -19,6 +19,14 @@ Talking to a twin in Ask is now a conversation instead of record, stop, wait.
   played only after the whole answer was in.
 - Talk over the twin and it stops. If you ask something while it's still
   working, it asks that next.
+- A spoken question gets a spoken "Let me check." right away (about 1.8
+  seconds after you stop talking, in the twin's voice), and a quicker answer:
+  unless it names a connected system or asks for an action, the twin answers
+  from what it already knows without connecting its tools (about 2 seconds
+  saved), with brief thinking and a 2 to 4 sentence spoken style. In our
+  tests the first words of the answer came 6 seconds after you stop talking
+  on average, down from 10. Questions that need a system still get the full
+  run, and the twin says it's looking it up.
 - The twin starts working the moment the question is sent, instead of after
   the orb's opening animation (about 2.5 seconds sooner, typed questions too).
 - Speech recognition is ElevenLabs Scribe v2 Realtime. The browser connects to

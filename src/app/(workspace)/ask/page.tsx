@@ -19,6 +19,8 @@ import MorphOrb, { type MorphOrbHandle } from "@/components/ex/morph-orb/morph-o
 import { useVoiceInput, type VoiceInputError } from "@/components/ex/voice/use-voice-input";
 import { MicButton } from "@/components/ex/voice/mic-button";
 import { LiveSpeaker, playbackContext } from "@/components/ex/voice/live-speaker";
+import { playAck, prepareAcks, type PlayingAck } from "@/components/ex/voice/voice-ack";
+import { VOICE_ANSWER_STYLE, ackPhrase, voiceLane } from "@/lib/voice-lane";
 import { heardSpeech, looksLikeEcho, speakable, takeSentences, twinWordsInTheRoom } from "@/lib/speech-text";
 import { bcp47 } from "@/lib/i18n/format";
 import { describeToolCall, words } from "@/components/ex/morph-orb/tool-nodes";
@@ -147,6 +149,8 @@ async function askTwin(
     text?: (d: string) => void;
   },
   signal?: AbortSignal,
+  /** Asked by voice: the server's voice fast lane and a spoken-answer style. */
+  voice = false,
 ): Promise<string> {
   const res = await fetch("/api/twin/chat", {
     method: "POST",
@@ -157,7 +161,10 @@ async function askTwin(
     body: JSON.stringify({
       employeeId,
       history,
-      question: `${question}\n\n(${ANSWER_STYLE} Reply in ${/[\u0590-\u05FF]/.test(question) ? "Hebrew" : "English"}.)`,
+      question: `${question}\n\n(${voice ? VOICE_ANSWER_STYLE : ANSWER_STYLE} Reply in ${/[\u0590-\u05FF]/.test(question) ? "Hebrew" : "English"}.)`,
+      voice,
+      // Ask doesn't show follow-up chips: don't wait on a model call for them.
+      followups: false,
     }),
   });
   if (!res.ok || !res.body) throw new Error(`chat failed: ${res.status}`);
@@ -451,6 +458,10 @@ function writeVoiceOn(on: boolean) {
 }
 /** Live voice stops listening after this long with nothing said or playing. */
 const LIVE_IDLE_MS = 30_000;
+/** A spoken question is acknowledged this soon after it's sent, unless the
+ *  answer has already started (it can't arrive sooner: the SDK alone takes
+ *  ~0.7s to start). */
+const ACK_AFTER_MS = 300;
 /** How long a voice notice stays over the stage. */
 const HINT_MS = 4_500;
 const linkedTwin = () => new URLSearchParams(window.location.search).get("twin");
@@ -539,6 +550,8 @@ export default function AskPage() {
 
   // The live speaker saying the current answer, sentence by sentence.
   const speakerRef = useRef<LiveSpeaker | null>(null);
+  // "Let me check." playing while the twin works on a spoken question.
+  const ackRef = useRef<PlayingAck | null>(null);
   // The turn spoken live while it streamed, so it isn't spoken again at the end.
   const liveTurnRef = useRef<number | null>(null);
   // Live speech failed to connect once: whole-answer playback for this visit.
@@ -583,6 +596,8 @@ export default function AskPage() {
     const speaker = speakerRef.current;
     speakerRef.current = null;
     speaker?.stop();
+    ackRef.current?.stop();
+    ackRef.current = null;
     setAudio(null);
   };
 
@@ -839,6 +854,22 @@ export default function AskPage() {
       for (const sentence of sentences) speaker.say(speakable(sentence));
       if (final) speaker.finish();
     };
+    // A spoken question gets an immediate "Let me check." while the twin
+    // works, unless the answer has already started by then.
+    const ackTimer =
+      viaVoice && speaker
+        ? window.setTimeout(() => {
+            if (speakerRef.current !== speaker || speaker.spoken || signal.aborted) return;
+            const phrase = ackPhrase(question, voiceLane(question));
+            const ack = playAck(twin.ttsVoiceId, phrase, () => {
+              if (ackRef.current === ack) ackRef.current = null;
+            });
+            if (!ack) return;
+            ackRef.current = ack;
+            speaker.after(ack.endsAt, phrase);
+            setAudio({ id, status: "playing" });
+          }, ACK_AFTER_MS)
+        : undefined;
     // Escaped before the answer was shown: stop the run, its voice and the queue.
     const onAbort = () => {
       if (speakerRef.current === speaker) stopAudio();
@@ -867,12 +898,13 @@ export default function AskPage() {
             })),
           thinking: (d) => patchTurn(id, (turn) => ({ ...turn, thinking: turn.thinking + d })),
           text: (d) => sayStreamed(d),
-        }, signal)) || t("ask.empty");
+        }, signal, viaVoice)) || t("ask.empty");
       answer = tidyCites(answer);
     } catch {
       answer = signal.aborted ? t("ask.stopped") : t("ask.error");
     } finally {
       signal.removeEventListener("abort", onAbort);
+      window.clearTimeout(ackTimer);
     }
     if (!signal.aborted) sayStreamed("", true);
     patchTurn(id, (turn) => ({ ...turn, answer }));
@@ -898,7 +930,7 @@ export default function AskPage() {
     // Barge-in: the person talking over the twin stops it at once. Only once
     // it's actually talking: words said while it thinks are queued instead.
     onPartial: (text) => {
-      if (!speakerRef.current?.playing && !audioRef.current) return;
+      if (!speakerRef.current?.playing && !audioRef.current && !ackRef.current) return;
       if (!heardSpeech(text) || looksLikeEcho(text, echoSource())) return;
       stopAudio();
     },
@@ -954,6 +986,11 @@ export default function AskPage() {
     voiceStateRef.current = voice.state;
     liveEngineRef.current = voice.engine === "live";
   }, [voice.state, voice.engine]);
+  // Have the twin's "Let me check." ready before the first spoken question.
+  const ackVoice = twin?.ttsVoiceId;
+  useEffect(() => {
+    if (voice.engine === "live" && voice.state !== "idle") prepareAcks(ackVoice);
+  }, [voice.engine, voice.state, ackVoice]);
   // Live voice listens across questions; it lets go after a quiet spell with
   // nothing said, nothing being answered and nothing playing.
   const live = voice.engine === "live";

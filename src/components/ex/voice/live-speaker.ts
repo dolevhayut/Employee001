@@ -52,6 +52,7 @@ export class LiveSpeaker {
   private ws: WebSocket | null = null;
   private voiceId = "";
   private queue: string[] = [];
+  private sentences = 0;
   private finished = false;
   private gotFinal = false;
   private stopped = false;
@@ -76,15 +77,23 @@ export class LiveSpeaker {
     const text = sentence.trim();
     if (!text || this.stopped || this.finished) return;
     this.spoken += (this.spoken ? " " : "") + text;
+    this.sentences++;
     if (this.ws?.readyState === WebSocket.OPEN) this.sendText(text);
     else this.queue.push(text);
+  }
+
+  /** Something else is being said first (the acknowledgment): start no
+   *  earlier than `ctxTime`, and count `text` as said, for the echo check. */
+  after(ctxTime: number, text: string) {
+    this.nextAt = Math.max(this.nextAt, ctxTime);
+    this.spoken = text + (this.spoken ? " " + this.spoken : "");
   }
 
   /** No more sentences: say what's left, then end. */
   finish() {
     if (this.finished || this.stopped) return;
     this.finished = true;
-    if (!this.spoken) return this.stop();
+    if (!this.sentences) return this.stop();
     clearTimeout(this.deadline);
     this.deadline = setTimeout(() => this.stop(), FINISH_TIMEOUT_MS);
     if (this.ws?.readyState === WebSocket.OPEN && this.queue.length === 0) this.ws.send(JSON.stringify({ close_socket: true }));

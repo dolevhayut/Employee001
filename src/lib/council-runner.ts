@@ -8,6 +8,7 @@ import type {
 import type { EmployeeWithTwin } from "@/lib/employees";
 import { buildEmployeeMcpServer } from "@/lib/composio-client";
 import { loadOrgCustomMcpServers } from "@/lib/custom-mcp";
+import { voiceLane } from "@/lib/voice-lane";
 import {
   buildArtifactsMcpServer,
   ARTIFACT_TOOL_FULL_NAME,
@@ -661,6 +662,14 @@ export type RunOptions = {
   /** The signed-in user who asked (audit requesterId), when there is one. */
   requesterId?: string;
   /**
+   * The question was spoken (live voice on Ask) and the answer will be too:
+   * brief thinking (low effort, no extended thinking), and unless the
+   * question needs a connected system (voice-lane.ts), no Composio or org
+   * MCP servers, which take ~2s to connect. Only removes tools; every guard
+   * (consent, approvals, read scope, disclosure, retired rules) is unchanged.
+   */
+  voice?: boolean;
+  /**
    * When set, registers the twin-to-twin consultation MCP server for this run
    * so the twin can consult / request approval from peers. Threaded one hop
    * deeper on each consultation; the shared `visited` set + depth cap inside
@@ -839,6 +848,8 @@ export async function runSingleTwin(
 ): Promise<string> {
   const start = Date.now();
   const ts = () => Date.now() - start;
+  // E001_TIMING=1 logs where a run's time goes, phase by phase.
+  const mark = process.env.E001_TIMING === "1" ? (phase: string) => console.log(`[twin-timing] ${phase} +${ts()}ms`) : () => {};
   const runId = options.runId ?? `run_${employee.id}_${Date.now()}`;
   // The record on disk decides, not the caller: a retired twin always runs
   // without tools, whichever surface asked it.
@@ -906,7 +917,8 @@ export async function runSingleTwin(
     // Retired twins get the same lock-down as an unattended public reply.
     const publicReply = options.publicReply === true || retired;
     const consultMode = options.consultMode === true || publicReply;
-    const [composioMcp, orgMcpServers] = consultMode
+    const voiceFastLane = options.voice === true && voiceLane(question).fast;
+    const [composioMcp, orgMcpServers] = consultMode || voiceFastLane
       ? [null, {} as Awaited<ReturnType<typeof loadOrgCustomMcpServers>>]
       : await Promise.all([
           buildEmployeeMcpServer(employee.id).catch((err) => {
@@ -977,6 +989,7 @@ export async function runSingleTwin(
         : {}),
     };
     const hasMcp = Object.keys(mcpServers).length > 0;
+    mark(voiceFastLane ? "tools (voice fast lane: local only)" : "tools (Composio + org MCP)");
 
     let memoryBlock = "";
     if (!publicReply) try {
@@ -995,6 +1008,7 @@ export async function runSingleTwin(
       const message = err instanceof Error ? err.message : "Unknown error";
       console.warn(`[twin-memory] search skipped: ${message}`);
     }
+    mark("memory search");
 
     let orgSkillsBlock = "";
     let orgSkillHits: OrgSkillHit[] = [];
@@ -1054,6 +1068,7 @@ export async function runSingleTwin(
       const message = err instanceof Error ? err.message : "Unknown error";
       console.warn(`[goals] load skipped: ${message}`);
     }
+    mark("skills, brain, goals");
 
     const surface: "chat" | "meeting" | "routine" =
       options.context?.type === "routine"
@@ -1078,6 +1093,7 @@ export async function runSingleTwin(
       const message = err instanceof Error ? err.message : "Unknown error";
       console.warn(`[intent-planner] skipped: ${message}`);
     }
+    mark("intent planner");
 
     // Tool-policy gate: pause the agent when a write/external tool fires
     const policyOverrides = await getToolPolicyOverrides(employee.id).catch(() => undefined);
@@ -1232,13 +1248,17 @@ export async function runSingleTwin(
       };
     };
 
-    const baseOptions = buildBaseOptions({
-      surface,
-      abortController: options.abortController,
-      runId,
-      employeeId: employee.id,
-      modelOverride: options.modelOverride,
-    });
+    const baseOptions = {
+      ...buildBaseOptions({
+        surface,
+        abortController: options.abortController,
+        runId,
+        employeeId: employee.id,
+        modelOverride: options.modelOverride,
+      }),
+      // A spoken answer: the first words matter more than depth.
+      ...(options.voice ? { effort: "low" as const, thinking: { type: "disabled" as const } } : {}),
+    };
 
     const hooks = buildTwinHooks({
       runId,
@@ -1331,10 +1351,14 @@ export async function runSingleTwin(
       },
     });
 
+    mark("query() started");
+    let firstThinking = true;
+    let firstText = true;
     for await (const message of stream) {
       // First system/init carries the session id — emit so caller can persist
       // it and pass `resumeSessionId` on the next turn.
       if (message.type === "system" && (message as { subtype?: string }).subtype === "init") {
+        mark("SDK ready (system init)");
         const sid = (message as { session_id?: string }).session_id;
         if (sid) {
           onEvent({
@@ -1353,6 +1377,8 @@ export async function runSingleTwin(
         if (event.type === "content_block_delta") {
           const delta = event.delta;
           if (delta.type === "text_delta" && delta.text) {
+            if (firstText) mark("first text token");
+            firstText = false;
             finalText += delta.text;
             onEvent({
               type: "text_delta",
@@ -1362,6 +1388,8 @@ export async function runSingleTwin(
             });
           } else if (delta.type === "thinking_delta") {
             // Extended-thinking deltas — adaptive thinking is on by default.
+            if (firstThinking) mark("first thinking token");
+            firstThinking = false;
             const thinkingText =
               (delta as { thinking?: string }).thinking ?? "";
             if (thinkingText) {
@@ -1382,6 +1410,7 @@ export async function runSingleTwin(
         const content = message.message.content;
         for (const block of content) {
           if (block.type === "tool_use") {
+            mark(`tool call ${block.name}`);
             toolUseCount++;
             // Track files Read
             const input = block.input as Record<string, unknown>;

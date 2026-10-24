@@ -39,6 +39,10 @@ export async function POST(request: NextRequest) {
     employeeId?: string;
     history?: ConversationTurn[];
     sessionId?: string;
+    /** Asked by voice: the voice fast lane (council-runner RunOptions.voice). */
+    voice?: boolean;
+    /** False skips the follow-up suggestions (a model call after the answer). */
+    followups?: boolean;
   };
 
   const question = body.question?.trim() ?? "";
@@ -309,7 +313,11 @@ export async function POST(request: NextRequest) {
           question,
           onEvent,
           useResume ? [] : body.history ?? [],
-          { resumeSessionId: useResume ? body.sessionId : undefined, requesterId: sessionUserFromHeaders(request.headers)?.id }
+          {
+            resumeSessionId: useResume ? body.sessionId : undefined,
+            requesterId: sessionUserFromHeaders(request.headers)?.id,
+            voice: body.voice === true,
+          }
         );
 
         // After the main answer finished streaming, emit 3 follow-up
@@ -324,7 +332,7 @@ export async function POST(request: NextRequest) {
         const trimmed = responseText.trim();
         const tail = trimmed.slice(-300);
         const twinAskedAQuestion = tail.includes("?") || tail.includes("؟");
-        if (trimmed.length > 0 && !twinAskedAQuestion) {
+        if (body.followups !== false && trimmed.length > 0 && !twinAskedAQuestion) {
           const suggestions = await generateFollowups({
             question,
             answer: responseText,
