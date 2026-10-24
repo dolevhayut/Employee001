@@ -238,3 +238,29 @@ describe("read-only detection", () => {
     }
   });
 });
+
+describe("read classification by action, not toolkit prefix", () => {
+  const allowAll = { readAllowlist: { ...NONE, composioToolkits: ["share_point", "outlook", "slack", "gmail", "microsoft_teams", "googledrive"] } };
+  it.each([
+    "SHARE_POINT_SEARCH_FILES",
+    "SHARE_POINT_LIST_SITES",
+    "OUTLOOK_QUERY_EMAILS",
+    "OUTLOOK_LIST_MESSAGES",
+    "MICROSOFT_TEAMS_TEAMS_LIST",
+    "MICROSOFT_TEAMS_TEAMS_LIST_CHANNELS",
+    "SLACK_WHO_AM_I",
+    "GMAIL_WHO_AM_I",
+    "GOOGLEDRIVE_DOWNLOAD_FILE",
+    "GOOGLEDRIVE_EXPORT_GOOGLE_WORKSPACE_FILE",
+  ])("%s is a read, allowed when its toolkit is allowlisted", (tool) => {
+    expect(isReadOnlyAction(tool)).toBe(true);
+    expect(classifyTool(`mcp__composio__${tool}`, {}, undefined, allowAll).kind).toBe("allow");
+    expect(classifyTool(`mcp__composio__${tool}`, {}, undefined, {}).kind).toBe("ask");
+  });
+
+  it.each(["SHARE_POINT_UPLOAD_FILE", "SHARE_POINT_SHARE_FILE", "GMAIL_MARK_AS_READ", "SLACK_ADD_REACTION_TO_AN_ITEM", "OUTLOOK_REPLY_EMAIL", "MICROSOFT_TEAMS_TEAMS_POST_CHANNEL_MESSAGE"])("%s is not a read", (tool) => {
+    expect(isReadOnlyAction(tool)).toBe(false);
+    expect(classifyTool(`mcp__composio__${tool}`, {}, undefined, allowAll).kind).not.toBe("allow");
+  });
+});
+

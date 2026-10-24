@@ -158,7 +158,17 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
   };
 
   const TWIN_FILE_SET = new Set<string>(TWIN_FILE_NAMES);
-  const expectedDir = path.resolve(employeeDir);
+  // Compare resolved paths: the data folder may sit behind a symlink (macOS
+  // /tmp, a moved home), and the model may write either spelling. Resolving
+  // the parent also stops a symlink inside the folder from pointing out of it.
+  const real = (p: string) => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  const expectedDir = real(employeeDir);
 
   // Tool gate: sandbox Write to {employeeDir}/{KNOWN_NAME}.md, allow read-only
   // Composio/org tools, deny any external write the agent attempts.
@@ -173,7 +183,8 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
         typeof typedInput.file_path === "string"
           ? (typedInput.file_path as string)
           : "";
-      const abs = path.resolve(employeeDir, file);
+      const resolved = path.resolve(employeeDir, file);
+      const abs = path.join(real(path.dirname(resolved)), path.basename(resolved));
       const filename = path.basename(abs);
 
       if (!abs.startsWith(expectedDir + path.sep) && abs !== expectedDir) {
@@ -236,7 +247,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
     const reason =
       decision.kind === "block"
         ? decision.reason
-        : `Twin builder is read-only — ${toolName} blocked. Use *_GET_* / *_LIST_* / *_SEARCH_* / *_FETCH_* / *_RETRIEVE_* / *_FIND_* / *_READ_* tools to gather evidence.`;
+        : `Twin builder is read-only — ${toolName} blocked. Use read actions (GET, LIST, SEARCH, FETCH, QUERY, FIND, READ, RETRIEVE, DOWNLOAD, EXPORT) to gather evidence.`;
     onEvent({ type: "tool_blocked", tool: toolName, reason, ts: ts() });
     return { behavior: "deny", message: reason };
   };

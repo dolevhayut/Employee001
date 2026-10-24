@@ -49,12 +49,38 @@ const HARD_BLOCK_PATTERNS: RegExp[] = [
 const READ_ONLY_PATTERNS: RegExp[] = [
   // Composio style (GITHUB_LIST_ISSUES) and MCP style (get_company,
   // find_projects): a read verb at the start or after a toolkit prefix.
-  /(?:^|_)(?:GET|LIST|SEARCH|FETCH|RETRIEVE|READ|FIND)_/i,
+  // The verb may also end the name (MICROSOFT_TEAMS_TEAMS_LIST).
+  /(?:^|_)(?:GET|LIST|SEARCH|FETCH|RETRIEVE|READ|FIND|QUERY|DOWNLOAD|EXPORT)(?:_|$)/i,
+  // Identity lookups (SLACK_WHO_AM_I, GMAIL_WHO_AM_I).
+  /(?:^|_)WHO_AM_I$/i,
 ];
+
+/** Composio toolkits whose slug prefix is two words. Their prefix is not a
+ *  verb: "SHARE" in SHARE_POINT_SEARCH_FILES is the app, not a share action. */
+const MULTI_WORD_TOOLKITS = ["SHARE_POINT", "MICROSOFT_TEAMS", "ONE_DRIVE", "GOOGLE_DRIVE", "GOOGLE_SHEETS", "GOOGLE_DOCS", "GOOGLE_CALENDAR", "GOOGLE_MEET", "ZOHO_CRM", "AZURE_DEVOPS"];
+
+/** The toolkit a Composio action belongs to ("share_point", "gmail"). */
+function toolkitOf(name: string): string {
+  const upper = name.toUpperCase();
+  const multi = MULTI_WORD_TOOLKITS.find((t) => upper.startsWith(`${t}_`));
+  return (multi ?? name.split("_")[0] ?? "").toLowerCase();
+}
+
+/** The action part of a name, without a multi-word toolkit prefix. */
+function actionOf(name: string): string {
+  const upper = name.toUpperCase();
+  const multi = MULTI_WORD_TOOLKITS.find((t) => upper.startsWith(`${t}_`));
+  return multi ? name.slice(multi.length + 1) : name;
+}
+
+const isPureRead = (name: string) => {
+  const action = actionOf(name);
+  return READ_ONLY_PATTERNS.some((re) => re.test(action)) && !MUTATING_SEGMENT.test(action);
+};
 
 /** A mutating verb anywhere in the name ("get_or_create_ticket") means it is
  *  not a pure read, whatever verb comes first. */
-const MUTATING_SEGMENT = /(?:^|_)(?:CREATE|UPDATE|SEND|POST|REPLY|EDIT|MODIFY|PATCH|MERGE|CLOSE|REOPEN|ASSIGN|TRANSFER|DELETE|REMOVE|WRITE|UPSERT|INSERT|SET|ADD|MOVE|INVITE|SHARE|PUBLISH|SUBMIT|APPROVE|ARCHIVE)(?:_|$)/i;
+const MUTATING_SEGMENT = /(?:^|_)(?:CREATE|UPDATE|SEND|POST|REPLY|EDIT|MODIFY|PATCH|MERGE|CLOSE|REOPEN|ASSIGN|TRANSFER|DELETE|REMOVE|WRITE|UPSERT|INSERT|SET|ADD|MOVE|INVITE|SHARE|PUBLISH|SUBMIT|APPROVE|ARCHIVE|MARK|STAR|LABEL|TAG|PIN|REACT|SNOOZE|MUTE)(?:_|$)/i;
 
 /** Local sandbox tools the SDK exposes for agent-internal use only. */
 const LOCAL_SAFE_TOOLS = new Set([
@@ -98,7 +124,7 @@ const ALWAYS_BLOCKED_TOOLS = new Set([
 export function isReadOnlyAction(toolName: string): boolean {
   const name = bareName(toolName);
   if (readActionPrecedesBlockedTerm(name)) return false;
-  return READ_ONLY_PATTERNS.some((re) => re.test(name)) && !MUTATING_SEGMENT.test(name);
+  return isPureRead(name);
 }
 
 function mcpServerOf(toolName: string): string | undefined {
@@ -111,7 +137,7 @@ function readSourceAllowed(original: string, name: string, allow: ReadAllowlist 
   if (server && INTERNAL_MCP_SERVERS.has(server)) return true;
   if (!allow) return false;
   if (server && server !== "composio") return allow.servers.some((s) => s.toLowerCase() === server);
-  const toolkit = name.split("_")[0]?.toLowerCase() ?? "";
+  const toolkit = toolkitOf(name);
   return allow.composioToolkits.some((t) => t.toLowerCase() === toolkit);
 }
 
@@ -143,7 +169,7 @@ function bareName(toolName: string): string {
 function readActionPrecedesBlockedTerm(name: string): boolean {
   const parts = name.split("_");
   const readIndex = parts.findIndex((part) =>
-    ["GET", "LIST", "SEARCH", "FETCH", "RETRIEVE", "READ", "FIND"].includes(
+    ["GET", "LIST", "SEARCH", "FETCH", "RETRIEVE", "READ", "FIND", "QUERY", "DOWNLOAD", "EXPORT"].includes(
       part.toUpperCase(),
     ),
   );
@@ -258,12 +284,12 @@ export function classifyTool(
 
   // Reads: auto only from an internal or admin-allowlisted source, because
   // the call sends query content to that provider.
-  if (READ_ONLY_PATTERNS.some((re) => re.test(name)) && !MUTATING_SEGMENT.test(name)) {
+  if (isPureRead(name)) {
     if (readSourceAllowed(original, name, ctx.readAllowlist)) return { kind: "allow" };
     const source = mcpServerOf(original) ?? "an external service";
     return {
       kind: "ask",
-      reason: `${name} sends query content to ${source === "composio" ? `${name.split("_")[0]} (via Composio)` : source}. An admin can allowlist this source in Settings.`,
+      reason: `${name} sends query content to ${source === "composio" ? `${toolkitOf(name)} (via Composio)` : source}. An admin can allowlist this source in Settings.`,
     };
   }
 
