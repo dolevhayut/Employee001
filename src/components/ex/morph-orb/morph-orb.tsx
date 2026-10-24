@@ -691,6 +691,11 @@ function createRuntime(env: Env): Runtime {
       await play(tracks, sig);
       if (sig.aborted) throw ABORT;
     };
+    // Ask right away: the twin works while the orb launches, instead of after
+    // (the launch alone is ~2.5s). The answer still waits for the animation.
+    const pending = Promise.resolve()
+      .then(() => cfg.onSubmit(text))
+      .then((b) => (typeof b === "string" && b.trim() ? b : COPY.answerBody), () => COPY.answerBody);
     try {
       env.ui.setPhase("launch");
       hist.length = 0;
@@ -713,9 +718,6 @@ function createRuntime(env: Env): Runtime {
       const ctl = { stop: false };
       void labelLoop(sig, ctl);
       const t0 = performance.now();
-      const pending = Promise.resolve()
-        .then(() => cfg.onSubmit(text))
-        .then((b) => (typeof b === "string" && b.trim() ? b : COPY.answerBody), () => COPY.answerBody);
       const got = await abortable(pending, sig);
       if (sig.aborted) throw ABORT;
       const body = got ?? COPY.answerBody;

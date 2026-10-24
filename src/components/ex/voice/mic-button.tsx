@@ -2,7 +2,8 @@
 
 // The mic in the orb's input pill. Same 38px round shape as the send button;
 // while listening it fills with the accent and a halo breathes with the live
-// input level, so the CEO sees the twin is hearing them.
+// input level, so the CEO sees the twin is hearing them. A spinner while live
+// voice connects (press to cancel) or a clip is transcribed.
 
 import { motion, useTransform, type MotionValue } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
@@ -64,7 +65,7 @@ export function MicButton({
         />
       )}
       <span style={{ position: "relative", display: "grid", placeItems: "center" }}>
-        {state === "transcribing" ? (
+        {state === "transcribing" || state === "connecting" ? (
           <Icons.Loader size={16} />
         ) : listening ? (
           // live level as three bars, like the voice memo meter

@@ -1,10 +1,15 @@
 "use client";
 
-// Voice input: press to talk, press again (or pause) to stop, get the words.
-// With an ElevenLabs key on the server the clip is recorded here and
-// transcribed by POST /api/stt (Scribe); without one it falls back to the
-// browser's own Web Speech recognition. Either way a live input level is
-// exposed as a MotionValue, so the meter animates without re-rendering.
+// Voice input: press to talk, get the words. Three engines, best first:
+//   - live: the mic streams to ElevenLabs Scribe v2 Realtime (token from
+//     POST /api/stt/token). The words show while the person talks, each pause
+//     sends one question, and the mic stays open for the next one (and for
+//     talking over the twin) until it's pressed again.
+//   - elevenlabs: the clip is recorded here and transcribed by POST /api/stt.
+//     Also the fallback when live can't connect.
+//   - browser: the browser's own Web Speech recognition, without a key.
+// Every engine exposes the input level as a MotionValue, so the meter
+// animates without re-rendering.
 //
 // Ported from "Speech Input" (vercel-crawled, 21st.dev id 28387), with the
 // order flipped (server STT first) and end-of-speech detection added.
@@ -12,10 +17,13 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useMotionValue, type MotionValue } from "framer-motion";
 import { silenceStart, silenceStep, MAX_RECORD_MS, STT_MIN_BYTES, type SilenceState } from "@/lib/stt";
+import { heardSpeech } from "@/lib/speech-text";
+import { canStreamMic, startLiveTranscriber, type LiveTranscriber } from "./live-transcriber";
 
-export type VoiceInputState = "idle" | "listening" | "transcribing";
-export type VoiceEngine = "elevenlabs" | "browser" | "none";
-export type VoiceInputError = "denied" | "unsupported" | "stt" | "no_speech";
+export type VoiceInputState = "idle" | "connecting" | "listening" | "transcribing";
+export type VoiceEngine = "live" | "elevenlabs" | "browser" | "none";
+/** `live_lost`: a live session that was working closed on its own. */
+export type VoiceInputError = "denied" | "unsupported" | "stt" | "no_speech" | "live_lost";
 
 /* Web Speech types, local so they never clash with other declarations. */
 type RecognitionAlternative = { transcript: string };
@@ -46,7 +54,7 @@ const canRecord = () =>
 // Browser support is a constant client fact: read it through a store so SSR
 // renders "none" and the client resolves it on hydration.
 const noop = () => () => {};
-const supportSnapshot = () => `${canRecord() ? "r" : ""}${recognitionCtor() ? "s" : ""}`;
+const supportSnapshot = () => `${canRecord() ? "r" : ""}${recognitionCtor() ? "s" : ""}${canStreamMic() ? "w" : ""}`;
 
 const RECORDER_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
 const pickRecorderType = () => RECORDER_TYPES.find((t) => MediaRecorder.isTypeSupported?.(t)) ?? "";
@@ -119,16 +127,24 @@ function startMeter(
 export function useVoiceInput(opts: {
   /** True when the server has an ElevenLabs key (POST /api/stt works). */
   serverStt: boolean;
+  /** True when live voice is on (POST /api/stt/token works). */
+  liveStt?: boolean;
   /** False when voice is off on this install: no browser fallback either. */
   allowBrowser?: boolean;
   /** BCP-47 tag for the browser fallback (e.g. "he-IL"). */
   lang: string;
   onTranscript: (text: string) => void;
+  /** Live only: the words so far, while the person is still talking. */
+  onPartial?: (text: string) => void;
   onError?: (err: VoiceInputError) => void;
 }) {
   const support = useSyncExternalStore(noop, supportSnapshot, () => "");
+  // Live couldn't connect once: record-then-transcribe for the rest of the visit.
+  const [liveBroken, setLiveBroken] = useState(false);
   const engine: VoiceEngine =
-    opts.serverStt && support.includes("r")
+    opts.liveStt && !liveBroken && support.includes("w")
+      ? "live"
+      : opts.serverStt && support.includes("r")
       ? "elevenlabs"
       : opts.allowBrowser !== false && support.includes("s")
         ? "browser"
@@ -147,6 +163,7 @@ export function useVoiceInput(opts: {
   const meterRef = useRef<Meter | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recognitionRef = useRef<Recognition | null>(null);
+  const liveRef = useRef<LiveTranscriber | null>(null);
   const discardRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   // Made in the click gesture by start(), handed to the meter once the mic is open.
@@ -172,6 +189,7 @@ export function useVoiceInput(opts: {
   const stop = useCallback(() => {
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();
     recognitionRef.current?.stop();
+    liveRef.current?.finish();
   }, []);
 
   /** Stop listening and throw away whatever was heard. */
@@ -182,6 +200,8 @@ export function useVoiceInput(opts: {
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();
     recognitionRef.current?.abort();
     recognitionRef.current = null;
+    liveRef.current?.close();
+    liveRef.current = null;
     release();
     setInterim("");
     setState("idle");
@@ -277,6 +297,76 @@ export function useVoiceInput(opts: {
     }, MAX_RECORD_MS);
   }, [cancel, level, release, stop, transcribe]);
 
+  const startLive = useCallback(async () => {
+    // Live couldn't start: say so, and fall back for the rest of the visit.
+    const unavailable = () => {
+      release();
+      setState("idle");
+      setLiveBroken(true);
+      optsRef.current.onError?.("stt");
+    };
+    let url: string;
+    try {
+      const res = await fetch("/api/stt/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      if (!res.ok) throw new Error(`stt token ${res.status}`);
+      url = ((await res.json()) as { url: string }).url;
+    } catch {
+      if (!discardRef.current) unavailable();
+      return;
+    }
+    if (discardRef.current) return release();
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    } catch {
+      release();
+      setState("idle");
+      optsRef.current.onError?.("denied");
+      return;
+    }
+    if (discardRef.current) {
+      stream.getTracks().forEach((t) => t.stop());
+      return release();
+    }
+    streamRef.current = stream;
+    const ctx = ctxRef.current;
+    ctxRef.current = null; // the meter owns it now
+    if (!ctx) return unavailable();
+    meterRef.current = startMeter(stream, level, ctx);
+    let ready = false;
+    try {
+      const session = await startLiveTranscriber(url, ctx, stream, {
+        ready: () => {
+          ready = true;
+          setState("listening");
+        },
+        // NFKC: Scribe sometimes returns full-width punctuation ("？", "，").
+        partial: (text) => {
+          setInterim(text.normalize("NFKC"));
+          optsRef.current.onPartial?.(text);
+        },
+        commit: (text) => {
+          setInterim("");
+          const said = text.normalize("NFKC").replace(/\s+/g, " ").trim();
+          if (said && heardSpeech(said)) optsRef.current.onTranscript(said);
+        },
+        closed: (failed) => {
+          if (liveRef.current === session) liveRef.current = null;
+          release();
+          setInterim("");
+          setState("idle");
+          if (!failed || discardRef.current) return;
+          if (ready) optsRef.current.onError?.("live_lost");
+          else unavailable();
+        },
+      });
+      if (discardRef.current) return session.close();
+      liveRef.current = session;
+    } catch {
+      if (!discardRef.current) unavailable();
+    }
+  }, [level, release]);
+
   const startRecognition = useCallback(async () => {
     const Ctor = recognitionCtor();
     if (!Ctor) return;
@@ -350,16 +440,19 @@ export function useVoiceInput(opts: {
       if (ctxRef.current) void ctxRef.current.close().catch(() => {});
       ctxRef.current = openAudioContext();
     }
-    if (engine === "elevenlabs") {
+    if (engine === "live") {
+      setState("connecting");
+      void startLive();
+    } else if (engine === "elevenlabs") {
       setState("listening");
       void startRecording();
     } else if (engine === "browser") void startRecognition();
     else optsRef.current.onError?.("unsupported");
-  }, [engine, state, startRecognition, startRecording]);
+  }, [engine, state, startLive, startRecognition, startRecording]);
 
   const toggle = useCallback(() => {
     if (state === "listening") stop();
-    else if (state === "transcribing") cancel();
+    else if (state === "transcribing" || state === "connecting") cancel();
     else start();
   }, [cancel, start, state, stop]);
 
@@ -370,6 +463,7 @@ export function useVoiceInput(opts: {
       abortRef.current?.abort();
       if (recorderRef.current?.state === "recording") recorderRef.current.stop();
       recognitionRef.current?.abort();
+      liveRef.current?.close();
       window.clearTimeout(capRef.current);
       void ctxRef.current?.close().catch(() => {});
       meterRef.current?.stop();

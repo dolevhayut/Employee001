@@ -1,0 +1,27 @@
+import { NextRequest } from "next/server";
+import { liveTokenRefusal, liveVoiceId, mintSingleUseToken, ttsLiveUrl } from "@/lib/voice-live";
+
+// POST /api/tts/token — opens live spoken answers on Ask. Returns the Text to
+// Dialogue WebSocket URL (Eleven v4 Turbo, 24 kHz PCM) with a single-use token
+// in it, and the voice to register on it: the twin's own when given, else the
+// install's default. The browser sends the answer there sentence by sentence
+// as the twin writes it. The API key stays here.
+// Body: { voiceId?: string }
+
+export const runtime = "nodejs";
+
+export async function POST(request: NextRequest) {
+  const refusal = liveTokenRefusal();
+  if (refusal) return Response.json({ error: refusal.error }, { status: refusal.status });
+
+  const body = (await request.json().catch(() => ({}))) as { voiceId?: unknown };
+  let token: string | null;
+  try {
+    token = await mintSingleUseToken("ttd_websocket", request.signal);
+  } catch (err) {
+    console.error("[tts/token] ElevenLabs unreachable", err instanceof Error ? err.message : err);
+    return Response.json({ error: "Text to speech is unreachable" }, { status: 502 });
+  }
+  if (!token) return Response.json({ error: "Text to speech refused the token request" }, { status: 502 });
+  return Response.json({ url: ttsLiveUrl(token), voiceId: liveVoiceId(body?.voiceId) }, { headers: { "Cache-Control": "no-store" } });
+}

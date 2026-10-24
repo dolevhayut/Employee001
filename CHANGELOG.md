@@ -8,6 +8,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Live voice in Ask
+Talking to a twin in Ask is now a conversation instead of record, stop, wait.
+
+- Press the mic once and just talk. Your words show in the input as you say
+  them, and when you pause the question is sent. The mic stays open for the
+  next question until you press it again, or after 30 seconds of quiet.
+- The answer is spoken while the twin is still writing it, sentence by
+  sentence, in the twin's own voice (ElevenLabs Eleven v4 Turbo). Before, it
+  played only after the whole answer was in.
+- Talk over the twin and it stops. If you ask something while it's still
+  working, it asks that next.
+- The twin starts working the moment the question is sent, instead of after
+  the orb's opening animation (about 2.5 seconds sooner, typed questions too).
+- Speech recognition is ElevenLabs Scribe v2 Realtime. The browser connects to
+  ElevenLabs with single-use tokens from two new routes (`/api/stt/token`,
+  `/api/tts/token`); the API key stays on the server. The twin itself still
+  runs on your machine: ElevenLabs only turns speech into text and text into
+  speech.
+- Unchanged: answers to typed questions are read aloud only with "Voice on".
+  Voice stays off with `EMPLOYEE001_VOICE=off`, and live voice is off in EU
+  mode. `EMPLOYEE001_VOICE_LIVE=off` goes back to record-then-transcribe. If
+  live voice can't connect, Ask falls back to it on its own.
+
 ### Relay: when someone leaves, their knowledge stays
 Relay (`/handover`) is no longer a demo. When an employee is leaving:
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { voiceAllowed, voiceEnabled } from "@/lib/data-residency";
+import { liveVoiceEnabled } from "@/lib/voice-live";
 import fs from "fs";
 import { envFilePath } from "@/lib/app-home";
 import { canRunModel, currentProvider, providerLabel, type ModelProvider } from "@/lib/model-provider";
@@ -21,6 +22,8 @@ export type SystemConfigStatus = {
   voice: boolean;
   /** Any voice, the browser's speech-recognition fallback included. */
   voiceAllowed: boolean;
+  /** Live voice on Ask (Scribe v2 Realtime in, Eleven v4 Turbo out). */
+  voiceLive: boolean;
   /** The configured model provider and whether it can run a model. Twin
    *  building runs on it, so non-Anthropic installs need no Anthropic key. */
   modelProvider: ModelProvider;
@@ -51,6 +54,7 @@ export async function GET() {
     elevenLabs,
     voice: voiceEnabled(),
     voiceAllowed: voiceAllowed(),
+    voiceLive: liveVoiceEnabled(),
     modelProvider,
     modelProviderLabel: providerLabel(modelProvider),
     modelReady: model.ok,
