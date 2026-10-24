@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { DEMO_ASK_FALLBACK } from "@/lib/demo-ask-recording";
+import { isDemoReplay } from "@/lib/demo-replay";
 import { canRunModel } from "@/lib/model-provider";
 import { briefFrom, briefFromOrgBrain, briefFromSystems, pickTwins, readyTwins, synthesize } from "@/lib/org-ask";
 
@@ -16,6 +18,7 @@ export async function POST(req: NextRequest) {
     // fall through to the 400
   }
   if (!question) return Response.json({ error: "question is required" }, { status: 400 });
+  if (isDemoReplay()) return demoAnswer();
   const modelRun = canRunModel();
   if (!modelRun.ok) return Response.json({ error: modelRun.reason }, { status: 500 });
 
@@ -64,6 +67,20 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" },
+  });
+}
+
+function demoAnswer() {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "answer_delta", delta: DEMO_ASK_FALLBACK })}\n\n`));
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
+      controller.close();
+    },
+  });
   return new Response(stream, {
     headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" },
   });

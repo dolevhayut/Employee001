@@ -59,7 +59,7 @@ export function parseAskRecording(input: unknown): DemoAskRecording {
 
 /** What anything outside the recording gets in the demo, instead of a model call. */
 export const DEMO_ASK_FALLBACK =
-  "In the demo, try one of the suggested questions, or run `npx employee001 demo --live` with a key to ask your own.";
+  "In the demo, try one of the suggested questions, or run `npx employee001 demo --live` with a key to ask your own, or `npx employee001` in an empty folder to set up your own team.";
 
 /**
  * A question as the person meant it: Ask appends an answer-style note after a

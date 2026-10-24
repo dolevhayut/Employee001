@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useRef, useEffect, useMemo, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Database as DatabaseIcon,
   Page as FileTextIcon,
@@ -1887,8 +1887,10 @@ function CouncilPageInner() {
   // a client-side navigation to this same, already-mounted page.
   const rawQ = searchParams.get("q");
   const prefill = rawQ && rawQ.length <= 500 ? rawQ : "";
+  const sendPrefill = searchParams.get("send") === "1";
   const [input, setInput] = useState(prefill);
   const [appliedPrefill, setAppliedPrefill] = useState(prefill);
+  const sentPrefills = useRef(new Set<string>());
   if (prefill !== appliedPrefill) {
     setAppliedPrefill(prefill);
     if (prefill) setInput(prefill);
@@ -2100,6 +2102,22 @@ function CouncilPageInner() {
 
     scrollToBottom();
   }
+
+  const router = useRouter();
+  // sendMessage is intentionally omitted: sentPrefills makes this URL-triggered effect one-shot.
+  useEffect(() => {
+    if (!sendPrefill) {
+      sentPrefills.current.delete(prefill);
+      return;
+    }
+    if (!prefill || readyEmployees.length === 0 || sentPrefills.current.has(prefill)) return;
+    sentPrefills.current.add(prefill);
+    void sendMessage(prefill);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("send");
+    router.replace(params.size ? `/council?${params}` : "/council");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill, readyEmployees.length, router, searchParams, sendPrefill]);
 
   /** Find the last response for this employee that is currently streaming.
    *  Falls back to the last response with matching employeeId if none is streaming. */

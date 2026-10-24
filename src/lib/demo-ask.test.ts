@@ -97,6 +97,7 @@ describe("demo Ask recording", () => {
     const evts = events(await res.text());
     expect(evts.filter((e) => e.type === "text_delta").map((e) => e.delta).join("")).toBe(DEMO_ASK_FALLBACK);
     expect(DEMO_ASK_FALLBACK).toContain("npx employee001 demo --live");
+    expect(DEMO_ASK_FALLBACK).toContain("npx employee001` in an empty folder");
     expect(runSingleTwin).not.toHaveBeenCalled();
   });
 

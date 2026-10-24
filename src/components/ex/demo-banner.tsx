@@ -10,6 +10,7 @@ type DemoStatus = { demo: boolean; live?: boolean; question?: string };
 export function DemoBanner() {
   const { t } = useT();
   const [status, setStatus] = useState<DemoStatus | null>(null);
+  const [setupCopied, setSetupCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,6 +24,15 @@ export function DemoBanner() {
       cancelled = true;
     };
   }, []);
+
+  async function copySetupCommand() {
+    try {
+      await navigator.clipboard.writeText("npx employee001");
+      setSetupCopied(true);
+    } catch {
+      // Clipboard access can be unavailable in an embedded browser.
+    }
+  }
 
   if (!status?.demo) return null;
   const live = status.live === true;
@@ -54,13 +64,20 @@ export function DemoBanner() {
       <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>{t("demo.banner.body")}</span>
       {!live && question && (
         <Link
-          href={`/council?q=${encodeURIComponent(question)}`}
+          href={`/council?q=${encodeURIComponent(question)}&send=1`}
           style={{ fontSize: "var(--fs-sm)", color: "var(--accent)", fontWeight: 650, textDecoration: "none", whiteSpace: "nowrap" }}
         >
           {t("demo.banner.ask")} →
         </Link>
       )}
       <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)", flex: "1 1 330px" }}>{t("demo.banner.upgrade")}</span>
+      <button
+        type="button"
+        onClick={copySetupCommand}
+        style={{ padding: "5px 9px", background: "var(--surface)", border: "1px solid var(--hairline)", borderRadius: 4, color: "var(--text)", fontSize: "var(--fs-xs)", fontWeight: 650, cursor: "pointer", whiteSpace: "nowrap" }}
+      >
+        {setupCopied ? t("demo.banner.setupCopied") : t("demo.banner.setup")}
+      </button>
     </motion.aside>
   );
 }
