@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canRunModel, currentProvider, providerLabel } from "@/lib/model-provider";
+import { addPersonProblem, canRunModel, currentProvider, providerLabel } from "@/lib/model-provider";
 import { createInvite, listInvites } from "@/lib/invites";
 
 export const runtime = "nodejs";
@@ -14,6 +14,8 @@ export async function POST(request: NextRequest) {
   // profile, then nothing works — bad first impression, broken promise.
   // The builder runs on the configured provider (Anthropic, Bedrock, Vertex,
   // Foundry or local), so check that provider, not the Anthropic key.
+  const seat = addPersonProblem();
+  if (seat) return NextResponse.json({ error: "subscription_single_user", message: seat }, { status: 409 });
   const model = canRunModel();
   const missing: string[] = [];
   if (!model.ok) missing.push(currentProvider() === "anthropic" ? "ANTHROPIC_API_KEY" : "EMPLOYEE001_MODEL_PROVIDER");

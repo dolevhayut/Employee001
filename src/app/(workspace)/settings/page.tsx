@@ -327,6 +327,7 @@ function WorkspaceSection() {
   const [saved, setSaved] = useState<{ name: string; description: string } | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [provider, setProvider] = useState<string | null>(null);
+  const [providerDetail, setProviderDetail] = useState<{ claudeCode?: { version?: string; loggedIn?: boolean; subscriptionType?: string }; problem?: string }>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -350,7 +351,10 @@ function WorkspaceSection() {
   useEffect(() => {
     fetch("/api/model-provider", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-      .then((data: { provider: string }) => setProvider(data.provider))
+      .then((data: { provider: string; claudeCode?: { version?: string; loggedIn?: boolean; subscriptionType?: string }; problem?: string }) => {
+        setProvider(data.provider);
+        setProviderDetail({ claudeCode: data.claudeCode, problem: data.problem });
+      })
       .catch(() => setProvider(null));
   }, []);
 
@@ -439,6 +443,17 @@ function WorkspaceSection() {
           <div style={{ fontSize: "var(--fs-ui)", fontWeight: 500 }}>
             {t("profile.provider.label")} {provider ? t(`profile.provider.${provider}` as MessageKey) : "…"}
           </div>
+          {providerDetail.claudeCode && !providerDetail.problem && (
+            <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
+              Claude Code {providerDetail.claudeCode.version}, signed in
+              {providerDetail.claudeCode.subscriptionType ? ` (${providerDetail.claudeCode.subscriptionType})` : ""}. Covers you alone: to invite colleagues, switch to an API key or your cloud.
+            </div>
+          )}
+          {providerDetail.problem && (
+            <div style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)", color: "var(--danger)" }}>
+              {providerDetail.problem}
+            </div>
+          )}
           <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
             {t("profile.provider.note")}
           </div>

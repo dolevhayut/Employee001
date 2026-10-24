@@ -4,6 +4,7 @@ import { createUser, listUsers, publicUser } from "@/lib/auth/store";
 import { ROLES, sessionUserFromHeaders, type Role } from "@/lib/auth/request-user";
 import { hashPassword, passwordProblem } from "@/lib/auth/password";
 import { readJson } from "@/lib/auth/http";
+import { addPersonProblem } from "@/lib/model-provider";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,8 @@ export async function POST(request: Request) {
   const me = sessionUserFromHeaders(request.headers);
   const body = await readJson<{ email?: string; name?: string; role?: Role; password?: string; employeeId?: string }>(request);
   if (!me || !body?.email || !body.role || !ROLES.includes(body.role)) return NextResponse.json({ error: "Email and a valid role are required." }, { status: 400 });
+  const seat = addPersonProblem();
+  if (seat) return NextResponse.json({ error: seat }, { status: 409 });
   if (body.role === "owner" && me.role !== "owner") return NextResponse.json({ error: "Only an owner can add an owner." }, { status: 403 });
   if (body.role === "employee" && !body.employeeId) return NextResponse.json({ error: "Pick the twin this employee may see." }, { status: 400 });
   if (body.password !== undefined) {

@@ -7,6 +7,7 @@ import { countTwins } from "../lib/adopt-data.mjs";
 import { checkDiskEncryption } from "../lib/disk-encryption.mjs";
 import { checkDataPermissions, fixDataPermissions } from "../lib/data-permissions.mjs";
 import { KEYCHAIN_PLACEHOLDER, SECRET_NAMES } from "../lib/keychain.mjs";
+import { claudeCliStatus, MIN_CLAUDE_CODE_VERSION, planLabel } from "../lib/claude-cli.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(HERE, "..", "..");
@@ -134,6 +135,9 @@ function modelHosts(get) {
     };
   }
 
+  if (provider === "claude-code") {
+    return { agent: { host: "api.anthropic.com", on: true, when: "twin runs (your own Claude Code and Claude subscription)" }, direct, directOn: false, directAllowed: false };
+  }
   if (flagOn(get("CLAUDE_CODE_USE_BEDROCK"))) {
     const region = safeToken(get("AWS_REGION") || get("AWS_DEFAULT_REGION"), "<region>");
     const host = hostnameOnly(get("ANTHROPIC_BEDROCK_BASE_URL")) || `bedrock-runtime.${region}.amazonaws.com`;
@@ -311,12 +315,18 @@ export default async function doctor(argv = []) {
 
   // Provider (settings presence only; doctor never validates customer-cloud credentials).
   const provider = (env.EMPLOYEE001_MODEL_PROVIDER || process.env.EMPLOYEE001_MODEL_PROVIDER || "anthropic").toLowerCase();
-  if (["anthropic", "bedrock", "vertex", "foundry", "local"].includes(provider)) ok("Claude provider", provider);
+  if (["anthropic", "claude-code", "bedrock", "vertex", "foundry", "local"].includes(provider)) ok("Claude provider", provider);
   else { fail("Claude provider", `${provider} is invalid — run \`employee001 setup\``); issues++; }
 
   // Anthropic key is only required and checked for direct Anthropic API mode.
   const aKey = env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
-  if (provider !== "anthropic") {
+  if (provider === "claude-code") {
+    const claude = claudeCliStatus();
+    if (!claude.installed) { fail("Claude Code", "not installed — npm install -g @anthropic-ai/claude-code, then run `claude` and sign in"); issues++; }
+    else if (claude.versionOk === false) { fail("Claude Code", `${claude.version} is too old (needs ${MIN_CLAUDE_CODE_VERSION}+) — run \`claude update\``); issues++; }
+    else if (!claude.loggedIn) { fail("Claude Code", "not signed in — run `claude` and sign in with your Claude account"); issues++; }
+    else ok("Claude Code", `${claude.version}, signed in${planLabel(claude) ? ` (${planLabel(claude)})` : ""} — one person only`);
+  } else if (provider !== "anthropic") {
     const configured = provider === "bedrock" ? env.AWS_REGION || process.env.AWS_REGION : provider === "vertex" ? (env.CLOUD_ML_REGION || process.env.CLOUD_ML_REGION) && (env.ANTHROPIC_VERTEX_PROJECT_ID || process.env.ANTHROPIC_VERTEX_PROJECT_ID) : provider === "foundry" ? env.ANTHROPIC_FOUNDRY_RESOURCE || process.env.ANTHROPIC_FOUNDRY_RESOURCE : (env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_BASE_URL) && (env.ANTHROPIC_DEFAULT_OPUS_MODEL || process.env.ANTHROPIC_DEFAULT_OPUS_MODEL) && (env.ANTHROPIC_DEFAULT_SONNET_MODEL || process.env.ANTHROPIC_DEFAULT_SONNET_MODEL) && (env.ANTHROPIC_DEFAULT_HAIKU_MODEL || process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL);
     if (configured) ok("Customer-cloud settings", "present (credentials are not checked)");
     else { fail("Customer-cloud settings", "missing — run `employee001 setup`"); issues++; }

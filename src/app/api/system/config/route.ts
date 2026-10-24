@@ -4,6 +4,7 @@ import { liveVoiceEnabled } from "@/lib/voice-live";
 import fs from "fs";
 import { envFilePath } from "@/lib/app-home";
 import { canRunModel, currentProvider, providerLabel, type ModelProvider } from "@/lib/model-provider";
+import { claudeCliStatus } from "@/lib/claude-code-cli";
 import { KEYCHAIN_PLACEHOLDER, readKeychainSecret, storeKeychainSecret, type SecretName } from "@/lib/keychain";
 
 // Returns *presence* of each required API key, never the value itself.
@@ -30,6 +31,8 @@ export type SystemConfigStatus = {
   modelProviderLabel: string;
   modelReady: boolean;
   modelProblem?: string;
+  /** In claude-code mode: the user's own Claude Code and its sign-in. */
+  claudeCode?: { installed: boolean; version?: string; loggedIn?: boolean; subscriptionType?: string };
   /** True iff every *required* key is set. The UI uses this to flip the
    *  Invite button between active and disabled. */
   ready: boolean;
@@ -45,8 +48,10 @@ export async function GET() {
   const anthropic = Boolean(process.env.ANTHROPIC_API_KEY);
   const composio = Boolean(process.env.COMPOSIO_API_KEY);
   const elevenLabs = Boolean(process.env.ELEVENLABS_API_KEY);
-  const model = canRunModel();
   const modelProvider = currentProvider();
+  // Read Claude Code's sign-in first so canRunModel sees it.
+  const cli = modelProvider === "claude-code" ? await claudeCliStatus() : undefined;
+  const model = canRunModel();
   const ready = model.ok && composio;
   const body: SystemConfigStatus = {
     anthropic,
@@ -59,6 +64,7 @@ export async function GET() {
     modelProviderLabel: providerLabel(modelProvider),
     modelReady: model.ok,
     ...(model.ok ? {} : { modelProblem: model.reason }),
+    ...(cli ? { claudeCode: { installed: cli.installed, version: cli.version, loggedIn: cli.loggedIn, subscriptionType: cli.subscriptionType } } : {}),
     ready,
   };
   return NextResponse.json(body, {

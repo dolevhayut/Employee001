@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canRunModel } from "@/lib/model-provider";
+import { addPersonProblem, canRunModel } from "@/lib/model-provider";
 import fs from "fs/promises";
 import path from "path";
 import { randomUUID } from "node:crypto";
@@ -491,7 +491,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       });
     }
 
-    if (!canRunModel().ok) {
+    // On a Claude subscription the builder doesn't run for someone else's
+    // action (an invite from before the switch): it waits like a missing key.
+    if (!canRunModel().ok || addPersonProblem()) {
       // Can't run the builder, but onboarding succeeded — defer politely.
       try {
         await writePendingBuild(employeeId, {

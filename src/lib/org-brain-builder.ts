@@ -10,7 +10,8 @@
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { OrgBrainInput, OrgBrainNodeType } from "@/lib/org-brain";
-import { TWIN_MODEL_PRIMARY, TWIN_MODEL_FALLBACK } from "@/lib/sdk-defaults";
+import { TWIN_MODEL_PRIMARY, TWIN_MODEL_FALLBACK, providerRuntimeOptions } from "@/lib/sdk-defaults";
+import { canRunModel, modelForProvider } from "@/lib/model-provider";
 
 const VALID_TYPES: OrgBrainNodeType[] = [
   "document",
@@ -162,11 +163,12 @@ export async function buildBrainNodesFromText(
       notes: "empty input",
     };
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY not set — Brain Builder unavailable");
+  const ready = canRunModel();
+  if (!ready.ok) {
+    throw new Error(`${ready.reason} — Brain Builder unavailable`);
   }
 
-  const model = process.env.BRAIN_BUILDER_MODEL ?? TWIN_MODEL_PRIMARY;
+  const model = modelForProvider(process.env.BRAIN_BUILDER_MODEL ?? TWIN_MODEL_PRIMARY);
   const prompt = input.sourceLabel
     ? `Source: ${input.sourceLabel}\n\n---\n\n${text}`
     : text;
@@ -177,7 +179,7 @@ export async function buildBrainNodesFromText(
     prompt,
     options: {
       model,
-      fallbackModel: TWIN_MODEL_FALLBACK,
+      fallbackModel: modelForProvider(TWIN_MODEL_FALLBACK),
       systemPrompt: SYSTEM_PROMPT,
       allowedTools: [],
       maxTurns: 1,
@@ -187,7 +189,7 @@ export async function buildBrainNodesFromText(
       },
       permissionMode: "bypassPermissions",
       settingSources: [],
-      env: { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY },
+      ...providerRuntimeOptions(),
     },
   });
 

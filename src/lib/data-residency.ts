@@ -33,6 +33,7 @@ export function modelResidencyProblem(env: Env = process.env): string | null {
   }
   if (provider === "local") return null;
   if (provider === "foundry") return null; // the Azure resource's region is the customer's choice
+  if (provider === "claude-code") return "EMPLOYEE001_REGION=eu: a Claude subscription processes in the US. Use Bedrock (eu-*), Vertex (europe-*) or a local model.";
   return "EMPLOYEE001_REGION=eu: the direct Anthropic API processes in the US. Use Bedrock (eu-*), Vertex (europe-*) or a local model.";
 }
 

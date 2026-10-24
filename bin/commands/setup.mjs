@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import * as p from "@clack/prompts";
 import { createKeychain, KEYCHAIN_PLACEHOLDER, SECRET_NAMES } from "../lib/keychain.mjs";
 import { findFreePort, isPortInUse } from "../lib/port.mjs";
+import { claudeCliStatus, MIN_CLAUDE_CODE_VERSION, planLabel } from "../lib/claude-cli.mjs";
 
 // Claude Code's brand orange (R204 G120 G92 — close to the official wordmark).
 // 24-bit ANSI works on every modern terminal we ship to; FORCE_COLOR=0 or a
@@ -123,11 +124,20 @@ export default async function setup(_argv, { launch = true } = {}) {
     }
   }
 
+  // A signed-in Claude Code means the user's subscription can run the twins
+  // with no API key, so it's offered first.
+  let claude = claudeCliStatus();
+  const claudeHint = claude.loggedIn
+    ? `Claude Code is signed in${planLabel(claude) ? ` (${planLabel(claude)})` : ""}. No API key needed. Just you, no colleagues`
+    : claude.installed
+      ? "No API key. Sign in to Claude Code first. Just you, no colleagues"
+      : "No API key. Needs Claude Code on this machine. Just you, no colleagues";
   const provider = await p.select({
     message: "Where should Claude run?",
-    initialValue: existing.EMPLOYEE001_MODEL_PROVIDER ?? "anthropic",
+    initialValue: existing.EMPLOYEE001_MODEL_PROVIDER ?? (claude.loggedIn ? "claude-code" : "anthropic"),
     options: [
-      { value: "anthropic", label: "Anthropic API", hint: "Default" },
+      { value: "claude-code", label: "Your Claude subscription", hint: claudeHint },
+      { value: "anthropic", label: "Anthropic API key", hint: "For a team. Pay per use" },
       { value: "bedrock", label: "AWS Bedrock" },
       { value: "vertex", label: "Google Vertex AI" },
       { value: "foundry", label: "Azure AI Foundry" },
@@ -149,7 +159,25 @@ export default async function setup(_argv, { launch = true } = {}) {
   let localOpusModel = "";
   let localSonnetModel = "";
   let localHaikuModel = "";
-  if (provider === "anthropic") {
+  if (provider === "claude-code") {
+    // Sign-in happens in Claude Code itself (Anthropic's own flow); we never
+    // see the account's token.
+    while (!claude.installed || !claude.loggedIn || claude.versionOk === false) {
+      p.note(
+        !claude.installed
+          ? ["Install Claude Code, then sign in with your Claude account:", "", "  npm install -g @anthropic-ai/claude-code", "  claude"].join("\n")
+          : claude.versionOk === false
+            ? [`Claude Code ${claude.version} is too old (needs ${MIN_CLAUDE_CODE_VERSION}+). In another terminal run:`, "", "  claude update"].join("\n")
+            : ["In another terminal, run `claude` and sign in with your Claude account (it opens your browser)."].join("\n"),
+        "Claude Code",
+      );
+      const again = await p.confirm({ message: "Done? Check again", initialValue: true });
+      if (p.isCancel(again) || !again) { p.cancel("Setup cancelled. Run `npx employee001 setup` again when Claude Code is ready, or pick an API key."); return false; }
+      claude = claudeCliStatus();
+    }
+    p.log.success(`Using your Claude subscription${planLabel(claude) ? ` (${planLabel(claude)})` : ""} through Claude Code ${claude.version ?? ""}.`.replace(" .", "."));
+    p.log.info("It covers you alone: to bring in colleagues later, switch to an API key or your cloud.");
+  } else if (provider === "anthropic") {
     p.log.info("No key yet? Press Ctrl+C and run `npx employee001 demo`: it needs none.");
     for (;;) {
       anthropicKey = await p.password({
@@ -338,7 +366,7 @@ export default async function setup(_argv, { launch = true } = {}) {
   // Local endpoint settings are written only for the local provider: an
   // empty or stale ANTHROPIC_BASE_URL must never redirect Anthropic/cloud runs.
   // Cloud users' hand-set model pins survive a re-run (unless they were local pins).
-  const keepPins = provider !== "anthropic" && provider !== "local" && existing.EMPLOYEE001_MODEL_PROVIDER !== "local";
+  const keepPins = provider !== "anthropic" && provider !== "claude-code" && provider !== "local" && existing.EMPLOYEE001_MODEL_PROVIDER !== "local";
   const pins = provider === "local"
     ? { OPUS: localOpusModel, SONNET: localSonnetModel, HAIKU: localHaikuModel }
     : keepPins
@@ -361,7 +389,8 @@ export default async function setup(_argv, { launch = true } = {}) {
     "# Employee001 — local configuration",
     "# This file is read at startup. Edits take effect on the next `employee001 start`.",
     "",
-    "# Claude provider. Use your own cloud account for boundary mode.",
+    "# Claude provider: claude-code (your own signed-in Claude Code, one person),",
+    "# anthropic, bedrock, vertex, foundry or local. Use your own cloud account for boundary mode.",
     `EMPLOYEE001_MODEL_PROVIDER=${provider}`,
     "",
     "# Required only for the Anthropic API provider. Get one from https://console.anthropic.com",

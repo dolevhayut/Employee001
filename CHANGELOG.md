@@ -8,6 +8,25 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Run your twins on your Claude subscription, with no API key
+- `npx employee001 setup` now finds Claude Code on your machine. If it's
+  signed in, "Your Claude subscription" is the first choice and needs no API
+  key. Twins then run through your own `claude`, the unmodified CLI you
+  installed and signed in to. Employee001 never sees, passes or stores your
+  Claude token.
+- It covers one person. In this mode Employee001 refuses employee invites and
+  extra accounts, and stops if a second account becomes active. Before you
+  bring in colleagues, switch to an API key or your cloud (Bedrock, Vertex AI,
+  Foundry). Settings shows the Claude Code version, the sign-in and the plan.
+  `doctor` checks them too.
+- Meeting summaries, Ask's combined answer and the other direct-API extras stay
+  off in this mode, as they do on a cloud provider.
+- The org brain builder and the intent planner passed only the Anthropic key
+  to the model process, so on Bedrock, Vertex or a local model they couldn't
+  run. They now go through the configured provider. The memory dreamer handed
+  its model process the whole environment; it now gets only the allowlisted
+  variables, like every other model call.
+
 ### The demo shows Relay and voice, still with no keys
 - `npx employee001 demo` now has a sixth invented twin, Theo Lindqvist, a
   former Head of Revenue Operations: retired with his own consent, private

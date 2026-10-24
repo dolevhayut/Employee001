@@ -15,7 +15,7 @@ import type {
   NotificationHookInput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { appendAuditEntry } from "@/lib/audit-log";
-import { modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
+import { claudeCodeExecutable, modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
 import { dataDir } from "@/lib/app-home";
 import { checkTwinRead } from "@/lib/twin-read-scope";
 import { sdkChildEnv } from "@/lib/sdk-env";
@@ -78,6 +78,7 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
   | "disallowedTools"
   | "betas"
   | "env"
+  | "pathToClaudeCodeExecutable"
   | "abortController"
   | "title"
   | "promptSuggestions"
@@ -108,12 +109,8 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
     disallowedTools: TWIN_HARD_DISALLOWED,
     betas,
     // Only the allowlisted variables (sdk-env.ts): the child must not see
-    // the app's other secrets. providerEnvForAgentSdk() unsets other
-    // providers' flags with undefined, which sdkChildEnv drops.
-    env: sdkChildEnv(process.env, {
-      ...providerEnvForAgentSdk(),
-      CLAUDE_AGENT_SDK_CLIENT_APP: PKG_VERSION,
-    }),
+    // the app's other secrets.
+    ...providerRuntimeOptions(),
     abortController: args.abortController,
     title: args.title,
     // Predicted follow-ups in chat surfaces — free (rides parent prompt cache).
@@ -121,6 +118,23 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
     // No effect until programmatic subagents land, but harmless to keep on.
     agentProgressSummaries: false,
     strictMcpConfig: true,
+  };
+}
+
+/** How every Agent SDK child reaches the configured model provider: the
+ *  allowlisted env (sdk-env.ts) with the provider's flags, and, in
+ *  claude-code mode, the user's own `claude` instead of the bundled runtime.
+ *  Spread it into any query() options that don't use buildBaseOptions. */
+export function providerRuntimeOptions(): Pick<Options, "env" | "pathToClaudeCodeExecutable"> {
+  const executable = claudeCodeExecutable();
+  return {
+    // providerEnvForAgentSdk() unsets other providers' flags with undefined,
+    // which sdkChildEnv drops.
+    env: sdkChildEnv(process.env, {
+      ...providerEnvForAgentSdk(),
+      CLAUDE_AGENT_SDK_CLIENT_APP: PKG_VERSION,
+    }),
+    ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
   };
 }
 

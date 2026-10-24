@@ -1,7 +1,10 @@
 import "server-only";
 import { euRegion, modelResidencyProblem } from "./data-residency";
+import { cachedClaudeCliStatus, claudeCodeEnvOverrides, claudeCodeProblem, findClaudeCli } from "./claude-code-cli";
 
-export const MODEL_PROVIDERS = ["anthropic", "bedrock", "vertex", "foundry", "local"] as const;
+// "claude-code": the user's own signed-in Claude Code (a Claude subscription,
+// one person only). See claude-code-cli.ts.
+export const MODEL_PROVIDERS = ["anthropic", "claude-code", "bedrock", "vertex", "foundry", "local"] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 type Env = Record<string, string | undefined>;
 
@@ -32,6 +35,10 @@ export function canRunModel(env: Env = process.env): { ok: true } | { ok: false;
 
   switch (currentProvider(env)) {
     case "anthropic": return required(["ANTHROPIC_API_KEY"]);
+    case "claude-code": {
+      const reason = claudeCodeProblem(cachedClaudeCliStatus(), env);
+      return reason ? { ok: false, reason } : { ok: true };
+    }
     case "bedrock": return required(["AWS_REGION"]);
     case "vertex": return required(["CLOUD_ML_REGION", "ANTHROPIC_VERTEX_PROJECT_ID"]);
     case "foundry": return required(["ANTHROPIC_FOUNDRY_RESOURCE"]);
@@ -50,6 +57,7 @@ export function providerEnvForAgentSdk(env: Env = process.env): Env {
     case "bedrock": return { ...clear, CLAUDE_CODE_USE_BEDROCK: "1", AWS_REGION: env.AWS_REGION };
     case "vertex": return { ...clear, CLAUDE_CODE_USE_VERTEX: "1", CLOUD_ML_REGION: env.CLOUD_ML_REGION, ANTHROPIC_VERTEX_PROJECT_ID: env.ANTHROPIC_VERTEX_PROJECT_ID };
     case "foundry": return { ...clear, CLAUDE_CODE_USE_FOUNDRY: "1", ANTHROPIC_FOUNDRY_RESOURCE: env.ANTHROPIC_FOUNDRY_RESOURCE };
+    case "claude-code": return { ...clear, ...claudeCodeEnvOverrides() };
     case "local": {
       // Fail closed: without a valid endpoint the child would fall back to
       // api.anthropic.com. The real Anthropic key is blanked so it is never
@@ -65,6 +73,26 @@ export function providerEnvForAgentSdk(env: Env = process.env): Env {
     }
     default: return clear;
   }
+}
+
+/** The Claude Code executable the Agent SDK should run: the user's own in
+ *  claude-code mode, the SDK's bundled one otherwise. */
+export function claudeCodeExecutable(env: Env = process.env): string | undefined {
+  if (currentProvider(env) !== "claude-code") return undefined;
+  const cli = findClaudeCli(env);
+  // Never fall back to the bundled runtime here: it would run without the
+  // user's sign-in (or with whatever key is around) and bill the wrong way.
+  if (!cli) throw new Error("Claude Code isn't installed on this machine. Install it, run `claude` once and sign in, or run `npx employee001 setup`.");
+  return cli;
+}
+
+/** Why another person can't be added (an account or an employee invite):
+ *  a Claude subscription runs on one person's plan, and Anthropic doesn't
+ *  allow routing other people's requests through it. Null otherwise. */
+export function addPersonProblem(env: Env = process.env): string | null {
+  return currentProvider(env) === "claude-code"
+    ? "This install runs on your own Claude subscription, which covers you alone. To bring in colleagues, switch to an Anthropic API key or your cloud provider first: run `npx employee001 setup`."
+    : null;
 }
 
 const LOCAL_MODEL_PINS = ["OPUS", "SONNET", "HAIKU"] as const;
@@ -93,7 +121,8 @@ function modelFamily(model: string): "OPUS" | "SONNET" | "HAIKU" | null {
 
 /** Provider IDs differ. Substitute only an operator-supplied Agent SDK override; never guess one. */
 export function modelForProvider(model: string, env: Env = process.env): string {
-  if (currentProvider(env) === "anthropic") return model;
+  const provider = currentProvider(env);
+  if (provider === "anthropic" || provider === "claude-code") return model;
   const family = modelFamily(model);
   const override = family ? env[`ANTHROPIC_DEFAULT_${family}_MODEL`] : undefined;
   return override?.trim() || model;
@@ -108,10 +137,12 @@ export function modelErrorMessage(raw: string, env: Env = process.env): string {
   const provider = currentProvider(env);
   const fix = provider === "anthropic"
     ? "Check ANTHROPIC_API_KEY in .env (or run `npx employee001 setup` again), then restart."
-    : `Check the ${providerLabel(provider)} credentials on this machine, then restart.`;
+    : provider === "claude-code"
+      ? "Run `claude` in a terminal and sign in with your Claude account, then try again."
+      : `Check the ${providerLabel(provider)} credentials on this machine, then restart.`;
   return `${detail.replace(/[.\s]+$/, "")}. ${fix}`;
 }
 
 export function providerLabel(provider: ModelProvider): string {
-  return { anthropic: "Anthropic API", bedrock: "AWS Bedrock", vertex: "Google Vertex AI", foundry: "Azure AI Foundry", local: "Local model (offline)" }[provider];
+  return { anthropic: "Anthropic API", "claude-code": "Claude subscription (Claude Code)", bedrock: "AWS Bedrock", vertex: "Google Vertex AI", foundry: "Azure AI Foundry", local: "Local model (offline)" }[provider];
 }

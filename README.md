@@ -158,7 +158,7 @@ The folder you run `setup` in is your install: it holds `.env` and `data/`. Run 
 - **Anything else.** `npx employee001 doctor` checks Node, `.env`, keys, port and the build. Employee001 is tested on Node 22 and 24 LTS.
 
 > [!NOTE]
-> **Requirements.** Node.js 22+. You need a model provider: an [Anthropic API key](https://console.anthropic.com), or your own Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible endpoint. Inviting employees and building their twins also needs a [Composio API key](https://app.composio.dev); marketplace agents work without it. No keys at all? `npx employee001 demo` replays a meeting, a former employee's twin and spoken answers with six invented twins.
+> **Requirements.** Node.js 22+. You need a model provider: your own Claude subscription through a signed-in [Claude Code](https://code.claude.com) on the same machine (no API key, for you alone), an [Anthropic API key](https://console.anthropic.com), or your own Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible endpoint. Inviting employees and building their twins also needs a [Composio API key](https://app.composio.dev); marketplace agents work without it. No keys at all? `npx employee001 demo` replays a meeting, a former employee's twin and spoken answers with six invented twins.
 
 ### Commands
 
@@ -232,7 +232,7 @@ Four different things, stated separately. The full table is in [SECURITY.md](SEC
 | Boundary | What | Notes |
 |---|---|---|
 | **Stored on your machine** | Profiles, knowledge files, memory, chat history, meetings, approvals, audit log, settings | Files under `./data/`. No database, no Employee001 account. Protect the folder with filesystem permissions. |
-| **Sent to your model provider** | Prompts and the profile context a twin needs | Anthropic API, or your own Bedrock / Vertex AI / Azure AI Foundry / local endpoint for twin runs and twin building. Meeting summaries, Ask's combined answer, memory rerank and knowledge proposals call the Anthropic API directly (disabled in cloud-provider mode unless `EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1`). The provider's own terms apply. |
+| **Sent to your model provider** | Prompts and the profile context a twin needs | Anthropic API, your own Claude Code (Claude subscription), or your own Bedrock / Vertex AI / Azure AI Foundry / local endpoint for twin runs and twin building. Meeting summaries, Ask's combined answer, memory rerank and knowledge proposals call the Anthropic API directly (disabled in cloud-provider mode unless `EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1`). The provider's own terms apply. |
 | **Sent to tools you connect** | Tool calls and OAuth | Composio for employee-connected apps, plus any custom MCP server. `WebSearch` queries go out without approval; `WebFetch` waits for it. Optional: OpenAI (memory embeddings), ElevenLabs (text-to-speech, and microphone audio for speech-to-text). |
 | **Telemetry** | Off by default | Opt-in only, anonymous aggregate counts (version, OS, number of twins, meetings, approvals). No endpoint is configured out of the box. |
 

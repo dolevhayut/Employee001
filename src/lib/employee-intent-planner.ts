@@ -1,6 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { ARTIFACT_TOOL_FULL_NAME } from "@/lib/artifacts-mcp";
-import { TWIN_MODEL_FALLBACK } from "@/lib/sdk-defaults";
+import { TWIN_MODEL_FALLBACK, providerRuntimeOptions } from "@/lib/sdk-defaults";
 import { directAnthropicAllowed } from "@/lib/model-provider";
 
 export type ResponseIntentPlan = {
@@ -333,7 +333,7 @@ export async function planEmployeeResponseIntent(
         },
         permissionMode: "bypassPermissions",
         settingSources: [],
-        env: { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY },
+        ...providerRuntimeOptions(),
       },
     });
 

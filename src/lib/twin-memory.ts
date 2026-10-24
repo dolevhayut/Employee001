@@ -2,8 +2,8 @@ import fs from "fs";
 import { embeddingsEndpoint } from "@/lib/data-residency";
 import path from "path";
 import { randomUUID } from "crypto";
-import { TWIN_MODEL_FALLBACK, TWIN_MODEL_HAIKU } from "@/lib/sdk-defaults";
-import { currentProvider, directAnthropicAllowed, modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
+import { TWIN_MODEL_FALLBACK, TWIN_MODEL_HAIKU, providerRuntimeOptions } from "@/lib/sdk-defaults";
+import { currentProvider, directAnthropicAllowed, modelForProvider } from "@/lib/model-provider";
 import { dataDir } from "@/lib/app-home";
 import { filterProfilingContent, memoryRedactionLevel, redactSensitive } from "@/lib/sensitive-content";
 
@@ -1135,7 +1135,7 @@ async function extractFactsViaLLM(
         outputFormat: { type: "json_schema", schema: DREAMER_SCHEMA },
         permissionMode: "bypassPermissions",
         settingSources: [],
-        env: { ...process.env, ...providerEnvForAgentSdk() },
+        ...providerRuntimeOptions(),
       },
     });
 
