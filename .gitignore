@@ -12,6 +12,8 @@ out/
 
 # Local data (created on first run)
 data/
+# The demo's invented company ships with the CLI (never real data).
+!bin/demo/data/
 
 # OS
 .DS_Store

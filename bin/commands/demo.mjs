@@ -55,9 +55,9 @@ function isLiveProviderKey(key) {
 /**
  * The demo child has a deliberately tiny inherited environment. In particular,
  * a shell-exported API key cannot turn a replay into a billable run.
- * @param {{ home: string, port: number, live?: boolean, parentEnv?: Record<string, string | undefined>, recordingPath: string }} options
+ * @param {{ home: string, port: number, live?: boolean, parentEnv?: Record<string, string | undefined>, recordingPath: string, askPath?: string }} options
  */
-export function buildDemoChildEnv({ home, port, live = false, parentEnv = process.env, recordingPath }) {
+export function buildDemoChildEnv({ home, port, live = false, parentEnv = process.env, recordingPath, askPath }) {
   const childEnv = {};
   for (const [key, value] of Object.entries(parentEnv)) {
     if (value === undefined) continue;
@@ -72,6 +72,7 @@ export function buildDemoChildEnv({ home, port, live = false, parentEnv = proces
     ...(live ? { EMPLOYEE001_DEMO_LIVE: "1" } : {}),
     EMPLOYEE001_BIND: "127.0.0.1",
     EMPLOYEE001_DEMO_RECORDING: resolve(recordingPath),
+    ...(askPath ? { EMPLOYEE001_DEMO_ASK: resolve(askPath) } : {}),
     PORT: String(port),
   };
 }
@@ -111,7 +112,8 @@ export default async function demo(argv) {
   }
   const home = createDemoHome({ port: options.port });
   const recordingPath = join(PKG_ROOT, "bin", "demo", "recording.json");
-  const env = buildDemoChildEnv({ home, port: options.port, live: options.live, recordingPath });
+  const askPath = join(PKG_ROOT, "bin", "demo", "ask.json");
+  const env = buildDemoChildEnv({ home, port: options.port, live: options.live, recordingPath, askPath });
   let cleaned = false;
   const cleanup = () => {
     if (cleaned || options.keep) return;
@@ -143,6 +145,6 @@ export default async function demo(argv) {
   process.once("SIGTERM", cleanAfterChildExits);
 
   process.stdout.write(
-    `Demo running at http://localhost:${options.port} — 5 invented twins at Lumen Labs. Nothing here touches your files. Ctrl+C to stop.\n`,
+    `Demo running at http://localhost:${options.port} — 6 invented twins at Lumen Labs, one of them a former employee. Nothing here touches your files. Ctrl+C to stop.\n`,
   );
 }

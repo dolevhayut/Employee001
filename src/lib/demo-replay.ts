@@ -10,6 +10,10 @@ export type DemoRecording = {
   events: Array<{ dtMs: number; event: CouncilEvent }>;
 };
 
+/** `employee001 demo` without --live: recordings answer, never a model. */
+export const isDemoReplay = (env: Record<string, string | undefined> = process.env) =>
+  env.EMPLOYEE001_DEMO === "1" && env.EMPLOYEE001_DEMO_LIVE !== "1";
+
 type Sleep = (ms: number) => Promise<void>;
 const delay: Sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

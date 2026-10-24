@@ -12,6 +12,9 @@ import { appendTaskRun } from "@/lib/task-history";
 import { canRunModel, modelErrorMessage } from "@/lib/model-provider";
 import { pickRelevantProfileFiles } from "@/lib/profile-relevance";
 import { dataDir } from "@/lib/app-home";
+import { isDemoReplay } from "@/lib/demo-replay";
+import { createDemoAskResponse } from "@/lib/demo-ask";
+import { loadPackage } from "@/lib/relay/package-store";
 
 // Keyword → file heuristic for detecting which files the answer drew from
 const FILE_KEYWORDS: [string[], string][] = [
@@ -53,6 +56,10 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  // `employee001 demo` (no --live): a recorded answer or a hint, never a
+  // model call, whatever keys the server happens to have.
+  if (isDemoReplay()) return createDemoAskResponse(body.employeeId, question, request.signal);
 
   const employeeId = body.employeeId;
   const fromDisk = await loadEmployeesFromDisk();
@@ -124,6 +131,11 @@ export async function POST(request: NextRequest) {
         // Ask appends a "(answer style… reply in X)" note; score the question only.
         question.split("\n\n(")[0],
       );
+      // A retired twin also answers from its reviewed handover notes, which
+      // are in its prompt: show them read like the profile.
+      if (employee.lifecycle === "retired" && (await loadPackage(employee.id))?.review) {
+        send({ type: "tool_call", name: "Read", args: { file_path: "/handover/notes.md" }, ts: 0 });
+      }
       recalled.forEach((file, i) => {
         setTimeout(() => {
           send({ type: "tool_call", name: "Read", args: { file_path: `/profile/${file}` }, ts: Date.now() - start });

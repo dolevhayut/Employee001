@@ -1,0 +1,65 @@
+{
+  "updatedAt": "2026-09-18T11:05:00.000Z",
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "Thanks for doing this, Theo. Let's start with what someone covering your role decides most often. What lands on you every week, and where are the lines?"
+    },
+    {
+      "role": "user",
+      "content": "Mostly discounts and renewal terms. My rule was simple: up to 15% off list, the account executive decides. Between 15% and 25%, I sign off, and I want a reason in the deal note. Anything above 25%, or any multi-year price lock, goes to Amara. I never approved a discount without a renewal date on the opportunity, because that is how we lost track of Greenbridge last spring."
+    },
+    {
+      "role": "assistant",
+      "content": "Who takes the 15 to 25 percent approvals once you're gone?"
+    },
+    {
+      "role": "user",
+      "content": "Elise has agreed to take the 15 to 25 percent approvals until a new RevOps lead starts. She knows the design partners better than anyone, but she will want the pricing sheet, not my memory."
+    },
+    {
+      "role": "assistant",
+      "content": "Walk me through a renewal. What happens, and when?"
+    },
+    {
+      "role": "user",
+      "content": "Ninety days before a renewal, I open a renewal opportunity in HubSpot and tag the customer success owner. At sixty days, we send the usage summary from the Insights admin export. At thirty days, the quote goes out, and Finance gets a copy the same day so invoicing is not a surprise. If a customer has not replied by fourteen days, Elise calls the sponsor directly."
+    },
+    {
+      "role": "assistant",
+      "content": "Which accounts need special care?"
+    },
+    {
+      "role": "user",
+      "content": "HarborMetric is the one to watch. Their renewal is December 15, and their procurement team asks for a security questionnaire every single year, even when nothing changed. Start it in October, not December, and send it to Priya first. Northstar Atlas pays annually in advance and has never pushed back on price. Greenbridge Systems always asks for a discount in the last week; hold the line at 15% unless they add seats."
+    },
+    {
+      "role": "assistant",
+      "content": "What's still open as you leave?"
+    },
+    {
+      "role": "user",
+      "content": "Two things. The HarborMetric renewal quote is drafted in HubSpot but not sent; it needs the security questionnaire done first. And the usage-based pricing pilot with Northstar Atlas is paused; I wrote up the numbers in the pricing sheet, but nobody has decided whether to continue it."
+    },
+    {
+      "role": "assistant",
+      "content": "Where do the tools live, and how does someone get access?"
+    },
+    {
+      "role": "user",
+      "content": "Deals and renewals live in HubSpot; Amara grants admin access. The pricing sheet is a Google Sheet in the RevOps shared drive, and Elise can add people. Invoices go through our billing system, and Finance owns access to that."
+    },
+    {
+      "role": "assistant",
+      "content": "Any terms a newcomer will trip over?"
+    },
+    {
+      "role": "user",
+      "content": "We say 'design partners' for the three November cohort accounts. 'Seat true-up' is the quarterly check where we bill for seats added mid-term. And 'the ladder' is my name for the 15, 25 and above-25 discount tiers."
+    },
+    {
+      "role": "assistant",
+      "content": "That covers it. Thank you, Theo. I'll turn this into notes for you and an admin to review."
+    }
+  ]
+}

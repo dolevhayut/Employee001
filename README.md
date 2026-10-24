@@ -130,7 +130,13 @@ Everything below is in the current npm release ([0.9.0](CHANGELOG.md)) unless ma
 npx employee001 demo
 ```
 
-Replays a recorded session with five invented twins in a temporary folder. No API keys, nothing written to your current directory. Add `--live` to run it against your own model provider.
+Opens a made-up company, Lumen Labs, in a temporary folder: six invented twins, one of them a former employee. No API keys and no model calls: everything you see is replayed from recordings, and nothing is written to your current directory.
+
+- **Team Meeting** opens first and replays five twins debating a launch date.
+- **Relay → Former employees** has Theo, a Head of Revenue Operations who has left. His twin stays read-only, answers only from his profile and his approved handover notes, and is labelled "Former Head of Revenue Operations". Download his notes as Markdown or as `rcp.json`.
+- **Ask** suggests recorded questions. Ask Theo who approves a 20% discount now and he answers from his handover notes; ask about this quarter's churn and he says he doesn't know. Turn on **Voice on** to hear each answer in the twin's voice.
+
+Anything outside the recordings gets a pointer to `--live`, which runs the demo against your own model provider (`ANTHROPIC_API_KEY=… npx employee001 demo --live`). Talking to a twin by microphone needs an ElevenLabs key.
 
 ## Installation
 
@@ -152,7 +158,7 @@ The folder you run `setup` in is your install: it holds `.env` and `data/`. Run 
 - **Anything else.** `npx employee001 doctor` checks Node, `.env`, keys, port and the build. Employee001 is tested on Node 22 and 24 LTS.
 
 > [!NOTE]
-> **Requirements.** Node.js 22+. You need a model provider: an [Anthropic API key](https://console.anthropic.com), or your own Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible endpoint. Inviting employees and building their twins also needs a [Composio API key](https://app.composio.dev); marketplace agents work without it. No keys at all? `npx employee001 demo` runs a recorded meeting with five invented twins.
+> **Requirements.** Node.js 22+. You need a model provider: an [Anthropic API key](https://console.anthropic.com), or your own Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible endpoint. Inviting employees and building their twins also needs a [Composio API key](https://app.composio.dev); marketplace agents work without it. No keys at all? `npx employee001 demo` replays a meeting, a former employee's twin and spoken answers with six invented twins.
 
 ### Commands
 
@@ -160,7 +166,7 @@ The folder you run `setup` in is your install: it holds `.env` and `data/`. Run 
 |---|---|
 | `npx employee001 setup` | Interactive first-run wizard. Writes `.env`, creates `data/`. |
 | `npx employee001 start` | Starts the local server and opens the browser. Flags: `--no-open`, `--port <n>`, `--strict` (no nonessential traffic). |
-| `npx employee001 demo` | Try it with five invented twins and no keys. Flags: `--live`, `--keep`, `--port <n>`. |
+| `npx employee001 demo` | Try it with six invented twins (one a former employee) and no keys. Flags: `--live`, `--keep`, `--port <n>`. |
 | `npx employee001 doctor` | Health check: Node version, env, API keys, port, build. |
 | `npx employee001 doctor --egress` | Lists every outside host your current config talks to, and what is sent. |
 | `npx employee001 secure` | Moves plaintext `.env` secrets into your OS keychain. |

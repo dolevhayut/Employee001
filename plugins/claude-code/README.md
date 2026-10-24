@@ -47,7 +47,7 @@ Change them later with `/plugin configure employee001@employee001`. From a shell
 /employee001:team-meeting Should the bank pilot be 60 or 90 days? with Shira and Daniel
 ```
 
-No twins yet? `npx employee001 demo --live` starts five invented twins on port 3100. Point the plugin's endpoint at `http://127.0.0.1:3100/api/mcp`.
+No twins yet? `npx employee001 demo --live` starts six invented twins on port 3100. Point the plugin's endpoint at `http://127.0.0.1:3100/api/mcp`.
 
 ## What leaves your machine
 

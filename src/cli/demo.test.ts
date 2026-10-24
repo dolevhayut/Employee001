@@ -31,6 +31,7 @@ describe("employee001 demo", () => {
     expect(env).not.toHaveProperty("ANTHROPIC_API_KEY");
     expect(env).not.toHaveProperty("OTHER_SECRET");
     expect(env).toMatchObject({ EMPLOYEE001_DEMO: "1", EMPLOYEE001_HOME: "/tmp/demo" });
+    expect(buildDemoChildEnv({ home: "/tmp/demo", port: 3100, parentEnv, recordingPath: "/tmp/recording.json", askPath: "/tmp/ask.json" })).toMatchObject({ EMPLOYEE001_DEMO_ASK: "/tmp/ask.json" });
     expect(buildDemoChildEnv({ home: "/tmp/demo", port: 3100, live: true, parentEnv, recordingPath: "/tmp/recording.json" })).toMatchObject({ ANTHROPIC_API_KEY: "would-spend", EMPLOYEE001_DEMO_LIVE: "1" });
   });
 

@@ -1,0 +1,616 @@
+{
+  "version": 1,
+  "answers": [
+    {
+      "id": "theo-discount",
+      "employeeId": "theo-lindqvist",
+      "question": "Who approves a 20% discount now?",
+      "audio": {
+        "file": "ask-audio/theo-discount.mp3",
+        "voiceId": "nPczCjzI2devNBz1zQrb"
+      },
+      "events": [
+        {
+          "dtMs": 180,
+          "event": {
+            "type": "tool_call",
+            "name": "Read",
+            "args": {
+              "file_path": "/handover/notes.md"
+            },
+            "ts": 180
+          }
+        },
+        {
+          "dtMs": 320,
+          "event": {
+            "type": "tool_result",
+            "name": "result",
+            "summary": "ok",
+            "files": [],
+            "ts": 500
+          }
+        },
+        {
+          "dtMs": 240,
+          "event": {
+            "type": "tool_call",
+            "name": "Read",
+            "args": {
+              "file_path": "/profile/DECISIONS.md"
+            },
+            "ts": 740
+          }
+        },
+        {
+          "dtMs": 320,
+          "event": {
+            "type": "tool_result",
+            "name": "result",
+            "summary": "ok",
+            "files": [],
+            "ts": 1060
+          }
+        },
+        {
+          "dtMs": 420,
+          "event": {
+            "type": "text_delta",
+            "delta": "From my handover notes: ",
+            "ts": 1480
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "discounts between 15% and ",
+            "ts": 1535
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "25% off list needed ",
+            "ts": 1590
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "my sign-off, with a ",
+            "ts": 1645
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "reason in the deal ",
+            "ts": 1700
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "note [[handover]]. Since I ",
+            "ts": 1755
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "left, Elise Moreno takes ",
+            "ts": 1810
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "those approvals until a ",
+            "ts": 1865
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "new RevOps lead starts ",
+            "ts": 1920
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "[[handover]]. Anything above 25%, ",
+            "ts": 1975
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "or a multi-year price ",
+            "ts": 2030
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "lock, goes to Amara ",
+            "ts": 2085
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "[[handover]].",
+            "ts": 2140
+          }
+        },
+        {
+          "dtMs": 120,
+          "event": {
+            "type": "done",
+            "confidence": 0.86,
+            "cited_files": [],
+            "ts": 2260
+          }
+        }
+      ]
+    },
+    {
+      "id": "theo-harbormetric",
+      "employeeId": "theo-lindqvist",
+      "question": "What should I know about the HarborMetric renewal?",
+      "audio": {
+        "file": "ask-audio/theo-harbormetric.mp3",
+        "voiceId": "nPczCjzI2devNBz1zQrb"
+      },
+      "events": [
+        {
+          "dtMs": 180,
+          "event": {
+            "type": "tool_call",
+            "name": "Read",
+            "args": {
+              "file_path": "/handover/notes.md"
+            },
+            "ts": 180
+          }
+        },
+        {
+          "dtMs": 320,
+          "event": {
+            "type": "tool_result",
+            "name": "result",
+            "summary": "ok",
+            "files": [],
+            "ts": 500
+          }
+        },
+        {
+          "dtMs": 420,
+          "event": {
+            "type": "text_delta",
+            "delta": "From my handover notes: ",
+            "ts": 920
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "HarborMetric renews on December ",
+            "ts": 975
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "15, and their procurement ",
+            "ts": 1030
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "asks for a security ",
+            "ts": 1085
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "questionnaire every year, so ",
+            "ts": 1140
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "start it in October ",
+            "ts": 1195
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "and send it to ",
+            "ts": 1250
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "Priya first [[handover]]. When ",
+            "ts": 1305
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "I left on September ",
+            "ts": 1360
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "26, the renewal quote ",
+            "ts": 1415
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "was drafted in HubSpot ",
+            "ts": 1470
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "but not sent, waiting ",
+            "ts": 1525
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "on that questionnaire [[handover]]. ",
+            "ts": 1580
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "I don't know where ",
+            "ts": 1635
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "it stands now.",
+            "ts": 1690
+          }
+        },
+        {
+          "dtMs": 120,
+          "event": {
+            "type": "done",
+            "confidence": 0.86,
+            "cited_files": [],
+            "ts": 1810
+          }
+        }
+      ]
+    },
+    {
+      "id": "theo-churn",
+      "employeeId": "theo-lindqvist",
+      "question": "What's our churn rate this quarter?",
+      "audio": {
+        "file": "ask-audio/theo-churn.mp3",
+        "voiceId": "nPczCjzI2devNBz1zQrb"
+      },
+      "events": [
+        {
+          "dtMs": 180,
+          "event": {
+            "type": "tool_call",
+            "name": "Read",
+            "args": {
+              "file_path": "/handover/notes.md"
+            },
+            "ts": 180
+          }
+        },
+        {
+          "dtMs": 320,
+          "event": {
+            "type": "tool_result",
+            "name": "result",
+            "summary": "ok",
+            "files": [],
+            "ts": 500
+          }
+        },
+        {
+          "dtMs": 420,
+          "event": {
+            "type": "text_delta",
+            "delta": "I don't know. I ",
+            "ts": 920
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "left on September 26, ",
+            "ts": 975
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "and nothing in my ",
+            "ts": 1030
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "profile or handover notes ",
+            "ts": 1085
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "covers churn, so I ",
+            "ts": 1140
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "won't guess. Someone on ",
+            "ts": 1195
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "the team today will ",
+            "ts": 1250
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "have the current number.",
+            "ts": 1305
+          }
+        },
+        {
+          "dtMs": 120,
+          "event": {
+            "type": "done",
+            "confidence": 0.86,
+            "cited_files": [],
+            "ts": 1425
+          }
+        }
+      ]
+    },
+    {
+      "id": "marcus-sso",
+      "employeeId": "marcus-reed",
+      "question": "Is SSO ready for general availability?",
+      "audio": {
+        "file": "ask-audio/marcus-sso.mp3",
+        "voiceId": "cjVigY5qzO86Huf0OWal"
+      },
+      "events": [
+        {
+          "dtMs": 180,
+          "event": {
+            "type": "tool_call",
+            "name": "Read",
+            "args": {
+              "file_path": "/profile/CONTEXT.md"
+            },
+            "ts": 180
+          }
+        },
+        {
+          "dtMs": 320,
+          "event": {
+            "type": "tool_result",
+            "name": "result",
+            "summary": "ok",
+            "files": [],
+            "ts": 500
+          }
+        },
+        {
+          "dtMs": 240,
+          "event": {
+            "type": "tool_call",
+            "name": "Read",
+            "args": {
+              "file_path": "/profile/PEOPLE.md"
+            },
+            "ts": 740
+          }
+        },
+        {
+          "dtMs": 320,
+          "event": {
+            "type": "tool_result",
+            "name": "result",
+            "summary": "ok",
+            "files": [],
+            "ts": 1060
+          }
+        },
+        {
+          "dtMs": 240,
+          "event": {
+            "type": "tool_call",
+            "name": "Read",
+            "args": {
+              "file_path": "/profile/DECISIONS.md"
+            },
+            "ts": 1300
+          }
+        },
+        {
+          "dtMs": 320,
+          "event": {
+            "type": "tool_result",
+            "name": "result",
+            "summary": "ok",
+            "files": [],
+            "ts": 1620
+          }
+        },
+        {
+          "dtMs": 420,
+          "event": {
+            "type": "text_delta",
+            "delta": "Not yet: the SAML ",
+            "ts": 2040
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "happy path works, but ",
+            "ts": 2095
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "SSO deprovisioning, JIT role ",
+            "ts": 2150
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "mapping and audit events ",
+            "ts": 2205
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "are still open [[profile]]. ",
+            "ts": 2260
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "November 21 is a ",
+            "ts": 2315
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "realistic engineering-complete date if ",
+            "ts": 2370
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "we keep new scope ",
+            "ts": 2425
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "off the release train ",
+            "ts": 2480
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "[[profile]]. Priya signs the ",
+            "ts": 2535
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "security gate, not me ",
+            "ts": 2590
+          }
+        },
+        {
+          "dtMs": 55,
+          "event": {
+            "type": "text_delta",
+            "delta": "[[profile]].",
+            "ts": 2645
+          }
+        },
+        {
+          "dtMs": 120,
+          "event": {
+            "type": "done",
+            "confidence": 0.86,
+            "cited_files": [],
+            "ts": 2765
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -25,6 +25,7 @@ export const words = (s: string) => s.replace(/[_-]+/g, " ").trim();
 export function describeToolCall(name: string, args: Record<string, unknown> = {}): Omit<ToolNodeStep, "id"> {
   if (name === "Read") {
     const path = String(args.file_path ?? "");
+    if (path.includes("/handover/")) return { kind: "read", label: "Recalled from handover notes", detail: "reviewed notes" };
     if (path.includes("/profile/")) return { kind: "read", label: "Recalled from profile", detail: base(path).replace(/\.md$/, "") };
     if (path.includes("org-brain")) return { kind: "brain", label: "Read company brain", detail: base(path).replace(/\.md$/, "") };
     return { kind: "read", label: "Read", detail: base(path) };

@@ -11,7 +11,7 @@ Usage:
   employee001 <command> [options]
 
 Get started:
-  demo      Try Employee001 with 5 invented twins — no keys, nothing touches your files
+  demo      Try Employee001 with 6 invented twins — no keys, nothing touches your files
   setup     Interactive first-run wizard for your own team (writes .env, creates data/)
   start     Start the local server (runs setup first if there's no .env)
 

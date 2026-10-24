@@ -153,6 +153,7 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/marketplace/hired/[id]": { DELETE: admin },
   "/api/marketplace/trial-chat": { POST: member },
   "/api/demo": { GET: member },
+  "/api/demo/audio/[id]": { GET: member },
   "/api/model-provider": { GET: member },
   "/api/budgets": { GET: member },
   "/api/budgets/[id]": { GET: member, PUT: admin },

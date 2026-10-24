@@ -1,0 +1,22 @@
+{
+  "id": "theo-lindqvist",
+  "name": "Theo Lindqvist",
+  "role": "Head of Revenue Operations",
+  "department": "Go-to-Market",
+  "integrations": ["HubSpot", "Google Drive"],
+  "lastActiveAt": "2026-09-26T16:00:00.000Z",
+  "questionsThisWeek": 0,
+  "weekOf": "2026-W39",
+  "seedModel": "claude-opus-5-5",
+  "refreshModel": "claude-sonnet-5-5",
+  "synthetic": true,
+  "lifecycle": "retired",
+  "handoverStartedAt": "2026-09-15T09:00:00.000Z",
+  "retention": {
+    "grantedAt": "2026-09-18T11:20:00.000Z",
+    "textDigest": "f267f2d8294596cbef1abb387baa34ca77afc5766c5a84431362bb91b240bb5e",
+    "locale": "en",
+    "onBehalf": false
+  },
+  "retiredAt": "2026-09-26T16:30:00.000Z"
+}

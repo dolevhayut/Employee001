@@ -1,0 +1,295 @@
+{
+  "source_twin_id": "theo-lindqvist",
+  "schema_version": "relay-rcp-1",
+  "generated_at": "2026-09-18T11:12:00.000Z",
+  "synth_mode": "model",
+  "status": "handover-ready",
+  "decision_rules": [
+    {
+      "id": "theo-lindqvist-decision_rules-1",
+      "title": "The discount ladder",
+      "body": "Up to 15% off list: the account executive decides. 15% to 25%: RevOps signs off, with a reason in the deal note. Above 25%, or any multi-year price lock: Amara.",
+      "provenance": "interview",
+      "confidence": 0.95,
+      "gaps": [],
+      "evidenceQuote": "up to 15% off list, the account executive decides. Between 15% and 25%, I sign off, and I want a reason in the deal note. Anything above 25%, or any multi-year price lock, goes to Amara.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-decision_rules-2",
+      "title": "No renewal date, no discount",
+      "body": "Never approve a discount unless the opportunity has a renewal date.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "I never approved a discount without a renewal date on the opportunity",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-decision_rules-3",
+      "title": "15% to 25% approvals after Theo",
+      "body": "Elise Moreno takes the 15% to 25% approvals until a new RevOps lead starts, working from the pricing sheet.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "Elise has agreed to take the 15 to 25 percent approvals until a new RevOps lead starts.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-decision_rules-4",
+      "title": "Greenbridge's late discount ask",
+      "body": "Hold Greenbridge Systems at 15% unless they add seats.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "hold the line at 15% unless they add seats",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    }
+  ],
+  "playbooks": [
+    {
+      "id": "theo-lindqvist-playbooks-5",
+      "title": "Renewal calendar",
+      "body": "1. 90 days out: open a renewal opportunity in HubSpot and tag the customer success owner.\n2. 60 days: send the usage summary from the Insights admin export.\n3. 30 days: send the quote; copy Finance the same day.\n4. 14 days with no reply: Elise calls the sponsor.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "Ninety days before a renewal, I open a renewal opportunity in HubSpot and tag the customer success owner.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-playbooks-6",
+      "title": "Quotes go to Finance the same day",
+      "body": "When a renewal quote goes out, Finance gets a copy that day so invoicing is not a surprise.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "At thirty days, the quote goes out, and Finance gets a copy the same day so invoicing is not a surprise.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-playbooks-7",
+      "title": "A customer goes quiet",
+      "body": "No reply 14 days before renewal: Elise calls the sponsor directly.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "If a customer has not replied by fourteen days, Elise calls the sponsor directly.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    }
+  ],
+  "contact_graph": [
+    {
+      "id": "theo-lindqvist-contact_graph-8",
+      "title": "Amara Vale, CEO",
+      "body": "Decides discounts above 25% and any multi-year price lock. Grants HubSpot admin access.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "Anything above 25%, or any multi-year price lock, goes to Amara.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-contact_graph-9",
+      "title": "Elise Moreno, VP Customer Success",
+      "body": "Approves 15% to 25% discounts for now. Knows the design partners best; wants the pricing sheet, not recollections.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "She knows the design partners better than anyone, but she will want the pricing sheet, not my memory.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-contact_graph-10",
+      "title": "Priya Nair, Head of Security & Privacy",
+      "body": "Reviews security questionnaires before they go to a customer.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "send it to Priya first",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-contact_graph-11",
+      "title": "Finance",
+      "body": "Owns access to the billing system and gets a copy of every renewal quote.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "Finance owns access to that",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    }
+  ],
+  "edge_cases": [
+    {
+      "id": "theo-lindqvist-edge_cases-12",
+      "title": "HarborMetric's yearly security questionnaire",
+      "body": "HarborMetric renews December 15 and its procurement asks for a security questionnaire every year. Start it in October and send it to Priya first.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "their procurement team asks for a security questionnaire every single year, even when nothing changed. Start it in October, not December",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-edge_cases-13",
+      "title": "Greenbridge asks late",
+      "body": "Greenbridge Systems asks for a discount in the last week of every renewal.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "Greenbridge Systems always asks for a discount in the last week",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-edge_cases-14",
+      "title": "Northstar Atlas pays up front",
+      "body": "Northstar Atlas pays annually in advance and has never pushed back on price.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "Northstar Atlas pays annually in advance and has never pushed back on price.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    }
+  ],
+  "tooling_map": [
+    {
+      "id": "theo-lindqvist-tooling_map-15",
+      "system": "HubSpot",
+      "location": "Deals and renewals",
+      "accessVia": "Amara grants admin access",
+      "ownedBy": "Amara Vale",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "Deals and renewals live in HubSpot; Amara grants admin access.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-tooling_map-16",
+      "system": "Pricing sheet",
+      "location": "Google Sheet in the RevOps shared drive",
+      "accessVia": "Elise can add people",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "The pricing sheet is a Google Sheet in the RevOps shared drive, and Elise can add people.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-tooling_map-17",
+      "system": "Billing system",
+      "location": "Invoices",
+      "accessVia": "Ask Finance",
+      "ownedBy": "Finance",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "Invoices go through our billing system, and Finance owns access to that.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-tooling_map-18",
+      "system": "Insights admin export",
+      "location": "Usage summaries for renewals",
+      "accessVia": "Any Insights admin",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "we send the usage summary from the Insights admin export",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    }
+  ],
+  "glossary": [
+    {
+      "id": "theo-lindqvist-glossary-19",
+      "title": "Design partners",
+      "body": "The three November cohort accounts.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "We say 'design partners' for the three November cohort accounts.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-glossary-20",
+      "title": "Seat true-up",
+      "body": "The quarterly check that bills for seats added mid-term.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "'Seat true-up' is the quarterly check where we bill for seats added mid-term.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-glossary-21",
+      "title": "The ladder",
+      "body": "Theo's name for the 15%, 25% and above-25% discount tiers.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "'the ladder' is my name for the 15, 25 and above-25 discount tiers.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    }
+  ],
+  "open_loops": [
+    {
+      "id": "theo-lindqvist-open_loops-22",
+      "title": "HarborMetric renewal quote",
+      "body": "Drafted in HubSpot, not sent. Waits on the security questionnaire.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "The HarborMetric renewal quote is drafted in HubSpot but not sent; it needs the security questionnaire done first.",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    },
+    {
+      "id": "theo-lindqvist-open_loops-23",
+      "title": "Northstar Atlas usage pricing pilot",
+      "body": "Paused. The numbers are in the pricing sheet; nobody has decided whether to continue.",
+      "provenance": "interview",
+      "confidence": 0.9,
+      "gaps": [],
+      "evidenceQuote": "the usage-based pricing pilot with Northstar Atlas is paused",
+      "verified": true,
+      "verificationReason": "Evidence quote appears verbatim in the source transcript."
+    }
+  ],
+  "provenance": {
+    "interviewerModel": "claude-opus-5-5",
+    "transcriptRef": "interview.json",
+    "redactionApplied": true,
+    "itemCount": 23,
+    "consent": {
+      "subjectId": "theo-lindqvist",
+      "grantedAt": "2026-09-18T11:12:00.000Z",
+      "banner": "relay-handover-interview"
+    },
+    "auditRunId": "relay-theo-lindqvist"
+  },
+  "review": {
+    "approvedAt": "2026-09-25T15:10:00.000Z"
+  }
+}

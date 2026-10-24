@@ -20,6 +20,8 @@ import { useVoiceInput, type VoiceInputError } from "@/components/ex/voice/use-v
 import { MicButton } from "@/components/ex/voice/mic-button";
 import { LiveSpeaker, playbackContext } from "@/components/ex/voice/live-speaker";
 import { playAck, prepareAcks, type PlayingAck } from "@/components/ex/voice/voice-ack";
+import { playDemoClip, type DemoClip } from "@/components/ex/voice/demo-clip";
+import { normalizeDemoQuestion } from "@/lib/demo-ask-recording";
 import { VOICE_ANSWER_STYLE, ackPhrase, voiceLaneInContext } from "@/lib/voice-lane";
 import { heardSpeech, looksLikeEcho, speakable, takeSentences, twinWordsInTheRoom } from "@/lib/speech-text";
 import { bcp47 } from "@/lib/i18n/format";
@@ -56,7 +58,8 @@ function sourcesOf(steps: { kind: StepKind; label: string; detail?: string; logo
   // The profile is always in the twin's context, even when nothing lit up.
   add("profile", { name: "Profile", title: "Own profile", initials: "P", color: "var(--accent-soft)", kind: "read" });
   for (const st of steps) {
-    if (st.kind === "read" && st.label.startsWith("Recalled from profile")) add("profile", { name: "Profile", title: "Own profile", initials: "P", color: "var(--accent-soft)", kind: "read" }, st.detail);
+    if (st.kind === "read" && st.label.startsWith("Recalled from handover notes")) add("handover", { name: "Handover notes", title: "Reviewed when they left", initials: "H", color: "var(--accent-soft)", kind: "read" }, st.detail);
+    else if (st.kind === "read" && st.label.startsWith("Recalled from profile")) add("profile", { name: "Profile", title: "Own profile", initials: "P", color: "var(--accent-soft)", kind: "read" }, st.detail);
     else if (st.kind === "brain") add("brain", { name: "Company brain", title: "Documents", initials: "B", color: "var(--accent-soft)", kind: "brain" }, st.detail);
     else if (st.kind === "web") add("web", { name: "Web", title: "Searched the web", initials: "W", color: "var(--accent-soft)", kind: "web" }, st.detail);
     else if (st.logo) add(st.logo, { name: st.label, title: "Connected system", initials: st.label.charAt(0), color: "var(--accent-soft)", kind: "tool", logo: st.logo }, st.detail);
@@ -502,6 +505,10 @@ const ACK_AFTER_MS = 300;
 const HINT_MS = 4_500;
 const linkedTwin = () => new URLSearchParams(window.location.search).get("twin");
 
+/** A question the zero-key demo has a recorded answer (and voice) for. */
+type DemoAsk = { id: string; employeeId: string; question: string; audio: boolean };
+type DemoStatus = { demo: boolean; live?: boolean; ask?: DemoAsk[] };
+
 export default function AskPage() {
   const { t, locale } = useT();
   const roster = useRoster();
@@ -539,6 +546,20 @@ export default function AskPage() {
   // Live voice (Scribe v2 Realtime in, Eleven v4 Turbo out): off in EU mode.
   const [voiceLive, setVoiceLive] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
+  // `employee001 demo` without --live: recorded answers only, and their
+  // pre-rendered voice instead of ElevenLabs.
+  const [demo, setDemo] = useState<DemoStatus | null>(null);
+  const demoReplay = Boolean(demo?.demo && !demo.live);
+  const demoAsks = demoReplay ? demo?.ask ?? [] : [];
+  const demoVoice = demoAsks.some((a) => a.audio);
+  const demoClipFor = (employeeId: string, question: string) => {
+    const asked = normalizeDemoQuestion(question);
+    const hit = demoAsks.find((a) => a.audio && a.employeeId === employeeId && normalizeDemoQuestion(a.question) === asked);
+    return hit ? `/api/demo/audio/${encodeURIComponent(hit.id)}` : null;
+  };
+  // A suggested question for another twin waits for that twin to be picked.
+  const pendingAskRef = useRef<DemoAsk | null>(null);
+  const clipRef = useRef<DemoClip | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const turnSeq = useRef(0);
   const stepSeq = useRef(0);
@@ -569,7 +590,7 @@ export default function AskPage() {
   const twin = twins.find((e) => e.id === twinId);
   // Someone who has left takes no tasks (the work queue refuses them): ask only.
   const retired = twin?.lifecycle === "retired";
-  const mode = retired ? "ask" : modePick;
+  const mode = retired || demoReplay ? "ask" : modePick;
 
   // Your last conversation with each twin comes back when you pick it; each
   // person sees only what they asked. "New conversation" starts a fresh one.
@@ -619,6 +640,26 @@ export default function AskPage() {
   };
 
   useEffect(() => {
+    let alive = true;
+    fetch("/api/demo", { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<DemoStatus>) : null))
+      .then((d) => {
+        if (alive) setDemo(d);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const pending = pendingAskRef.current;
+    if (!pending || twinId !== pending.employeeId) return;
+    pendingAskRef.current = null;
+    orbRef.current?.submit(pending.question);
+  }, [twinId]);
+
+  useEffect(() => {
     fetch("/api/system/config")
       .then((r) => r.json())
       .then((c: { voice?: boolean; voiceAllowed?: boolean; voiceLive?: boolean }) => {
@@ -651,6 +692,7 @@ export default function AskPage() {
       audioRef.current?.pause();
       speakerRef.current?.stop();
       ackRef.current?.stop();
+      clipRef.current?.stop();
     },
     [],
   );
@@ -658,7 +700,7 @@ export default function AskPage() {
   // Answers play on one AudioContext; browsers only let it start from a click
   // or key press, so wake it on the first one while answers are read aloud.
   useEffect(() => {
-    if (!voiceLive || !voiceOn) return;
+    if (!(voiceLive || demoVoice) || !voiceOn) return;
     const unlock = () => void playbackContext();
     window.addEventListener("pointerdown", unlock, true);
     window.addEventListener("keydown", unlock, true);
@@ -666,7 +708,7 @@ export default function AskPage() {
       window.removeEventListener("pointerdown", unlock, true);
       window.removeEventListener("keydown", unlock, true);
     };
-  }, [voiceLive, voiceOn]);
+  }, [voiceLive, demoVoice, voiceOn]);
 
   // Every stop bumps the generation, so a speakWhole() still fetching its
   // audio gives up instead of playing over the mic (or over a newer answer).
@@ -685,7 +727,29 @@ export default function AskPage() {
     speaker?.stop();
     ackRef.current?.stop();
     ackRef.current = null;
+    clipRef.current?.stop();
+    clipRef.current = null;
     setAudio(null);
+  };
+
+  /** The demo's recorded answer in the twin's voice (no key needed). */
+  const playClip = async (turnId: number, url: string) => {
+    const gen = speakGen.current;
+    setAudio({ id: turnId, status: "loading" });
+    const clip: DemoClip | null = await playDemoClip(url, {
+      ended: () => {
+        if (clipRef.current !== clip) return;
+        clipRef.current = null;
+        setAudio(null);
+      },
+    });
+    // Stopped (or a newer answer started) while the clip was loading.
+    if (gen !== speakGen.current) {
+      clip?.stop();
+      return;
+    }
+    clipRef.current = clip;
+    setAudio(clip ? { id: turnId, status: "playing" } : null);
   };
 
   /** A live speaker for one turn, or null when live speech isn't available.
@@ -721,6 +785,17 @@ export default function AskPage() {
     if (audio?.id === turnId) {
       stopAudio();
       return;
+    }
+    if (demoReplay) {
+      const turn = turns.find((x) => x.id === turnId);
+      const clip = turn ? demoClipFor(turn.twinId, turn.question) : null;
+      if (!clip) {
+        flashHint(t("ask.demo.voiceOnly"));
+        return;
+      }
+      playbackContext(); // inside the click
+      stopAudio();
+      return playClip(turnId, clip);
     }
     if (!voiceReady) {
       flashHint(t("ask.voiceSetup"), { settings: true });
@@ -933,8 +1008,14 @@ export default function AskPage() {
     // speaker as soon as the twin streams it.
     const speaker = voiceReady && (voiceOn || viaVoice) ? openSpeaker(id, twin.ttsVoiceId) : null;
     liveTurnRef.current = speaker ? id : null;
+    // The demo speaks its recorded answer as the text starts, like live voice.
+    let demoClip = voiceOn && !signal.aborted ? demoClipFor(twinId, question) : null;
     let unsaid = "";
     const sayStreamed = (delta: string, final = false) => {
+      if (demoClip && delta) {
+        void playClip(id, demoClip);
+        demoClip = null;
+      }
       if (!speaker) return;
       const { sentences, rest } = takeSentences(unsaid + delta, final);
       unsaid = rest;
@@ -1034,7 +1115,7 @@ export default function AskPage() {
   const voice = useVoiceInput({
     serverStt: voiceReady,
     liveStt: voiceLive,
-    allowBrowser: voiceAllowed,
+    allowBrowser: voiceAllowed && !demoReplay,
     lang: bcp47(locale),
     // Barge-in: the person talking over the twin stops it at once. Only once
     // it's actually talking: words said while it thinks are queued instead.
@@ -1080,6 +1161,11 @@ export default function AskPage() {
     },
   });
   const onMic = () => {
+    // Talking needs an ElevenLabs key: the demo has none.
+    if (demoReplay) {
+      flashHint(t("ask.demo.mic"), { mic: true });
+      return;
+    }
     // Don't let the mic hear the twin's last answer.
     if (voice.state === "idle") {
       stopAudio();
@@ -1166,11 +1252,12 @@ export default function AskPage() {
       <Topbar
         crumbs={[t("nav.ask")]}
         actions={
-          voiceReady ? (
+          voiceReady || demoVoice ? (
             <button
               type="button"
               className="btn sm"
               onClick={() => {
+                if (!voiceOn) playbackContext(); // unlock audio inside the click
                 writeVoiceOn(!voiceOn);
                 stopAudio();
               }}
@@ -1367,6 +1454,7 @@ export default function AskPage() {
                     key={e.id}
                     type="button"
                     onClick={() => setSelected(e.id)}
+                    title={`${e.name} · ${displayRole(e)}`}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -1391,7 +1479,7 @@ export default function AskPage() {
             </div>
             {/* ask a question, or hand over a task, like you would a colleague */}
             <div role="tablist" style={{ display: "flex", padding: 3, gap: 2, borderRadius: 10, background: "var(--bg-sunken)", border: "1px solid var(--hairline)" }}>
-              {(retired ? (["ask"] as const) : (["ask", "task"] as const)).map((m) => {
+              {(retired || demoReplay ? (["ask"] as const) : (["ask", "task"] as const)).map((m) => {
                 const on = mode === m;
                 return (
                   <button
@@ -1417,6 +1505,38 @@ export default function AskPage() {
                 );
               })}
             </div>
+            {/* the demo's recorded questions: no key, no model call */}
+            {demoAsks.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, maxWidth: 640, padding: "0 16px" }}>
+                <div style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{t("ask.demo.suggested")}</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+                  {demoAsks.map((a) => {
+                    const who = twins.find((e) => e.id === a.employeeId);
+                    if (!who) return null;
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        title={`${who.name} · ${displayRole(who)}`}
+                        onClick={() => {
+                          playbackContext(); // the answer may be spoken: unlock audio inside the click
+                          if (twinId === a.employeeId) orbRef.current?.submit(a.question);
+                          else {
+                            pendingAskRef.current = a;
+                            setSelected(a.employeeId);
+                          }
+                        }}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px 4px 4px", borderRadius: 999, border: "1px dashed var(--hairline-strong)", background: "var(--surface)", color: "var(--text)", fontSize: 12.5, cursor: "pointer", textAlign: "start" }}
+                      >
+                        <Avatar initials={who.initials} color={who.avatarColor} size={20} />
+                        <span style={{ color: "var(--text-muted)", whiteSpace: "nowrap" }}>{who.firstName}{who.lifecycle === "retired" ? ` (${t("ask.demo.former")})` : ""}:</span>
+                        {a.question}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
 

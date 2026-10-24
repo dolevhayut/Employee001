@@ -8,6 +8,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### The demo shows Relay and voice, still with no keys
+- `npx employee001 demo` now has a sixth invented twin, Theo Lindqvist, a
+  former Head of Revenue Operations: retired with his own consent, private
+  profile files withheld, and an approved handover package whose every quote
+  is in his interview. He's under Relay → Former employees, his notes download
+  as Markdown or `rcp.json`, and he's labelled "Former …" everywhere.
+- Ask in the demo suggests four recorded questions, three of them to Theo:
+  two answered from his handover notes, one he declines because he doesn't
+  know. The answers replay through `/api/twin/chat` (no model call, whatever
+  keys the server has); any other question gets a pointer to `--live`.
+- "Voice on" plays the recorded answers in each twin's voice (Eleven v4,
+  pre-rendered, about 530 KB in all). The microphone needs an ElevenLabs key,
+  so in the demo it says so instead of listening.
+- A retired twin's trace now shows it read its handover notes, and its
+  answers cite them as "Handover notes".
+
 ## [0.9.0] — 2026-10-24
 
 Highlights: Relay (when someone leaves, their twin stays, read-only), live
