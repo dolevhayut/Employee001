@@ -9,6 +9,10 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { buildBaseOptions } from "@/lib/sdk-defaults";
 import { canRunModel, modelErrorMessage, modelForProvider } from "@/lib/model-provider";
 
+let spentUsd = 0;
+/** What Relay model calls have cost in this process (the eval reports it). */
+export const relaySpentUsd = () => spentUsd;
+
 export function relayModelReady(): { ok: true } | { ok: false; reason: string } {
   return canRunModel();
 }
@@ -52,6 +56,7 @@ export async function relayTurn(args: {
         args.onDelta(e.delta.text);
       }
     } else if (m.type === "result") {
+      if (typeof m.total_cost_usd === "number") spentUsd += m.total_cost_usd;
       if (m.subtype === "success") result = m.result;
       else throw new Error(modelErrorMessage(`Relay model run ended: ${m.subtype}`));
     }

@@ -102,7 +102,8 @@ export async function interviewerTurn(
   const text = answer?.trim();
   if (text) {
     await whileOpen(employeeId, startedAt, async () => {
-      messages = [...(await loadInterview(employeeId)), { role: "user", content: text.slice(0, 8000) }];
+      // Redacted before it's saved: a password said in passing never lands on disk.
+      messages = [...(await loadInterview(employeeId)), { role: "user", content: redactPii(text.slice(0, 8000)) }];
       await saveInterview(employeeId, messages);
     });
   }
