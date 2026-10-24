@@ -175,6 +175,19 @@ describe("LiveSpeaker", () => {
     expect(failed).toHaveBeenCalledTimes(1);
   });
 
+  it("after() delays it behind the acknowledgment and counts that as said", async () => {
+    tokenRoute();
+    const ended = vi.fn();
+    const sp = new LiveSpeaker("v1", { ended });
+    sp.after(5, "Let me check.");
+    sp.say("The answer.");
+    expect(sp.spoken).toBe("Let me check. The answer.");
+    const only = new LiveSpeaker("v1", { ended });
+    only.after(5, "Let me check.");
+    only.finish(); // no sentences: just ends
+    expect(ended).toHaveBeenCalledTimes(1);
+  });
+
   it("finish() with nothing said just ends", async () => {
     tokenRoute();
     const ended = vi.fn();

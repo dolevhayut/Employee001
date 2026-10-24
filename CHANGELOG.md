@@ -24,9 +24,11 @@ Talking to a twin in Ask is now a conversation instead of record, stop, wait.
   unless it names a connected system or asks for an action, the twin answers
   from what it already knows without connecting its tools (about 2 seconds
   saved), with brief thinking and a 2 to 4 sentence spoken style. In our
-  tests the first words of the answer came 6 seconds after you stop talking
-  on average, down from 10. Questions that need a system still get the full
-  run, and the twin says it's looking it up.
+  tests the first words of the answer came 4.5 seconds after you stop talking
+  on average, down from 9.7. Questions that name a system or ask for an
+  action (in English or Hebrew, including the org's own MCP servers and a
+  follow-up to such a question) still get the full run with full reasoning,
+  and the twin says it's looking it up.
 - The twin starts working the moment the question is sent, instead of after
   the orb's opening animation (about 2.5 seconds sooner, typed questions too).
 - Speech recognition is ElevenLabs Scribe v2 Realtime. The browser connects to

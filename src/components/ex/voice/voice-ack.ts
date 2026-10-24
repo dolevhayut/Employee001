@@ -8,9 +8,11 @@
 import { ACK_PHRASES } from "@/lib/voice-lane";
 import { playbackContext } from "./live-speaker";
 
-const cache = new Map<string, Promise<AudioBuffer | null>>();
 const key = (voiceId: string | undefined, phrase: string) => `${voiceId ?? ""}\u0000${phrase}`;
 const ready = new Map<string, AudioBuffer>();
+/** Voices being prepared, or that failed recently (retried after a minute). */
+const preparing = new Map<string, number>();
+const RETRY_MS = 60_000;
 
 async function synthesize(voiceId: string | undefined, phrase: string): Promise<AudioBuffer | null> {
   const ctx = playbackContext();
@@ -31,18 +33,25 @@ async function synthesize(voiceId: string | undefined, phrase: string): Promise<
   }
 }
 
-/** Synthesizes the acknowledgments for this voice in the background. */
+/** Synthesizes the acknowledgments for this voice in the background, one at
+ *  a time (no burst against ElevenLabs' concurrency limit next to the live
+ *  sockets). A failure is retried no sooner than a minute later. */
 export function prepareAcks(voiceId: string | undefined) {
-  for (const phrase of ACK_PHRASES) {
-    const k = key(voiceId, phrase);
-    if (cache.has(k)) continue;
-    const pending = synthesize(voiceId, phrase).then((buf) => {
+  const v = voiceId ?? "";
+  const since = preparing.get(v);
+  if (since !== undefined && (since === Infinity || Date.now() - since < RETRY_MS)) return;
+  preparing.set(v, Infinity);
+  void (async () => {
+    let failed = false;
+    for (const phrase of ACK_PHRASES) {
+      const k = key(voiceId, phrase);
+      if (ready.has(k)) continue;
+      const buf = await synthesize(voiceId, phrase);
       if (buf) ready.set(k, buf);
-      else cache.delete(k); // try again next time
-      return buf;
-    });
-    cache.set(k, pending);
-  }
+      else failed = true;
+    }
+    if (failed) preparing.set(v, Date.now());
+  })();
 }
 
 export type PlayingAck = { stop: () => void; endsAt: number };

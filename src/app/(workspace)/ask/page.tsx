@@ -20,7 +20,7 @@ import { useVoiceInput, type VoiceInputError } from "@/components/ex/voice/use-v
 import { MicButton } from "@/components/ex/voice/mic-button";
 import { LiveSpeaker, playbackContext } from "@/components/ex/voice/live-speaker";
 import { playAck, prepareAcks, type PlayingAck } from "@/components/ex/voice/voice-ack";
-import { VOICE_ANSWER_STYLE, ackPhrase, voiceLane } from "@/lib/voice-lane";
+import { VOICE_ANSWER_STYLE, ackPhrase, voiceLaneInContext } from "@/lib/voice-lane";
 import { heardSpeech, looksLikeEcho, speakable, takeSentences, twinWordsInTheRoom } from "@/lib/speech-text";
 import { bcp47 } from "@/lib/i18n/format";
 import { describeToolCall, words } from "@/components/ex/morph-orb/tool-nodes";
@@ -564,6 +564,7 @@ export default function AskPage() {
     () => () => {
       audioRef.current?.pause();
       speakerRef.current?.stop();
+      ackRef.current?.stop();
     },
     [],
   );
@@ -860,13 +861,17 @@ export default function AskPage() {
       viaVoice && speaker
         ? window.setTimeout(() => {
             if (speakerRef.current !== speaker || speaker.spoken || signal.aborted) return;
-            const phrase = ackPhrase(question, voiceLane(question));
+            const previous = [...history].reverse().find((h) => h.role === "user")?.text;
+            const phrase = ackPhrase(question, voiceLaneInContext(question, previous));
             const ack = playAck(twin.ttsVoiceId, phrase, () => {
               if (ackRef.current === ack) ackRef.current = null;
+              // Its words stay echo for a moment after, even if the answer's voice failed.
+              if (spokenRef.current.text === phrase) spokenRef.current = { text: phrase, endedAt: Date.now() };
             });
             if (!ack) return;
             ackRef.current = ack;
             speaker.after(ack.endsAt, phrase);
+            spokenRef.current = { text: phrase, endedAt: null };
             setAudio({ id, status: "playing" });
           }, ACK_AFTER_MS)
         : undefined;
@@ -874,6 +879,8 @@ export default function AskPage() {
     const onAbort = () => {
       if (speakerRef.current === speaker) stopAudio();
       else speaker?.stop();
+      ackRef.current?.stop();
+      ackRef.current = null;
       queuedVoiceRef.current = null;
       setBusy(false);
     };
@@ -921,7 +928,8 @@ export default function AskPage() {
 
   // Talk instead of type: the transcript is asked (or handed as a task, per
   // the mode) exactly as if it had been typed into the orb.
-  const echoSource = () => twinWordsInTheRoom(speakerRef.current?.spoken ?? null, spokenRef.current, Boolean(audioRef.current));
+  const echoSource = () =>
+    twinWordsInTheRoom(speakerRef.current?.spoken ?? null, spokenRef.current, Boolean(audioRef.current || ackRef.current));
   const voice = useVoiceInput({
     serverStt: voiceReady,
     liveStt: voiceLive,
@@ -932,6 +940,14 @@ export default function AskPage() {
     onPartial: (text) => {
       if (!speakerRef.current?.playing && !audioRef.current && !ackRef.current) return;
       if (!heardSpeech(text) || looksLikeEcho(text, echoSource())) return;
+      if (ackRef.current && !speakerRef.current?.playing && !audioRef.current) {
+        // Talking over "Let me check." ("okay") cuts only that; the answer
+        // still comes, right away.
+        ackRef.current.stop();
+        ackRef.current = null;
+        speakerRef.current?.cancelHold();
+        return;
+      }
       stopAudio();
     },
     onTranscript: (text) => {

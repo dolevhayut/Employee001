@@ -89,6 +89,11 @@ export class LiveSpeaker {
     this.spoken = text + (this.spoken ? " " + this.spoken : "");
   }
 
+  /** The acknowledgment was cut short: start as soon as audio arrives. */
+  cancelHold() {
+    if (!this.started) this.nextAt = 0;
+  }
+
   /** No more sentences: say what's left, then end. */
   finish() {
     if (this.finished || this.stopped) return;

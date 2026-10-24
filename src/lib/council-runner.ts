@@ -7,8 +7,8 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { EmployeeWithTwin } from "@/lib/employees";
 import { buildEmployeeMcpServer } from "@/lib/composio-client";
-import { loadOrgCustomMcpServers } from "@/lib/custom-mcp";
-import { voiceLane } from "@/lib/voice-lane";
+import { listCustomMcp, loadOrgCustomMcpServers } from "@/lib/custom-mcp";
+import { voiceLaneInContext } from "@/lib/voice-lane";
 import {
   buildArtifactsMcpServer,
   ARTIFACT_TOOL_FULL_NAME,
@@ -662,10 +662,11 @@ export type RunOptions = {
   /** The signed-in user who asked (audit requesterId), when there is one. */
   requesterId?: string;
   /**
-   * The question was spoken (live voice on Ask) and the answer will be too:
-   * brief thinking (low effort, no extended thinking), and unless the
-   * question needs a connected system (voice-lane.ts), no Composio or org
-   * MCP servers, which take ~2s to connect. Only removes tools; every guard
+   * The question was spoken (live voice on Ask) and the answer will be too.
+   * Unless it needs a connected system or asks for an action (voice-lane.ts,
+   * the previous question included), the run skips Composio and org MCP
+   * servers (~2s to connect) and thinks briefly (low effort, no extended
+   * thinking). Otherwise it's a normal run. Only removes tools; every guard
    * (consent, approvals, read scope, disclosure, retired rules) is unchanged.
    */
   voice?: boolean;
@@ -917,7 +918,17 @@ export async function runSingleTwin(
     // Retired twins get the same lock-down as an unattended public reply.
     const publicReply = options.publicReply === true || retired;
     const consultMode = options.consultMode === true || publicReply;
-    const voiceFastLane = options.voice === true && voiceLane(question).fast;
+    // The org's own MCP server names count as systems too (a local file read).
+    const voiceFastLane =
+      options.voice === true &&
+      !consultMode &&
+      voiceLaneInContext(
+        question,
+        [...history].reverse().find((t) => t.role === "user")?.text,
+        await listCustomMcp()
+          .then((servers) => servers.filter((s) => s.enabled).map((s) => s.name))
+          .catch(() => []),
+      ).fast;
     const [composioMcp, orgMcpServers] = consultMode || voiceFastLane
       ? [null, {} as Awaited<ReturnType<typeof loadOrgCustomMcpServers>>]
       : await Promise.all([
@@ -989,7 +1000,7 @@ export async function runSingleTwin(
         : {}),
     };
     const hasMcp = Object.keys(mcpServers).length > 0;
-    mark(voiceFastLane ? "tools (voice fast lane: local only)" : "tools (Composio + org MCP)");
+    mark(consultMode ? "tools (none: consult/public/retired)" : voiceFastLane ? "tools (voice fast lane: local only)" : "tools (Composio + org MCP)");
 
     let memoryBlock = "";
     if (!publicReply) try {
@@ -1256,8 +1267,9 @@ export async function runSingleTwin(
         employeeId: employee.id,
         modelOverride: options.modelOverride,
       }),
-      // A spoken answer: the first words matter more than depth.
-      ...(options.voice ? { effort: "low" as const, thinking: { type: "disabled" as const } } : {}),
+      // A spoken answer from what the twin knows: the first words matter more
+      // than depth. A voice question that needs tools keeps full reasoning.
+      ...(voiceFastLane ? { effort: "low" as const, thinking: { type: "disabled" as const } } : {}),
     };
 
     const hooks = buildTwinHooks({
