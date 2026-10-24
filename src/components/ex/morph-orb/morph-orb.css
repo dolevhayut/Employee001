@@ -449,3 +449,12 @@
 @media (prefers-reduced-motion: reduce) {
   .mo-underglow, .mo-aurora i, .mo-ring, .mo-lab-t, .mo-dots i { animation: none; }
 }
+
+/* The run's flow (flow-canvas.tsx) is a picture, not a canvas: React Flow
+   turns pointer events back on for its pane, nodes and edges; keep the whole
+   stage click-through so the orb and the card underneath stay usable. */
+.mo-flow .react-flow,
+.mo-flow .react-flow * {
+  pointer-events: none !important;
+  cursor: default !important;
+}
