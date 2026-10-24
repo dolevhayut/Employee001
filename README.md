@@ -96,7 +96,7 @@ sequenceDiagram
 
 ## Features shipped today
 
-Everything below is in the current npm release ([0.7.0](CHANGELOG.md)) unless marked otherwise.
+Everything below is in the current npm release ([0.9.0](CHANGELOG.md)) unless marked otherwise.
 
 **Ask and collaborate**
 - **Ask a twin** (`/flow`): talk to one twin, see each source and tool it reaches for, or hand it a task.
@@ -108,7 +108,7 @@ Everything below is in the current npm release ([0.7.0](CHANGELOG.md)) unless ma
 - **Memory**: per-twin episodic recall and distilled facts, stored locally, with a relevance gate. Semantic recall uses OpenAI embeddings only if you add `OPENAI_API_KEY`.
 - **Knowledge uploads**: PDF and Word files become Markdown the twin reads on demand.
 - **Editable profiles**: a split-pane editor over the nine files in `/profile`, with version history.
-- **Relay** (`/handover`, on `main`, not yet released): when someone leaves, a short handover interview asks what their twin's profile is missing. With their consent the twin stays as a read-only former employee's twin that everyone can keep asking, and the CEO can download the notes.
+- **Relay** (`/handover`): when someone leaves, a short handover interview asks what their twin's profile is missing. With their consent the twin stays as a read-only former employee's twin that everyone can keep asking, and the CEO can download the notes.
 - **Hebrew**: twins converse, write and remember in Hebrew with right-to-left rendering. UI translation is partial.
 
 **Work, with sign-off**
@@ -116,7 +116,7 @@ Everything below is in the current npm release ([0.7.0](CHANGELOG.md)) unless ma
 - **Slack**: a connected twin drafts answers to its @mentions and DMs; replies go through Approvals by default.
 - **Email intake**: a twin drafts replies to incoming mail; sending goes through the approval gate.
 - **Routines and autonomous shifts** (`/routines`, `/cockpit`) with per-run archives and a daily per-twin budget. They only run when Autonomy is switched on (off by default).
-- **Voice**: listen to answers via ElevenLabs. Speaking a question in Ask is on `main`, not yet released.
+- **Voice**: talk to a twin in Ask: live transcription as you speak, the answer spoken sentence by sentence in the twin's voice, and you can talk over it (ElevenLabs; off in EU mode).
 
 **Platform**
 - **Your org's own MCP server**: every install includes one, so anyone on the team can ask the twins from Claude Code, Codex, Cursor and other MCP clients ([below](#your-twins-inside-every-agent-mcp), [docs/mcp.md](./docs/mcp.md)).

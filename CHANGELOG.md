@@ -8,6 +8,47 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-10-24
+
+Highlights: Relay (when someone leaves, their twin stays, read-only), live
+voice in Ask, and Ask keeps your conversations.
+
+### Ask keeps your conversations
+- Each answered question is saved to the twin's history with the steps it
+  took. Pick a twin and your last conversation with it comes back, even after
+  a reload; "New conversation" starts fresh (the old one stays saved).
+- History is per person: the server records who asked, and each person sees
+  only their own questions. Before, anyone could read what colleagues asked a
+  twin on the chat page. Clearing chat history clears only your own rows, and
+  deleting an employee also removes what they asked other twins.
+- The run stage is drawn with React Flow: wires land on their nodes, the
+  steps of a finished answer fold behind their count, and answers are no
+  longer read aloud unless you turn "Voice on".
+
+### Fixes
+- **AI disclosure:** Outlook replies and Teams posts went out without
+  "🤖 AI twin of …". Every chat app and email body field now carries it, as
+  HTML when the message is HTML; reads like GMAIL_LIST_DRAFTS are no longer
+  mistaken for sends.
+- **Slack auto-replies** used argument names Composio's current schema
+  doesn't have: thread context came back empty and replies sent "text"
+  (now "markdown_text"). The focus page asked for a removed Slack tool.
+- **Reads classified by action:** SharePoint (its "SHARE" prefix read as a
+  share), Outlook search (QUERY), Drive downloads/exports, Teams listings and
+  "who am I" lookups are reads, so the twin builder can use them and chat
+  twins don't ask approval for them. Marking mail as read stays gated.
+- The twin builder's write gate resolves symlinks (data folders under macOS
+  /tmp or a moved home no longer block the first profile writes).
+- A retired twin isn't offered tasks in Ask, and the work queue refuses them.
+
+### For contributors
+- `npm run eval:connectors`: a Composio emulator over CompanySim (Gmail,
+  Outlook, Slack, Jira, Drive, SharePoint, Teams) with Composio's captured
+  tool contracts, switched on with `EMPLOYEE001_CONNECTORS=emulator` (never in
+  a production build), plus evals for the twin builder, the approval gate and
+  email intake. `npm run eval:relay` evaluates the handover interviewer, also
+  end to end from emulated connectors (`RELAY_EVAL_BUILD=emulator`).
+
 ### Live voice in Ask
 Talking to a twin in Ask is now a conversation instead of record, stop, wait.
 
