@@ -21,7 +21,9 @@ type Env = Record<string, string | undefined>;
 /** Oldest Claude Code we've verified the Agent SDK protocol against. */
 export const MIN_CLAUDE_CODE_VERSION = "2.1.258";
 
-const NAMES = process.platform === "win32" ? ["claude.exe", "claude.cmd", "claude"] : ["claude"];
+// On Windows only the native installer's claude.exe: npm's claude.cmd shim
+// can't be spawned without a shell, by us or by the Agent SDK.
+const NAMES = process.platform === "win32" ? ["claude.exe"] : ["claude"];
 
 function isFile(p: string): boolean {
   try {
@@ -36,7 +38,8 @@ function isFile(p: string): boolean {
 export function findClaudeCli(env: Env = process.env): string | null {
   const override = env.EMPLOYEE001_CLAUDE_PATH?.trim();
   if (override) return isFile(override) ? override : null;
-  const home = env.HOME || os.homedir();
+  // Git Bash sets HOME to an MSYS path on Windows: ask the OS there.
+  const home = process.platform === "win32" ? os.homedir() : env.HOME || os.homedir();
   const dirs = [
     ...(env.PATH ?? "").split(path.delimiter).filter(Boolean),
     path.join(home, ".local", "bin"),
@@ -51,23 +54,35 @@ export function findClaudeCli(env: Env = process.env): string | null {
   return null;
 }
 
-/** Env for the CLI and the SDK child in this mode: no API key, no auth token,
- *  no base URL, so Claude Code uses its own sign-in, and never a token we pass. */
-export function claudeCodeEnvOverrides(): Env {
-  return {
-    ANTHROPIC_API_KEY: undefined,
-    ANTHROPIC_AUTH_TOKEN: undefined,
-    ANTHROPIC_BASE_URL: undefined,
-    CLAUDE_CODE_OAUTH_TOKEN: undefined,
-  };
+/** Env for the CLI and the SDK child in this mode: no key, token, endpoint,
+ *  provider switch or cloud credential of any kind, so Claude Code uses only
+ *  its own sign-in and nothing we (or the shell we were started from) pass.
+ *  Kept: the config dir (where that sign-in lives) and our client tag. */
+export function claudeCodeEnvOverrides(source: Env = process.env): Env {
+  const out: Env = {};
+  for (const key of Object.keys(source)) {
+    if (/^(ANTHROPIC_|CLAUDE_|AWS_|GOOGLE_|AZURE_|VERTEX_REGION_)/.test(key) || key === "CLOUD_ML_REGION") out[key] = undefined;
+  }
+  delete out.CLAUDE_CONFIG_DIR;
+  delete out.CLAUDE_AGENT_SDK_CLIENT_APP;
+  return out;
 }
 
-/** Why this mode can't serve the workspace: it covers one person only. */
-export function seatProblem(): string | null {
+/** Whether the server listens beyond this machine (EMPLOYEE001_BIND, or the
+ *  HOSTNAME `start` and the Docker image set to an address). */
+export function reachableFromNetwork(env: Env = process.env): boolean {
+  const bind = (env.EMPLOYEE001_BIND ?? env.HOSTNAME ?? "").trim().toLowerCase();
+  if (!bind || ["127.0.0.1", "::1", "localhost"].includes(bind)) return false;
+  return /^[0-9.:a-f]+$/.test(bind) && /[.:]/.test(bind);
+}
+
+/** Why this mode can't serve the workspace: it covers one person on this
+ *  machine. Checked on every model run (claudeCodeExecutable). */
+export function seatProblem(env: Env = process.env): string | null {
   const active = listUsers().filter((u) => !u.disabled).length;
-  return active > 1
-    ? "A Claude subscription covers one person, and this workspace has more than one account. Use an Anthropic API key or your cloud provider instead (run `npx employee001 setup`)."
-    : null;
+  if (active > 1) return "A Claude subscription covers one person, and this workspace has more than one account. Use an Anthropic API key or your cloud provider instead (run `npx employee001 setup`).";
+  if (reachableFromNetwork(env)) return "A Claude subscription covers one person on this machine, and this server is reachable from the network. Bind it to 127.0.0.1, or use an Anthropic API key or your cloud provider (run `npx employee001 setup`).";
+  return null;
 }
 
 export type ClaudeCliStatus = {
@@ -123,13 +138,16 @@ export function parseAuthStatus(stdout: string): Pick<ClaudeCliStatus, "loggedIn
 
 let cached: { at: number; status: ClaudeCliStatus } | undefined;
 const TTL_MS = 30_000;
+// A "signed out" answer goes stale fast: the user is about to sign in.
+const NEGATIVE_TTL_MS = 3_000;
+const ttl = (status: ClaudeCliStatus) => (status.loggedIn === false || status.installed === false || status.error ? NEGATIVE_TTL_MS : TTL_MS);
 
 let inflight: Promise<ClaudeCliStatus> | undefined;
 
 /** The last status we read, if any (canRunModel is synchronous). A stale or
  *  missing one is refreshed in the background for the next caller. */
 export function cachedClaudeCliStatus(): ClaudeCliStatus | undefined {
-  if (!inflight && (!cached || Date.now() - cached.at >= TTL_MS)) {
+  if (!inflight && (!cached || Date.now() - cached.at >= ttl(cached.status))) {
     inflight = claudeCliStatus({ fresh: true }).catch(() => cached?.status ?? { installed: false }).finally(() => { inflight = undefined; });
   }
   return cached?.status;
@@ -137,7 +155,7 @@ export function cachedClaudeCliStatus(): ClaudeCliStatus | undefined {
 
 /** Whether `claude` is installed, recent enough and signed in. */
 export async function claudeCliStatus(opts: { fresh?: boolean } = {}): Promise<ClaudeCliStatus> {
-  if (!opts.fresh && cached && Date.now() - cached.at < TTL_MS) return cached.status;
+  if (!opts.fresh && cached && Date.now() - cached.at < ttl(cached.status)) return cached.status;
   const cli = findClaudeCli();
   let status: ClaudeCliStatus;
   if (!cli) {
@@ -149,8 +167,8 @@ export async function claudeCliStatus(opts: { fresh?: boolean } = {}): Promise<C
       status.versionOk = compareVersions(status.version, MIN_CLAUDE_CODE_VERSION) >= 0;
       Object.assign(status, parseAuthStatus(await run(cli, ["auth", "status"])));
     } catch (err) {
+      // Couldn't run it (a timeout, a launch error): unknown, not "signed out".
       status.error = err instanceof Error ? err.message.split("\n")[0] : String(err);
-      status.loggedIn ??= false;
     }
   }
   cached = { at: Date.now(), status };
@@ -159,9 +177,13 @@ export async function claudeCliStatus(opts: { fresh?: boolean } = {}): Promise<C
 
 /** What's wrong with this mode right now, worded for the person fixing it. */
 export function claudeCodeProblem(status: ClaudeCliStatus | undefined, env: Env = process.env): string | null {
-  const seat = seatProblem();
+  const seat = seatProblem(env);
   if (seat) return seat;
-  if (!findClaudeCli(env)) return "Claude Code isn't installed on this machine. Install it (npm install -g @anthropic-ai/claude-code), run `claude` once and sign in.";
+  if (!findClaudeCli(env)) {
+    return process.platform === "win32"
+      ? "Claude Code (claude.exe) isn't installed on this machine. Install it with Anthropic's native installer, run `claude` once and sign in."
+      : "Claude Code isn't installed on this machine. Install it (npm install -g @anthropic-ai/claude-code), run `claude` once and sign in.";
+  }
   if (!status) return null; // not checked yet: let the run report it
   if (status.version && !status.versionOk) return `Claude Code ${status.version} is too old (needs ${MIN_CLAUDE_CODE_VERSION}+). Run \`claude update\`.`;
   if (status.loggedIn === false) return "Claude Code isn't signed in. Run `claude` in a terminal and sign in with your Claude account, then try again.";

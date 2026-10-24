@@ -22,6 +22,7 @@ import {
   resolveSession,
   type User,
 } from "./store";
+import { addPersonProblem } from "../model-provider";
 
 // ─── Rate limiting ───────────────────────────────────────────────────────────
 
@@ -177,7 +178,7 @@ export function signInWithOidc(claims: IdClaims, cfg: OidcConfig, ip: string): L
     const byEmail = findUserByEmail(email);
     if (byEmail && !byEmail.oidc) {
       user = updateUser(byEmail.id, { oidc: { issuer: cfg.issuer, subject: claims.sub } });
-    } else if (!byEmail && cfg.allowedDomains.includes(email.split("@")[1] ?? "")) {
+    } else if (!byEmail && cfg.allowedDomains.includes(email.split("@")[1] ?? "") && !addPersonProblem()) {
       user = createUser({ email, name: claims.name ?? email, role: "member", oidc: { issuer: cfg.issuer, subject: claims.sub }, createdBy: "oidc" });
       auditAuth("userCreated", { userId: user.id, role: "member", via: "oidc" }, user.id);
     }

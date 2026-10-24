@@ -71,6 +71,21 @@ function generateToken() {
 let ENV_PATH = resolve(process.cwd(), ".env");
 let DATA_DIR = resolve(process.cwd(), "data");
 
+/** "2 more accounts and 1 pending invite" in this folder's data/, or "". */
+function otherPeople() {
+  const read = (file, fallback) => {
+    try { return JSON.parse(readFileSync(resolve(DATA_DIR, file), "utf8")); } catch { return fallback; }
+  };
+  const users = read("auth/users.json", []);
+  const invites = read("invites.json", []);
+  const extra = Math.max(0, (Array.isArray(users) ? users.filter((u) => u && !u.disabled).length : 0) - 1);
+  const pending = Array.isArray(invites) ? invites.filter((i) => i && !i.completedAt && !i.revokedAt && (!i.expiresAt || Date.parse(i.expiresAt) > Date.now())).length : 0;
+  const parts = [];
+  if (extra) parts.push(`${extra} more account${extra === 1 ? "" : "s"}`);
+  if (pending) parts.push(`${pending} pending invite${pending === 1 ? "" : "s"}`);
+  return parts.join(" and ");
+}
+
 function readExistingEnv() {
   if (!existsSync(ENV_PATH)) return {};
   const text = readFileSync(ENV_PATH, "utf8");
@@ -177,6 +192,8 @@ export default async function setup(_argv, { launch = true } = {}) {
     }
     p.log.success(`Using your Claude subscription${planLabel(claude) ? ` (${planLabel(claude)})` : ""} through Claude Code ${claude.version ?? ""}.`.replace(" .", "."));
     p.log.info("It covers you alone: to bring in colleagues later, switch to an API key or your cloud.");
+    const others = otherPeople();
+    if (others) p.log.warn(`This workspace already has ${others}. In this mode they can't use it, and pending invites won't build, until you switch to an API key or your cloud.`);
   } else if (provider === "anthropic") {
     p.log.info("No key yet? Press Ctrl+C and run `npx employee001 demo`: it needs none.");
     for (;;) {

@@ -1,6 +1,6 @@
 import "server-only";
 import { euRegion, modelResidencyProblem } from "./data-residency";
-import { cachedClaudeCliStatus, claudeCodeEnvOverrides, claudeCodeProblem, findClaudeCli } from "./claude-code-cli";
+import { cachedClaudeCliStatus, claudeCodeEnvOverrides, claudeCodeProblem, findClaudeCli, seatProblem } from "./claude-code-cli";
 
 // "claude-code": the user's own signed-in Claude Code (a Claude subscription,
 // one person only). See claude-code-cli.ts.
@@ -57,7 +57,7 @@ export function providerEnvForAgentSdk(env: Env = process.env): Env {
     case "bedrock": return { ...clear, CLAUDE_CODE_USE_BEDROCK: "1", AWS_REGION: env.AWS_REGION };
     case "vertex": return { ...clear, CLAUDE_CODE_USE_VERTEX: "1", CLOUD_ML_REGION: env.CLOUD_ML_REGION, ANTHROPIC_VERTEX_PROJECT_ID: env.ANTHROPIC_VERTEX_PROJECT_ID };
     case "foundry": return { ...clear, CLAUDE_CODE_USE_FOUNDRY: "1", ANTHROPIC_FOUNDRY_RESOURCE: env.ANTHROPIC_FOUNDRY_RESOURCE };
-    case "claude-code": return { ...clear, ...claudeCodeEnvOverrides() };
+    case "claude-code": return { ...clear, ...claudeCodeEnvOverrides(env) };
     case "local": {
       // Fail closed: without a valid endpoint the child would fall back to
       // api.anthropic.com. The real Anthropic key is blanked so it is never
@@ -79,6 +79,10 @@ export function providerEnvForAgentSdk(env: Env = process.env): Env {
  *  claude-code mode, the SDK's bundled one otherwise. */
 export function claudeCodeExecutable(env: Env = process.env): string | undefined {
   if (currentProvider(env) !== "claude-code") return undefined;
+  // Every model run passes here (providerRuntimeOptions), routines and
+  // shifts included: the one-person rule holds even where no route checked.
+  const seat = seatProblem(env);
+  if (seat) throw new Error(seat);
   const cli = findClaudeCli(env);
   // Never fall back to the bundled runtime here: it would run without the
   // user's sign-in (or with whatever key is around) and bill the wrong way.

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { canRunModel } from "@/lib/model-provider";
+import { addPersonProblem, canRunModel } from "@/lib/model-provider";
 import {
   refreshConnections,
   isComposioConfigured,
@@ -51,18 +51,18 @@ export async function GET(
   // Guarded by getActiveBuild() so we never double-fire.
   try {
     const pending = await readPendingBuild(id);
-    if (pending && countActiveConnections(state) > 0 && !getActiveBuild(id)) {
-      await clearPendingBuild(id);
-      if (canRunModel().ok) {
-        const fromDisk = await loadEmployeesFromDisk();
-        const employee = fromDisk.find((e) => e.id === id);
-        if (employee) {
-          spawnDetachedBuild({
-            employee,
-            lookbackDays: pending.lookbackDays,
-            ceoContext: pending.ceoContext ?? "Auto-train on consent",
-          });
-        }
+    // On a Claude subscription a build from someone else's invite keeps
+    // waiting; the pending marker stays until a build actually starts.
+    if (pending && countActiveConnections(state) > 0 && !getActiveBuild(id) && canRunModel().ok && !addPersonProblem()) {
+      const fromDisk = await loadEmployeesFromDisk();
+      const employee = fromDisk.find((e) => e.id === id);
+      if (employee) {
+        await clearPendingBuild(id);
+        spawnDetachedBuild({
+          employee,
+          lookbackDays: pending.lookbackDays,
+          ceoContext: pending.ceoContext ?? "Auto-train on consent",
+        });
       }
     }
   } catch (err) {
