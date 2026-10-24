@@ -19,6 +19,7 @@ import { CitedAnswer, type CitedSource } from "@/components/ex/cited-answer";
 import { SourceCard, type SourceCardData, type SourceLookup } from "@/components/ex/source-card";
 import { describeToolCall } from "@/components/ex/morph-orb/tool-nodes";
 import { parseCitedAnswer } from "@/lib/org-answer";
+import { displayRole } from "@/lib/employees";
 
 type SourceState = {
   kind: SourceCardData["kind"];
@@ -221,7 +222,7 @@ export default function AskCompanyPage() {
                   id: sid,
                   kind: st.kind,
                   name: e?.firstName ?? st.name ?? sid,
-                  title: e?.role ?? st.title ?? "",
+                  title: e ? displayRole(e) : st.title ?? "",
                   initials: e?.initials,
                   color: e?.avatarColor,
                   status: st.status,
