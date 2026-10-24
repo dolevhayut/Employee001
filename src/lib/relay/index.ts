@@ -1,37 +1,14 @@
 /**
- * Relay · public barrel — the SPINOUT-SURVIVING CONTRACT SURFACE (PRD section 7).
+ * Relay · the portable Role Context Package contract.
  *
- * This is the thin, deliberate boundary the rest of Employee001 (and any future
- * spinout / agent→agent successor) imports from. Kept PRAGMATIC for the demo —
- * NO adapters/ports ceremony. The portable type contract lives in ./rcp.types
- * (zero E001 imports); this barrel re-exports it plus the four contract
- * functions:
- *
- *   - createHandover  — mint a handover + run it (wrapper of runRelayHandover)
- *   - exportRCP       — portable READ side: load + validate data/handovers/<id>/rcp.json
- *   - ingestRCP       — portable INGEST side: validate a foreign RCP (Phase 2 agent→agent)
- *   - the RoleContextPackage type + schema-version constant
- *
- * exportRCP / ingestRCP have ZERO dependency on E001 internals beyond the
- * portable ./rcp.types — they are the read/write halves of the spinout contract.
+ * exportRCP / ingestRCP are the read and write halves of the handover package
+ * as a portable file (rcp.json): another tool, or another Employee001, can
+ * read a package exported here. Zero dependency on E001 internals beyond
+ * ./rcp.types and the package store.
  */
 
-import fs from "fs";
-import path from "path";
-import { dataDir } from "../app-home";
-
-import {
-  RCP_SCHEMA_VERSION,
-  type RoleContextPackage,
-} from "./rcp.types";
-import {
-  runRelayHandover,
-  newHandoverId,
-  type RelayEvent,
-  type RunRelayHandoverArgs,
-} from "./runner";
-
-// ─── Re-exports (the portable contract) ───────────────────────────────────────
+import { RCP_SCHEMA_VERSION, type RoleContextPackage } from "./rcp.types";
+import { loadPackage, savePackage } from "./package-store";
 
 export { RCP_SCHEMA_VERSION } from "./rcp.types";
 export type {
@@ -44,103 +21,37 @@ export type {
   SynthMode,
   RcpStatus,
 } from "./rcp.types";
-export {
-  runRelayHandover,
-  spawnDetachedRelay,
-  appendHandoverEvent,
-  newHandoverId,
-  DEMO_BANNER,
-} from "./runner";
-export type {
-  RelayEvent,
-  RelayPhase,
-  RelayStoppedReason,
-  RunRelayHandoverArgs,
-  SpawnRelayResult,
-} from "./runner";
 export { scoreCoverage } from "./coverage";
 export type { CoverageResult } from "./coverage";
 export { verifyRcpEvidence } from "./evidence";
 
-// ─── Path helper (kept local so the barrel is self-contained) ─────────────────
-
-const RCP_PATH = (employeeId: string) =>
-  dataDir("handovers", employeeId, "rcp.json");
-
-// ─── createHandover ───────────────────────────────────────────────────────────
-
-/**
- * Mint a handoverId + run the relay handover to completion (collecting events).
- * Thin wrapper over runRelayHandover for callers that want a one-shot, awaited
- * run (e.g. the headless demo script). The detached/streamed path is
- * spawnDetachedRelay (used by the POST route).
- *
- * synthMode defaults to 'fixture' — the no-API demo default.
- */
-export async function createHandover(
-  args: Omit<RunRelayHandoverArgs, "handoverId" | "onEvent"> & {
-    handoverId?: string;
-    onEvent?: (e: RelayEvent) => void;
-  },
-): Promise<{ handoverId: string; rcpPath: string; events: RelayEvent[] }> {
-  const handoverId = args.handoverId ?? newHandoverId();
-  const events: RelayEvent[] = [];
-
-  await runRelayHandover({
-    ...args,
-    synthMode: args.synthMode ?? "fixture",
-    handoverId,
-    onEvent: (e) => {
-      events.push(e);
-      args.onEvent?.(e);
-    },
-  });
-
-  return { handoverId, rcpPath: RCP_PATH(args.employee.id), events };
-}
-
 // ─── exportRCP (portable READ side of the contract) ───────────────────────────
 
-/**
- * Read + validate data/handovers/<employeeId>/rcp.json and return the typed
- * RCP, or null if the file is absent or fails validation. Zero dependency on
- * E001 internals — the portable read side of the contract.
- */
-export function exportRCP(employeeId: string): RoleContextPackage | null {
-  try {
-    const raw = fs.readFileSync(RCP_PATH(employeeId), "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    const result = validateRCP(parsed);
-    return result.ok ? result.rcp : null;
-  } catch {
-    return null;
-  }
+/** The twin's handover package, validated, or null if absent or invalid. */
+export async function exportRCP(employeeId: string): Promise<RoleContextPackage | null> {
+  const result = validateRCP(await loadPackage(employeeId));
+  return result.ok ? result.rcp : null;
 }
 
 // ─── ingestRCP (portable INGEST side — Phase 2 agent→agent) ───────────────────
 
 /**
- * Validate a FOREIGN RCP (schema_version, required fields, and the no-secrets
- * invariant on tooling_map) so it can seed a successor twin. For the demo this
- * validates + persists to data/handovers/<source_twin_id>/rcp.json; it does NOT
- * spin a model. Returns a discriminated result.
+ * Validate a foreign RCP (schema_version, required fields, and the no-secrets
+ * invariant on tooling_map) and save it as that twin's handover package.
  */
-export function ingestRCP(
+export async function ingestRCP(
   rcp: RoleContextPackage,
-): { ok: true; employeeId: string } | { ok: false; error: string } {
+): Promise<{ ok: true; employeeId: string } | { ok: false; error: string }> {
   const result = validateRCP(rcp as unknown);
   if (!result.ok) return { ok: false, error: result.error };
-
   const employeeId = result.rcp.source_twin_id;
+  if (!/^[a-z0-9_][a-z0-9_-]{1,63}$/.test(employeeId)) return { ok: false, error: "source_twin_id is not a valid twin id" };
   try {
-    const dest = RCP_PATH(employeeId);
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.writeFileSync(dest, JSON.stringify(result.rcp, null, 2), "utf8");
+    await savePackage(employeeId, result.rcp);
   } catch (err) {
     const m = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `Failed to persist ingested RCP: ${m}` };
   }
-
   return { ok: true, employeeId };
 }
 

@@ -45,6 +45,13 @@ export async function POST(
     );
   }
 
+  if (employee.lifecycle === "retired") {
+    return new Response(
+      JSON.stringify({ error: "This person has left. Ask their twin instead; it takes no tasks." }),
+      { status: 409, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   if (employee.twinStatus !== "ready") {
     return new Response(
       JSON.stringify({ error: "twin is not ready" }),

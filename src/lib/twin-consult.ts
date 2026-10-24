@@ -103,6 +103,7 @@ export async function consultTwin(
   const target = findTarget(ctx, targetId);
   if (!target) {
     const list = availableTargets(ctx)
+      .filter((e) => e.lifecycle !== "retired")
       .map((e) => `${e.id} (${e.firstName}, ${e.role})`)
       .join("; ");
     return `No ready twin with id "${targetId}". Available to consult: ${list || "(none)"}.`;
@@ -165,7 +166,9 @@ export async function requestApproval(
       approverName: "system",
     };
   }
-  const approver = findTarget(ctx, approverId);
+  const found = findTarget(ctx, approverId);
+  // Someone who has left has no authority to approve anything.
+  const approver = found?.lifecycle === "retired" ? undefined : found;
   if (!approver) {
     const list = availableTargets(ctx)
       .map((e) => `${e.id} (${e.firstName}, ${e.role})`)

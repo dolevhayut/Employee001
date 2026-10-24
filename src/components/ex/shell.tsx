@@ -79,6 +79,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/employees", labelKey: "nav.twins", icon: "Home" },
       { href: "/marketplace", labelKey: "nav.hire", icon: "Store" },
+      { href: "/handover", labelKey: "nav.handover", icon: "Send" },
     ],
   },
   {
@@ -96,10 +97,6 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/budgets", labelKey: "nav.spend", icon: "DollarSign" },
       { href: "/connections", labelKey: "nav.tools", icon: "Plug" },
     ],
-  },
-  {
-    labelKey: "nav.section.labs",
-    items: [{ href: "/handover", labelKey: "nav.handover", icon: "Send" }],
   },
 ];
 
@@ -205,8 +202,7 @@ const STATIC_COMMANDS: StaticCommand[] = [
   { id: "connections", labelKey: "nav.tools", href: "/connections", icon: "Plug", group: "navigate", hintKey: "shell.cmd.tools.hint", keywords: "connections integrations composio slack github gmail tools mcp כלים חיבורים" },
   { id: "marketplace", labelKey: "nav.hire", href: "/marketplace", icon: "Store", group: "navigate", hintKey: "shell.cmd.hire.hint", keywords: "marketplace agents hire catalog גיוס סוכנים" },
   { id: "council", labelKey: "nav.teamMeeting", href: "/council", icon: "Team", group: "navigate", hintKey: "shell.cmd.meeting.hint", keywords: "council meeting team debate room ישיבת צוות מועצה" },
-  { id: "handover", labelKey: "nav.handover", href: "/handover", icon: "Send", group: "navigate", hintKey: "shell.cmd.handover.hint", keywords: "relay handover offboarding rcp role context successor coverage חפיפה" },
-  { id: "handover-live", labelKey: "shell.cmd.liveInterview", href: "/handover/live", icon: "Bot", group: "navigate", hintKey: "shell.cmd.liveInterview.hint", keywords: "relay live interview handover chat answer real opus synthesize tune prompt ראיון חי חפיפה" },
+  { id: "handover", labelKey: "nav.handover", href: "/handover", icon: "Send", group: "navigate", hintKey: "shell.cmd.handover.hint", keywords: "relay handover offboarding leaving former employee retire retired twin knowledge חפיפה עזיבה עובד לשעבר" },
   { id: "templates", labelKey: "shell.cmd.templates", href: "/templates", icon: "Doc", group: "navigate", hintKey: "shell.cmd.templates.hint", keywords: "slash commands prompts snippets תבניות" },
   { id: "routines", labelKey: "nav.schedules", href: "/routines", icon: "Refresh", group: "navigate", hintKey: "shell.cmd.schedules.hint", keywords: "routines automation schedule recurring cron תזמונים שגרות" },
   { id: "focus", labelKey: "shell.cmd.focus", href: "/focus", icon: "Eye", group: "navigate", hintKey: "shell.cmd.focus.hint", keywords: "focus prefetch composio github linear gmail world state מיקוד פוקוס" },

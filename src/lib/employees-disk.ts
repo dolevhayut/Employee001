@@ -5,7 +5,7 @@
 import "server-only";
 import fs from "fs/promises";
 import path from "path";
-import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin } from "./employees";
+import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin, RetentionConsent, TwinLifecycle } from "./employees";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 import { withSidecarLock } from "./sidecar-lock";
 import { dataDir } from "./app-home";
@@ -55,6 +55,11 @@ type DiskSidecar = {
   seedModel?: ClaudeModel;
   refreshModel?: ClaudeModel;
   answerSlackWithoutAsking?: boolean;
+  /** Relay lifecycle; missing = active. */
+  lifecycle?: TwinLifecycle;
+  handoverStartedAt?: string;
+  retiredAt?: string;
+  retention?: RetentionConsent;
   /** Synthetic demo-fixture twin: not a person, consent doesn't apply. */
   synthetic?: boolean;
   /**
@@ -171,6 +176,9 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
       ...(sidecar.consent ? { consent: sidecar.consent } : {}),
       ...(sidecar.synthetic === true ? { synthetic: true } : {}),
       answerSlackWithoutAsking: sidecar.answerSlackWithoutAsking === true,
+      ...(sidecar.lifecycle && sidecar.lifecycle !== "active" ? { lifecycle: sidecar.lifecycle } : {}),
+      ...(sidecar.retiredAt ? { retiredAt: sidecar.retiredAt } : {}),
+      ...(sidecar.retention ? { retention: sidecar.retention } : {}),
     });
   }
 

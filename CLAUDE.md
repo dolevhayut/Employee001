@@ -76,8 +76,12 @@ boards, plans and logs are in `docs/local/cto/archive/`.
 
 - `/profile` — twin profile; **Files** tab is a split-pane TipTap editor over the 9
   base profile files + an uploadable `knowledge/` dir the twin reads on demand.
-- `/handover` (+ `/handover/live`) — Relay: captures a departing employee's knowledge
-  into a portable Role Context Package (`rcp.json`). **DEMO module — not published.**
+- `/handover` (+ `/handover/interview`) — Relay: when someone leaves, a gap-first
+  handover interview, retention consent, reviewed notes (`rcp.json`), then a
+  **retired** twin (`lifecycle` in employee.json): read-only, no tools, no memory
+  writes, labelled "Former <role>". The runner enforces it from disk
+  (`runSingleTwin`); work paths (intake, routines, shifts, tasks, builder,
+  approvals) refuse retired twins.
 - `/flow`, `/cockpit`, `/connections` — twin chat with live memory graph, run
   observability, and Composio tool connections.
 

@@ -98,6 +98,11 @@ async function executeWorkItem(item: WorkItem): Promise<void> {
     skipWorkItem(item.id, "Assignee employee no longer exists");
     return;
   }
+  // Queued before the person left: a former employee's twin takes no work.
+  if (employee.lifecycle === "retired") {
+    skipWorkItem(item.id, "Assignee has left the company (retired twin)");
+    return;
+  }
 
   // Budget gate releases the lease WITHOUT consuming an attempt — being out
   // of budget is the workspace's state, not the item's failure.

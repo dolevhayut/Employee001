@@ -1,4 +1,5 @@
 import { enqueueWorkItem } from "@/lib/work-items";
+import { isRetiredSync } from "@/lib/twin-lifecycle";
 import { toolkitAllowed } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
 
@@ -64,7 +65,9 @@ export function shouldIgnoreSlackMessage(message: IncomingSlackMessage, twinSlac
 export function ingestSlackMessage(
   employeeId: string,
   message: IncomingSlackMessage,
-): { deduped: boolean; workItemId: string | null; skipped?: "consent" } {
+): { deduped: boolean; workItemId: string | null; skipped?: "consent" | "retired" } {
+  // A former employee's twin answers in the app only; it takes no work.
+  if (isRetiredSync(employeeId)) return { deduped: false, workItemId: null, skipped: "retired" };
   if (!toolkitAllowed(loadConsentStatus(employeeId), "slack")) {
     return { deduped: false, workItemId: null, skipped: "consent" };
   }

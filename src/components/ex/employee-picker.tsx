@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { NavArrowRight } from "iconoir-react";
-import { type EmployeeWithTwin } from "@/lib/employees";
+import { type EmployeeWithTwin, displayRole } from "@/lib/employees";
 import { useRoster } from "@/components/ex/roster-context";
 import { useT } from "@/components/ex/i18n-context";
 import type { MessageKey } from "@/lib/i18n/messages";
@@ -139,7 +139,7 @@ export function EmployeePicker({ value, onSelect, navigate = true, readyOnly, pl
             {active.name}
           </div>
           <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", lineHeight: 1.25 }}>
-            {active.role}
+            {displayRole(active)}
           </div>
         </div>
         <span
@@ -221,7 +221,7 @@ export function EmployeePicker({ value, onSelect, navigate = true, readyOnly, pl
                   <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--text)" }}>
                     {emp.name}
                   </div>
-                  <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>{emp.role}</div>
+                  <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>{displayRole(emp)}</div>
                 </div>
                 <span
                   style={{

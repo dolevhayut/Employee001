@@ -61,7 +61,8 @@ function selectParticipants(
   playbook: Playbook,
   employees: Awaited<ReturnType<typeof loadEmployeesFromDisk>>,
 ) {
-  const ready = employees.filter((employee) => employee.twinStatus === "ready");
+  // Playbooks put twins to work; a former employee's twin isn't one of them.
+  const ready = employees.filter((employee) => employee.twinStatus === "ready" && employee.lifecycle !== "retired");
   const scope = playbook.participants;
   if (scope === "all") return ready;
   if (Array.isArray(scope))
@@ -202,7 +203,7 @@ export async function runPlaybook(
       responders: participants,
       question: prompt,
       allParticipants: employees.filter(
-        (employee) => employee.twinStatus === "ready",
+        (employee) => employee.twinStatus === "ready" && employee.lifecycle !== "retired",
       ),
       onEvent,
     });

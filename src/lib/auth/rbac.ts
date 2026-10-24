@@ -97,10 +97,14 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/twin-builder/[employeeId]/stream": { GET: member },
   "/api/twin-builder/active": { GET: member },
   "/api/twin-focus/[id]": { GET: member, PUT: member },
-  "/api/relay/[employeeId]": { GET: admin, POST: admin },
-  "/api/relay/[employeeId]/interview": { POST: admin },
-  "/api/relay/[employeeId]/stream": { GET: admin },
-  "/api/relay/[employeeId]/synthesize": { POST: admin },
+  // Relay: admins run the lifecycle; the departing employee does their own
+  // interview, consent and review (approval itself is admin-only, in-route).
+  "/api/relay": { GET: admin },
+  "/api/relay/[employeeId]": { GET: role("admin", "employeeId"), POST: admin },
+  "/api/relay/[employeeId]/interview": { POST: role("admin", "employeeId") },
+  "/api/relay/[employeeId]/synthesize": { POST: role("admin", "employeeId") },
+  "/api/relay/[employeeId]/consent": { POST: role("admin", "employeeId") },
+  "/api/relay/[employeeId]/package": { GET: admin, PATCH: role("admin", "employeeId") },
 
   // Using the product
   "/api/twin/chat": { POST: member },
@@ -176,9 +180,9 @@ export const API_ROUTES: Record<string, Methods> = {
 /** Pages anyone may open (they handle their own credential). */
 const PUBLIC_PAGES = [/^\/login(\/|$)/, /^\/signup(\/|$)/, /^\/forgot-password(\/|$)/, /^\/auth(\/|$)/, /^\/join(\/|$)/, /^\/onboarding(\/|$)/, /^\/welcome(\/|$)/];
 /** Pages an employee-role user may open. */
-const EMPLOYEE_PAGES = [/^\/$/, /^\/profile(\/|$)/, /^\/account(\/|$)/];
+const EMPLOYEE_PAGES = [/^\/$/, /^\/profile(\/|$)/, /^\/account(\/|$)/, /^\/handover\/interview(\/|$)/];
 /** Admin-only pages. */
-const ADMIN_PAGES = [/^\/settings(\/|$)/, /^\/audit(\/|$)/, /^\/connections(\/|$)/, /^\/budgets(\/|$)/, /^\/handover(\/|$)/];
+const ADMIN_PAGES = [/^\/settings(\/|$)/, /^\/audit(\/|$)/, /^\/connections(\/|$)/, /^\/budgets(\/|$)/, /^\/handover\/?$/];
 
 type Compiled = { pattern: string; re: RegExp; params: string[]; methods: Methods };
 

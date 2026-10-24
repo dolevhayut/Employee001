@@ -13,6 +13,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import type { EmployeeWithTwin } from "@/lib/employees";
+import { displayRole } from "@/lib/employees";
 import { useT } from "@/components/ex/i18n-context";
 import { isolate } from "@/lib/i18n/format";
 import { useOrgName } from "./use-org-name";
@@ -236,7 +237,7 @@ function EmployeePopover({
               textOverflow: "ellipsis",
             }}
           >
-            <bdi>{employee.role}</bdi>
+            <bdi>{displayRole(employee)}</bdi>
           </div>
         </div>
         {isAgent && (
@@ -449,7 +450,7 @@ export function OrgChart({ employees, ceoName }: Props) {
         position: { x, y: ROW_H },
         data: {
           label: emp.name,
-          sub: `${isolate(emp.role)} · ${isolate(emp.department)}`,
+          sub: `${isolate(displayRole(emp))} · ${isolate(emp.department)}`,
           initials: emp.initials,
           color: emp.avatarColor,
           kind: isAgent(emp) ? "agent" : "employee",

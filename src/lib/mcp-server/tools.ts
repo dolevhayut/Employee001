@@ -1,4 +1,5 @@
 import { appendAuditEntry } from "@/lib/audit-log";
+import { displayRole } from "@/lib/employees";
 import { listPendingApprovals } from "@/lib/approval-bus";
 import { runSingleTwin } from "@/lib/council-runner";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
@@ -158,9 +159,10 @@ async function listTwins(): Promise<ToolResult> {
         id: employee.id,
         name: employee.name,
         firstName: employee.firstName,
-        role: employee.role,
+        role: displayRole(employee),
         department: employee.department,
         status: employee.twinStatus,
+        lifecycle: employee.lifecycle ?? "active",
       }))
       .sort((left, right) => left.name.localeCompare(right.name)),
   );
@@ -309,10 +311,10 @@ async function askTwin(args: ToolArgs): Promise<ToolResult> {
       content: [
         {
           type: "text",
-          text: `${employee.firstName} (${employee.role}) says:\n\n${answer}`,
+          text: `${employee.firstName} (${displayRole(employee)}${employee.lifecycle === "retired" ? ", has left the company" : ""}) says:\n\n${answer}`,
         },
       ],
-      structuredContent: { twinId: employee.id, name: employee.firstName, role: employee.role, answer },
+      structuredContent: { twinId: employee.id, name: employee.firstName, role: displayRole(employee), former: employee.lifecycle === "retired", answer },
     };
   } finally {
     inFlight().delete(employee.id);

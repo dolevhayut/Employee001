@@ -1,4 +1,5 @@
 import { enqueueWorkItem } from "@/lib/work-items";
+import { isRetiredSync } from "@/lib/twin-lifecycle";
 import { toolkitAllowed } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
 
@@ -32,7 +33,9 @@ export function normalizeEmailMessage(message: RawEmailMessage): IncomingEmail |
 export function ingestEmailMessage(
   employeeId: string,
   message: IncomingEmail,
-): { deduped: boolean; workItemId: string | null; skipped?: "consent" } {
+): { deduped: boolean; workItemId: string | null; skipped?: "consent" | "retired" } {
+  // A former employee's twin answers in the app only; it takes no work.
+  if (isRetiredSync(employeeId)) return { deduped: false, workItemId: null, skipped: "retired" };
   if (!toolkitAllowed(loadConsentStatus(employeeId), "gmail")) {
     return { deduped: false, workItemId: null, skipped: "consent" };
   }

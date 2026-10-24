@@ -22,7 +22,7 @@ import {
   type EmployeeCanvas,
 } from "@/components/ex/employee-canvas";
 import { ClarificationCard } from "@/components/ex/clarification-card";
-import { type EmployeeWithTwin } from "@/lib/employees";
+import { type EmployeeWithTwin, displayRole } from "@/lib/employees";
 import { useRoster } from "@/components/ex/roster-context";
 import type { CouncilEvent, ClarificationQuestion } from "@/lib/council-runner";
 import { humanizeToolAction } from "@/lib/tool-humanize";
@@ -268,7 +268,7 @@ function ParticipantsBar({
               <bdi>{emp.firstName}</bdi>
             </span>
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>
-              <bdi>{emp.role}</bdi>
+              <bdi>{displayRole(emp)}</bdi>
             </span>
           </button>
         );
@@ -1460,7 +1460,7 @@ function TwinBubble({
         >
           <bdi>{emp.name}</bdi>
           <span style={{ fontWeight: 400, color: "var(--text-subtle)", marginInlineStart: "var(--sp-4)" }}>
-            <bdi>{emp.role}</bdi>
+            <bdi>{displayRole(emp)}</bdi>
           </span>
           {delegatedFrom && (
             <span
@@ -2998,7 +2998,7 @@ function CouncilPageInner() {
                     </span>
                   </div>
                   <div style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>
-                    <bdi>{emp.role}</bdi>
+                    <bdi>{displayRole(emp)}</bdi>
                   </div>
                 </div>
               </button>

@@ -76,6 +76,9 @@ import { proposalsEnabled, proposeKnowledgeFromMeeting } from "@/lib/knowledge-p
 import { dataDir } from "@/lib/app-home";
 import { canRunModel } from "@/lib/model-provider";
 import { goalChain, listGoals, renderGoalsBlock } from "@/lib/goals";
+import { isRetired, loadLifecycle } from "@/lib/twin-lifecycle";
+import { loadPackage } from "@/lib/relay/package-store";
+import { RETIRED_PROFILE_FILE_NAMES, retiredSystemPrompt, reviewedHandoverMarkdown } from "@/lib/relay/retired-twin";
 
 // ─── Event types ──────────────────────────────────────────────────────────────
 
@@ -259,8 +262,8 @@ const PROFILE_FILE_NAMES = [
  *  requester never chose to see them and no human reviews the reply. */
 export const PUBLIC_PROFILE_FILE_NAMES = ["EXPERTISE.md", "CONTEXT.md", "PROJECTS.md", "TONE.md", "BOUNDARIES.md"] as const;
 
-function loadProfileFiles(employeeDir: string, publicOnly = false): string {
-  const names: readonly string[] = publicOnly ? PUBLIC_PROFILE_FILE_NAMES : PROFILE_FILE_NAMES;
+function loadProfileFiles(employeeDir: string, publicOnly = false, retired = false): string {
+  const names: readonly string[] = retired ? RETIRED_PROFILE_FILE_NAMES : publicOnly ? PUBLIC_PROFILE_FILE_NAMES : PROFILE_FILE_NAMES;
   return names.map((name) => {
     try {
       const content = fs.readFileSync(path.join(employeeDir, name), "utf8");
@@ -297,7 +300,24 @@ function buildSystemPromptBlocks(
   },
   responseIntentBlock?: string,
   publicOnly = false,
+  /** Set for a retired twin: the reviewed handover notes and when they left. */
+  retired?: { handoverMarkdown: string; retiredAt?: string },
 ): string[] {
+  if (retired) {
+    const staticBlock = retiredSystemPrompt({
+      employee,
+      orgClause: orgClause(readOrgIdentity()),
+      retiredAt: retired.retiredAt,
+      languageBlock: twinLanguageBlock(),
+      profileContent: loadProfileFiles(employeeDir, false, true),
+      handoverMarkdown: retired.handoverMarkdown,
+    });
+    // A meeting still needs the transcript; nothing else applies.
+    const meeting = teamMeetingContext
+      ? `# Team meeting\n\nYou are in a live group meeting. Everyone sees every message. Write at most 4 sentences, plain prose, and don't repeat what colleagues already said.\n\n**In the room:** ${teamMeetingContext.colleagues.join(", ")}\n\n## Transcript so far\n\n${teamMeetingContext.transcript ?? "(meeting just started)"}`
+      : "";
+    return meeting ? [staticBlock, SYSTEM_PROMPT_DYNAMIC_BOUNDARY, meeting] : [staticBlock];
+  }
   const profileContent = loadProfileFiles(employeeDir, publicOnly);
   const knowledgeIndex = publicOnly ? "" : knowledgeIndexMarkdown(employee.id);
   const knowledgeBlock = knowledgeIndex
@@ -632,6 +652,12 @@ export type RunOptions = {
    * twin's public profile already says.
    */
   publicReply?: boolean;
+  /**
+   * A retired twin (the person has left). Set automatically from the twin's
+   * lifecycle. No tools, no memory read or write, no company context: it
+   * answers only from its profile and reviewed handover notes.
+   */
+  retired?: boolean;
   /** The signed-in user who asked (audit requesterId), when there is one. */
   requesterId?: string;
   /**
@@ -648,7 +674,7 @@ export function buildToolConfig(options: RunOptions): {
   disallowedTools?: string[];
   agents?: ReturnType<typeof buildTwinAgentDefinitions>;
 } {
-  if (options.publicReply) {
+  if (options.publicReply || options.retired) {
     return {
       allowedTools: [],
       disallowedTools: ["AskUserQuestion", "Read", "Glob", "Grep", "Write", "WebSearch", "WebFetch", "Task", "TodoWrite"],
@@ -814,6 +840,11 @@ export async function runSingleTwin(
   const start = Date.now();
   const ts = () => Date.now() - start;
   const runId = options.runId ?? `run_${employee.id}_${Date.now()}`;
+  // The record on disk decides, not the caller: a retired twin always runs
+  // without tools, whichever surface asked it.
+  const lifecycle = await loadLifecycle(employee.id);
+  if (isRetired(lifecycle)) options = { ...options, retired: true };
+  const retired = options.retired === true;
 
   // Pre-create the scratch directory so Glob(`scratch/<id>/*`) returns the dir
   // rather than "No files found" — an empty result causes the model to assume
@@ -851,8 +882,8 @@ export async function runSingleTwin(
   const prompt =
     !useResume && history.length > 0
       ? `<conversation_history>\n${history
-          .map((t) => `${t.role === "user" ? "CEO" : employee.firstName}: ${t.text}`)
-          .join("\n\n")}\n</conversation_history>\n\nCEO: ${question}`
+          .map((t) => `${t.role === "user" ? (retired ? "Colleague" : "CEO") : employee.firstName}: ${t.text}`)
+          .join("\n\n")}\n</conversation_history>\n\n${retired ? "Colleague" : "CEO"}: ${question}`
       : question;
 
   let toolUseCount = 0;
@@ -870,7 +901,8 @@ export async function runSingleTwin(
     // Consultation runs stay light: skip the personal Composio + org-wide MCP
     // setup entirely (the consulted twin gives advice from its profile +
     // org-brain, it doesn't act on external systems on this hop).
-    const publicReply = options.publicReply === true;
+    // Retired twins get the same lock-down as an unattended public reply.
+    const publicReply = options.publicReply === true || retired;
     const consultMode = options.consultMode === true || publicReply;
     const [composioMcp, orgMcpServers] = consultMode
       ? [null, {} as Awaited<ReturnType<typeof loadOrgCustomMcpServers>>]
@@ -896,7 +928,7 @@ export async function runSingleTwin(
 
     const meetingId = options.teamMeetingContext?.meetingId;
 
-    const mcpServers = {
+    const mcpServers = publicReply ? {} : {
       ...orgMcpServers,
       ...(composioMcp ? { composio: composioMcp } : {}),
       // Always available — purely local UI render, no auth required
@@ -1261,6 +1293,12 @@ export async function runSingleTwin(
             : undefined,
           responseIntentBlock,
           publicReply,
+          retired
+            ? {
+                handoverMarkdown: reviewedHandoverMarkdown(await loadPackage(employee.id), employee),
+                retiredAt: lifecycle.retiredAt,
+              }
+            : undefined,
         ),
         // Allowed built-ins:
         //   - TodoWrite / AskUserQuestion: surface twin reasoning + clarifications.
@@ -1273,6 +1311,8 @@ export async function runSingleTwin(
         //     docs, case studies. Replaces "I think" with "per Stripe's docs
         //     as of today, …".
         allowedTools: toolConfig.allowedTools,
+        // A retired twin gets no built-in tools at all, not just denied ones.
+        ...(retired ? { tools: [] } : {}),
         ...(toolConfig.disallowedTools ? { disallowedTools: toolConfig.disallowedTools } : {}),
         ...(toolConfig.agents ? { agents: toolConfig.agents } : {}),
         toolConfig: { askUserQuestion: { previewFormat: "html" } },
@@ -1473,7 +1513,8 @@ export async function runSingleTwin(
       ts: ts(),
     });
 
-    void rememberTwinRun({
+    // A retired twin learns nothing new.
+    if (!retired) void rememberTwinRun({
       employeeId: employee.id,
       runId,
       surface: memorySurfaceFor(options),
@@ -1772,8 +1813,9 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
   // Learnings → knowledge proposals (E-084). Fire-and-forget: the CEO already
   // has the answer; suggestions show up in each twin's Files tab for approval.
   if (proposalsEnabled()) {
+    // A retired twin learns nothing new, so it gets no knowledge proposals.
     const spoke = allParticipants
-      .filter((e) => spokenThisRun.has(e.id))
+      .filter((e) => spokenThisRun.has(e.id) && e.lifecycle !== "retired")
       .map((e) => ({ id: e.id, name: e.name }));
     void proposeKnowledgeFromMeeting({
       meetingId: meeting.id,

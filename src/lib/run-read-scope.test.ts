@@ -52,11 +52,24 @@ describe("read scope per run type", () => {
     expect(text).not.toMatch(/claude-agent-sdk/);
   });
 
-  it("relay (handover) has no file tools: it uses the Messages API only", () => {
+  it("relay (handover) has no tools at all: one model call, through relay/model.ts only", () => {
     for (const file of fs.readdirSync(path.join(SRC, "lib", "relay"))) {
-      if (file.endsWith(".test.ts")) continue;
-      expect(source(`lib/relay/${file}`), file).not.toMatch(/claude-agent-sdk/);
+      if (file.endsWith(".test.ts") || file === "model.ts") continue;
+      expect(source(`lib/relay/${file}`), file).not.toMatch(/claude-agent-sdk|@anthropic-ai\/sdk/);
     }
+    const model = source("lib/relay/model.ts");
+    expect(model).toMatch(/tools:\s*\[\]/);
+    expect(model).toMatch(/mcpServers:\s*\{\}/);
+    expect(model).toMatch(/maxTurns:\s*1\b/);
+    expect(model).toMatch(/behavior:\s*"deny"/);
+  });
+
+  it("a retired twin runs with no tools, no MCP servers and no memory write", () => {
+    const text = source("lib/council-runner.ts");
+    expect(text).toMatch(/isRetired\(lifecycle\)\) options = \{ \.\.\.options, retired: true \}/);
+    expect(text).toMatch(/\.\.\.\(retired \? \{ tools: \[\] \} : \{\}\)/);
+    expect(text).toMatch(/const mcpServers = publicReply \? \{\}/);
+    expect(text).toMatch(/if \(!retired\) void rememberTwinRun/);
   });
 
   it("the Ask-the-company systems agent can't read files at all", () => {

@@ -8,6 +8,35 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Relay: when someone leaves, their knowledge stays
+Relay (`/handover`) is no longer a demo. When an employee is leaving:
+
+- An admin starts a **handover**. The employee opens their interview link and
+  answers a short text interview (about 20 to 30 minutes, pausable). The
+  interviewer has read their twin's profile, so it asks only what's missing,
+  and follows up on vague answers ("we just ask Sarah": who, when, what if
+  she's out).
+- The employee chooses whether their twin **stays after they leave**. This is a
+  separate consent, recorded with the wording's digest in the audit log. A
+  "no" means the twin is deleted when they go.
+- The interview becomes **handover notes**: decision rules, how things are
+  done, who to go to, what to watch out for, systems and access, open work.
+  Each item carries its quote from the interview. The employee and an admin
+  edit them, and an admin approves them.
+- The admin **retires** the twin. A retired twin stays for good, and everyone
+  can keep asking it in Ask, Ask the company, Team Meeting and MCP. It is
+  labelled "Former <role>", answers only from its profile and the approved
+  notes, and says when it doesn't know. It has no tools, takes no actions, runs
+  no routines, shifts, tasks or Slack/email work, can't approve anything, and
+  writes no memory. Its PEOPLE, PREFERENCES and EMPLOYMENT files are left out.
+- Admins can **download** the notes as Markdown with sources, or as the
+  portable `rcp.json`. Every download is audited. Deleting the twin removes
+  everything, as before.
+
+The interview and notes now run on your configured model provider (Bedrock,
+Vertex, Foundry, local, EU mode), not only the direct Anthropic API. The old
+fixture demo (`/handover/live`, `scripts/relay-demo.mjs`) is gone.
+
 ## [0.8.0] — 2026-10-23
 
 ### Compliance and security

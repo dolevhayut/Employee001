@@ -184,4 +184,9 @@ export interface RoleContextPackage {
   open_loops: CapturedItem[];
   /** Package-level provenance roll-up (per-item provenance lives on each item). */
   provenance: RcpProvenance;
+  /**
+   * Set when the employee and an admin reviewed the package. Only a reviewed
+   * package is used to answer questions. Optional: older packages omit it.
+   */
+  review?: { approvedAt: string; approvedBy?: string };
 }

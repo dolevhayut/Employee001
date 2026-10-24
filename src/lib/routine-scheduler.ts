@@ -117,6 +117,16 @@ export async function fireRoutine(
     });
     return "error";
   }
+  // A former employee's twin answers questions; it runs no routines.
+  if (employee.lifecycle === "retired") {
+    state.running.delete(r.id);
+    updateRoutine(r.id, {
+      lastRunAt: new Date().toISOString(),
+      lastRunStatus: "skipped",
+      lastRunSummary: "Skipped: this person has left (retired twin)",
+    });
+    return "skipped";
+  }
 
   // Budget pre-flight: shift-kind routines only. If the twin is out of budget
   // for today, skip the run and post a feed item instead of burning tokens.

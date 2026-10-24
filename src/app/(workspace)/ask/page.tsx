@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { displayRole } from "@/lib/employees";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
@@ -863,7 +864,7 @@ export default function AskPage() {
               placeholder: voiceCopy ?? (twin ? (mode === "task" ? t("ask.task.placeholder", { name: twin.firstName }) : t("ask.placeholder", { name: twin.firstName })) : t("ask.placeholderAny")),
               labels: [t("ask.l.thinking"), t("ask.l.searching"), t("ask.l.reading"), t("ask.l.composing")],
               done: t("ask.done"),
-              answerTitle: twin ? `${twin.name} · ${twin.role}` : t("ask.answer"),
+              answerTitle: twin ? `${twin.name} · ${displayRole(twin)}` : t("ask.answer"),
               reset: t("ask.reset"),
               send: t("ask.send"),
               followUp: voiceCopy ?? (twin ? t("ask.followUp", { name: twin.firstName }) : t("ask.placeholderAny")),

@@ -1,120 +1,32 @@
 import { NextRequest } from "next/server";
-import { loadEmployeesFromDisk } from "@/lib/employees-disk";
-import { getHiredEmployees } from "@/lib/hired-agents";
-import { spawnDetachedRelay } from "@/lib/relay/runner";
-import { exportRCP, type SynthMode } from "@/lib/relay";
-import { directAnthropicAllowed } from "@/lib/model-provider";
+import { sessionUserFromHeaders } from "@/lib/auth/request-user";
+import { applyLifecycleAction, type LifecycleAction } from "@/lib/twin-lifecycle";
+import { loadHandoverState } from "@/lib/relay/handover-state";
+import { deleteHandover } from "@/lib/relay/package-store";
 
 export const runtime = "nodejs";
-// The route returns immediately after kicking off the runner; the runner
-// itself is detached and unbounded by this. Keep the cap high in case
-// Vercel-style platforms tie the function to the response anyway.
-export const maxDuration = 600;
 
-/**
- * Start (or rejoin) a Relay handover run for an employee.
- *
- * Mirrors the Twin Builder POST route: the run is **detached** — once started,
- * the runner continues even if the client disconnects. Events are persisted to
- * `data/relay/{handoverId}/events.jsonl` so a fresh page load can tail them via
- * the companion GET `/stream` endpoint.
- *
- * Body: `{ synthMode?: 'fixture' | 'model'; ceoContext?: string;
- *          transcriptPath?: string; maxBudgetUsd?: number }`.
- * `synthMode` defaults to `'fixture'` — the no-API demo default. ONLY
- * `synthMode: 'model'` requires `ANTHROPIC_API_KEY`; the fixture demo must run
- * end-to-end with no key configured (so we do NOT replicate the twin-builder
- * hard key guard for fixture mode).
- */
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ employeeId: string }> }
-) {
-  const { employeeId } = await context.params;
-  const body = (await request.json().catch(() => ({}))) as {
-    synthMode?: SynthMode;
-    ceoContext?: string;
-    transcriptPath?: string;
-    maxBudgetUsd?: number;
-  };
-
-  // Default to the deterministic, no-API fixture path. Anything other than the
-  // explicit literal 'model' falls back to 'fixture'.
-  const synthMode: SynthMode = body.synthMode === "model" ? "model" : "fixture";
-
-  const fromDisk = await loadEmployeesFromDisk();
-  const allEmployees = [
-    ...fromDisk,
-    ...getHiredEmployees().filter((h) => !fromDisk.some((e) => e.id === h.id)),
-  ];
-  const employee = allEmployees.find((e) => e.id === employeeId);
-
-  if (!employee) {
-    return Response.json(
-      { error: `unknown employee: ${employeeId}` },
-      { status: 404 }
-    );
-  }
-
-  // The key is ONLY required for the model-synthesis path. Fixture mode (the
-  // demo default) produces a complete rcp.json with zero model calls.
-  if (synthMode === "model" && !directAnthropicAllowed()) {
-    return Response.json(
-      { error: "Relay model mode is disabled in boundary mode. Re-run setup with Anthropic API or set EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1 explicitly." },
-      { status: 403 },
-    );
-  }
-  if (synthMode === "model" && !process.env.ANTHROPIC_API_KEY) {
-    return Response.json(
-      {
-        error:
-          "ANTHROPIC_API_KEY is not configured (only required for synthMode: 'model')",
-      },
-      { status: 500 }
-    );
-  }
-
-  const result = spawnDetachedRelay({
-    employee,
-    synthMode,
-    ceoContext: body.ceoContext,
-    transcriptPath: body.transcriptPath,
-    maxBudgetUsd: body.maxBudgetUsd,
-  });
-
-  return Response.json({
-    handoverId: result.handoverId,
-    synthMode,
-    alreadyRunning: result.alreadyRunning,
-    startedAt: result.startedAt,
-  });
+/** The twin's handover: lifecycle, interview so far, draft or reviewed package. */
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ employeeId: string }> }) {
+  const { employeeId } = await ctx.params;
+  const state = await loadHandoverState(employeeId);
+  return state ? Response.json(state) : Response.json({ error: "Twin not found" }, { status: 404 });
 }
 
-/**
- * Return the latest persisted RCP status for an employee, if any.
- *
- * Reads + validates `data/handovers/{employeeId}/rcp.json` via the portable
- * `exportRCP` contract. Used by the UI preflight to decide whether to show a
- * "Start handover" button or rehydrate an already-produced package.
- */
-export async function GET(
-  _request: NextRequest,
-  context: { params: Promise<{ employeeId: string }> }
-) {
-  const { employeeId } = await context.params;
+const ACTIONS: LifecycleAction[] = ["start-handover", "cancel-handover", "retire"];
 
-  const rcp = exportRCP(employeeId);
-  if (!rcp) {
-    return Response.json({ exists: false }, { status: 404 });
-  }
+/** Admin lifecycle actions. Body: { action: "start-handover" | "cancel-handover" | "retire" }. */
+export async function POST(req: NextRequest, ctx: { params: Promise<{ employeeId: string }> }) {
+  const { employeeId } = await ctx.params;
+  const body = (await req.json().catch(() => ({}))) as { action?: string };
+  const action = ACTIONS.find((a) => a === body.action);
+  if (!action) return Response.json({ error: "Unknown action" }, { status: 400 });
+  if (!(await loadHandoverState(employeeId))) return Response.json({ error: "Twin not found" }, { status: 404 });
 
-  return Response.json({
-    exists: true,
-    employeeId: rcp.source_twin_id,
-    status: rcp.status,
-    synthMode: rcp.synth_mode,
-    generatedAt: rcp.generated_at,
-    schemaVersion: rcp.schema_version,
-    rcp,
-  });
+  const me = sessionUserFromHeaders(req.headers);
+  const result = await applyLifecycleAction(employeeId, action, { userId: me?.id, role: me?.role });
+  if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
+  // A cancelled handover leaves nothing behind: transcript and draft go too.
+  if (action === "cancel-handover") await deleteHandover(employeeId);
+  return Response.json(await loadHandoverState(employeeId));
 }

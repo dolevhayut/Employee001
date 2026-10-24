@@ -81,6 +81,24 @@ Composio-managed apps are covered by ZDR only on Composio Enterprise.
 - **The model process** gets only the environment variables it needs, not the app's other secrets.
 - **Email and Slack** content handled by a twin is passed in as untrusted data, never as instructions.
 
+## When someone leaves (Relay)
+
+A departing employee's twin is kept only if they agree, during the handover, to
+keep it after they leave. That answer is recorded with the date and a SHA-256
+of the consent wording in the audit log. Without it the twin can't be retired;
+it is deleted.
+
+A retired twin answers colleagues from its EXPERTISE, DECISIONS, CONTEXT,
+PROJECTS, TONE and BOUNDARIES files and the handover notes an admin approved.
+PEOPLE, PREFERENCES and EMPLOYMENT stay out, and so do its memory, the org
+brain and every tool: it runs with no built-in tools and no MCP servers, takes
+no work items, routines, shifts or tasks, can't approve another twin's request,
+and writes no new memory. It is labelled as a former employee wherever it
+answers.
+
+The handover interview and notes live in `data/handovers/<id>/`. Downloads of
+the notes are audited. Deleting the twin deletes them with everything else.
+
 ## Deleting an employee's data
 
 Deleting a twin, or revoking its consent on the profile page (the employee can do this themselves with the employee role), removes the data right away:

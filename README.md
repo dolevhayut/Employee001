@@ -108,6 +108,7 @@ Everything below is in the current npm release ([0.7.0](CHANGELOG.md)) unless ma
 - **Memory**: per-twin episodic recall and distilled facts, stored locally, with a relevance gate. Semantic recall uses OpenAI embeddings only if you add `OPENAI_API_KEY`.
 - **Knowledge uploads**: PDF and Word files become Markdown the twin reads on demand.
 - **Editable profiles**: a split-pane editor over the nine files in `/profile`, with version history.
+- **Relay** (`/handover`, on `main`, not yet released): when someone leaves, a short handover interview asks what their twin's profile is missing. With their consent the twin stays as a read-only former employee's twin that everyone can keep asking, and the CEO can download the notes.
 - **Hebrew**: twins converse, write and remember in Hebrew with right-to-left rendering. UI translation is partial.
 
 **Work, with sign-off**

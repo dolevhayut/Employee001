@@ -14,7 +14,7 @@ import { listCustomMcp, loadOrgCustomMcpServers } from "@/lib/custom-mcp";
 import { selectOrgBrainNodesForRun } from "@/lib/org-brain";
 import { classifyTool } from "@/lib/tool-policy";
 import { loadReadAllowlist } from "@/lib/read-allowlist";
-import type { EmployeeWithTwin } from "@/lib/employees";
+import { displayRole, type EmployeeWithTwin } from "@/lib/employees";
 
 // "Ask the company": the organization answers with ONE voice. Unlike a team
 // meeting (twins talking, in turn, each in their own voice), everything here
@@ -37,7 +37,7 @@ export async function readyTwins(): Promise<EmployeeWithTwin[]> {
 
 /** Which twins should answer: keywords first, Haiku when they can't decide. */
 export async function pickTwins(question: string, twins: EmployeeWithTwin[]): Promise<{ picks: RoutePick[]; by: "keywords" | "model" }> {
-  const candidates = twins.map((e) => ({ id: e.id, firstName: e.firstName, name: e.name, role: e.role, text: readTwinText(dataDir("employees", e.id)) }));
+  const candidates = twins.map((e) => ({ id: e.id, firstName: e.firstName, name: e.name, role: displayRole(e), text: readTwinText(dataDir("employees", e.id)) }));
   const picks = routeQuestion(question, candidates);
   if (picks[0]?.score < 3 && !picks[0]?.named) {
     const fromModel = await routeWithModel(question, candidates);
@@ -86,7 +86,8 @@ export async function briefFrom(
     const brief = text.trim();
     const empty = !brief || brief.toUpperCase().startsWith(NOTHING);
     emit({ type: "source_done", id: twin.id, brief: empty ? "" : brief, empty });
-    return empty ? null : { id: twin.id, name: twin.firstName, title: twin.role, brief };
+    // A former employee's brief is what they knew when they left: say so.
+    return empty ? null : { id: twin.id, name: twin.firstName, title: twin.lifecycle === "retired" ? `${displayRole(twin)}, has left` : twin.role, brief };
   } catch {
     emit({ type: "source_error", id: twin.id });
     return null;

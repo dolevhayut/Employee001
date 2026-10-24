@@ -213,7 +213,35 @@ export const ELEVENLABS_VOICE_STORAGE_KEY = "twin.ttsVoices";
 
 // ─── Employee twin type ───────────────────────────────────────────────────────
 
+/**
+ * Where a twin is in the employee's life at the company (Relay).
+ * - active: the person works here; the twin works for them.
+ * - handover: the person is leaving; the handover interview is open.
+ * - retired: the person has left. The twin stays so colleagues can keep
+ *   asking it, but it only answers from what it knows: no tools, no actions,
+ *   no new memory.
+ */
+export type TwinLifecycle = "active" | "handover" | "retired";
+
+/** The departing employee's consent to keep their twin after they leave. */
+export type RetentionConsent = {
+  grantedAt: string;
+  /** sha256 of the consent text shown, so the wording can be proven later. */
+  textDigest: string;
+  locale: "en" | "he";
+};
+
+/** The role as people should see it: "Former <role>" once the person left. */
+export function displayRole(e: { role: string; lifecycle?: TwinLifecycle }): string {
+  return e.lifecycle === "retired" ? `Former ${e.role}` : e.role;
+}
+
 export type EmployeeWithTwin = Employee & {
+  /** Missing means "active" (records written before Relay). */
+  lifecycle?: TwinLifecycle;
+  /** ISO timestamp the twin was retired. */
+  retiredAt?: string;
+  retention?: RetentionConsent;
   /** Per-twin unattended Slack policy. Off unless the CEO explicitly enables it. */
   answerSlackWithoutAsking?: boolean;
   twinStatus: TwinStatus;

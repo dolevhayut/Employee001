@@ -1,32 +1,28 @@
 /**
- * Relay · LIVE interview (model-backed)
+ * Relay · live handover interview
  *
- * The interactive counterpart to the fixture demo. Here a real human answers:
- *  - streamInterviewerTurn() runs the warm interviewer agent (sonnet) one turn
- *    at a time — it asks, the employee types a real answer, it asks the next.
- *  - synthesizeFromConversation() takes the full live transcript and runs the
- *    opus synthesis to produce a real RoleContextPackage.
+ *  - interviewerTurn() runs one interviewer turn: it appends the employee's
+ *    answer to the saved transcript, asks the next question (streamed), and
+ *    saves that too. The transcript lives on the server
+ *    (data/handovers/<id>/interview.json), so the employee can pause and
+ *    come back, and the interviewer's side can't be edited by the client.
+ *  - synthesizeHandover() turns the transcript into the handover package
+ *    (data/handovers/<id>/package.json), a draft until it is reviewed.
  *
- * IMPORTANT — does NOT touch the static investor fixture. Live RCPs are written
- * to data/handovers/<id>/rcp.live.json (the fixture stays at rcp.json).
- *
- * The interviewer's behaviour is governed entirely by INTERVIEWER_SYSTEM_PROMPT
- * in ./interviewer — edit that file to tune the agent; the dev server hot-reloads
- * the route so the next turn uses the new prompt.
+ * Both go through relayTurn(), so they run on the workspace's model provider.
  */
 
 import fs from "fs";
-import fsp from "fs/promises";
 import path from "path";
 import { dataDir } from "../app-home";
-import Anthropic from "@anthropic-ai/sdk";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
-import { directAnthropicAllowed } from "@/lib/model-provider";
 
 import { INTERVIEWER_SYSTEM_PROMPT, buildInterviewerPrompt } from "./interviewer";
 import { scoreCoverage, type CoverageResult } from "./coverage";
-import { redactPii } from "./synthesis";
+import { redactPii } from "./redact";
 import { verifyRcpEvidence } from "./evidence";
+import { relayTurn } from "./model";
+import { loadInterview, loadPackage, saveInterview, savePackage, type InterviewMessage } from "./package-store";
 import {
   RCP_SCHEMA_VERSION,
   type CapturedItem,
@@ -35,33 +31,16 @@ import {
   type ToolingRef,
 } from "./rcp.types";
 
-/** PRD: capture = sonnet (fast/warm), synthesis = opus (deep reasoning). */
+/** Capture = the fast primary model, synthesis = opus (deep reasoning). */
 export const CAPTURE_MODEL = TWIN_MODEL_PRIMARY;
 export const SYNTHESIS_MODEL = TWIN_MODEL_OPUS;
 
-/** The mandatory demo banner (ConsentRecord.banner literal, PRD 13.5). */
-const DEMO_BANNER =
-  "DEMO — not legally reviewed, not for production, not published";
-
-export type ChatMessage = { role: "user" | "assistant"; content: string };
+export type ChatMessage = InterviewMessage;
 
 const PROFILE_FILES = [
   "EXPERTISE.md", "TONE.md", "CONTEXT.md", "DECISIONS.md", "PREFERENCES.md",
   "PEOPLE.md", "PROJECTS.md", "BOUNDARIES.md", "EMPLOYMENT.md",
 ];
-
-let _client: Anthropic | null = null;
-function getClient(): Anthropic {
-  if (!hasApiKey()) {
-    throw new Error("Direct Anthropic endpoint is disabled for this provider");
-  }
-  if (!_client) _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  return _client;
-}
-
-export function hasApiKey(): boolean {
-  return directAnthropicAllowed() && Boolean(process.env.ANTHROPIC_API_KEY);
-}
 
 /** Read the twin's profile files as a single text block for interviewer context. */
 export function loadProfileText(employeeId: string): string {
@@ -78,68 +57,45 @@ export function loadProfileText(employeeId: string): string {
     .join("\n\n---\n\n");
 }
 
-/** Full system prompt = the tunable interviewer prompt + "what's already known". */
-function buildInterviewSystem(employeeId: string): string {
-  const profile = loadProfileText(employeeId) || "(no profile on file)";
-  return `${INTERVIEWER_SYSTEM_PROMPT}\n\n---\n\n${buildInterviewerPrompt(
-    profile,
-    "(read-only history not loaded in live mode — rely on the profile above)",
-  )}`;
+function transcriptText(messages: ChatMessage[]): string {
+  return messages
+    .filter((m) => m.content && m.content.trim())
+    .map((m) => `${m.role === "assistant" ? "INTERVIEWER" : "EMPLOYEE"}: ${m.content.trim()}`)
+    .join("\n\n");
 }
 
-/**
- * The Anthropic API requires the first message to be role:user. The visible
- * transcript starts with the interviewer's greeting (assistant), so we prepend
- * a hidden kickoff user turn to keep roles alternating.
- */
-const KICKOFF: ChatMessage = {
-  role: "user",
-  content:
-    "[The handover interview is starting now. Greet me warmly and specifically — grounded in what you already know about me from the profile — then ask your first question. Ask one question at a time and follow the thread.]",
-};
-
-function normalizeForModel(messages: ChatMessage[]): ChatMessage[] {
-  const clean = messages.filter((m) => m.content && m.content.trim());
-  if (clean.length === 0 || clean[0].role !== "user") return [KICKOFF, ...clean];
-  return clean;
-}
+const OPENING =
+  "Open the interview now. Greet them warmly and specifically, grounded in their profile. In a sentence, say what this is: a conversation of about 20 to 30 minutes so their know-how keeps helping the team, which they can pause any time and review before it's used. Then ask your first question.";
 
 /**
- * Run ONE interviewer turn, streaming the question text via onDelta.
- * Returns the full assistant message text.
+ * Append the employee's answer (if any), run one interviewer turn streaming
+ * via onDelta, save both, and return the updated transcript.
  */
-export async function streamInterviewerTurn(
+export async function interviewerTurn(
   employeeId: string,
-  messages: ChatMessage[],
+  answer: string | undefined,
   onDelta: (delta: string) => void,
-): Promise<string> {
-  const client = getClient();
-  const system = buildInterviewSystem(employeeId);
-  const msgs = normalizeForModel(messages);
+): Promise<ChatMessage[]> {
+  const messages = await loadInterview(employeeId);
+  const text = answer?.trim();
+  if (text) messages.push({ role: "user", content: text.slice(0, 8000) });
+  if (text) await saveInterview(employeeId, messages);
 
-  let full = "";
-  const stream = client.messages.stream({
-    model: CAPTURE_MODEL,
-    // Ceiling, not spend: Claude 5.5 models think by default and thinking
-    // counts against max_tokens, so 1024 cut interviewer questions off.
-    max_tokens: 4096,
-    system,
-    messages: msgs.map((m) => ({ role: m.role, content: m.content })),
-  });
-  stream.on("text", (t) => {
-    full += t;
-    onDelta(t);
-  });
-  await stream.finalMessage();
-  return full.trim();
+  const draft = await loadPackage(employeeId);
+  const gaps = draft ? scoreCoverage(draft).gaps.join(", ") : "";
+  const system = `${INTERVIEWER_SYSTEM_PROMPT}\n\n---\n\n${buildInterviewerPrompt(loadProfileText(employeeId), gaps)}`;
+  const prompt = messages.length === 0
+    ? OPENING
+    : `The interview so far:\n\n${transcriptText(messages)}\n\nWrite the interviewer's next message.`;
+
+  const reply = await relayTurn({ employeeId, model: CAPTURE_MODEL, system, prompt, onDelta });
+  if (!reply) throw new Error("The interviewer returned an empty message. Try again.");
+  messages.push({ role: "assistant", content: reply });
+  await saveInterview(employeeId, messages);
+  return messages;
 }
 
 // ─── Synthesis (opus) ─────────────────────────────────────────────────────────
-
-const rcpLivePath = (employeeId: string) =>
-  dataDir("handovers", employeeId, "rcp.live.json");
-
-export const RCP_LIVE_PATH = rcpLivePath;
 
 interface RawItem {
   title?: string;
@@ -230,36 +186,25 @@ function clamp01(n: number): number {
 }
 
 /**
- * Run the opus synthesis on a live transcript and write rcp.live.json.
- * Returns the validated RCP + its coverage score. Never overwrites the
- * static fixture (rcp.json).
+ * Turn the saved interview into the handover package and save it as a draft
+ * (any earlier review is cleared: the content changed).
  */
-export async function synthesizeFromConversation(
+export async function synthesizeHandover(
   employeeId: string,
-  messages: ChatMessage[],
 ): Promise<{ rcp: RoleContextPackage; coverage: CoverageResult }> {
-  const client = getClient();
+  const messages = await loadInterview(employeeId);
+  if (!messages.some((m) => m.role === "user" && m.content.trim())) {
+    throw new Error("No answers yet. Answer a few questions first.");
+  }
   const profile = loadProfileText(employeeId);
-  const conversation = messages
-    .filter((m) => m.content && m.content.trim())
-    .map(
-      (m) =>
-        `${m.role === "assistant" ? "INTERVIEWER" : "EMPLOYEE"}: ${m.content.trim()}`,
-    )
-    .join("\n\n");
+  const conversation = transcriptText(messages);
 
-  const res = await client.messages.create({
+  const text = (await relayTurn({
+    employeeId,
     model: SYNTHESIS_MODEL,
-    // Room for thinking plus the full RCP JSON (thinking counts against it).
-    max_tokens: 16000,
-    messages: [{ role: "user", content: buildLiveSynthesisPrompt(profile, conversation) }],
-  });
-
-  const text = res.content
-    .filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text")
-    .map((b) => b.text)
-    .join("")
-    .trim();
+    system: "You turn handover interviews into structured JSON. Output only JSON.",
+    prompt: buildLiveSynthesisPrompt(profile, conversation),
+  })).trim();
   const cleaned = text
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/i, "")
@@ -301,15 +246,15 @@ export async function synthesizeFromConversation(
     open_loops,
     provenance: {
       interviewerModel: CAPTURE_MODEL,
-      transcriptRef: "live-interview",
+      transcriptRef: "interview.json",
       redactionApplied: true,
       itemCount,
       consent: {
         subjectId: employeeId,
         grantedAt: generatedAt,
-        banner: DEMO_BANNER,
+        banner: "relay-handover-interview",
       },
-      auditRunId: "live",
+      auditRunId: `relay-${employeeId}`,
     },
   };
 
@@ -318,9 +263,7 @@ export async function synthesizeFromConversation(
   const coverage = scoreCoverage(rcp);
   rcp.status = coverage.status;
 
-  const dest = rcpLivePath(employeeId);
-  await fsp.mkdir(path.dirname(dest), { recursive: true });
-  await fsp.writeFile(dest, JSON.stringify(rcp, null, 2), "utf8");
+  await savePackage(employeeId, rcp);
 
   return { rcp, coverage };
 }

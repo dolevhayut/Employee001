@@ -20,6 +20,7 @@ import { OrgChart } from "@/components/ex/org-chart";
 import {
   EMPLOYEES_WITH_TWIN,
   ORG_SKILLS,
+  displayRole,
   type EmployeeWithTwin,
   type TwinStatus,
 } from "@/lib/employees";
@@ -527,7 +528,7 @@ function EmployeeCard({
             <bdi>{emp.name}</bdi>
           </div>
           <div className="subtle" style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-2)" }}>
-            <bdi>{emp.role}</bdi> · <bdi>{emp.department}</bdi>
+            <bdi>{displayRole(emp)}</bdi> · <bdi>{emp.department}</bdi>
           </div>
         </div>
         <StarButton active={isFavorite} onToggle={onToggleFavorite} />

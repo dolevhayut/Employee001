@@ -57,6 +57,9 @@ export async function POST(
       { status: 404 }
     );
   }
+  if (employee.lifecycle === "retired") {
+    return Response.json({ error: "This person has left. A retired twin isn't retrained." }, { status: 409 });
+  }
 
   const model = canRunModel();
   if (!model.ok) {

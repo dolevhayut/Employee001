@@ -10,6 +10,7 @@
 // Both are classified `allow` by tool-policy (added to LOCAL_SAFE_TOOLS) so
 // they pass the shift-mode canUseTool gate without an approval prompt.
 
+import { displayRole } from "@/lib/employees";
 import "server-only";
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -23,7 +24,9 @@ import {
 function rosterLines(ctx: ConsultContext): string {
   const targets = availableTargets(ctx);
   if (targets.length === 0) return "(no other twins are available to consult right now)";
-  return targets.map((e) => `- \`${e.id}\` — ${e.name}, ${e.role}`).join("\n");
+  return targets
+    .map((e) => `- \`${e.id}\` — ${e.name}, ${displayRole(e)}${e.lifecycle === "retired" ? " (has left: advice only, can't approve)" : ""}`)
+    .join("\n");
 }
 
 export function buildConsultMcpServer(ctx: ConsultContext) {

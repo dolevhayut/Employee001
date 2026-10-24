@@ -1,4 +1,5 @@
 import path from "path";
+import { isRetiredSync } from "@/lib/twin-lifecycle";
 import fs from "fs";
 import { query, SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
@@ -183,6 +184,9 @@ export async function runShift(args: {
   requesterId?: string;
 }): Promise<ShiftRunResult> {
   const { employee, trigger, abortController, requesterId } = args;
+  if (isRetiredSync(employee.id)) {
+    return { report: null, summary: "Skipped: this person has left (retired twin).", turns: 0, costUsd: 0, stoppedReason: "error", runId: "" };
+  }
   const runId = `shift_${employee.id}_${Date.now()}`;
 
   const employeeDir = dataDir("employees", employee.id);

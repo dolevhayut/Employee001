@@ -1,30 +1,33 @@
 import { NextRequest } from "next/server";
-import { streamInterviewerTurn, hasApiKey, type ChatMessage } from "@/lib/relay/live-interview";
-import { directAnthropicAllowed } from "@/lib/model-provider";
+import { interviewerTurn } from "@/lib/relay/live-interview";
+import { loadHandoverState } from "@/lib/relay/handover-state";
+import { modelErrorMessage } from "@/lib/model-provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 /**
- * LIVE interview — one interviewer turn, streamed as SSE.
+ * One interviewer turn, streamed as SSE. Body: `{ answer?: string }`: the
+ * employee's answer to the last question (omit to open the interview). The
+ * transcript is kept on the server.
  *
- * Body: `{ messages: { role: 'user'|'assistant'; content: string }[] }`
- * The client sends the full visible transcript each turn (starting with the
- * interviewer's greeting). An empty array opens the interview.
- *
- * Emits SSE events: `{ type:'text_delta', delta }` per token, then
- * `{ type:'done', text }` (or `{ type:'error', message }` + done on failure).
- *
- * Uses the sonnet capture model. Requires ANTHROPIC_API_KEY (live mode only —
- * the static fixture demo at POST /api/relay/[id] needs no key).
+ * Events: `{ type:'text_delta', delta }`, then `{ type:'done', messages }`,
+ * or `{ type:'error', message }`.
  */
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ employeeId: string }> },
-) {
-  const { employeeId } = await context.params;
-  const body = (await request.json().catch(() => ({}))) as { messages?: ChatMessage[] };
-  const messages = Array.isArray(body.messages) ? body.messages : [];
+export async function POST(req: NextRequest, ctx: { params: Promise<{ employeeId: string }> }) {
+  const { employeeId } = await ctx.params;
+  const state = await loadHandoverState(employeeId);
+  if (!state) return Response.json({ error: "Twin not found" }, { status: 404 });
+  if (state.lifecycle !== "handover") return Response.json({ error: "No handover is open for this twin." }, { status: 409 });
+  if (!state.model.ok) return Response.json({ error: state.model.reason }, { status: 503 });
+
+  const body = (await req.json().catch(() => ({}))) as { answer?: unknown };
+  const answer = typeof body.answer === "string" ? body.answer : undefined;
+  // An empty answer opens the interview, or retries after a failed turn
+  // (the last saved message is then the employee's).
+  if (!answer?.trim() && state.messages.length > 0 && state.messages.at(-1)?.role !== "user") {
+    return Response.json({ error: "Write an answer first." }, { status: 400 });
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -36,22 +39,11 @@ export async function POST(
           /* stream closed */
         }
       };
-
-      if (!hasApiKey()) {
-        send({ type: "error", message: directAnthropicAllowed() ? "ANTHROPIC_API_KEY is not configured (live interview needs a key)." : "Live Relay is disabled in boundary mode because it calls the Direct Anthropic endpoint." });
-        send({ type: "done", text: "" });
-        try { controller.close(); } catch { /* noop */ }
-        return;
-      }
-
       try {
-        const full = await streamInterviewerTurn(employeeId, messages, (delta) =>
-          send({ type: "text_delta", delta }),
-        );
-        send({ type: "done", text: full });
+        const messages = await interviewerTurn(employeeId, answer, (delta) => send({ type: "text_delta", delta }));
+        send({ type: "done", messages });
       } catch (err) {
-        send({ type: "error", message: err instanceof Error ? err.message : "interview turn failed" });
-        send({ type: "done", text: "" });
+        send({ type: "error", message: modelErrorMessage(err instanceof Error ? err.message : "Interview turn failed") });
       } finally {
         try { controller.close(); } catch { /* already closed */ }
       }
