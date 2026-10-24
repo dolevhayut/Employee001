@@ -22,6 +22,22 @@ describe("SDK child env", () => {
     expect(Object.keys(env).sort()).toEqual(["ANTHROPIC_API_KEY", "AWS_REGION", "CLAUDE_AGENT_SDK_CLIENT_APP", "HOME", "LC_ALL", "PATH"]);
   });
 
+  it("passes Claude Code settings by name, never the session a Claude Code terminal exports", () => {
+    const env = sdkChildEnv({
+      ...source,
+      CLAUDE_CONFIG_DIR: "/cfg",
+      CLAUDE_CODE_USE_BEDROCK: "1",
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+      CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH: "1",
+      CLAUDE_CODE_OAUTH_SCOPES: "user:inference",
+      CLAUDE_CODE_OAUTH_TOKEN: "oat",
+      CLAUDE_CODE_MESSAGING_TOKEN: "m",
+      CLAUDE_CODE_SESSION_ID: "s",
+      CLAUDECODE: "1",
+    }, {});
+    expect(Object.keys(env).filter((k) => k.startsWith("CLAUDE")).sort()).toEqual(["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CONFIG_DIR"]);
+  });
+
   it("never leaks app secrets", () => {
     const env = sdkChildEnv(source, {});
     for (const key of ["COMPOSIO_API_KEY", "OPENAI_API_KEY", "ELEVENLABS_API_KEY", "TELEGRAM_BOT_TOKEN", "SLACK_BOT_TOKEN", "EMPLOYEE001_TOKEN", "DATABASE_URL"]) {

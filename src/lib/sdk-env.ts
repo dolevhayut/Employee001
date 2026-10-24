@@ -19,9 +19,17 @@ const EXACT = new Set([
   "AWS_CONTAINER_CREDENTIALS_FULL_URI", "AWS_CONTAINER_AUTHORIZATION_TOKEN",
   "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_PROJECT", "CLOUD_ML_REGION",
   "AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_CLIENT_SECRET", "AZURE_FEDERATED_TOKEN_FILE",
+  // Claude Code settings the operator may set. Named one by one: a shell
+  // started by Claude Code (its terminal, the desktop app) exports dozens of
+  // CLAUDE_CODE_* session variables, its auth among them, and passing the
+  // prefix let a twin run on that session's sign-in instead of the
+  // configured key.
+  "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
+  "CLAUDE_CODE_SKIP_BEDROCK_AUTH", "CLAUDE_CODE_SKIP_VERTEX_AUTH", "CLAUDE_CODE_SKIP_FOUNDRY_AUTH",
+  "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "CLAUDE_CODE_MAX_OUTPUT_TOKENS",
 ]);
 
-const PREFIXES = ["LC_", "ANTHROPIC_", "CLAUDE_", "VERTEX_REGION_"];
+const PREFIXES = ["LC_", "ANTHROPIC_", "VERTEX_REGION_"];
 
 export function isSdkChildEnvVar(name: string): boolean {
   return EXACT.has(name) || PREFIXES.some((p) => name.startsWith(p));
