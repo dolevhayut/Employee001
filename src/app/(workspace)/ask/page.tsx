@@ -407,6 +407,29 @@ function writePanelWidth(px: number) {
   }
   for (const cb of panelListeners) cb();
 }
+// Reading answers aloud is opt-in: off until the person turns it on, then
+// remembered. A question asked by voice is still answered by voice.
+const VOICE_KEY = "e001.ask.voiceOn";
+const voiceListeners = new Set<() => void>();
+function voiceSubscribe(cb: () => void) {
+  voiceListeners.add(cb);
+  return () => voiceListeners.delete(cb);
+}
+function voiceSnapshot(): boolean {
+  try {
+    return localStorage.getItem(VOICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeVoiceOn(on: boolean) {
+  try {
+    localStorage.setItem(VOICE_KEY, on ? "1" : "0");
+  } catch {
+    // ignore: the choice just won't be remembered
+  }
+  for (const cb of voiceListeners) cb();
+}
 const linkedTwin = () => new URLSearchParams(window.location.search).get("twin");
 
 export default function AskPage() {
@@ -438,7 +461,7 @@ export default function AskPage() {
     };
   }, [dragging]);
   const [busy, setBusy] = useState(false);
-  const [voiceOn, setVoiceOn] = useState(true);
+  const voiceOn = useSyncExternalStore(voiceSubscribe, voiceSnapshot, () => false);
   const [voiceReady, setVoiceReady] = useState(false);
   // Voice off on this install (EMPLOYEE001_VOICE=off or EU mode): no browser
   // speech recognition either.
@@ -795,7 +818,7 @@ export default function AskPage() {
               type="button"
               className="btn sm"
               onClick={() => {
-                setVoiceOn((v) => !v);
+                writeVoiceOn(!voiceOn);
                 stopAudio();
               }}
               title={t("ask.voiceTitle")}
