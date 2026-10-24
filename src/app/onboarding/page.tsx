@@ -156,10 +156,7 @@ function OnboardingPageInner() {
   ).every((s) => acceptedScopes.has(s.id));
   const [name, setName] = usePersistedState<string>(k("name"), defaultName);
   const [role, setRole] = usePersistedState<string>(k("role"), defaultRole);
-  const [domain, setDomain] = usePersistedState<string>(
-    k("domain"),
-    "Distributed systems & platform",
-  );
+  const [domain, setDomain] = usePersistedState<string>(k("domain"), "");
   // `chosen` is now only an ephemeral UI hint ("which rows did the employee
   // touch in this session"). The source of truth for "is this actually
   // connected" lives in the per-invite /connections endpoint and is fetched
@@ -470,7 +467,8 @@ function OnboardingPageInner() {
               const sourcesBlocked =
                 step === 2 && Boolean(inviteToken) && activeConnections === 0;
               const consentBlocked = step === 0 && !requiredScopesAccepted;
-              const disabled = consentBlocked || sourcesBlocked;
+              const profileBlocked = step === 1 && !domain.trim();
+              const disabled = consentBlocked || sourcesBlocked || profileBlocked;
               return (
             <button
               className="btn primary"
@@ -527,41 +525,54 @@ function OnboardingPageInner() {
 
 function Field({
   label,
+  inputId,
   children,
   hint,
 }: {
   label: string;
+  inputId: string;
   children: React.ReactNode;
   hint?: string;
 }) {
   return (
-    <label style={{ display: "block", marginBottom: "var(--sp-18)" }}>
-      <div style={{ fontSize: "var(--fs-sm)", fontWeight: 500, marginBottom: "var(--sp-6)" }}>{label}</div>
+    <div style={{ display: "block", marginBottom: "var(--sp-18)" }}>
+      <label
+        htmlFor={inputId}
+        style={{ display: "block", fontSize: "var(--fs-sm)", fontWeight: 500, marginBottom: "var(--sp-6)" }}
+      >
+        {label}
+      </label>
       {children}
       {hint && (
         <div className="subtle" style={{ fontSize: "var(--fs-meta)", marginTop: "var(--sp-4)" }}>
           {hint}
         </div>
       )}
-    </label>
+    </div>
   );
 }
 
 function TextInput({
+  id,
   value,
   onChange,
+  placeholder,
   style,
   readOnly,
 }: {
+  id: string;
   value: string;
   onChange: (v: string) => void;
+  placeholder?: string;
   style?: React.CSSProperties;
   readOnly?: boolean;
 }) {
   return (
     <input
+      id={id}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
       readOnly={readOnly}
       style={{
         width: "100%",
@@ -761,17 +772,23 @@ function StepYou({
           ? <>{firstName}&apos;s twin will answer questions in their voice on the topics they own. We start with the basics.</>
           : t("onboarding.profileSub")}
       </p>
-      <Field label={isCeo ? "שם תצוגה" : t("onboarding.name")}>
-        <TextInput value={name} onChange={setName} />
+      <Field label={isCeo ? "שם תצוגה" : t("onboarding.name")} inputId="onboarding-name">
+        <TextInput id="onboarding-name" value={name} onChange={setName} />
       </Field>
-      <Field label={isCeo ? "תפקיד" : t("onboarding.role")}>
-        <TextInput value={role} onChange={setRole} />
+      <Field label={isCeo ? "תפקיד" : t("onboarding.role")} inputId="onboarding-role">
+        <TextInput id="onboarding-role" value={role} onChange={setRole} />
       </Field>
       <Field
         label={isCeo ? `באיזה תחום ${firstName} הוא/היא סמכות מקצועית?` : t("onboarding.domain")}
+        inputId="onboarding-domain"
         hint={t("onboarding.domainHint")}
       >
-        <TextInput value={domain} onChange={setDomain} />
+        <TextInput
+          id="onboarding-domain"
+          value={domain}
+          onChange={setDomain}
+          placeholder={t("onboarding.domainPh")}
+        />
       </Field>
     </div>
   );

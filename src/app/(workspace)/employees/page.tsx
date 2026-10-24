@@ -649,9 +649,28 @@ function EmployeeCard({
   );
 }
 
-function inviteUrl(token: string): string {
-  if (typeof window === "undefined") return `/join?invite=${token}`;
-  return `${window.location.origin}/join?invite=${token}`;
+function isLocalBrowserOrigin(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "::1";
+  } catch {
+    return false;
+  }
+}
+
+function inviteUrl(token: string, appUrl?: string | null): string {
+  const configured = appUrl?.trim().replace(/\/$/, "");
+  const base =
+    configured ||
+    (typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : "");
+  if (!base) return `/join?invite=${encodeURIComponent(token)}`;
+  return `${base}/join?invite=${encodeURIComponent(token)}`;
+}
+
+function showInviteLocalOnlyNote(appUrl?: string | null): boolean {
+  if (appUrl?.trim()) return false;
+  if (typeof window === "undefined") return false;
+  return isLocalBrowserOrigin(window.location.origin);
 }
 
 type SystemConfig = {
@@ -662,6 +681,8 @@ type SystemConfig = {
   modelProviderLabel?: string;
   modelReady?: boolean;
   modelProblem?: string;
+  /** Configured public base URL (APP_URL / EMPLOYEE001_PUBLIC_URL). */
+  appUrl?: string | null;
   ready: boolean;
 };
 
@@ -691,6 +712,17 @@ function MissingKeysCard({
     setSaving(key === "ANTHROPIC_API_KEY" ? "anthropic" : "composio");
     setError(null);
     try {
+      if (key === "COMPOSIO_API_KEY") {
+        const check = await fetch("/api/system/composio-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ apiKey: trimmed }),
+        });
+        const checkBody = (await check.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+        if (!check.ok || !checkBody.ok) {
+          throw new Error(checkBody.message ?? t("twins.keys.saveFailed", { status: check.status }));
+        }
+      }
       const res = await fetch("/api/system/config", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -872,10 +904,18 @@ function InvitePanel({
   // on mount; the user has to restart the server after editing .env, so
   // there's no point in polling.
   const [config, setConfig] = useState<SystemConfig | null>(null);
+  const [appUrl, setAppUrl] = useState<string | null>(null);
   useEffect(() => {
-    fetch("/api/system/config")
-      .then((r) => r.json() as Promise<SystemConfig>)
-      .then(setConfig)
+    Promise.all([
+      fetch("/api/system/config").then((r) => r.json() as Promise<SystemConfig>),
+      fetch("/api/system/composio-check")
+        .then((r) => r.json() as Promise<{ appUrl?: string | null }>)
+        .catch(() => ({ appUrl: null })),
+    ])
+      .then(([cfg, pub]) => {
+        setConfig(cfg);
+        setAppUrl(cfg.appUrl ?? pub.appUrl ?? null);
+      })
       .catch(() =>
         setConfig({ anthropic: false, composio: false, ready: false }),
       );
@@ -949,7 +989,7 @@ function InvitePanel({
   }
 
   async function copy(token: string) {
-    const url = inviteUrl(token);
+    const url = inviteUrl(token, appUrl);
     try {
       await navigator.clipboard.writeText(url);
       setCopiedToken(token);
@@ -1052,9 +1092,16 @@ function InvitePanel({
             config={config}
             onSaved={() => {
               // Re-fetch the gate state so the form unlocks immediately.
-              fetch("/api/system/config")
-                .then((r) => r.json() as Promise<SystemConfig>)
-                .then(setConfig)
+              Promise.all([
+                fetch("/api/system/config").then((r) => r.json() as Promise<SystemConfig>),
+                fetch("/api/system/composio-check")
+                  .then((r) => r.json() as Promise<{ appUrl?: string | null }>)
+                  .catch(() => ({ appUrl: null })),
+              ])
+                .then(([cfg, pub]) => {
+                  setConfig(cfg);
+                  setAppUrl(cfg.appUrl ?? pub.appUrl ?? null);
+                })
                 .catch(() => {});
             }}
           />
@@ -1441,7 +1488,8 @@ function InvitePanel({
 
           <div style={{ display: "grid", gap: "var(--sp-8)" }}>
             {pending.map((inv) => {
-              const url = inviteUrl(inv.token);
+              const url = inviteUrl(inv.token, appUrl);
+              const localOnly = showInviteLocalOnlyNote(appUrl);
               const copied = copiedToken === inv.token;
               const started = !!inv.employeeId;
               const expired = new Date(inv.expiresAt).getTime() < now;
@@ -1544,6 +1592,17 @@ function InvitePanel({
                     >
                       <bdi>{url}</bdi>
                     </div>
+                    {localOnly ? (
+                      <div
+                        style={{
+                          fontSize: "var(--fs-meta)",
+                          color: "var(--text-muted)",
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        {t("twins.invite.localOnlyNote")}
+                      </div>
+                    ) : null}
                   </div>
 
                   <button
