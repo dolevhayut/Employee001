@@ -9,7 +9,7 @@ import { describe, it } from "vitest";
 import { loadWorld, dossierFor } from "./companysim";
 import { judgeAnswer, groundTruthText, type AnswerVerdict, type HiddenKnowledge } from "./agents";
 
-type Saved = { personId: string; name: string; qa: { question: string; expected: string | null; answer: string }[] };
+type Saved = { personId: string; twinId?: string; name: string; qa: { question: string; expected: string | null; answer: string }[] };
 
 const dirs = (process.env.RELAY_EVAL_REGRADE ?? "").split(",").filter(Boolean);
 
@@ -22,7 +22,9 @@ describe.skipIf(dirs.length === 0)("Relay eval re-grade", () => {
       const out: (Saved & { regraded: AnswerVerdict[] })[] = [];
       for (const r of saved) {
         const knowledge = JSON.parse(fs.readFileSync(path.join(dir, "..", "fixtures", `${r.personId}.json`), "utf8")) as HiddenKnowledge;
-        const truth = groundTruthText(dossierFor(world, r.personId), knowledge);
+        const profileFile = r.twinId ? path.join(dir, `${r.twinId}.profile.md`) : "";
+        const profile = profileFile && fs.existsSync(profileFile) ? fs.readFileSync(profileFile, "utf8") : "";
+        const truth = groundTruthText(dossierFor(world, r.personId), knowledge, profile);
         const regraded = await Promise.all(r.qa.map((q) => judgeAnswer(q.question, q.expected, q.answer, truth)));
         out.push({ ...r, regraded });
         const count = (v: AnswerVerdict["verdict"]) => regraded.filter((g, i) => r.qa[i].expected && g.verdict === v).length;

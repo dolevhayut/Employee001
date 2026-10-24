@@ -38,7 +38,18 @@ curl -X POST http://127.0.0.1:4545/api/control/generation/start -H 'content-type
 env -u ANTHROPIC_API_KEY node --env-file=.env.local node_modules/vitest/vitest.mjs run -c vitest.eval.config.ts
 ```
 
-Options (environment): `RELAY_EVAL_PEOPLE` (default 3), `RELAY_EVAL_PERSON_IDS`
+### End to end: a twin built from (emulated) connectors
+
+`RELAY_EVAL_BUILD=emulator` builds each twin the real way first: the twin
+builder reads simulated Gmail/Outlook/Slack/Jira/Drive/SharePoint over the same
+CompanySim company (see [evals/connectors](../connectors/README.md)). A judge
+reads the built profile; the facts it already holds count as known, and
+everything else (plus the tacit know-how) is what the interview has to
+recover. Add `RELAY_EVAL_COMPARE=<earlier run dir>` to put a seeded run's rows
+next to it. The builder adds about $2 per person (`RELAY_EVAL_BUILD_BUDGET_USD`
+caps it).
+
+Options (environment): `RELAY_EVAL_BUILD` (`seeded` or `emulator`), `RELAY_EVAL_PEOPLE` (default 3), `RELAY_EVAL_PERSON_IDS`
 (comma-separated CompanySim person ids), `RELAY_EVAL_MAX_ANSWERS` (default 16),
 `RELAY_EVAL_OUT` (default `docs/local/evals/relay-<time>`), `COMPANYSIM_URL`.
 

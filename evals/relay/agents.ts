@@ -26,8 +26,11 @@ export type StructuredQuestion = { factId: string; question: string };
 export type HiddenKnowledge = { tacit: TacitFact[]; questions: StructuredQuestion[] };
 
 /** Everything true about the person, for graders. */
-export function groundTruthText(d: Dossier, knowledge: HiddenKnowledge): string {
-  return [...d.facts.map((f) => `- ${f.text}`), ...knowledge.tacit.map((t) => `- ${t.fact}`)].join("\n");
+export function groundTruthText(d: Dossier, knowledge: HiddenKnowledge, builtProfile = ""): string {
+  const facts = [...d.facts.map((f) => `- ${f.text}`), ...knowledge.tacit.map((t) => `- ${t.fact}`)].join("\n");
+  // A twin built from connectors also knows what the connector data said
+  // (company name, issue keys, file names): true, though not in the list.
+  return builtProfile ? `${facts}\n\nThe twin's profile, built from the person's (simulated) mail, chat, tickets and files; also true:\n${builtProfile.slice(0, 12_000)}` : facts;
 }
 
 export function parseJson<T>(text: string): T {
