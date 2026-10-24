@@ -88,7 +88,12 @@ runtime or an operating-system dependency is unavailable. macOS needs a real
 Windows is refused while upstream support remains alpha. Public web research is
 still permitted through the sandbox's approval callback and every such host is
 written to the audit log as `sandboxNetwork`; loopback, link-local, cloud
-metadata and private-network targets remain blocked by resolved-address checks.
+metadata and private-network targets remain blocked by resolved-address checks,
+except the explicit port-qualified loopback literal required for a configured
+local model or enabled local MCP server. Claude Code session state remains
+writable for subscription sign-in, but sandboxed twins cannot modify Claude
+Code settings, plugins, hooks, skills, agents, commands, output styles, or
+`~/.claude.json`.
 
 - **Consent first**: a twin whose employee hasn't recorded consent can't be trained, gets none of the employee's tools or meeting transcripts, and can't act through their accounts. The synthetic demo twins are exempt. Consent is recorded with evidence (who, when, which consent text by SHA-256, scopes, IP, user agent) in the audit chain.
 - **Reads**: a twin's `Read`, `Glob` and `Grep` are limited to its own folder, colleagues' nine profile files, `org-brain/` and `org-skills/`, in every run type (chat, meeting, routines, work items, shifts, training). Other twins' memory and chat history, invites, the audit log and settings are blocked.

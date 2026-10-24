@@ -369,7 +369,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
       required: ["files", "overallConfidence"],
     } as const;
 
-    await ensureTwinSandbox();
+    await ensureTwinSandbox(`builder:${employee.id}`);
     const stream = query({
       prompt: `Research ${employee.name} (${employee.role}) using the connected systems and write all 9 twin profile files into \`${employeeDir}\`. Begin by listing what's connected, then plan, then execute. Do not write a file until you have grounded evidence for it.`,
       options: {

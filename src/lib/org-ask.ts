@@ -134,7 +134,7 @@ export async function briefFromSystems(question: string, emit: (e: SourceEvent) 
   };
   let brief = "";
   try {
-    await ensureTwinSandbox();
+    await ensureTwinSandbox("system");
     const stream = query({
       prompt: `The CEO asked the company:
 """${question.slice(0, 1200)}"""

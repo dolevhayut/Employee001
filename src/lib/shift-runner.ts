@@ -410,7 +410,7 @@ export async function runShift(args: {
       cwd: employeeDir,
     });
 
-    await ensureTwinSandbox();
+    await ensureTwinSandbox(`routine:${employee.id}`);
     const stream = query({
       prompt: `Run your shift. Use your MCP tools as needed, then emit a ShiftReport.`,
       options: {

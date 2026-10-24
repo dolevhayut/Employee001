@@ -29,7 +29,7 @@ export async function relayTurn(args: {
   if (!ready.ok) throw new Error(ready.reason);
 
   const runId = `relay_${args.employeeId}_${Date.now()}`;
-  await ensureTwinSandbox();
+  await ensureTwinSandbox(`relay:${args.employeeId}`);
   const stream = query({
     prompt: args.prompt,
     options: {

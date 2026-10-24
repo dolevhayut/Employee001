@@ -1305,7 +1305,7 @@ export async function runSingleTwin(
     });
 
     const toolConfig = buildToolConfig(options);
-    await ensureTwinSandbox();
+    await ensureTwinSandbox(`${surface}:${employee.id}`);
     const stream = query({
       prompt,
       options: {

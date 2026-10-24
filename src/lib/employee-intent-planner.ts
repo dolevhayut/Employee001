@@ -313,7 +313,7 @@ export async function planEmployeeResponseIntent(
 
     let structuredOutput: unknown = null;
 
-    await ensureTwinSandbox();
+    await ensureTwinSandbox("system");
     const stream = query({
       prompt,
       options: {

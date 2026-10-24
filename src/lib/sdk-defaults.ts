@@ -87,6 +87,7 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
   | "agentProgressSummaries"
   | "strictMcpConfig"
 > {
+  const runtimeOptions = providerRuntimeOptions();
   const effort: EffortLevel =
     args.surface === "builder" || args.surface === "relay"
       ? "high"
@@ -112,7 +113,11 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
     betas,
     // Only the allowlisted variables (sdk-env.ts): the child must not see
     // the app's other secrets.
-    ...providerRuntimeOptions(),
+    ...runtimeOptions,
+    env: {
+      ...runtimeOptions.env,
+      E001_SANDBOX_SCOPE: `${args.surface}:${args.employeeId}`,
+    },
     abortController: args.abortController,
     title: args.title,
     // Predicted follow-ups in chat surfaces — free (rides parent prompt cache).
@@ -132,10 +137,13 @@ export function providerRuntimeOptions(): Pick<Options, "env" | "pathToClaudeCod
   return {
     // providerEnvForAgentSdk() unsets other providers' flags with undefined,
     // which sdkChildEnv drops.
-    env: sdkChildEnv(process.env, {
+    env: {
+      ...sdkChildEnv(process.env, {
       ...providerEnvForAgentSdk(),
       CLAUDE_AGENT_SDK_CLIENT_APP: PKG_VERSION,
-    }),
+      }),
+      E001_SANDBOX_SCOPE: "system",
+    },
     ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
     ...(twinSandboxEnabled() ? { spawnClaudeCodeProcess } : {}),
   };

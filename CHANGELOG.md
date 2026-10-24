@@ -13,6 +13,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Sandbox Runtime for an OS-level filesystem and network boundary in addition
   to the existing in-process tool hooks. It fails closed when dependencies are
   unavailable and reports its off/on/unavailable state in system config.
+- Sandbox execution now uses a fixed argv launcher instead of injecting a twin
+  command into nested shells. Per-run write grants isolate scratch state, with
+  profile writes available only to Twin Builder; sensitive data and Claude Code
+  startup configuration are denied.
 
 ### Build your own twin, no tools to connect
 - A new **Build my twin** page (`/build-my-twin`, first on the Launchpad) lets

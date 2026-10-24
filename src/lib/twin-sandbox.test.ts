@@ -1,69 +1,98 @@
-import { describe, expect, it } from "vitest";
-import { buildTwinSandboxPolicy, spawnClaudeCodeProcess, twinSandboxStatus } from "@/lib/twin-sandbox";
+import { describe, expect, it, vi } from "vitest";
+
+const { sandbox, spawn } = vi.hoisted(() => ({
+  sandbox: {
+    checkDependencies: vi.fn(() => ({ errors: [] })),
+    initialize: vi.fn(async () => undefined),
+    wrapWithSandboxArgv: vi.fn(async () => ({ argv: ["/bin/bash", "-c", "fixed launcher"], env: { SRT: "1" } })),
+  },
+  spawn: vi.fn(() => ({ stdin: {}, stdout: {}, stderr: {} })),
+}));
+
+vi.mock("@anthropic-ai/sandbox-runtime", () => ({ SandboxManager: sandbox }));
+vi.mock("child_process", () => ({ spawn }));
+
+import { buildTwinSandboxPolicy, ensureTwinSandbox, spawnClaudeCodeProcess } from "@/lib/twin-sandbox";
+
+const env = {
+  EMPLOYEE001_HOME: "/workspace/employee001",
+  HOME: "/Users/ceo",
+  TMPDIR: "/private/tmp/employee001",
+};
 
 describe("twin sandbox policy", () => {
-  it("limits filesystem writes and derives provider and custom MCP egress", () => {
-    const policy = buildTwinSandboxPolicy(
-      {
-        EMPLOYEE001_HOME: "/workspace/employee001",
-        HOME: "/Users/ceo",
-        EMPLOYEE001_MODEL_PROVIDER: "bedrock",
-        AWS_REGION: "eu-west-1",
-        TMPDIR: "/private/tmp/employee001",
-      },
-      [
-        { enabled: true, url: "https://mcp.example.test/v1" },
-        { enabled: false, url: "https://disabled.example.test/mcp" },
-      ]
-    );
-
-    expect(policy.network.allowedDomains).toEqual(expect.arrayContaining([
-      "bedrock-runtime.eu-west-1.amazonaws.com",
-      "*.amazonaws.com",
-      "backend.composio.dev",
-      "*.composio.dev",
-      "mcp.example.test",
-    ]));
-    expect(policy.network.allowedDomains).not.toContain("disabled.example.test");
-    expect(policy.network.deniedResolvedAddresses).toContain("192.168.0.0/16");
-    expect(policy.filesystem.denyRead).toEqual(expect.arrayContaining([
-      "/Users/ceo/.ssh",
-      "/workspace/employee001/.env*",
-      "/workspace/employee001/data/auth/**",
-      "/workspace/employee001/data/invites.json",
-      "/workspace/employee001/data/employees/*/chat-history.jsonl",
-    ]));
-    expect(policy.filesystem.allowWrite).toEqual(expect.arrayContaining([
-      "/workspace/employee001/data/employees",
-      "/workspace/employee001/data/scratch",
+  it("limits each scope to its own scratch and gives builders only their employee directory", () => {
+    const normal = buildTwinSandboxPolicy(env, [], "chat:maya");
+    const builder = buildTwinSandboxPolicy(env, [], "builder:maya");
+    expect(normal.filesystem.allowWrite).toEqual(expect.arrayContaining([
+      "/workspace/employee001/data/scratch/maya",
       "/Users/ceo/.claude",
-      "/private/tmp/employee001",
+    ]));
+    expect(normal.filesystem.allowRead).toContain("/workspace/employee001/data/scratch/maya");
+    expect(normal.filesystem.allowWrite).not.toContain("/workspace/employee001/data/employees/maya");
+    expect(builder.filesystem.allowWrite).toContain("/workspace/employee001/data/employees/maya");
+  });
+
+  it("denies secrets, relay data, all scratch reads, and Claude Code startup mutations", () => {
+    const policy = buildTwinSandboxPolicy(env, [], "routine:maya");
+    expect(policy.filesystem.denyRead).toEqual(expect.arrayContaining([
+      "/workspace/employee001/data/org/custom-mcp.json",
+      "/workspace/employee001/data/telegram-approval-secret",
+      "/workspace/employee001/data/relay/**",
+      "/workspace/employee001/data/handovers/**",
+      "/workspace/employee001/data/audit*.jsonl",
+      "/workspace/employee001/data/settings.json",
+      "/workspace/employee001/data/*-secret*",
+      "/workspace/employee001/data/scratch/**",
+    ]));
+    expect(policy.filesystem.denyWrite).toEqual(expect.arrayContaining([
+      "/Users/ceo/.claude/settings.json",
+      "/Users/ceo/.claude/hooks",
+      "/Users/ceo/.claude.json",
     ]));
   });
 
-  it("fails closed when the synchronous SDK spawner runs before initialization", () => {
-    const prior = process.env.EMPLOYEE001_SANDBOX;
-    process.env.EMPLOYEE001_SANDBOX = "1";
-    expect(() => spawnClaudeCodeProcess({ command: "claude", args: [], env: {}, signal: new AbortController().signal })).toThrow("not ready");
-    if (prior === undefined) delete process.env.EMPLOYEE001_SANDBOX;
-    else process.env.EMPLOYEE001_SANDBOX = prior;
-    expect(twinSandboxStatus().status).toBe("off");
+  it("allows a local provider only as a port-qualified IP literal", () => {
+    const policy = buildTwinSandboxPolicy({
+      ...env,
+      EMPLOYEE001_MODEL_PROVIDER: "local",
+      ANTHROPIC_BASE_URL: "http://127.0.0.1:11434",
+    });
+    expect(policy.network.allowedDomains).toContain("127.0.0.1:11434");
+    expect(policy.network.deniedResolvedAddresses).toEqual(expect.arrayContaining(["10.0.0.0/8"]));
   });
 
-  it.skipIf(process.env.SRT_E2E !== "1")("initializes the installed SRT runtime before an integration twin run", async () => {
-    const prior = process.env.EMPLOYEE001_SANDBOX;
+  it("spawns the cached wrapper argv and keeps untrusted command text out of the shell", async () => {
+    const previous = process.env.EMPLOYEE001_SANDBOX;
     process.env.EMPLOYEE001_SANDBOX = "1";
-    const { ensureTwinSandbox } = await import("@/lib/twin-sandbox");
-    await expect(ensureTwinSandbox()).resolves.toBeUndefined();
-    if (prior === undefined) delete process.env.EMPLOYEE001_SANDBOX;
-    else process.env.EMPLOYEE001_SANDBOX = prior;
+    await ensureTwinSandbox("chat:maya");
+    spawnClaudeCodeProcess({
+      command: "claude",
+      args: ["--system-prompt", "quotes '$' and ".repeat(1000)],
+      cwd: "/tmp",
+      env: { E001_SANDBOX_SCOPE: "chat:maya", CHILD: "yes" },
+      signal: new AbortController().signal,
+    });
+    expect(sandbox.wrapWithSandboxArgv).toHaveBeenCalledWith(expect.stringContaining("launcher.mjs"), undefined, expect.any(Object));
+    expect(spawn).toHaveBeenCalledWith("/bin/bash", ["-c", "fixed launcher"], expect.objectContaining({
+      cwd: "/tmp",
+      env: expect.objectContaining({
+        SRT: "1",
+        CHILD: "yes",
+        E001_TWIN_ARGV: expect.stringContaining("quotes '$'"),
+      }),
+    }));
+    const spawnOptions = (spawn.mock.calls.at(-1) as unknown as [string, string[], { env: Record<string, string> }])[2];
+    expect(spawnOptions.env.E001_SANDBOX_SCOPE).toBeUndefined();
+    if (previous === undefined) delete process.env.EMPLOYEE001_SANDBOX;
+    else process.env.EMPLOYEE001_SANDBOX = previous;
   });
 
-  it("passes the whole command line to bash -c as one word, $ and quotes intact", async () => {
-    const { sandboxedCommand } = await import("@/lib/twin-sandbox");
-    const { execFileSync } = await import("node:child_process");
-    // sandbox-runtime ends its wrap with `/bin/bash -c <command>`; printf stands in for claude.
-    const line = sandboxedCommand("/bin/bash -c __EMPLOYEE001_TWIN_COMMAND__", "printf", ["%s|", "--system-prompt", "Max $50k, it's Maya's $' call", "--model", "x"]);
-    expect(execFileSync("/bin/sh", ["-c", line], { encoding: "utf8" })).toBe("--system-prompt|Max $50k, it's Maya's $' call|--model|x|");
+  it("fails closed when the SDK child did not receive a prepared scope", () => {
+    const previous = process.env.EMPLOYEE001_SANDBOX;
+    process.env.EMPLOYEE001_SANDBOX = "1";
+    expect(() => spawnClaudeCodeProcess({ command: "claude", args: [], env: {}, signal: new AbortController().signal })).toThrow("not ready for this scope");
+    if (previous === undefined) delete process.env.EMPLOYEE001_SANDBOX;
+    else process.env.EMPLOYEE001_SANDBOX = previous;
   });
 });

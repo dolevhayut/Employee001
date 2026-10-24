@@ -176,7 +176,7 @@ export async function buildBrainNodesFromText(
 
   let structuredOutput: unknown = null;
 
-  await ensureTwinSandbox();
+  await ensureTwinSandbox("system");
   const stream = query({
     prompt,
     options: {
