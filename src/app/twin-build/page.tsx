@@ -459,9 +459,10 @@ function TwinBuildContent() {
     }
     if (!res.ok) {
       // The server explains a refusal (e.g. no consent on file); show it.
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
+      // Most refusals carry the reason in `message`; some (a retired twin) in `error`.
+      const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
       setPhase("error");
-      setErrorMsg(body.message ?? `Request failed: ${res.status}`);
+      setErrorMsg(body.message ?? body.error ?? `Request failed: ${res.status}`);
       return;
     }
     const data = (await res.json()) as {
