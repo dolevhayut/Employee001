@@ -160,7 +160,22 @@ type TraceEvent = {
   tool?: string;
   reason?: string;
   approvalId?: string;
+  message?: string;
 };
+
+/** A failure the server explained (a bad key, Claude Code signed out, a
+ *  demo question with no recording): shown as is, not as "no answer". */
+class TwinError extends Error {}
+
+async function serverError(res: Response): Promise<string | null> {
+  try {
+    const body = (await res.json()) as { message?: unknown; error?: unknown };
+    const text = typeof body.message === "string" ? body.message : typeof body.error === "string" ? body.error : "";
+    return text.trim() || null;
+  } catch {
+    return null;
+  }
+}
 
 function plain(md: string): string {
   return md
@@ -206,12 +221,16 @@ async function askTwin(
       followups: false,
     }),
   });
-  if (!res.ok || !res.body) throw new Error(`chat failed: ${res.status}`);
+  if (!res.ok || !res.body) {
+    const explained = res.ok ? null : await serverError(res);
+    throw explained ? new TwinError(explained) : new Error(`chat failed: ${res.status}`);
+  }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
   let text = "";
+  let failure: string | null = null;
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -236,6 +255,9 @@ async function askTwin(
         case "text_delta":
           text += evt.delta ?? "";
           if (evt.delta) on.text?.(evt.delta);
+          break;
+        case "error":
+          failure = evt.message?.trim() || failure;
           break;
         case "thinking_delta":
           on.thinking(evt.delta ?? "");
@@ -276,6 +298,7 @@ async function askTwin(
       }
     }
   }
+  if (failure && !text.trim()) throw new TwinError(failure);
   return plain(text);
 }
 
@@ -1082,8 +1105,8 @@ export default function AskPage() {
         }, signal, viaVoice)) || t("ask.empty");
       answer = tidyCites(answer);
       answered = true;
-    } catch {
-      answer = signal.aborted ? t("ask.stopped") : t("ask.error");
+    } catch (err) {
+      answer = signal.aborted ? t("ask.stopped") : err instanceof TwinError ? err.message : t("ask.error");
     } finally {
       signal.removeEventListener("abort", onAbort);
       window.clearTimeout(ackTimer);

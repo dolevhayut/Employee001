@@ -52,6 +52,7 @@ type OrgEvent = {
   brief?: string;
   empty?: boolean;
   delta?: string;
+  message?: string;
 };
 
 const COLUMN = 740;
@@ -98,7 +99,16 @@ export default function AskCompanyPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
-      if (!res.ok || !res.body) throw new Error(String(res.status));
+      if (!res.ok || !res.body) {
+        // The server says why (a bad key, Claude Code signed out): show that.
+        const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+        if (typeof body?.error === "string" && body.error.trim()) {
+          const why = body.error.trim();
+          patch(id, (r) => ({ ...r, answer: why, done: true }));
+          return;
+        }
+        throw new Error(String(res.status));
+      }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
@@ -156,7 +166,7 @@ export default function AskCompanyPage() {
         patch(id, (r) => ({ ...r, answer: r.answer + (evt.delta ?? "") }));
         return;
       case "error":
-        patch(id, (r) => ({ ...r, error: true }));
+        patch(id, (r) => (r.answer || !evt.message ? { ...r, error: true } : { ...r, answer: evt.message }));
         return;
     }
   }

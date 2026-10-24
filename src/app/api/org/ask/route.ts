@@ -28,7 +28,11 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      // The first reason a source couldn't run, for an answer with no sources.
+      let failure: string | null = null;
       const send = (data: object) => {
+        const evt = data as { type?: string; message?: string };
+        if (evt.type === "source_error" && evt.message && !failure) failure = evt.message;
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
         } catch {
@@ -45,7 +49,7 @@ export async function POST(req: NextRequest) {
         // Sources work in parallel: this is a lookup, not a meeting.
         const briefs = [fromBrain, ...(await Promise.all([fromSystems, ...chosen.map((twin) => briefFrom(twin, question, send, abort))]))];
         if (!abort.signal.aborted) {
-          await synthesize(question, briefs, (delta) => send({ type: "answer_delta", delta }));
+          await synthesize(question, briefs, (delta) => send({ type: "answer_delta", delta }), failure);
           send({ type: "done" });
         }
       } catch (err) {

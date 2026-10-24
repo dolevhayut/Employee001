@@ -8,7 +8,8 @@ import { dataDir } from "@/lib/app-home";
 import { readTwinText, routeQuestion, type RoutePick } from "@/lib/org-router";
 import { routeWithModel } from "@/lib/org-router-model";
 import { runSingleTwin } from "@/lib/council-runner";
-import { directAnthropicAllowed } from "@/lib/model-provider";
+import { directAnthropicAllowed, modelErrorMessage } from "@/lib/model-provider";
+import { relayTurn } from "@/lib/relay/model";
 import { TWIN_HARD_DISALLOWED, TWIN_MODEL_PRIMARY, buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
 import { listCustomMcp, loadOrgCustomMcpServers } from "@/lib/custom-mcp";
 import { selectOrgBrainNodesForRun } from "@/lib/org-brain";
@@ -63,7 +64,7 @@ export type SourceEvent =
   | { type: "source_start"; id: string; name?: string; title?: string }
   | { type: "source_tool"; id: string; tool: string; input: unknown }
   | { type: "source_done"; id: string; brief: string; empty: boolean }
-  | { type: "source_error"; id: string };
+  | { type: "source_error"; id: string; message?: string };
 
 /** Run one twin as a read-only source and return its brief (null when it had nothing). */
 export async function briefFrom(
@@ -88,8 +89,8 @@ export async function briefFrom(
     emit({ type: "source_done", id: twin.id, brief: empty ? "" : brief, empty });
     // A former employee's brief is what they knew when they left: say so.
     return empty ? null : { id: twin.id, name: twin.firstName, title: twin.lifecycle === "retired" ? `${displayRole(twin)}, has left` : twin.role, brief };
-  } catch {
-    emit({ type: "source_error", id: twin.id });
+  } catch (err) {
+    emit({ type: "source_error", id: twin.id, message: modelErrorMessage(err instanceof Error ? err.message : String(err)) });
     return null;
   }
 }
@@ -179,16 +180,27 @@ function getClient(): Anthropic | null {
   return client;
 }
 
-/** Turn the briefs into the company's single answer, streamed. */
-export async function synthesize(question: string, sources: (Brief | null)[], onDelta: (delta: string) => void): Promise<void> {
+function synthesisSystem(hebrew: boolean): string {
+  return `You write the company's answer to its CEO from briefs: the company brain (documents), the company's connected systems (records), and team members.
+
+Rules:
+- One answer, in ${hebrew ? "Hebrew" : "English"}. Speak as the company ("we"), never as one person. No greeting, no sign-off.
+- Lead with the direct answer in one or two sentences, then the supporting facts. At most 160 words. Plain sentences or "- " bullets; no headings, no bold, no tables.
+- After every sentence or bullet that states a fact, add the ids of the briefs it came from, like [[daniel-azoulay]] or [[systems, daniel-azoulay]], right before the period or at the end of the bullet.
+- Prefer records and documents for hard numbers; use team members for context and status.
+- Use only facts in the briefs. If briefs disagree, say so and cite both. If something the CEO asked is not covered, say what is missing.`;
+}
+
+/** Turn the briefs into the company's single answer, streamed. `failure` is
+ *  why a source couldn't run (a bad key, Claude Code signed out): when no
+ *  source had anything, that's the answer, not "no one knew". */
+export async function synthesize(question: string, sources: (Brief | null)[], onDelta: (delta: string) => void, failure?: string | null): Promise<void> {
   const usable = sources.filter((s): s is Brief => Boolean(s?.brief));
   const hebrew = /[֐-׿]/.test(question);
-  const c = getClient();
-  if (!c || usable.length === 0) {
-    // No direct model access (other provider) or nothing found: show the briefs as they are.
+  if (usable.length === 0) {
     onDelta(
-      usable.length
-        ? usable.map((s) => `${s.brief.replace(/\n+/g, " ")} [[${s.id}]]`).join("\n\n")
+      failure
+        ? (hebrew ? `לא הצלחתי להגיע לתאומים: ${failure}` : `Couldn't reach the twins: ${failure}`)
         : hebrew
           ? "אף אחד בצוות לא מצא מידע על זה."
           : "No one on the team had anything on this.",
@@ -197,18 +209,26 @@ export async function synthesize(question: string, sources: (Brief | null)[], on
   }
 
   const briefs = usable.map((s) => `<brief id="${s.id}" source="${s.name}" about="${s.title}">\n${s.brief}\n</brief>`).join("\n\n");
+  const prompt = `CEO's question:\n"""${question.slice(0, 1200)}"""\n\nBriefs:\n${briefs}`;
+  const c = getClient();
+  if (!c) {
+    // No direct API (a cloud provider, a local model or a Claude
+    // subscription): write it through the Agent SDK on the configured
+    // provider. If that fails before writing anything, show the briefs.
+    let wrote = false;
+    try {
+      await relayTurn({ employeeId: "org-ask", model: TWIN_MODEL_PRIMARY, system: synthesisSystem(hebrew), prompt, onDelta: (d) => { wrote = true; onDelta(d); } });
+    } catch {
+      if (!wrote) onDelta(usable.map((s) => `${s.brief.replace(/\n+/g, " ")} [[${s.id}]]`).join("\n\n"));
+    }
+    return;
+  }
+
   const stream = c.messages.stream({
     model: TWIN_MODEL_PRIMARY,
     max_tokens: 1200,
-    system: `You write the company's answer to its CEO from briefs: the company brain (documents), the company's connected systems (records), and team members.
-
-Rules:
-- One answer, in ${hebrew ? "Hebrew" : "English"}. Speak as the company ("we"), never as one person. No greeting, no sign-off.
-- Lead with the direct answer in one or two sentences, then the supporting facts. At most 160 words. Plain sentences or "- " bullets; no headings, no bold, no tables.
-- After every sentence or bullet that states a fact, add the ids of the briefs it came from, like [[daniel-azoulay]] or [[systems, daniel-azoulay]], right before the period or at the end of the bullet.
-- Prefer records and documents for hard numbers; use team members for context and status.
-- Use only facts in the briefs. If briefs disagree, say so and cite both. If something the CEO asked is not covered, say what is missing.`,
-    messages: [{ role: "user", content: `CEO's question:\n"""${question.slice(0, 1200)}"""\n\nBriefs:\n${briefs}` }],
+    system: synthesisSystem(hebrew),
+    messages: [{ role: "user", content: prompt }],
   });
   for await (const ev of stream) {
     if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") onDelta(ev.delta.text);
