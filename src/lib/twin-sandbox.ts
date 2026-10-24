@@ -152,6 +152,16 @@ export async function ensureTwinSandbox(): Promise<void> {
   return initializing;
 }
 
+/** The real command in place of the placeholder. sandbox-runtime puts the
+ *  wrapped command as the single argument of `bash -c`, unquoted (it quotes
+ *  what it's given), so the whole command line goes in as ONE quoted word;
+ *  inserted bare, `bash -c` would run `claude` with no arguments. And a
+ *  function replacer, so `$&` / `$'` in a prompt aren't read as patterns. */
+export function sandboxedCommand(wrapped: string, command: string, args: string[]): string {
+  const line = [command, ...args].map(shellQuote).join(" ");
+  return wrapped.replace(PLACEHOLDER, () => shellQuote(line));
+}
+
 /** Passed to the Agent SDK only after ensureTwinSandbox() resolves. */
 export function spawnClaudeCodeProcess(options: SpawnOptions): SpawnedProcess {
   if (!twinSandboxEnabled()) {
@@ -160,8 +170,7 @@ export function spawnClaudeCodeProcess(options: SpawnOptions): SpawnedProcess {
   if (!wrappedCommand) {
     throw new Error(unavailableReason || "EMPLOYEE001_SANDBOX=1 is not ready. Await ensureTwinSandbox() before query().");
   }
-  const command = [options.command, ...options.args].map(shellQuote).join(" ");
-  return spawn(wrappedCommand.replace(PLACEHOLDER, command), [], {
+  return spawn(sandboxedCommand(wrappedCommand, options.command, options.args), [], {
     shell: true,
     cwd: options.cwd,
     env: options.env as NodeJS.ProcessEnv,

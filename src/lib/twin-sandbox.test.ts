@@ -58,4 +58,12 @@ describe("twin sandbox policy", () => {
     if (prior === undefined) delete process.env.EMPLOYEE001_SANDBOX;
     else process.env.EMPLOYEE001_SANDBOX = prior;
   });
+
+  it("passes the whole command line to bash -c as one word, $ and quotes intact", async () => {
+    const { sandboxedCommand } = await import("@/lib/twin-sandbox");
+    const { execFileSync } = await import("node:child_process");
+    // sandbox-runtime ends its wrap with `/bin/bash -c <command>`; printf stands in for claude.
+    const line = sandboxedCommand("/bin/bash -c __EMPLOYEE001_TWIN_COMMAND__", "printf", ["%s|", "--system-prompt", "Max $50k, it's Maya's $' call", "--model", "x"]);
+    expect(execFileSync("/bin/sh", ["-c", line], { encoding: "utf8" })).toBe("--system-prompt|Max $50k, it's Maya's $' call|--model|x|");
+  });
 });
