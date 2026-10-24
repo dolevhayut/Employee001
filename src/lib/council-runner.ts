@@ -63,6 +63,7 @@ import { loadReadAllowlist } from "@/lib/read-allowlist";
 import { withOutboundDisclosure } from "@/lib/ai-disclosure";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
+import { ensureTwinSandbox } from "@/lib/twin-sandbox";
 import {
   buildTwinAgentDefinitions,
   isTwinSubagent,
@@ -1304,6 +1305,7 @@ export async function runSingleTwin(
     });
 
     const toolConfig = buildToolConfig(options);
+    await ensureTwinSandbox();
     const stream = query({
       prompt,
       options: {

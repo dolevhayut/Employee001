@@ -6,6 +6,7 @@ import { TWIN_MODEL_FALLBACK, TWIN_MODEL_HAIKU, providerRuntimeOptions } from "@
 import { currentProvider, directAnthropicAllowed, modelForProvider } from "@/lib/model-provider";
 import { dataDir } from "@/lib/app-home";
 import { filterProfilingContent, memoryRedactionLevel, redactSensitive } from "@/lib/sensitive-content";
+import { ensureTwinSandbox } from "@/lib/twin-sandbox";
 
 const MEMORY_ROOT = dataDir("memory");
 const DEFAULT_LIMIT = 5;
@@ -1120,6 +1121,7 @@ async function extractFactsViaLLM(
     });
 
     let structuredOutput: unknown = null;
+    await ensureTwinSandbox();
     const stream = query({
       prompt,
       options: {

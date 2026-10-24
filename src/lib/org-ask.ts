@@ -16,6 +16,7 @@ import { selectOrgBrainNodesForRun } from "@/lib/org-brain";
 import { classifyTool } from "@/lib/tool-policy";
 import { loadReadAllowlist } from "@/lib/read-allowlist";
 import { displayRole, type EmployeeWithTwin } from "@/lib/employees";
+import { ensureTwinSandbox } from "@/lib/twin-sandbox";
 
 // "Ask the company": the organization answers with ONE voice. Unlike a team
 // meeting (twins talking, in turn, each in their own voice), everything here
@@ -133,6 +134,7 @@ export async function briefFromSystems(question: string, emit: (e: SourceEvent) 
   };
   let brief = "";
   try {
+    await ensureTwinSandbox();
     const stream = query({
       prompt: `The CEO asked the company:
 """${question.slice(0, 1200)}"""

@@ -8,6 +8,7 @@ import "server-only";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { buildBaseOptions } from "@/lib/sdk-defaults";
 import { canRunModel, modelErrorMessage, modelForProvider } from "@/lib/model-provider";
+import { ensureTwinSandbox } from "@/lib/twin-sandbox";
 
 let spentUsd = 0;
 /** What Relay model calls have cost in this process (the eval reports it). */
@@ -28,6 +29,7 @@ export async function relayTurn(args: {
   if (!ready.ok) throw new Error(ready.reason);
 
   const runId = `relay_${args.employeeId}_${Date.now()}`;
+  await ensureTwinSandbox();
   const stream = query({
     prompt: args.prompt,
     options: {

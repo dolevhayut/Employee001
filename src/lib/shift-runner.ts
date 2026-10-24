@@ -22,6 +22,7 @@ import { runPrefetches, formatFocusBlock } from "@/lib/twin-focus-prefetch";
 import { appendFeedItem } from "@/lib/feed-store";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
+import { ensureTwinSandbox } from "@/lib/twin-sandbox";
 import { dataDir } from "@/lib/app-home";
 import { recordSpend } from "@/lib/twin-budget";
 import { createConsultContext } from "@/lib/twin-consult";
@@ -409,6 +410,7 @@ export async function runShift(args: {
       cwd: employeeDir,
     });
 
+    await ensureTwinSandbox();
     const stream = query({
       prompt: `Run your shift. Use your MCP tools as needed, then emit a ShiftReport.`,
       options: {

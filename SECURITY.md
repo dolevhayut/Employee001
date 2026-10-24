@@ -71,6 +71,25 @@ Composio-managed apps are covered by ZDR only on Composio Enterprise.
 
 ## What a twin can reach
 
+### Optional OS sandbox for twin runs
+
+The normal twin boundary is enforced in the Agent SDK process: tool hooks remove
+Bash, restrict reads and writes, and pass only an allowlisted child environment.
+Set `EMPLOYEE001_SANDBOX=1` to add Anthropic's Sandbox Runtime as a second,
+OS-level boundary around the Claude Code child process. It denies sensitive
+Employee001 files and limits writes to twin data/scratch areas; it also sends
+child traffic through an allowlisted egress proxy. This contains a compromised
+CLI or a bypass of an in-process hook, but does not replace the consent,
+approval, audit, or tool policies described below.
+
+Hardened mode is opt-in and fails closed: a twin run refuses to start if the
+runtime or an operating-system dependency is unavailable. macOS needs a real
+`rg`/ripgrep binary on `PATH`. Linux additionally needs bubblewrap and socat.
+Windows is refused while upstream support remains alpha. Public web research is
+still permitted through the sandbox's approval callback and every such host is
+written to the audit log as `sandboxNetwork`; loopback, link-local, cloud
+metadata and private-network targets remain blocked by resolved-address checks.
+
 - **Consent first**: a twin whose employee hasn't recorded consent can't be trained, gets none of the employee's tools or meeting transcripts, and can't act through their accounts. The synthetic demo twins are exempt. Consent is recorded with evidence (who, when, which consent text by SHA-256, scopes, IP, user agent) in the audit chain.
 - **Reads**: a twin's `Read`, `Glob` and `Grep` are limited to its own folder, colleagues' nine profile files, `org-brain/` and `org-skills/`, in every run type (chat, meeting, routines, work items, shifts, training). Other twins' memory and chat history, invites, the audit log and settings are blocked.
 - **External reads**: a read through a connected tool or MCP server sends query content out, so it runs on its own only when an admin listed that source in the read allowlist (seeded with what was already connected); otherwise it asks. `WebSearch` asks unless the admin turns it on. A per-employee "allow" can't open `WebFetch` or `WebSearch` without the admin's switch.

@@ -20,6 +20,7 @@ import { dataDir } from "@/lib/app-home";
 import { checkTwinRead } from "@/lib/twin-read-scope";
 import { sdkChildEnv } from "@/lib/sdk-env";
 import { discloseOutbound, isOutboundMessageTool } from "@/lib/ai-disclosure";
+import { spawnClaudeCodeProcess, twinSandboxEnabled } from "@/lib/twin-sandbox";
 
 const PKG_VERSION = "Employee001/0.2.0";
 
@@ -79,6 +80,7 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
   | "betas"
   | "env"
   | "pathToClaudeCodeExecutable"
+  | "spawnClaudeCodeProcess"
   | "abortController"
   | "title"
   | "promptSuggestions"
@@ -125,7 +127,7 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
  *  allowlisted env (sdk-env.ts) with the provider's flags, and, in
  *  claude-code mode, the user's own `claude` instead of the bundled runtime.
  *  Spread it into any query() options that don't use buildBaseOptions. */
-export function providerRuntimeOptions(): Pick<Options, "env" | "pathToClaudeCodeExecutable"> {
+export function providerRuntimeOptions(): Pick<Options, "env" | "pathToClaudeCodeExecutable" | "spawnClaudeCodeProcess"> {
   const executable = claudeCodeExecutable();
   return {
     // providerEnvForAgentSdk() unsets other providers' flags with undefined,
@@ -135,6 +137,7 @@ export function providerRuntimeOptions(): Pick<Options, "env" | "pathToClaudeCod
       CLAUDE_AGENT_SDK_CLIENT_APP: PKG_VERSION,
     }),
     ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
+    ...(twinSandboxEnabled() ? { spawnClaudeCodeProcess } : {}),
   };
 }
 

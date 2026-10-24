@@ -30,6 +30,7 @@ import {
 import { buildBaseOptions, buildTwinHooks, TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
+import { ensureTwinSandbox } from "@/lib/twin-sandbox";
 
 // Re-export the client-safe types/constants so existing imports keep working.
 import { TWIN_FILE_NAMES, type TwinFileName, type TwinBuilderEvent } from "./twin-builder-types";
@@ -368,6 +369,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
       required: ["files", "overallConfidence"],
     } as const;
 
+    await ensureTwinSandbox();
     const stream = query({
       prompt: `Research ${employee.name} (${employee.role}) using the connected systems and write all 9 twin profile files into \`${employeeDir}\`. Begin by listing what's connected, then plan, then execute. Do not write a file until you have grounded evidence for it.`,
       options: {

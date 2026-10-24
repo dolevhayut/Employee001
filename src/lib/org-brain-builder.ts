@@ -12,6 +12,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { OrgBrainInput, OrgBrainNodeType } from "@/lib/org-brain";
 import { TWIN_MODEL_PRIMARY, TWIN_MODEL_FALLBACK, providerRuntimeOptions } from "@/lib/sdk-defaults";
 import { canRunModel, modelForProvider } from "@/lib/model-provider";
+import { ensureTwinSandbox } from "@/lib/twin-sandbox";
 
 const VALID_TYPES: OrgBrainNodeType[] = [
   "document",
@@ -175,6 +176,7 @@ export async function buildBrainNodesFromText(
 
   let structuredOutput: unknown = null;
 
+  await ensureTwinSandbox();
   const stream = query({
     prompt,
     options: {

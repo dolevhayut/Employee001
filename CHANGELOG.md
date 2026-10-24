@@ -8,6 +8,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Hardened twin sandbox (opt-in)
+- `EMPLOYEE001_SANDBOX=1` wraps every Agent SDK twin process in Anthropic
+  Sandbox Runtime for an OS-level filesystem and network boundary in addition
+  to the existing in-process tool hooks. It fails closed when dependencies are
+  unavailable and reports its off/on/unavailable state in system config.
+
 ### Build your own twin, no tools to connect
 - A new **Build my twin** page (`/build-my-twin`, first on the Launchpad) lets
   the person running Employee001 brief their own twin. You give it your name,

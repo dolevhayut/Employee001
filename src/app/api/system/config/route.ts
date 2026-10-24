@@ -6,6 +6,7 @@ import { envFilePath } from "@/lib/app-home";
 import { canRunModel, currentProvider, providerLabel, type ModelProvider } from "@/lib/model-provider";
 import { claudeCliStatus } from "@/lib/claude-code-cli";
 import { KEYCHAIN_PLACEHOLDER, readKeychainSecret, storeKeychainSecret, type SecretName } from "@/lib/keychain";
+import { twinSandboxStatus } from "@/lib/twin-sandbox";
 
 // Returns *presence* of each required API key, never the value itself.
 // Used by the UI to gate the Invite-employee flow on a fully configured
@@ -33,6 +34,7 @@ export type SystemConfigStatus = {
   modelProblem?: string;
   /** In claude-code mode: the user's own Claude Code and its sign-in. */
   claudeCode?: { installed: boolean; version?: string; loggedIn?: boolean; subscriptionType?: string };
+  sandbox: { status: "off" | "on" | "unavailable"; reason?: string };
   /** True iff every *required* key is set. The UI uses this to flip the
    *  Invite button between active and disabled. */
   ready: boolean;
@@ -65,6 +67,7 @@ export async function GET() {
     modelReady: model.ok,
     ...(model.ok ? {} : { modelProblem: model.reason }),
     ...(cli ? { claudeCode: { installed: cli.installed, version: cli.version, loggedIn: cli.loggedIn, subscriptionType: cli.subscriptionType } } : {}),
+    sandbox: twinSandboxStatus(),
     ready,
   };
   return NextResponse.json(body, {

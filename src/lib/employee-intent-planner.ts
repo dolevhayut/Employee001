@@ -2,6 +2,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { ARTIFACT_TOOL_FULL_NAME } from "@/lib/artifacts-mcp";
 import { TWIN_MODEL_FALLBACK, providerRuntimeOptions } from "@/lib/sdk-defaults";
 import { directAnthropicAllowed } from "@/lib/model-provider";
+import { ensureTwinSandbox } from "@/lib/twin-sandbox";
 
 export type ResponseIntentPlan = {
   intent: string;
@@ -312,6 +313,7 @@ export async function planEmployeeResponseIntent(
 
     let structuredOutput: unknown = null;
 
+    await ensureTwinSandbox();
     const stream = query({
       prompt,
       options: {
