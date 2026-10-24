@@ -5,8 +5,7 @@
 // left and an Answer node takes its output on the right. Every source the
 // twin reaches for appears as a node above or below the orb, wired to it;
 // MCP servers fan out into the tools pulled through them ("CompanySim" →
-// get person, search tickets). Wires are dashed with dots flowing along them,
-// and a small orb hops along the wire to whatever the twin is doing now.
+// get person, search tickets). Wires are dashed with dots flowing along them.
 // The flowing-dot wires follow 21st.dev's "AI Agent Pipeline" (SVG
 // animateMotion); the node look follows n8n. When the answer card opens, a
 // wave runs out from it and gently pushes the nodes clear of it, nearest
@@ -19,11 +18,10 @@
 // boxes. Handles sit outside the parts that scale in, so React Flow measures
 // them where they end up.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { AnimatePresence, animate, motion, useMotionValue, type AnimationPlaybackControls } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, animate, motion, type AnimationPlaybackControls } from "framer-motion";
 import {
   ReactFlow,
-  EdgeLabelRenderer,
   Handle,
   Position,
   useUpdateNodeInternals,
@@ -370,59 +368,9 @@ function LeafNode({ data }: NodeProps<LeafData>) {
 
 // ── edges ───────────────────────────────────────────────────────────────
 
-/** Which stretch of the hop this wire carries: all of it, or one of two legs. */
-type Hop = { key: number; leg: "full" | "first" | "second" };
-type WireData = { live: boolean; done: boolean; delay: number; hop?: Hop };
-
-/** The small orb hopping along a wire, read point by point off the drawn path. */
-function HopDot({ pathRef, leg }: { pathRef: RefObject<SVGPathElement | null>; leg: Hop["leg"] }) {
-  const x = useMotionValue(-100);
-  const y = useMotionValue(-100);
-  const opacity = useMotionValue(0);
-  const scale = useMotionValue(0.6);
-  useEffect(() => {
-    // Two legs read as one hop: in fast along the source's wire, then out
-    // to the item, easing in to land.
-    const ctl = animate(0, 1, {
-      duration: leg === "full" ? 0.75 : leg === "first" ? 0.3 : 0.45,
-      delay: leg === "second" ? 0.3 : 0,
-      ease: leg === "first" ? "easeIn" : EASE,
-      onUpdate: (p) => {
-        const el = pathRef.current;
-        if (!el) return;
-        const pt = el.getPointAtLength(p * el.getTotalLength());
-        x.set(pt.x);
-        y.set(pt.y);
-        opacity.set(leg === "first" ? (p < 0.9 ? Math.min(1, p * 4) : (1 - p) * 10) : leg === "second" ? 1 : Math.min(1, p * 4));
-        scale.set(leg === "second" ? 1 : 0.6 + 0.4 * Math.min(1, p * 1.5));
-      },
-    });
-    return () => ctl.stop();
-  }, [leg, pathRef, x, y, opacity, scale]);
-  return (
-    <motion.span
-      style={{
-        position: "absolute",
-        left: 0,
-        top: 0,
-        x,
-        y,
-        opacity,
-        scale,
-        width: 16,
-        height: 16,
-        marginLeft: -8,
-        marginTop: -8,
-        borderRadius: "50%",
-        background: "radial-gradient(circle at 35% 35%, #fff 0%, var(--accent) 45%, var(--twin) 100%)",
-        boxShadow: "0 0 16px var(--accent), 0 0 30px color-mix(in oklab, var(--twin) 60%, transparent)",
-      }}
-    />
-  );
-}
+type WireData = { live: boolean; done: boolean; delay: number };
 
 function WireEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, data }: EdgeProps<WireData>) {
-  const pathRef = useRef<SVGPathElement>(null);
   const vertical = sourcePosition === Position.Top || sourcePosition === Position.Bottom;
   const d = vertical ? wireV(sourceX, sourceY, targetX, targetY) : wireH(sourceX, sourceY, targetX, targetY);
   const live = Boolean(data?.live);
@@ -443,7 +391,6 @@ function WireEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, data
         />
       </mask>
       <path
-        ref={pathRef}
         d={d}
         mask={`url(#${mask})`}
         fill="none"
@@ -459,11 +406,6 @@ function WireEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, data
             <animateMotion dur="1.4s" begin={`${b * 1.4}s`} repeatCount="indefinite" path={d} />
           </circle>
         ))}
-      {data?.hop && (
-        <EdgeLabelRenderer>
-          <HopDot key={data.hop.key} pathRef={pathRef} leg={data.hop.leg} />
-        </EdgeLabelRenderer>
-      )}
     </>
   );
 }
@@ -582,7 +524,6 @@ export function FlowCanvas({
   }, []);
 
   const active = laid.find((l) => l.g.lastId === latest?.id && !latest?.done);
-  const hopLeaf = active?.leaves.find((lf) => lf.lastId === latest?.id);
 
   const ports = useMemo(() => Array.from({ length: MAX_GROUPS }, (_, i) => port(i, w, h)), [w, h]);
   const node = <T,>(id: string, type: string, data: T): Node<T> => ({
@@ -636,7 +577,6 @@ export function FlowCanvas({
         live: isActive,
         done: l.g.done && !isActive,
         delay: 0.05 * l.i,
-        hop: isActive && latest ? { key: latest.id, leg: hopLeaf ? "first" : "full" } : undefined,
       }),
     );
     for (const lf of l.leaves) {
@@ -647,7 +587,6 @@ export function FlowCanvas({
           live: on,
           done: lf.done,
           delay: 0,
-          hop: on && hopLeaf === lf && latest ? { key: latest.id, leg: "second" } : undefined,
         }),
       );
     }
