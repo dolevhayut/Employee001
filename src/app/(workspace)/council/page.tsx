@@ -2103,21 +2103,6 @@ function CouncilPageInner() {
     scrollToBottom();
   }
 
-  const router = useRouter();
-  // sendMessage is intentionally omitted: sentPrefills makes this URL-triggered effect one-shot.
-  useEffect(() => {
-    if (!sendPrefill) {
-      sentPrefills.current.delete(prefill);
-      return;
-    }
-    if (!prefill || readyEmployees.length === 0 || sentPrefills.current.has(prefill)) return;
-    sentPrefills.current.add(prefill);
-    void sendMessage(prefill);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("send");
-    router.replace(params.size ? `/council?${params}` : "/council");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefill, readyEmployees.length, router, searchParams, sendPrefill]);
 
   /** Find the last response for this employee that is currently streaming.
    *  Falls back to the last response with matching employeeId if none is streaming. */
@@ -2571,6 +2556,23 @@ function CouncilPageInner() {
         break;
     }
   }
+
+  const router = useRouter();
+  // After the handlers it calls (sendMessage → handleEvent), so the React
+  // compiler sees them declared. sendMessage is intentionally omitted: sentPrefills makes this URL-triggered effect one-shot.
+  useEffect(() => {
+    if (!sendPrefill) {
+      sentPrefills.current.delete(prefill);
+      return;
+    }
+    if (!prefill || readyEmployees.length === 0 || sentPrefills.current.has(prefill)) return;
+    sentPrefills.current.add(prefill);
+    void sendMessage(prefill);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("send");
+    router.replace(params.size ? `/council?${params}` : "/council");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill, readyEmployees.length, router, searchParams, sendPrefill]);
 
   /** Detect @-trigger and update mentionQuery as the user types. */
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
