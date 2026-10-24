@@ -8,7 +8,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const HELP = `Employee001 — your company's organizational brain, running on your machine.
 
 Usage:
-  employee001 <command> [options]
+  employee001 [command] [options]      (no command = start)
 
 Get started:
   demo      Try Employee001 with 6 invented twins — no keys, nothing touches your files
@@ -56,10 +56,13 @@ const HOME_COMMANDS = new Set(["setup", "start", "doctor", "secure", "mcp"]);
 const KNOWN = new Set(["setup", "start", "update", "doctor", "secure", "export", "import", "mcp", "audit", "demo", "help"]);
 
 async function main() {
-  const cmd = process.argv[2];
-  const args = process.argv.slice(3);
+  // No command (or only flags, like `--port 4000`) starts the app, running
+  // setup first in a folder without .env: `npx employee001` is the whole install.
+  const first = process.argv[2];
+  const cmd = !first || (first.startsWith("-") && first !== "--help" && first !== "-h") ? "start" : first;
+  const args = cmd === first ? process.argv.slice(3) : process.argv.slice(2);
 
-  if (!cmd || cmd === "--help" || cmd === "-h" || cmd === "help") {
+  if (cmd === "--help" || cmd === "-h" || cmd === "help") {
     process.stdout.write(HELP);
     return;
   }

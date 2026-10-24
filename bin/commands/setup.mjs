@@ -480,8 +480,8 @@ export default async function setup(_argv, { launch = true } = {}) {
   if (p.isCancel(startNow) || !startNow) {
     p.outro(
       [
-        "Done. Whenever you're ready:",
-        "  employee001 start",
+        "Done. Whenever you're ready, run this in this folder:",
+        "  npx employee001",
         "",
         "Then open http://localhost:" + port,
       ].join("\n"),

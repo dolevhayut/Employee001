@@ -9,9 +9,10 @@
 **Every install is also your organization's own MCP server**, so your team can ask the twins from the agents they already use: Claude Code, Codex, Cursor, Claude Desktop.
 
 ```bash
-npx employee001 setup     # first-run wizard
-npx employee001 start     # opens http://localhost:3000
+npx employee001     # first run: a short setup, then it opens http://localhost:3000
 ```
+
+Signed in to Claude Code? Your Claude subscription runs the twins, no API key needed.
 
 [![npm version](https://img.shields.io/npm/v/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
 [![npm downloads](https://img.shields.io/npm/dm/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
@@ -141,11 +142,10 @@ Anything outside the recordings gets a pointer to `--live`, which runs the demo 
 ## Installation
 
 ```bash
-npx employee001 setup     # interactive first-run wizard: writes .env, creates data/
-npx employee001 start     # starts the server and opens http://localhost:3000
+npx employee001           # starts the server and opens http://localhost:3000
 ```
 
-Running `npx employee001` with no command prints help. `start` runs `setup` first if there's no `.env` in the current directory. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop.
+With no command it runs `start`, which runs `setup` first if there's no `.env` in the current directory (the wizard writes `.env` and creates `data/`; run `npx employee001 setup` to change it later). `npx employee001 help` lists the commands. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop.
 
 The folder you run `setup` in is your install: it holds `.env` and `data/`. Run `start` from the same folder, or set `EMPLOYEE001_HOME=/path/to/install` to use it from anywhere.
 

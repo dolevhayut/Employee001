@@ -8,6 +8,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### `npx employee001` is the whole install
+- With no command, `npx employee001` now starts the app, running setup first
+  in a folder without `.env`. It used to print help. `npx employee001 help`
+  still lists the commands.
+- Ask and Ask the company now say why a twin couldn't answer: an invalid key,
+  Claude Code signed out, or a demo question with no recording. Before, they
+  showed "didn't find an answer" or "No one on the team had anything on this".
+- On a cloud provider, a local model or a Claude subscription, Ask the company
+  now writes its combined answer through that provider. Before, it pasted the
+  raw notes.
+
 ### Run your twins on your Claude subscription, with no API key
 - `npx employee001 setup` now finds Claude Code on your machine. If it's
   signed in, "Your Claude subscription" is the first choice and needs no API
