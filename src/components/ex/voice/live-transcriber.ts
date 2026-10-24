@@ -7,26 +7,23 @@
 // at each pause (VAD). The session stays open across questions, so the person
 // can just keep talking, and so they can talk over the twin to stop it.
 
-import { Downsampler, bytesToBase64, floatToPcm16 } from "@/lib/pcm";
+import { Downsampler, STT_SAMPLE_RATE as SAMPLE_RATE, bytesToBase64, floatToPcm16 } from "@/lib/pcm";
 
-const SAMPLE_RATE = 16_000;
 const PROCESSOR = "e001-pcm-tap";
 
-// Batches the render quantum (128 samples) into ~100ms frames for the socket.
+// Batches the render quantum (128 samples) into ~100ms frames for the socket,
+// in one preallocated buffer: no allocation per quantum on the audio thread.
 const WORKLET = `
 class Tap extends AudioWorkletProcessor {
-  constructor() { super(); this.parts = []; this.size = 0; }
+  constructor() { super(); this.frame = Math.ceil(sampleRate / 10); this.buf = new Float32Array(this.frame + 128); this.size = 0; }
   process(inputs) {
     const ch = inputs[0] && inputs[0][0];
     if (ch && ch.length) {
-      this.parts.push(ch.slice(0));
+      this.buf.set(ch, this.size);
       this.size += ch.length;
-      if (this.size >= sampleRate / 10) {
-        const out = new Float32Array(this.size);
-        let at = 0;
-        for (const p of this.parts) { out.set(p, at); at += p.length; }
+      if (this.size >= this.frame) {
+        const out = this.buf.slice(0, this.size);
         this.port.postMessage(out, [out.buffer]);
-        this.parts = [];
         this.size = 0;
       }
     }
@@ -127,6 +124,7 @@ export async function startLiveTranscriber(url: string, ctx: AudioContext, strea
   };
 
   ws.onmessage = (e) => {
+    if (done) return; // closed or cancelled: nothing more is delivered
     let msg: ScribeMessage;
     try {
       msg = JSON.parse(String(e.data));
@@ -140,7 +138,7 @@ export async function startLiveTranscriber(url: string, ctx: AudioContext, strea
       on.ready();
     } else if (type === "partial_transcript") {
       partial = msg.text ?? "";
-      if (!done) on.partial(partial);
+      on.partial(partial);
     } else if (type === "committed_transcript") {
       partial = "";
       on.commit(msg.text ?? "");

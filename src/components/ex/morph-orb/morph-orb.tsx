@@ -45,7 +45,13 @@ export interface MorphOrbHandle {
 
 export interface MorphOrbProps {
   ref?: React.Ref<MorphOrbHandle>;
-  onSubmit?: (text: string) => Promise<string> | string;
+  /** Asks the question. `signal` aborts when the person escapes the run
+   *  before an answer is shown. */
+  onSubmit?: (text: string, signal: AbortSignal) => Promise<string> | string;
+  /** Call onSubmit as the run starts, so the answer is worked on during the
+   *  ~2.5s launch, instead of once the orb is thinking. Only for questions
+   *  that are safe to drop on Escape (abort `signal`). */
+  eagerSubmit?: boolean;
   /** Called once the answer card has unfolded (e.g. to read it aloud). */
   onAnswered?: (answer: string) => void;
   /** Called when the orb returns to the idle input. */
@@ -508,7 +514,7 @@ interface Env {
   getBody: () => HTMLElement | null;
   ui: UI; getSpeed: () => number; isReduced: () => boolean;
 }
-interface RunCfg { onSubmit: (text: string) => Promise<string> | string; minThink: number }
+interface RunCfg { onSubmit: (text: string, signal: AbortSignal) => Promise<string> | string; minThink: number; eager?: boolean }
 interface Runtime {
   start(text: string, cfg: RunCfg): boolean;
   escape(): void;
@@ -691,11 +697,13 @@ function createRuntime(env: Env): Runtime {
       await play(tracks, sig);
       if (sig.aborted) throw ABORT;
     };
-    // Ask right away: the twin works while the orb launches, instead of after
-    // (the launch alone is ~2.5s). The answer still waits for the animation.
-    const pending = Promise.resolve()
-      .then(() => cfg.onSubmit(text))
-      .then((b) => (typeof b === "string" && b.trim() ? b : COPY.answerBody), () => COPY.answerBody);
+    const ask = () =>
+      Promise.resolve()
+        .then(() => cfg.onSubmit(text, sig))
+        .then((b) => (typeof b === "string" && b.trim() ? b : COPY.answerBody), () => COPY.answerBody);
+    // Eager: the answer is worked on while the orb launches (~2.5s) instead
+    // of after. It still waits for the animation to be shown.
+    let pending = cfg.eager ? ask() : null;
     try {
       env.ui.setPhase("launch");
       hist.length = 0;
@@ -718,6 +726,7 @@ function createRuntime(env: Env): Runtime {
       const ctl = { stop: false };
       void labelLoop(sig, ctl);
       const t0 = performance.now();
+      pending ??= ask();
       const got = await abortable(pending, sig);
       if (sig.aborted) throw ABORT;
       const body = got ?? COPY.answerBody;
@@ -957,6 +966,7 @@ export default function MorphOrb({ ref, ...props }: MorphOrbProps) {
               rt.start(next, {
                 onSubmit: propsRef.current.onSubmit ?? (() => COPY.answerBody),
                 minThink: propsRef.current.minThinkMs ?? 3450,
+                eager: propsRef.current.eagerSubmit,
               });
             });
             return;
@@ -1014,6 +1024,7 @@ export default function MorphOrb({ ref, ...props }: MorphOrbProps) {
   const makeCfg = (): RunCfg => ({
     onSubmit: propsRef.current.onSubmit ?? defaultSubmit,
     minThink: propsRef.current.minThinkMs ?? 3450,
+    eager: propsRef.current.eagerSubmit,
   });
 
   const shake = () => {
@@ -1084,6 +1095,7 @@ export default function MorphOrb({ ref, ...props }: MorphOrbProps) {
         rt.start(text, {
           onSubmit: propsRef.current.onSubmit ?? (() => COPY.answerBody),
           minThink: propsRef.current.minThinkMs ?? 3450,
+          eager: propsRef.current.eagerSubmit,
         });
       });
       return true;

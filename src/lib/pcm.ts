@@ -1,6 +1,11 @@
 // 16-bit PCM in and out of the browser for live voice: the mic is cut down to
 // 16 kHz for Scribe, and the twin's speech arrives as base64 PCM to play.
 
+/** The mic is sent as 16 kHz mono 16-bit PCM (Scribe's pcm_16000). */
+export const STT_SAMPLE_RATE = 16_000;
+/** Speech comes back as 24 kHz mono 16-bit PCM (pcm_24000). */
+export const TTS_SAMPLE_RATE = 24_000;
+
 /** Turns a stream of Float32 frames at `inRate` into frames at `outRate`
  *  (lower), averaging each output sample's window so speech stays clean.
  *  Keeps the remainder between calls, so frame edges don't click. */

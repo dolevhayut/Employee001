@@ -164,6 +164,9 @@ export function useVoiceInput(opts: {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recognitionRef = useRef<Recognition | null>(null);
   const liveRef = useRef<LiveTranscriber | null>(null);
+  // Each live start gets a number; a cancel (or a newer start) makes the older
+  // attempt stale, and a stale attempt only cleans up what it opened itself.
+  const liveGenRef = useRef(0);
   const discardRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   // Made in the click gesture by start(), handed to the meter once the mic is open.
@@ -200,6 +203,7 @@ export function useVoiceInput(opts: {
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();
     recognitionRef.current?.abort();
     recognitionRef.current = null;
+    liveGenRef.current++; // a live start still connecting is now stale
     liveRef.current?.close();
     liveRef.current = null;
     release();
@@ -297,75 +301,83 @@ export function useVoiceInput(opts: {
     }, MAX_RECORD_MS);
   }, [cancel, level, release, stop, transcribe]);
 
-  const startLive = useCallback(async () => {
-    // Live couldn't start: say so, and fall back for the rest of the visit.
-    const unavailable = () => {
-      release();
-      setState("idle");
-      setLiveBroken(true);
-      optsRef.current.onError?.("stt");
-    };
-    let url: string;
-    try {
-      const res = await fetch("/api/stt/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      if (!res.ok) throw new Error(`stt token ${res.status}`);
-      url = ((await res.json()) as { url: string }).url;
-    } catch {
-      if (!discardRef.current) unavailable();
-      return;
-    }
-    if (discardRef.current) return release();
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-    } catch {
-      release();
-      setState("idle");
-      optsRef.current.onError?.("denied");
-      return;
-    }
-    if (discardRef.current) {
-      stream.getTracks().forEach((t) => t.stop());
-      return release();
-    }
-    streamRef.current = stream;
-    const ctx = ctxRef.current;
-    ctxRef.current = null; // the meter owns it now
-    if (!ctx) return unavailable();
-    meterRef.current = startMeter(stream, level, ctx);
-    let ready = false;
-    try {
-      const session = await startLiveTranscriber(url, ctx, stream, {
-        ready: () => {
-          ready = true;
-          setState("listening");
-        },
-        // NFKC: Scribe sometimes returns full-width punctuation ("？", "，").
-        partial: (text) => {
-          setInterim(text.normalize("NFKC"));
-          optsRef.current.onPartial?.(text);
-        },
-        commit: (text) => {
-          setInterim("");
-          const said = text.normalize("NFKC").replace(/\s+/g, " ").trim();
-          if (said && heardSpeech(said)) optsRef.current.onTranscript(said);
-        },
-        closed: (failed) => {
-          if (liveRef.current === session) liveRef.current = null;
-          release();
-          setInterim("");
-          setState("idle");
-          if (!failed || discardRef.current) return;
-          if (ready) optsRef.current.onError?.("live_lost");
-          else unavailable();
-        },
-      });
-      if (discardRef.current) return session.close();
-      liveRef.current = session;
-    } catch {
-      if (!discardRef.current) unavailable();
-    }
-  }, [level, release]);
+  const startLive = useCallback(
+    async (ctx: AudioContext | null) => {
+      liveGenRef.current += 1;
+      const gen = liveGenRef.current;
+      const stale = () => gen !== liveGenRef.current || discardRef.current;
+      // Live couldn't start: say so, and fall back for the rest of the visit.
+      const unavailable = () => {
+        release();
+        setState("idle");
+        setLiveBroken(true);
+        optsRef.current.onError?.("stt");
+      };
+      // The token and the mic permission at once: neither waits on the other.
+      const [token, mic] = await Promise.allSettled([
+        fetch("/api/stt/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(async (res) => {
+          if (!res.ok) throw new Error(`stt token ${res.status}`);
+          return ((await res.json()) as { url: string }).url;
+        }),
+        navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }),
+      ]);
+      const stream = mic.status === "fulfilled" ? mic.value : null;
+      if (stale()) {
+        stream?.getTracks().forEach((t) => t.stop());
+        void ctx?.close().catch(() => {});
+        return;
+      }
+      if (!stream) {
+        void ctx?.close().catch(() => {});
+        release();
+        setState("idle");
+        optsRef.current.onError?.("denied");
+        return;
+      }
+      streamRef.current = stream;
+      if (token.status === "rejected" || !ctx) {
+        void ctx?.close().catch(() => {});
+        return unavailable();
+      }
+      meterRef.current = startMeter(stream, level, ctx); // the meter owns ctx now
+      let ready = false;
+      let shown = "";
+      try {
+        const session = await startLiveTranscriber(token.value, ctx, stream, {
+          ready: () => {
+            ready = true;
+            setState("listening");
+          },
+          // NFKC: Scribe sometimes returns full-width punctuation ("？", "，").
+          partial: (text) => {
+            const next = text.normalize("NFKC");
+            if (next !== shown) setInterim((shown = next));
+            optsRef.current.onPartial?.(text);
+          },
+          commit: (text) => {
+            setInterim((shown = ""));
+            const said = text.normalize("NFKC").replace(/\s+/g, " ").trim();
+            if (said && heardSpeech(said)) optsRef.current.onTranscript(said);
+          },
+          closed: (failed) => {
+            if (liveRef.current !== session && liveRef.current !== null) return; // an older session
+            liveRef.current = null;
+            release();
+            setInterim("");
+            setState("idle");
+            if (!failed || discardRef.current) return;
+            if (ready) optsRef.current.onError?.("live_lost");
+            else unavailable();
+          },
+        });
+        if (stale()) return session.close();
+        liveRef.current = session;
+      } catch {
+        if (!stale()) unavailable();
+      }
+    },
+    [level, release],
+  );
 
   const startRecognition = useCallback(async () => {
     const Ctor = recognitionCtor();
@@ -442,7 +454,10 @@ export function useVoiceInput(opts: {
     }
     if (engine === "live") {
       setState("connecting");
-      void startLive();
+      // The live session gets its own context; nothing else may take it.
+      const ctx = ctxRef.current;
+      ctxRef.current = null;
+      void startLive(ctx);
     } else if (engine === "elevenlabs") {
       setState("listening");
       void startRecording();

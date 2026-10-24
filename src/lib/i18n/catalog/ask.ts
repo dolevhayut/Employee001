@@ -40,6 +40,7 @@ export const askEn = {
   "ask.mic.liveLost": "The live mic disconnected. Press it to talk again.",
   "ask.mic.idleEnd": "Stopped listening. Press the mic to talk again.",
   "ask.mic.queued": "Got it. I'll ask that as soon as this answer is in.",
+  "ask.stopped": "Stopped.",
   "ask.conversation": "Conversation",
   "ask.flow.question": "Question",
   "ask.flow.answer": "Answer",

@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { elevenLabsBase, voiceEnabled } from "@/lib/data-residency";
 import { fetchSpeech } from "@/lib/tts-model";
+import { liveVoiceId } from "@/lib/voice-live";
 
 const MAX_CHARS = 5000;
-const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 
 function stripMarkdown(md: string): string {
   return md
@@ -37,7 +37,8 @@ export async function POST(request: NextRequest) {
   }
 
   const text = stripMarkdown(rawText).slice(0, MAX_CHARS);
-  const voiceId = body.voiceId ?? DEFAULT_VOICE_ID;
+  // Same pick as live speech: the twin's voice, the install default, or Sarah.
+  const voiceId = liveVoiceId(body.voiceId);
 
   const upstream = await fetchSpeech(`${elevenLabsBase()}/v1/text-to-speech/${voiceId}/stream`, apiKey, text);
 

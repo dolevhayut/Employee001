@@ -7,7 +7,7 @@
 // reasoning when the model streams it. Read-only by design: a tool call that
 // would need approval is declined, so the orb never waits on a hidden card.
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { displayRole } from "@/lib/employees";
 import { Topbar } from "@/components/ex/shell";
@@ -19,7 +19,7 @@ import MorphOrb, { type MorphOrbHandle } from "@/components/ex/morph-orb/morph-o
 import { useVoiceInput, type VoiceInputError } from "@/components/ex/voice/use-voice-input";
 import { MicButton } from "@/components/ex/voice/mic-button";
 import { LiveSpeaker, playbackContext } from "@/components/ex/voice/live-speaker";
-import { heardSpeech, looksLikeEcho, speakable, takeSentences } from "@/lib/speech-text";
+import { heardSpeech, looksLikeEcho, speakable, takeSentences, twinWordsInTheRoom } from "@/lib/speech-text";
 import { bcp47 } from "@/lib/i18n/format";
 import { describeToolCall, words } from "@/components/ex/morph-orb/tool-nodes";
 import { FlowCanvas } from "@/components/ex/morph-orb/flow-canvas";
@@ -146,9 +146,11 @@ async function askTwin(
     /** The answer's text as it streams (spoken sentence by sentence in live voice). */
     text?: (d: string) => void;
   },
+  signal?: AbortSignal,
 ): Promise<string> {
   const res = await fetch("/api/twin/chat", {
     method: "POST",
+    signal,
     headers: { "Content-Type": "application/json" },
     // Name the language outright: a twin whose memory is in Hebrew otherwise
     // drifts into Hebrew for an English question.
@@ -449,14 +451,8 @@ function writeVoiceOn(on: boolean) {
 }
 /** Live voice stops listening after this long with nothing said or playing. */
 const LIVE_IDLE_MS = 30_000;
-/** The mic hearing the twin's last words this soon after it stopped is still echo. */
-const ECHO_TAIL_MS = 2_000;
-/** The twin's words the mic may be hearing back right now, or "". */
-function twinWordsInTheRoom(speaker: LiveSpeaker | null, last: { text: string; endedAt: number | null }, playing: boolean): string {
-  if (speaker) return speaker.spoken;
-  if (playing || (last.endedAt !== null && Date.now() - last.endedAt < ECHO_TAIL_MS)) return last.text;
-  return "";
-}
+/** How long a voice notice stays over the stage. */
+const HINT_MS = 4_500;
 const linkedTwin = () => new URLSearchParams(window.location.search).get("twin");
 
 export default function AskPage() {
@@ -507,7 +503,7 @@ export default function AskPage() {
   const flashHint = (text: string, { settings = false, mic = false } = {}) => {
     setVoiceHint({ text, settings, mic });
     window.clearTimeout(hintTimer.current);
-    hintTimer.current = window.setTimeout(() => setVoiceHint(null), 4500);
+    hintTimer.current = window.setTimeout(() => setVoiceHint(null), HINT_MS);
   };
   useEffect(() => () => window.clearTimeout(hintTimer.current), []);
   const orbRef = useRef<MorphOrbHandle | null>(null);
@@ -515,6 +511,8 @@ export default function AskPage() {
   const viaVoiceRef = useRef(false);
   // A question said (live) while the last answer was still being written.
   const queuedVoiceRef = useRef<string | null>(null);
+  // The turn whose answer the orb last showed.
+  const answeredTurnRef = useRef<number | null>(null);
 
   // ?twin=<id> preselects a twin (the Company brain links here when a twin is clicked).
   const linked = useSyncExternalStore(noopSubscribe, linkedTwin, () => null);
@@ -570,12 +568,14 @@ export default function AskPage() {
     };
   }, [voiceLive, voiceOn]);
 
-  // Every stop bumps the generation, so a speak() still fetching its audio
-  // gives up instead of playing over the mic (or over a newer answer).
+  // Every stop bumps the generation, so a speakWhole() still fetching its
+  // audio gives up instead of playing over the mic (or over a newer answer).
+  // Stopping also silences the live speaker.
   const speakGen = useRef(0);
   const voiceStateRef = useRef<"idle" | "connecting" | "listening" | "transcribing">("idle");
-  // Live voice keeps the mic open while the twin talks (talking over it stops it).
-  const liveMicRef = useRef(false);
+  // The live engine keeps the mic open while the twin talks (talking over it
+  // stops it), so playback isn't held back for an open mic.
+  const liveEngineRef = useRef(false);
   const stopAudio = () => {
     speakGen.current++;
     audioRef.current?.pause();
@@ -651,7 +651,7 @@ export default function AskPage() {
       if (!res.ok) throw new Error(`tts ${res.status}`);
       const blob = await res.blob();
       // Stopped (or the mic opened) while the audio was on its way: drop it.
-      if (gen !== speakGen.current || (!liveMicRef.current && voiceStateRef.current !== "idle")) return;
+      if (gen !== speakGen.current || (!liveEngineRef.current && voiceStateRef.current !== "idle")) return;
       const url = URL.createObjectURL(blob);
       const player = new Audio(url);
       audioRef.current = player;
@@ -807,7 +807,7 @@ export default function AskPage() {
     };
   }, [openTasks]);
 
-  const onSubmit = async (question: string) => {
+  const onSubmit = async (question: string, signal: AbortSignal) => {
     const viaVoice = viaVoiceRef.current;
     viaVoiceRef.current = false;
     if (mode === "task") return assign(question, viaVoice);
@@ -839,6 +839,14 @@ export default function AskPage() {
       for (const sentence of sentences) speaker.say(speakable(sentence));
       if (final) speaker.finish();
     };
+    // Escaped before the answer was shown: stop the run, its voice and the queue.
+    const onAbort = () => {
+      if (speakerRef.current === speaker) stopAudio();
+      else speaker?.stop();
+      queuedVoiceRef.current = null;
+      setBusy(false);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
     let answer: string;
     try {
       answer =
@@ -859,27 +867,38 @@ export default function AskPage() {
             })),
           thinking: (d) => patchTurn(id, (turn) => ({ ...turn, thinking: turn.thinking + d })),
           text: (d) => sayStreamed(d),
-        })) || t("ask.empty");
+        }, signal)) || t("ask.empty");
       answer = tidyCites(answer);
     } catch {
-      answer = t("ask.error");
+      answer = signal.aborted ? t("ask.stopped") : t("ask.error");
+    } finally {
+      signal.removeEventListener("abort", onAbort);
     }
-    sayStreamed("", true);
+    if (!signal.aborted) sayStreamed("", true);
     patchTurn(id, (turn) => ({ ...turn, answer }));
     return answer;
   };
 
+  /** Asks a spoken question; the orb may still be on its way back to idle. */
+  const submitVoice = (text: string, tries = 20) => {
+    viaVoiceRef.current = true;
+    if (orbRef.current?.submit(text)) return;
+    viaVoiceRef.current = false;
+    if (tries > 0) window.setTimeout(() => submitVoice(text, tries - 1), 100);
+  };
+
   // Talk instead of type: the transcript is asked (or handed as a task, per
   // the mode) exactly as if it had been typed into the orb.
-  const echoSource = () => twinWordsInTheRoom(speakerRef.current, spokenRef.current, Boolean(audioRef.current));
+  const echoSource = () => twinWordsInTheRoom(speakerRef.current?.spoken ?? null, spokenRef.current, Boolean(audioRef.current));
   const voice = useVoiceInput({
     serverStt: voiceReady,
     liveStt: voiceLive,
     allowBrowser: voiceAllowed,
     lang: bcp47(locale),
-    // Barge-in: the person talking over the twin stops it at once.
+    // Barge-in: the person talking over the twin stops it at once. Only once
+    // it's actually talking: words said while it thinks are queued instead.
     onPartial: (text) => {
-      if (!speakerRef.current && !audioRef.current) return;
+      if (!speakerRef.current?.playing && !audioRef.current) return;
       if (!heardSpeech(text) || looksLikeEcho(text, echoSource())) return;
       stopAudio();
     },
@@ -890,12 +909,12 @@ export default function AskPage() {
       viaVoiceRef.current = true;
       if (orbRef.current?.submit(text)) return;
       viaVoiceRef.current = false;
-      if (liveMicRef.current) {
-        // Said over an answer that's still being written: a word or two
-        // ("stop", "wait") only interrupts; a question is asked as soon as
-        // the answer lands.
-        if (text.split(/\s+/).length <= 2) return;
-        queuedVoiceRef.current = text;
+      if (liveEngineRef.current) {
+        // Said over an answer that's still being written: one word ("stop",
+        // "wait") only interrupts; anything longer is asked as soon as the
+        // answer lands (several in a row are asked together).
+        if (text.trim().split(/\s+/).length <= 1) return;
+        queuedVoiceRef.current = queuedVoiceRef.current ? `${queuedVoiceRef.current} ${text}` : text;
         flashHint(t("ask.mic.queued"), { mic: true });
         return;
       }
@@ -933,38 +952,42 @@ export default function AskPage() {
   };
   useEffect(() => {
     voiceStateRef.current = voice.state;
-    liveMicRef.current = voice.engine === "live";
+    liveEngineRef.current = voice.engine === "live";
   }, [voice.state, voice.engine]);
   // Live voice listens across questions; it lets go after a quiet spell with
   // nothing said, nothing being answered and nothing playing.
   const live = voice.engine === "live";
   const answering = busy && turns[turns.length - 1]?.answer == null;
   const stopVoice = voice.stop;
+  const idleEnd = useEffectEvent(() => {
+    stopVoice();
+    flashHint(t("ask.mic.idleEnd"), { mic: true });
+  });
   useEffect(() => {
     if (!live || voice.state !== "listening" || audio || answering) return;
-    const timer = window.setTimeout(() => {
-      stopVoice();
-      setVoiceHint({ text: t("ask.mic.idleEnd"), settings: false, mic: true });
-      window.clearTimeout(hintTimer.current);
-      hintTimer.current = window.setTimeout(() => setVoiceHint(null), 4500);
-    }, LIVE_IDLE_MS);
+    const timer = window.setTimeout(idleEnd, LIVE_IDLE_MS);
     return () => window.clearTimeout(timer);
-  }, [live, voice.state, voice.interim, audio, answering, stopVoice, t]);
-  // Escape drops a question still being spoken.
+  }, [live, voice.state, voice.interim, audio, answering]);
+  // Escape drops a question still being spoken. In a live conversation it
+  // also silences the twin; a second Escape then reaches the orb.
   const listening = voice.state === "listening";
   const cancelVoice = voice.cancel;
+  const escapeVoice = useEffectEvent(() => {
+    cancelVoice();
+    if (live) stopAudio();
+  });
   useEffect(() => {
     if (!listening) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      // Capture phase + stop: Escape drops the spoken question only, it must
-      // not also reach the orb's own Escape (which resets the answer).
+      // Capture phase + stop: it must not also reach the orb's own Escape
+      // (which resets the answer).
       e.stopImmediatePropagation();
-      cancelVoice();
+      escapeVoice();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [listening, cancelVoice]);
+  }, [listening]);
   const voiceCopy = listening
     ? voice.interim || t(live ? "ask.mic.live" : "ask.mic.listening")
     : voice.state === "connecting"
@@ -1009,6 +1032,9 @@ export default function AskPage() {
           <MorphOrb
             ref={orbRef}
             onSubmit={onSubmit}
+            // Asks start during the launch animation; a task waits, so an
+            // Escape during launch never hands one out.
+            eagerSubmit={mode === "ask"}
             inputAccessory={
               <MicButton
                 state={voice.state}
@@ -1036,17 +1062,15 @@ export default function AskPage() {
               />
             }
             onAnswered={(answer) => {
+              const last = turns[turns.length - 1];
+              answeredTurnRef.current = last?.id ?? null;
               const queued = queuedVoiceRef.current;
               if (queued) {
                 // The person already asked the next thing: ask it now.
                 queuedVoiceRef.current = null;
-                window.setTimeout(() => {
-                  viaVoiceRef.current = true;
-                  if (!orbRef.current?.submit(queued)) viaVoiceRef.current = false;
-                }, 0);
+                window.setTimeout(() => submitVoice(queued), 0);
                 return;
               }
-              const last = turns[turns.length - 1];
               // A spoken question always gets a spoken answer. Live voice
               // already said it while it streamed.
               if (!last || !voiceReady || !(voiceOn || last.viaVoice)) return;
@@ -1065,9 +1089,15 @@ export default function AskPage() {
               );
             })()}
             onReset={() => {
+              // A follow-up can already be running (the orb asks as it
+              // starts): leave its voice and busy state alone then.
+              if (turnSeq.current === answeredTurnRef.current) {
+                setBusy(false);
+                stopAudio();
+              }
+              const queued = queuedVoiceRef.current;
               queuedVoiceRef.current = null;
-              setBusy(false);
-              stopAudio();
+              if (queued) submitVoice(queued);
             }}
             minThinkMs={2600}
             copy={{

@@ -12,6 +12,7 @@
 // falls back to record-then-transcribe everywhere.
 
 import { elevenLabsBase, euRegion, voiceEnabled } from "@/lib/data-residency";
+import { STT_SAMPLE_RATE, TTS_SAMPLE_RATE } from "@/lib/pcm";
 
 type Env = Record<string, string | undefined>;
 
@@ -19,10 +20,6 @@ type Env = Record<string, string | undefined>;
 export const STT_REALTIME_MODEL = "scribe_v2_realtime";
 /** Eleven v4 Turbo: the v4 family for interactive use, ~100ms inference. */
 export const TTS_LIVE_DEFAULT_MODEL = "eleven_v4_turbo";
-/** The mic is sent as 16 kHz mono 16-bit PCM. */
-export const STT_SAMPLE_RATE = 16_000;
-/** Speech comes back as 24 kHz mono 16-bit PCM, played through Web Audio. */
-export const TTS_SAMPLE_RATE = 24_000;
 /** Quiet this long ends the question (ElevenLabs' default is 1.5s). */
 export const VAD_SILENCE_SECS = 1.2;
 /** Voice used when the twin has none of its own: Sarah, soft and conversational. */
@@ -80,9 +77,8 @@ export function ttsLiveUrl(token: string, env: Env = process.env): string {
 
 /** Why a token can't be minted on this install, as an HTTP answer; null when it can. */
 export function liveTokenRefusal(env: Env = process.env): { status: number; error: string } | null {
-  if (!liveVoiceEnabled(env)) return { status: 403, error: "live_voice_disabled" };
-  if (!env.ELEVENLABS_API_KEY) return { status: 500, error: "ELEVENLABS_API_KEY is not configured" };
-  return null;
+  // No key reads as off too: voiceEnabled() needs one.
+  return liveVoiceEnabled(env) ? null : { status: 403, error: "live_voice_disabled" };
 }
 
 /** A single-use token (valid 15 minutes, one connection) from ElevenLabs. */

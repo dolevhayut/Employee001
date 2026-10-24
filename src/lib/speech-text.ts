@@ -102,3 +102,21 @@ export function looksLikeEcho(heard: string, spoken: string): boolean {
   }
   return best / h.length >= 0.6;
 }
+
+/** The mic hearing the twin's last words this soon after it stopped is still
+ *  echo: VAD silence (1.2s), the network and the speakers' own delay. */
+export const ECHO_TAIL_MS = 3_000;
+
+/** The twin's words the mic may be hearing back right now, or "": what the
+ *  live speaker has said so far, else the last answer while it plays and for
+ *  ECHO_TAIL_MS after. */
+export function twinWordsInTheRoom(
+  liveSpoken: string | null,
+  last: { text: string; endedAt: number | null },
+  playing: boolean,
+  now: number = Date.now(),
+): string {
+  if (liveSpoken !== null) return liveSpoken;
+  if (playing || (last.endedAt !== null && now - last.endedAt < ECHO_TAIL_MS)) return last.text;
+  return "";
+}

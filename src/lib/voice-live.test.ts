@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { DEFAULT_VOICE_ID, elevenLabsWsBase, liveTokenRefusal, liveVoiceEnabled, liveVoiceId, sttRealtimeUrl, ttsLiveUrl } from "./voice-live";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_VOICE_ID, mintSingleUseToken, elevenLabsWsBase, liveTokenRefusal, liveVoiceEnabled, liveVoiceId, sttRealtimeUrl, ttsLiveUrl } from "./voice-live";
 
 const key = { ELEVENLABS_API_KEY: "k" };
 
@@ -12,7 +12,7 @@ describe("liveVoiceEnabled", () => {
     expect(liveVoiceEnabled({ ...key, EMPLOYEE001_REGION: "eu" })).toBe(false);
     expect(liveVoiceEnabled({ ...key, EMPLOYEE001_REGION: "eu", ELEVENLABS_BASE_URL: "https://api.eu.residency.elevenlabs.io" })).toBe(false);
   });
-  it("refuses tokens when off, and without a key", () => {
+  it("refuses tokens when off, and without a key (no key reads as off)", () => {
     expect(liveTokenRefusal({ ...key, EMPLOYEE001_REGION: "eu" })?.status).toBe(403);
     expect(liveTokenRefusal({})?.status).toBe(403);
     expect(liveTokenRefusal(key)).toBeNull();
@@ -53,5 +53,36 @@ describe("liveVoiceId", () => {
     expect(liveVoiceId(undefined, { ELEVENLABS_VOICE_ID: "Inst4ll" })).toBe("Inst4ll");
     expect(liveVoiceId(undefined, {})).toBe(DEFAULT_VOICE_ID);
     expect(liveVoiceId("../evil", {})).toBe(DEFAULT_VOICE_ID);
+  });
+});
+
+describe("mintSingleUseToken", () => {
+  const env = { ELEVENLABS_API_KEY: "k" };
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("returns the token, asked with the server's key", async () => {
+    const f = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => new Response(JSON.stringify({ token: "sutkn_1" })));
+    vi.stubGlobal("fetch", f);
+    expect(await mintSingleUseToken("realtime_scribe", undefined, env)).toBe("sutkn_1");
+    expect(String(f.mock.calls[0][0])).toBe("https://api.elevenlabs.io/v1/single-use-token/realtime_scribe");
+    expect((f.mock.calls[0][1]?.headers as Record<string, string>)["xi-api-key"]).toBe("k");
+  });
+
+  it("returns null on a refusal or an empty token", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 401 })));
+    expect(await mintSingleUseToken("ttd_websocket", undefined, env)).toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ token: "" }))));
+    expect(await mintSingleUseToken("ttd_websocket", undefined, env)).toBeNull();
+  });
+
+  it("throws when ElevenLabs is unreachable (the routes answer 502)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }));
+    await expect(mintSingleUseToken("realtime_scribe", undefined, env)).rejects.toThrow();
   });
 });

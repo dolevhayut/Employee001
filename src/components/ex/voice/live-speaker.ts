@@ -7,11 +7,14 @@
 // audio comes back as 24 kHz PCM and is queued gap-free on one AudioContext;
 // stop() silences it at once (barge-in).
 
-import { base64ToBytes, pcm16ToFloat } from "@/lib/pcm";
+import { TTS_SAMPLE_RATE as SAMPLE_RATE, base64ToBytes, pcm16ToFloat } from "@/lib/pcm";
 
-const SAMPLE_RATE = 24_000;
 /** The socket closes after 20s without a message; the twin may think longer. */
 const KEEP_ALIVE_MS = 10_000;
+/** Give up on a socket that hasn't opened by then (whole-answer playback takes over). */
+const CONNECT_TIMEOUT_MS = 8_000;
+/** After the last sentence, the end of speech is due well within this. */
+const FINISH_TIMEOUT_MS = 30_000;
 
 let shared: AudioContext | null = null;
 
@@ -56,7 +59,8 @@ export class LiveSpeaker {
   private sources = new Set<AudioBufferSourceNode>();
   private nextAt = 0;
   private rest: Uint8Array = new Uint8Array(0);
-  private keepAlive: number | undefined;
+  private keepAlive: ReturnType<typeof setInterval> | undefined;
+  private deadline: ReturnType<typeof setTimeout> | undefined;
   private readonly ctx: AudioContext | null;
 
   constructor(
@@ -81,6 +85,8 @@ export class LiveSpeaker {
     if (this.finished || this.stopped) return;
     this.finished = true;
     if (!this.spoken) return this.stop();
+    clearTimeout(this.deadline);
+    this.deadline = setTimeout(() => this.stop(), FINISH_TIMEOUT_MS);
     if (this.ws?.readyState === WebSocket.OPEN && this.queue.length === 0) this.ws.send(JSON.stringify({ close_socket: true }));
   }
 
@@ -88,7 +94,7 @@ export class LiveSpeaker {
   stop() {
     if (this.stopped) return;
     this.stopped = true;
-    window.clearInterval(this.keepAlive);
+    this.clearTimers();
     for (const s of this.sources) {
       s.onended = null;
       try {
@@ -102,8 +108,9 @@ export class LiveSpeaker {
     this.on.ended?.();
   }
 
-  get active() {
-    return !this.stopped;
+  /** Its voice is coming out of the speakers now (not still connecting). */
+  get playing() {
+    return this.started && !this.stopped;
   }
 
   private async open(requested?: string) {
@@ -125,12 +132,16 @@ export class LiveSpeaker {
     if (!this.ctx) return this.fail();
     const ws = new WebSocket(url);
     this.ws = ws;
+    this.deadline = setTimeout(() => {
+      if (ws.readyState !== WebSocket.OPEN) this.fail();
+    }, CONNECT_TIMEOUT_MS);
     ws.onopen = () => {
       if (this.stopped) return ws.close(1000);
+      clearTimeout(this.deadline);
       ws.send(JSON.stringify({ voices: [this.voiceId] }));
       for (const text of this.queue.splice(0)) this.sendText(text);
       if (this.finished) ws.send(JSON.stringify({ close_socket: true }));
-      this.keepAlive = window.setInterval(() => {
+      this.keepAlive = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ keep_alive: true }));
       }, KEEP_ALIVE_MS);
     };
@@ -147,7 +158,16 @@ export class LiveSpeaker {
         else this.stop();
         return;
       }
-      if (msg.audio) this.play(msg.audio);
+      if (msg.audio) {
+        try {
+          this.play(msg.audio);
+        } catch {
+          // a malformed chunk: stop cleanly rather than leave the turn hanging
+          if (!this.started) this.fail();
+          else this.stop();
+          return;
+        }
+      }
       if (msg.is_final) {
         this.gotFinal = true;
         this.endIfDone();
@@ -157,7 +177,7 @@ export class LiveSpeaker {
       if (!this.started) this.fail();
     };
     ws.onclose = () => {
-      window.clearInterval(this.keepAlive);
+      clearInterval(this.keepAlive);
       if (this.stopped) return;
       if (!this.started) return this.fail();
       // Closed early: let what's queued finish, then end.
@@ -204,14 +224,19 @@ export class LiveSpeaker {
   private endIfDone() {
     if (this.stopped || !this.gotFinal || this.sources.size > 0) return;
     this.stopped = true;
-    window.clearInterval(this.keepAlive);
+    this.clearTimers();
     this.on.ended?.();
+  }
+
+  private clearTimers() {
+    clearInterval(this.keepAlive);
+    clearTimeout(this.deadline);
   }
 
   private fail() {
     if (this.stopped) return;
     this.stopped = true;
-    window.clearInterval(this.keepAlive);
+    this.clearTimers();
     if (this.ws && this.ws.readyState <= WebSocket.OPEN) this.ws.close(1000);
     this.on.failed?.();
   }
