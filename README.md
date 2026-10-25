@@ -104,6 +104,7 @@ Everything below is in the current npm release ([0.10.0](CHANGELOG.md)).
 - **Invite a colleague**: they consent, connect their own tools, and their twin is built from that history. Connected tools also deepen a self-built twin.
 - **Editable profiles** (`/profile`): a split-pane editor over the nine files, with version history.
 - **Knowledge uploads**: PDF and Word files become Markdown the twin reads on demand.
+- **Local folders**: point a twin at up to five folders on your machine and it answers from your real files, read-only, with nothing uploaded. `.env` files, keys, `.git` and `node_modules` are never read, and every add and remove is audited. The files it reads go to your model provider.
 
 **Ask and collaborate**
 - **Ask** (`/ask`): talk to one twin, see each source and tool it reaches for, or hand it a task. Your conversations are saved per person; each person sees only their own.

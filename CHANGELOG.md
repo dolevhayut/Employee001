@@ -8,6 +8,39 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Your twin works from your real files, not from a summary someone uploaded
+- Point a twin at a folder on your machine and it answers from your actual
+  files, with nothing uploaded or synced. Add up to five folders on the
+  twin's profile, or one while you build your own twin.
+- The twin reads them; it can't change them. Write and Edit stay inside the
+  twin's own scratch folder, and shell access is off for every twin.
+- `.env` files, keys, `.git` and `node_modules` are never read, a symlink
+  can't lead out of the folder, and `Grep` there works one file at a time.
+  Your home folder itself, `~/.ssh`, `~/.claude` and the app's own data
+  can't be added.
+- Every add and remove is written to the audit log. The files a twin reads
+  go to your model provider to answer, and the add-folder screen says so.
+
+### Twins ask for what they're missing
+- When a question needs a system a twin can't reach, it files a request in
+  the admin's Inbox, with the reason and the access it needs. Nothing is
+  contacted or configured until you act on it.
+- Tasks run on twins with no connected tools: they work from their profile,
+  files and folders.
+
+### Two themes
+- Light (white, stone and dark brown) and dark (black, gray and white). The
+  OS setting picks one until you choose.
+
+### Security
+- In hardened mode (`EMPLOYEE001_SANDBOX=1`) a twin no longer inherits the
+  server's environment variables, and private addresses and `localhost` are
+  refused when reached by IP. On Linux, a host or container that can't run
+  the sandbox now says so up front, with the fix.
+- An approved `Edit` can no longer reach files outside the twin's scratch
+  folder.
+- Claude subscription mode still covers one person only.
+
 ---
 
 ## [0.10.0] — 2026-10-25
