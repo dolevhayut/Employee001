@@ -272,7 +272,9 @@ export function buildTwinHooks(
     return {};
   };
 
-  // Restrict the Write tool to the per-twin scratch directory. Twins can
+  // Restrict Write, Edit and MultiEdit to the per-twin scratch directory.
+  // Edit isn't auto-allowed (it asks), but an approved Edit must not reach
+  // profile files, other data or a configured knowledge folder either. Twins can
   // jot down notes / draft memos / save observations there, but they can't
   // overwrite their own profile, brain nodes, or anything else under data/.
   // Path is relative to the agent's cwd (set to data/ in council-runner).
@@ -282,7 +284,8 @@ export function buildTwinHooks(
     if (ctx.surface === "builder") return {};
     if (input.hook_event_name !== "PreToolUse") return {};
     const pre = input as PreToolUseHookInput;
-    if (pre.tool_name !== "Write") return {};
+    const tool = pre.tool_name;
+    if (tool !== "Write" && tool !== "Edit" && tool !== "MultiEdit") return {};
     const toolInput = (pre.tool_input ?? {}) as { file_path?: unknown };
     const rawPath =
       typeof toolInput.file_path === "string" ? toolInput.file_path : "";
@@ -294,8 +297,8 @@ export function buildTwinHooks(
           runId: ctx.runId,
           employeeId: ctx.employeeId,
           employeeName: ctx.employeeName,
-          toolName: "Write",
-          bareName: "Write",
+          toolName: tool,
+          bareName: tool,
           input: { file_path: rawPath },
           verdict: "hard_blocked",
           blockReason: reason,
@@ -316,7 +319,7 @@ export function buildTwinHooks(
     };
 
     if (!rawPath) {
-      return deny("Write requires a file_path.");
+      return deny(`${tool} requires a file_path.`);
     }
 
     const allowedPrefix = `scratch/${ctx.employeeId}/`;
@@ -346,7 +349,7 @@ export function buildTwinHooks(
 
     if (!ok) {
       return deny(
-        `Write is sandboxed to ${allowedPrefix}<filename>. Got: "${rawPath}" (normalised: "${normalized}"). ` +
+        `${tool} is sandboxed to ${allowedPrefix}<filename>. Got: "${rawPath}" (normalised: "${normalized}"). ` +
         `Use a relative path like scratch/${ctx.employeeId}/my-memo.md`
       );
     }

@@ -90,13 +90,13 @@ describe("the read-scope hook", () => {
     fs.rmSync(home, { recursive: true, force: true });
   });
 
-  async function preToolUse(restrict: boolean, file_path: string) {
+  async function preToolUse(restrict: boolean, file_path: string, tool_name = "Read") {
     const { buildTwinHooks } = await import("./sdk-defaults");
     const hooks = buildTwinHooks({ runId: "r", employeeId: "noa", employeeName: "Noa", surface: "chat", restrictReadsToTwinScope: restrict });
     const results = [];
     for (const matcher of hooks.PreToolUse ?? []) {
       for (const hook of matcher.hooks) {
-        results.push(await hook({ hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path }, tool_use_id: "t", session_id: "s", transcript_path: "", cwd: path.join(home, "data") } as never, "t", { signal: new AbortController().signal }));
+        results.push(await hook({ hook_event_name: "PreToolUse", tool_name, tool_input: { file_path }, tool_use_id: "t", session_id: "s", transcript_path: "", cwd: path.join(home, "data") } as never, "t", { signal: new AbortController().signal }));
       }
     }
     return results.map((r) => (r as { hookSpecificOutput?: { permissionDecision?: string } }).hookSpecificOutput?.permissionDecision).filter(Boolean);
@@ -106,5 +106,13 @@ describe("the read-scope hook", () => {
     expect(await preToolUse(true, "memory/itai/cards.jsonl")).toContain("deny");
     expect(await preToolUse(true, "employees/itai/chat-history.jsonl")).toContain("deny");
     expect(await preToolUse(true, "employees/noa/CONTEXT.md")).not.toContain("deny");
+  });
+
+  it("keeps Edit and MultiEdit inside the twin's scratch, like Write", async () => {
+    for (const tool of ["Write", "Edit", "MultiEdit"]) {
+      expect(await preToolUse(true, "employees/noa/CONTEXT.md", tool), tool).toContain("deny");
+      expect(await preToolUse(true, "/Users/someone/project/README.md", tool), tool).toContain("deny");
+      expect(await preToolUse(true, "scratch/noa/notes.md", tool), tool).not.toContain("deny");
+    }
   });
 });
