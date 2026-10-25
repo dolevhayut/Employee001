@@ -4,15 +4,16 @@ const { sandbox, spawn } = vi.hoisted(() => ({
   sandbox: {
     checkDependencies: vi.fn(() => ({ errors: [] })),
     initialize: vi.fn(async () => undefined),
-    wrapWithSandboxArgv: vi.fn(async () => ({ argv: ["/bin/bash", "-c", "fixed launcher"], env: { SRT: "1" } })),
+    // srt returns the whole server env plus its own variables.
+    wrapWithSandboxArgv: vi.fn(async () => ({ argv: ["/bin/bash", "-c", "fixed launcher"], env: { ...process.env, SRT: "1" } })),
   },
   spawn: vi.fn(() => ({ stdin: {}, stdout: {}, stderr: {} })),
 }));
 
 vi.mock("@anthropic-ai/sandbox-runtime", () => ({ SandboxManager: sandbox }));
-vi.mock("child_process", () => ({ spawn }));
+vi.mock("child_process", () => ({ spawn, spawnSync: vi.fn(() => ({ status: 0 })) }));
 
-import { buildTwinSandboxPolicy, ensureTwinSandbox, spawnClaudeCodeProcess } from "@/lib/twin-sandbox";
+import { buildTwinSandboxPolicy, ensureTwinSandbox, isNonPublicHost, spawnClaudeCodeProcess } from "@/lib/twin-sandbox";
 
 const env = {
   EMPLOYEE001_HOME: "/workspace/employee001",
@@ -65,6 +66,7 @@ describe("twin sandbox policy", () => {
   it("spawns the cached wrapper argv and keeps untrusted command text out of the shell", async () => {
     const previous = process.env.EMPLOYEE001_SANDBOX;
     process.env.EMPLOYEE001_SANDBOX = "1";
+    process.env.E001_TEST_SERVER_SECRET = "canary";
     await ensureTwinSandbox("chat:maya");
     spawnClaudeCodeProcess({
       command: "claude",
@@ -84,6 +86,8 @@ describe("twin sandbox policy", () => {
     }));
     const spawnOptions = (spawn.mock.calls.at(-1) as unknown as [string, string[], { env: Record<string, string> }])[2];
     expect(spawnOptions.env.E001_SANDBOX_SCOPE).toBeUndefined();
+    expect(spawnOptions.env.E001_TEST_SERVER_SECRET).toBeUndefined();
+    delete process.env.E001_TEST_SERVER_SECRET;
     if (previous === undefined) delete process.env.EMPLOYEE001_SANDBOX;
     else process.env.EMPLOYEE001_SANDBOX = previous;
   });
@@ -94,5 +98,16 @@ describe("twin sandbox policy", () => {
     expect(() => spawnClaudeCodeProcess({ command: "claude", args: [], env: {}, signal: new AbortController().signal })).toThrow("not ready for this scope");
     if (previous === undefined) delete process.env.EMPLOYEE001_SANDBOX;
     else process.env.EMPLOYEE001_SANDBOX = previous;
+  });
+});
+
+describe("isNonPublicHost", () => {
+  it("refuses loopback, private and link-local literals and localhost", () => {
+    for (const host of ["localhost", "app.localhost", "127.0.0.1", "10.1.2.3", "172.17.0.2", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "[::1]", "fd00::1", "fe80::1", "::ffff:127.0.0.1"]) {
+      expect(isNonPublicHost(host), host).toBe(true);
+    }
+  });
+  it("allows public hosts and literals", () => {
+    for (const host of ["example.com", "1.1.1.1", "172.32.0.1", "2606:4700::1111"]) expect(isNonPublicHost(host), host).toBe(false);
   });
 });
