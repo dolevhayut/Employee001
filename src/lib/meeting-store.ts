@@ -1,5 +1,5 @@
 /**
- * In-process store for active Team Meetings.
+ * Store for Team Meetings.
  *
  * A "meeting" is the long-running conversation the CEO has with multiple
  * twins on the /council page. The transcript is the source of truth that
@@ -7,20 +7,25 @@
  * CEO ask spawned a fresh isolated runCouncil with no memory of prior asks
  * and twins ran in parallel without seeing each other.
  *
- * Stored in memory only (Map<id, Meeting>). Survives within a single Next.js
- * process but resets on cold restart. Persisting to disk is a follow-up if
- * we need cross-restart durability.
+ * Meetings are company records, so they persist: each one lives in
+ * `data/meetings/<id>/meeting.json`, rewritten atomically (tmp file + rename)
+ * on create, on every appended turn, when shared files change and when a
+ * summary is stored. The in-memory Map is a cache that keeps one object per
+ * meeting, because the council runner holds that object and re-reads its
+ * transcript after every turn. Every lookup goes through `load()`, which
+ * falls back to disk, so meetings survive restarts and can be continued.
  *
- * Shared files (the "meeting scratch") are written to disk under
+ * Shared files (the "meeting scratch") live next to the record under
  * `data/meetings/<id>/shared/` so a twin's pulled artifact (Drive doc,
  * Slack export, etc.) can be referenced by another twin without paying
- * the prompt cost twice. The disk dir is wiped on cold start since the
- * meeting state itself is in-memory.
+ * the prompt cost twice.
  */
 
 import fs from "fs";
 import path from "path";
 import { dataDir } from "@/lib/app-home";
+// Type-only: meeting-summary is server-only and imports this module's types.
+import type { MeetingDecision } from "@/lib/meeting-summary";
 
 export type MeetingTurn =
   | { kind: "ceo"; text: string; ts: number }
@@ -58,14 +63,24 @@ export type SharedFile = {
   kind: "text" | "image";
 };
 
+/** A stored "Summarize & decide" result for the meeting's latest discussion. */
+export type MeetingSummary = MeetingDecision & {
+  generatedAt: number;
+  /** Transcript length when it was generated; a longer transcript has turns it doesn't cover. */
+  throughTurn: number;
+};
+
 export type Meeting = {
   id: string;
+  /** First CEO question, trimmed. Empty until the CEO has spoken. */
+  title: string;
   /** Twins "in the room" — chips at the top of the council page. Other
    *  twins can still be tagged via @ for delegation but aren't default speakers. */
   participantIds: string[];
   transcript: MeetingTurn[];
   /** Files dropped into the meeting scratch by twins, in chronological order. */
   sharedFiles: SharedFile[];
+  summary?: MeetingSummary;
   createdAt: number;
   updatedAt: number;
 };
@@ -75,29 +90,141 @@ const meetings = new Map<string, Meeting>();
 /** Hard upper bound for a single shared file. Approved by CEO at 25MB. */
 export const SHARED_FILE_MAX_BYTES = 25 * 1024 * 1024;
 
-const MEETINGS_ROOT = dataDir("meetings");
+const TITLE_MAX = 80;
 
-// Cold-start wipe: meeting state is in-memory, so any on-disk shared files
-// from a prior process are orphans. Clear them on module load to avoid
-// confusion or unbounded disk growth across restarts.
-let coldStartWipeDone = false;
-function ensureColdStartWipe() {
-  if (coldStartWipeDone) return;
-  coldStartWipeDone = true;
+/** Ids are created as `mtg_<ms>_<rand>`; anything else never touches the disk. */
+const MEETING_ID_RE = /^mtg_[A-Za-z0-9_]{1,64}$/;
+
+export function isValidMeetingId(id: unknown): id is string {
+  return typeof id === "string" && MEETING_ID_RE.test(id);
+}
+
+// Resolved per call: EMPLOYEE001_HOME may change after this module loads.
+function meetingsRoot(): string {
+  return dataDir("meetings");
+}
+
+function meetingDir(id: string): string {
+  return path.join(meetingsRoot(), id);
+}
+
+function meetingFile(id: string): string {
+  return path.join(meetingDir(id), "meeting.json");
+}
+
+/** The first CEO question as a one-line title of at most 80 characters. */
+export function titleFrom(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > TITLE_MAX ? `${flat.slice(0, TITLE_MAX - 1).trimEnd()}…` : flat;
+}
+
+/** Write the record via a tmp file + rename, so a crash never leaves half a file. */
+function persist(m: Meeting): void {
+  fs.mkdirSync(meetingDir(m.id), { recursive: true });
+  const target = meetingFile(m.id);
+  const tmp = `${target}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   try {
-    if (fs.existsSync(MEETINGS_ROOT)) {
-      fs.rmSync(MEETINGS_ROOT, { recursive: true, force: true });
-    }
+    fs.writeFileSync(tmp, JSON.stringify(m, null, 2), "utf8");
+    fs.renameSync(tmp, target);
   } catch (err) {
-    console.warn("[meeting-store] cold-start wipe failed:", err);
+    fs.rmSync(tmp, { force: true });
+    throw err;
   }
 }
-ensureColdStartWipe();
+
+/** Persist, but never let a disk error break a live meeting. */
+function persistQuietly(m: Meeting): void {
+  try {
+    persist(m);
+  } catch (err) {
+    console.warn(`[meeting-store] could not save ${m.id}:`, err);
+  }
+}
+
+function readFromDisk(id: string): Meeting | undefined {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(meetingFile(id), "utf8");
+  } catch {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<Meeting>;
+    if (parsed.id !== id || !Array.isArray(parsed.transcript)) return undefined;
+    const transcript = parsed.transcript as MeetingTurn[];
+    const firstCeo = transcript.find((t) => t.kind === "ceo");
+    return {
+      id,
+      title:
+        typeof parsed.title === "string" && parsed.title
+          ? parsed.title
+          : firstCeo
+            ? titleFrom(firstCeo.text)
+            : "",
+      participantIds: Array.isArray(parsed.participantIds)
+        ? parsed.participantIds.filter((p): p is string => typeof p === "string")
+        : [],
+      transcript,
+      sharedFiles: Array.isArray(parsed.sharedFiles) ? parsed.sharedFiles : [],
+      ...(parsed.summary && typeof parsed.summary === "object" ? { summary: parsed.summary } : {}),
+      createdAt: Number(parsed.createdAt) || 0,
+      updatedAt: Number(parsed.updatedAt) || Number(parsed.createdAt) || 0,
+    };
+  } catch (err) {
+    console.warn(`[meeting-store] unreadable meeting ${id}:`, err);
+    return undefined;
+  }
+}
+
+/**
+ * The one lookup every function uses: cache first, then disk, so a meeting
+ * from before a restart is found and stays one shared object. Invalid ids
+ * (anything a route passes from a query string) return undefined.
+ */
+function load(id: string | undefined | null): Meeting | undefined {
+  if (!isValidMeetingId(id)) return undefined;
+  const cached = meetings.get(id);
+  if (cached) return cached;
+  const fromDisk = readFromDisk(id);
+  if (fromDisk) meetings.set(id, fromDisk);
+  return fromDisk;
+}
+
+// Older versions kept meetings in memory only, so their `shared/` folders have
+// no meeting.json and no owner: nothing can list, continue or redact them.
+// createMeeting writes meeting.json before any file can be shared, so a folder
+// without one is always such an orphan. Swept once, on the first disk scan.
+let orphanSweepDone = false;
+function sweepOrphansOnce(ids: string[]): void {
+  if (orphanSweepDone) return;
+  orphanSweepDone = true;
+  for (const id of ids) {
+    if (meetings.has(id) || fs.existsSync(meetingFile(id))) continue;
+    try {
+      fs.rmSync(meetingDir(id), { recursive: true, force: true });
+    } catch (err) {
+      console.warn(`[meeting-store] could not remove orphaned ${id}:`, err);
+    }
+  }
+}
+
+function idsOnDisk(): string[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(meetingsRoot(), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const ids = entries.filter((e) => e.isDirectory() && isValidMeetingId(e.name)).map((e) => e.name);
+  sweepOrphansOnce(ids);
+  return ids;
+}
 
 export function createMeeting(participantIds: string[]): Meeting {
   const now = Date.now();
   const meeting: Meeting = {
     id: `mtg_${now}_${Math.random().toString(36).slice(2, 8)}`,
+    title: "",
     participantIds,
     transcript: [],
     sharedFiles: [],
@@ -105,39 +232,73 @@ export function createMeeting(participantIds: string[]): Meeting {
     updatedAt: now,
   };
   meetings.set(meeting.id, meeting);
+  persistQuietly(meeting);
   return meeting;
 }
 
 export function getMeeting(id: string): Meeting | undefined {
-  return meetings.get(id);
+  return load(id);
 }
 
-/** Snapshot of active in-memory meetings. Callers must not mutate the result. */
+/** Every stored meeting, newest activity first. Callers must not mutate the result. */
 export function listMeetings(): Meeting[] {
-  return Array.from(meetings.values());
+  const ids = new Set([...idsOnDisk(), ...meetings.keys()]);
+  const out: Meeting[] = [];
+  for (const id of ids) {
+    const m = load(id);
+    if (m) out.push(m);
+  }
+  return out.sort((a, b) => b.updatedAt - a.updatedAt || b.createdAt - a.createdAt);
+}
+
+/** Delete a meeting record and its shared files. True if it existed. */
+export function deleteMeeting(id: string): boolean {
+  const m = load(id);
+  if (!m) return false;
+  meetings.delete(m.id);
+  fs.rmSync(meetingDir(m.id), { recursive: true, force: true });
+  return true;
+}
+
+/** Store the latest "Summarize & decide" result on the meeting. */
+export function setMeetingSummary(id: string, decision: MeetingDecision): MeetingSummary | undefined {
+  const m = load(id);
+  if (!m) return undefined;
+  const summary: MeetingSummary = {
+    decision: decision.decision,
+    actions: decision.actions,
+    open: decision.open,
+    generatedAt: Date.now(),
+    throughTurn: m.transcript.length,
+  };
+  m.summary = summary;
+  persistQuietly(m);
+  return summary;
 }
 
 /**
- * Idempotent — returns the existing meeting if it exists, otherwise creates a
- * new one with the given participants. Used by the API route so the client
- * can pass `meetingId` blindly without first asking for one.
+ * Idempotent — returns the existing meeting if it exists (in memory or on
+ * disk), otherwise creates a new one with the given participants. Used by
+ * the API route so the client can pass `meetingId` blindly without first
+ * asking for one, and to continue a meeting from history.
  */
 export function getOrCreateMeeting(
   id: string | undefined,
   participantIds: string[]
 ): Meeting {
-  if (id) {
-    const existing = meetings.get(id);
-    if (existing) return existing;
-  }
+  const existing = load(id);
+  if (existing) return existing;
   return createMeeting(participantIds);
 }
 
 export function appendTurn(meetingId: string, turn: MeetingTurn): void {
-  const m = meetings.get(meetingId);
+  // By id, not by object: a meeting deleted mid-run must stay deleted.
+  const m = load(meetingId);
   if (!m) return;
   m.transcript.push(turn);
+  if (!m.title && turn.kind === "ceo") m.title = titleFrom(turn.text);
   m.updatedAt = Date.now();
+  persistQuietly(m);
 }
 
 /**
@@ -188,12 +349,12 @@ function guessContentType(filename: string): string {
 }
 
 function sharedDirFor(meetingId: string): string {
-  return path.join(MEETINGS_ROOT, meetingId, "shared");
+  return path.join(meetingDir(meetingId), "shared");
 }
 
 /** Resolve `desired` against existing files in the meeting; suffix with _2, _3 on collision. */
 function resolveCollision(meetingId: string, desired: string): string {
-  const m = meetings.get(meetingId);
+  const m = load(meetingId);
   const taken = new Set((m?.sharedFiles ?? []).map((f) => f.filename));
   if (!taken.has(desired)) return desired;
   const ext = path.extname(desired);
@@ -234,7 +395,7 @@ export function recordSharedFile(
         sharedByName: string;
       }
 ): SharedFile {
-  const m = meetings.get(meetingId);
+  const m = load(meetingId);
   if (!m) throw new Error(`meeting ${meetingId} not found`);
 
   const isImage = args.kind === "image";
@@ -249,9 +410,9 @@ export function recordSharedFile(
   }
 
   const safeName = sanitizeFilename(args.filename);
-  const finalName = resolveCollision(meetingId, safeName);
+  const finalName = resolveCollision(m.id, safeName);
 
-  const dir = sharedDirFor(meetingId);
+  const dir = sharedDirFor(m.id);
   fs.mkdirSync(dir, { recursive: true });
   const target = path.join(dir, finalName);
   if (isImage) {
@@ -274,6 +435,7 @@ export function recordSharedFile(
 
   m.sharedFiles.push(entry);
   m.updatedAt = Date.now();
+  persistQuietly(m);
   return entry;
 }
 
@@ -291,7 +453,7 @@ export function readSharedFile(
   meetingId: string,
   filename: string
 ): ReadSharedFileResult {
-  const m = meetings.get(meetingId);
+  const m = load(meetingId);
   if (!m) return { status: "not_found" };
 
   const safeName = sanitizeFilename(filename);
@@ -300,7 +462,7 @@ export function readSharedFile(
   if (entry.kind !== "text") return { status: "binary", entry };
 
   try {
-    const fullPath = path.join(sharedDirFor(meetingId), entry.filename);
+    const fullPath = path.join(sharedDirFor(m.id), entry.filename);
     const content = fs.readFileSync(fullPath, "utf8");
     return { status: "text", content, entry };
   } catch {
@@ -316,7 +478,7 @@ export function readSharedFileBytes(
   meetingId: string,
   filename: string
 ): { found: false } | { found: true; bytes: Buffer; entry: SharedFile } {
-  const m = meetings.get(meetingId);
+  const m = load(meetingId);
   if (!m) return { found: false };
 
   const safeName = sanitizeFilename(filename);
@@ -324,7 +486,7 @@ export function readSharedFileBytes(
   if (!entry) return { found: false };
 
   try {
-    const fullPath = path.join(sharedDirFor(meetingId), entry.filename);
+    const fullPath = path.join(sharedDirFor(m.id), entry.filename);
     const bytes = fs.readFileSync(fullPath);
     return { found: true, bytes, entry };
   } catch {
@@ -334,7 +496,7 @@ export function readSharedFileBytes(
 
 /** List all shared files for a meeting (in chronological order). */
 export function listSharedFiles(meetingId: string): SharedFile[] {
-  return meetings.get(meetingId)?.sharedFiles ?? [];
+  return load(meetingId)?.sharedFiles ?? [];
 }
 
 /**
@@ -362,33 +524,77 @@ export function renderSharedFilesForPrompt(files: SharedFile[]): string {
   return lines.join("\n");
 }
 
+const FORMER = "[former employee]";
+
 /**
- * Remove a deleted employee from live meetings: their turns are blanked
- * (the meeting belongs to the company, so others' turns stay), they leave
- * the participant list, and files they shared are deleted from disk.
+ * Remove a deleted employee from every stored meeting (in memory and on
+ * disk): their turns are blanked (the meeting belongs to the company, so
+ * others' turns stay), they leave the participant list, files they shared
+ * are deleted, and the stored summary is dropped, since it can name them or
+ * assign them actions (it is regenerated on demand). `mentions`, when given,
+ * also replaces their name or id in the remaining text with
+ * "[former employee]", the rule the purge applies to memory and the org
+ * brain. Every changed meeting is rewritten on disk.
  */
-export function redactEmployeeFromMeetings(employeeId: string): { turns: number; files: number } {
+export function redactEmployeeFromMeetings(
+  employeeId: string,
+  opts: { mentions?: RegExp } = {}
+): { turns: number; files: number; meetings: number } {
   let turns = 0;
   let files = 0;
-  for (const m of meetings.values()) {
+  let touched = 0;
+  const flags = (opts.mentions?.flags ?? "").replace("g", "");
+  const finds = opts.mentions ? new RegExp(opts.mentions.source, flags) : undefined;
+  const replaces = opts.mentions ? new RegExp(opts.mentions.source, `${flags}g`) : undefined;
+  const scrub = (text: string) => (replaces ? text.replace(replaces, FORMER) : text);
+
+  for (const m of listMeetings()) {
+    const before = JSON.stringify(m);
+    const involved =
+      m.participantIds.includes(employeeId) ||
+      before.includes(JSON.stringify(employeeId)) ||
+      Boolean(finds?.test(before));
+    if (!involved) continue;
+
     m.participantIds = m.participantIds.filter((id) => id !== employeeId);
-    m.transcript = m.transcript.map((t) => {
-      if (t.kind !== "twin") return t;
+    m.transcript = m.transcript.map((t): MeetingTurn => {
+      if (t.kind === "ceo") return { ...t, text: scrub(t.text) };
       if (t.employeeId === employeeId) {
         turns++;
-        return { ...t, employeeId: "[deleted]", employeeName: "[deleted]", text: "[removed: this employee's data was deleted]", delegatedFromId: t.delegatedFromId === employeeId ? undefined : t.delegatedFromId };
+        return {
+          kind: "twin",
+          employeeId: "[deleted]",
+          employeeName: "[deleted]",
+          text: "[removed: this employee's data was deleted]",
+          ts: t.ts,
+        };
       }
-      if (t.delegatedFromId === employeeId) return { ...t, delegatedFromId: undefined, delegatedFromName: "[deleted]" };
-      return t;
+      const next: MeetingTurn = { ...t, text: scrub(t.text) };
+      if (t.delegatedFromId === employeeId) {
+        delete next.delegatedFromId;
+        next.delegatedFromName = "[deleted]";
+      }
+      return next;
     });
-    m.sharedFiles = m.sharedFiles.filter((f) => {
-      if (f.sharedById !== employeeId) return true;
-      try {
-        fs.rmSync(path.join(sharedDirFor(m.id), f.filename), { force: true });
-      } catch { /* already gone */ }
-      files++;
-      return false;
-    });
+    m.sharedFiles = m.sharedFiles
+      .filter((f) => {
+        if (f.sharedById !== employeeId) return true;
+        try {
+          fs.rmSync(path.join(sharedDirFor(m.id), f.filename), { force: true });
+        } catch {
+          /* already gone */
+        }
+        files++;
+        return false;
+      })
+      .map((f) => ({ ...f, summary: scrub(f.summary) }));
+    m.title = scrub(m.title);
+    delete m.summary;
+
+    if (JSON.stringify(m) !== before) {
+      touched++;
+      persist(m);
+    }
   }
-  return { turns, files };
+  return { turns, files, meetings: touched };
 }

@@ -441,11 +441,12 @@ export async function purgeEmployee(id: string, reason: PurgeReason = "deleted")
   });
   steps.push(await unlinkGoals(id));
 
-  // Live meetings belong to the company: blank this employee's turns, drop
-  // their shared files.
+  // Stored meetings belong to the company: blank this employee's turns, drop
+  // their shared files and the meeting summaries, and replace their name in
+  // what others said (rewritten on disk).
   try {
-    const { turns, files } = redactEmployeeFromMeetings(id);
-    steps.push({ target: "meetings", status: turns || files ? "filtered" : "absent", count: turns + files });
+    const { turns, files, meetings } = redactEmployeeFromMeetings(id, { mentions: mentionsOf(id, name) });
+    steps.push({ target: "meetings", status: meetings ? "filtered" : "absent", count: turns + files });
   } catch (err) {
     steps.push({ target: "meetings", status: "error", error: message(err) });
   }

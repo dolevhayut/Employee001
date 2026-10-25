@@ -262,7 +262,7 @@ Example:
 
 ### `list_team_meetings`
 
-Use this to find Team Meetings from the current Employee001 process. Meetings are in memory and disappear when the app restarts.
+Use this to find Team Meetings. Meetings are stored under `data/meetings/` and survive restarts.
 
 Input:
 
@@ -270,14 +270,15 @@ Input:
 {}
 ```
 
-Output: `[{ id, participantIds, turns, createdAt, updatedAt }]`, newest first.
+Output: `[{ id, title, participantIds, turns, createdAt, updatedAt }]`, newest first. `title` is the first CEO question.
 
 Example:
 
 ```json
 [
   {
-    "id": "meeting_launch",
+    "id": "mtg_1791162000000_a1b2c3",
+    "title": "Are we ready to launch on Monday?",
     "participantIds": ["maya", "arie"],
     "turns": 8,
     "createdAt": 1791162000000,
@@ -294,7 +295,7 @@ Input:
 
 ```json
 {
-  "meetingId": "meeting_launch"
+  "meetingId": "mtg_1791162000000_a1b2c3"
 }
 ```
 
@@ -304,7 +305,7 @@ Example:
 
 ```json
 {
-  "id": "meeting_launch",
+  "id": "mtg_1791162000000_a1b2c3",
   "participantIds": ["maya", "arie"],
   "transcript": "Maya: Stage the launch.\n\nArie: Add a rollback test first.",
   "sharedFiles": [{ "name": "launch-checklist.md", "author": "maya" }]
@@ -381,7 +382,7 @@ On the default loopback bind, MCP accepts only `127.0.0.1`, `localhost`, or `[::
 
 When Employee001 is bound to a LAN address, `0.0.0.0`, or deployed on Fly, or once accounts exist, `/api/mcp` requires `Authorization: Bearer <token>`, where the token is `EMPLOYEE001_MCP_TOKEN` or `EMPLOYEE001_TOKEN`. A signed-in browser session also works. LAN and deployment hostnames are accepted, but browser requests must still have an `Origin` matching the request Host. Keep the token private: it grants full MCP access, including `ask_twin` spending.
 
-Run Employee001 as one local Node process. MCP rate limits, in-flight calls, Team Meetings, and pending approvals are process-local. Restarting the app clears meetings and in-memory request state.
+Run Employee001 as one local Node process. MCP rate limits, in-flight calls and pending approvals are process-local; restarting the app clears that in-memory request state. Team Meetings are stored under `data/meetings/` and survive restarts.
 
 Do not put the token in a URL, client-side code, logs, or a public configuration file. Use TLS for public or remote deployments.
 

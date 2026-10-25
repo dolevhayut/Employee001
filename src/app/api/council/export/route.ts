@@ -8,8 +8,8 @@ import { getMeeting } from "@/lib/meeting-store";
  *   - Returns the rendered transcript as `text/markdown`.
  *   - When `download=1` is set, sends a `Content-Disposition: attachment`
  *     header so the browser triggers a file download (council-<id>.md).
- *   - Returns 404 if the meeting id is unknown (in-memory store; meetings
- *     do not persist across server restarts).
+ *   - Returns 404 if the meeting id is unknown or was deleted. Meetings are
+ *     stored under data/meetings/, so they export across restarts.
  */
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const meeting = getMeeting(meetingId);
   if (!meeting) {
     return new Response(
-      JSON.stringify({ error: "meeting not found (in-memory store; restarts wipe state)" }),
+      JSON.stringify({ error: "meeting not found (it may have been deleted)" }),
       { status: 404, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -35,8 +35,9 @@ export async function GET(request: NextRequest) {
   const participants = meeting.participantIds.join(", ");
 
   const lines: string[] = [];
-  lines.push(`# Council meeting — \`${meeting.id}\``);
+  lines.push(`# Team meeting — ${meeting.title || `\`${meeting.id}\``}`);
   lines.push("");
+  lines.push(`- Id: \`${meeting.id}\``);
   lines.push(`- Created: ${created}`);
   lines.push(`- Participants: ${participants || "(none)"}`);
   lines.push(`- Turns: ${meeting.transcript.length}`);
@@ -44,6 +45,27 @@ export async function GET(request: NextRequest) {
     lines.push(`- Shared files: ${meeting.sharedFiles.length}`);
   }
   lines.push("");
+
+  if (meeting.summary) {
+    const s = meeting.summary;
+    lines.push("## Decision");
+    lines.push("");
+    lines.push(s.decision);
+    lines.push("");
+    if (s.actions.length > 0) {
+      lines.push("**Next steps**");
+      lines.push("");
+      for (const a of s.actions) lines.push(`- ${a.employeeId}: ${a.action}${a.due ? ` (due: ${a.due})` : ""}`);
+      lines.push("");
+    }
+    if (s.open.length > 0) {
+      lines.push("**Still open**");
+      lines.push("");
+      for (const q of s.open) lines.push(`- ${q}`);
+      lines.push("");
+    }
+  }
+
   lines.push("---");
   lines.push("");
 

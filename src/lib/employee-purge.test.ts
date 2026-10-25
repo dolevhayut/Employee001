@@ -261,6 +261,10 @@ describe("purgeEmployee", () => {
     expect(after.participantIds).toEqual([PEER]);
     expect(JSON.stringify(after.transcript)).not.toContain("my private view");
     expect(after.transcript[1]).toMatchObject({ text: "agree" });
+    // The stored record is rewritten too, not just the in-memory copy.
+    const stored = read(`meetings/${m.id}/meeting.json`);
+    expect(stored).not.toContain("my private view");
+    expect(JSON.parse(stored).participantIds).toEqual([PEER]);
   });
 
   it("refuses ids that could escape the data folder", async () => {

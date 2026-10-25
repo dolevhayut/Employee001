@@ -12,7 +12,7 @@ The user's request: $ARGUMENTS
 
 If there is no topic, ask the user for one and stop.
 
-If the user points at a meeting already running in the Employee001 app ("the launch meeting", a meeting id), call `list_team_meetings` and `get_team_meeting` and summarize that transcript instead of starting a new one. In-app meetings reset when the app restarts.
+If the user points at a meeting already running in the Employee001 app ("the launch meeting", a meeting id), call `list_team_meetings` and `get_team_meeting` and summarize that transcript instead of starting a new one. In-app meetings are stored, so older ones are listed too.
 
 Otherwise run a two-round meeting over MCP:
 

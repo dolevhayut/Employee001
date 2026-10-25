@@ -29,8 +29,19 @@ import { humanizeToolAction } from "@/lib/tool-humanize";
 import { useT } from "@/components/ex/i18n-context";
 import { isolate } from "@/lib/i18n/format";
 import type { MessageKey, MessageVars } from "@/lib/i18n/messages";
+import { MeetingHistoryDrawer, fetchMeetingDetail, type HistoryDetail } from "./meeting-history";
 
 type TFn = (key: MessageKey, vars?: MessageVars) => string;
+
+/** Keep `?meeting=<id>` in the URL so a reload reopens the same meeting. The
+ *  native History API syncs with useSearchParams in the App Router. */
+function setMeetingParam(id: string | null) {
+  const params = new URLSearchParams(window.location.search);
+  if (id) params.set("meeting", id);
+  else params.delete("meeting");
+  const qs = params.toString();
+  window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+}
 
 // Event-time unique id for a chat thread. Lives at module scope because it is a
 // side-effecting utility invoked from event handlers, not part of render.
@@ -125,6 +136,72 @@ type MeetingDecision = {
   actions: { employeeId: string; action: string; due?: string }[];
   open: string[];
 };
+
+/** Rebuild chat threads from a stored meeting, so it can be continued: one
+ *  thread per CEO message, with the twin turns that followed it. */
+function threadsFromMeeting(detail: HistoryDetail): MessageThread[] {
+  const threads: MessageThread[] = [];
+  const turnTs: number[][] = [];
+  const startTs: number[] = [];
+  detail.transcript.forEach((turn, i) => {
+    if (turn.kind === "ceo" || threads.length === 0) {
+      threads.push({
+        id: `hist_${detail.id}_${i}`,
+        userText: turn.kind === "ceo" ? turn.text : "",
+        responses: [],
+        delegations: [],
+        blockedDelegations: [],
+        fileShares: [],
+        pending: false,
+      });
+      turnTs.push([]);
+      startTs.push(turn.ts);
+      if (turn.kind === "ceo") return;
+    }
+    if (turn.kind !== "twin") return;
+    const thread = threads[threads.length - 1];
+    thread.responses.push({
+      employeeId: turn.employeeId,
+      text: turn.text,
+      streaming: false,
+      traces: [],
+      pendingApprovals: [],
+      pendingClarifications: [],
+      blocked: [],
+      artifacts: [],
+      ...(turn.delegatedFromId ? { delegatedFrom: { id: turn.delegatedFromId, name: turn.delegatedFromName ?? turn.delegatedFromId } } : {}),
+    });
+    turnTs[turnTs.length - 1].push(turn.ts);
+    if (turn.delegatedFromId) {
+      thread.delegations.push({ fromId: turn.delegatedFromId, fromName: turn.delegatedFromName ?? "", toId: turn.employeeId, toName: turn.employeeName });
+    }
+  });
+  // A file is shared during its author's turn, which is stored when the turn
+  // ends: attach it to that author's first turn at or after the share.
+  for (const f of detail.sharedFiles) {
+    let ti = 0;
+    startTs.forEach((ts, i) => {
+      if (ts <= f.sharedAt) ti = i;
+    });
+    const thread = threads[ti];
+    if (!thread) continue;
+    const after = thread.responses.findIndex((r, j) => r.employeeId === f.sharedById && turnTs[ti][j] >= f.sharedAt);
+    const idx = after >= 0 ? after : thread.responses.findLastIndex((r) => r.employeeId === f.sharedById);
+    thread.fileShares.push({
+      id: f.id,
+      filename: f.filename,
+      summary: f.summary,
+      sizeBytes: f.sizeBytes,
+      contentType: f.contentType,
+      kind: f.kind,
+      sharedById: f.sharedById,
+      sharedByName: f.sharedByName,
+      ts: f.sharedAt,
+      afterResponseIdx: idx,
+    });
+  }
+  return threads;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1877,11 +1954,17 @@ function CouncilPageInner() {
   );
   const [threads, setThreads] = useState<MessageThread[]>([]);
   // Stable across CEO messages — server uses it to load the meeting transcript
-  // so every twin sees prior CEO asks and prior twin turns. Resets on page
-  // reload (in-memory state). Server-side meeting state lives in meeting-store.
-  // Held in state (not a ref) because file chips read it during render to build
-  // their download/preview URLs.
+  // so every twin sees prior CEO asks and prior twin turns. Meetings are stored
+  // server-side (meeting-store), and `?meeting=<id>` reopens one after a
+  // reload or from History. Held in state (not a ref) because file chips read
+  // it during render to build their download/preview URLs.
   const [meetingId, setMeetingId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historyButtonRef = useRef<HTMLButtonElement>(null);
+  // The meeting id last asked for via `?meeting=`; stops repeat fetches and
+  // drops a late answer once something else was opened.
+  const requestedMeeting = useRef<string | null>(null);
+  const meetingParam = searchParams.get("meeting");
   // `?q=` prefills the input (the demo banner links to the recorded
   // question). Re-apply it when the param changes, because the banner link is
   // a client-side navigation to this same, already-mounted page.
@@ -2083,6 +2166,8 @@ function CouncilPageInner() {
           // loads the same transcript.
           if (event.type === "meeting") {
             setMeetingId(event.meetingId);
+            requestedMeeting.current = event.meetingId;
+            setMeetingParam(event.meetingId);
             continue;
           }
 
@@ -2574,6 +2659,67 @@ function CouncilPageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill, readyEmployees.length, router, searchParams, sendPrefill]);
 
+  const busy = threads.some((th) => th.pending);
+
+  /** Make a stored meeting the active one: its transcript becomes the chat,
+   *  its participants the room, and an up-to-date summary its decision. */
+  function applyMeeting(detail: HistoryDetail) {
+    const rebuilt = threadsFromMeeting(detail);
+    setThreads(rebuilt);
+    setMeetingId(detail.id);
+    setReplyTo(null);
+    setOpenFile(null);
+    setTypingFor([]);
+    // Not filtered by readiness here: the roster may still be loading after a
+    // reload, and sendMessage already skips twins that aren't ready.
+    const room = detail.participants.map((p) => p.id);
+    setActiveIdsOverride(room.length > 0 ? new Set(room) : null);
+    const last = rebuilt[rebuilt.length - 1];
+    const summary = detail.summary;
+    setDecisions(
+      last && summary && summary.throughTurn >= detail.transcript.length
+        ? { [last.id]: { status: "ready", data: summary, assigned: {} } }
+        : {}
+    );
+    scrollToBottom();
+  }
+
+  function continueMeeting(detail: HistoryDetail) {
+    requestedMeeting.current = detail.id;
+    applyMeeting(detail);
+    setMeetingParam(detail.id);
+    setHistoryOpen(false);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  function startNewMeeting() {
+    requestedMeeting.current = null;
+    setThreads([]);
+    setMeetingId(null);
+    setDecisions({});
+    setReplyTo(null);
+    setOpenFile(null);
+    setActiveIdsOverride(null);
+    setMeetingParam(null);
+    inputRef.current?.focus();
+  }
+
+  // `?meeting=<id>` (a reload, or a shared link) reopens a stored meeting.
+  useEffect(() => {
+    if (!meetingParam || meetingParam === meetingId || requestedMeeting.current === meetingParam) return;
+    requestedMeeting.current = meetingParam;
+    void fetchMeetingDetail(meetingParam).then((detail) => {
+      if (requestedMeeting.current !== meetingParam) return;
+      if (detail) applyMeeting(detail);
+      else {
+        requestedMeeting.current = null;
+        setMeetingParam(null);
+      }
+    });
+  // applyMeeting only sets state; re-running on its identity would refetch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meetingParam, meetingId]);
+
   /** Detect @-trigger and update mentionQuery as the user types. */
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
@@ -2718,7 +2864,35 @@ function CouncilPageInner() {
         }
       `}</style>
 
-      <Topbar crumbs={[t("nav.teamMeeting")]} />
+      <Topbar
+        crumbs={[t("nav.teamMeeting")]}
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)" }}>
+            {threads.length > 0 && (
+              <button
+                type="button"
+                className="btn sm"
+                onClick={startNewMeeting}
+                disabled={busy}
+                style={{ height: 28, display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <Icons.Plus size={12} /> {t("meeting.new")}
+              </button>
+            )}
+            <button
+              ref={historyButtonRef}
+              type="button"
+              className="btn sm"
+              onClick={() => setHistoryOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={historyOpen}
+              style={{ height: 28, display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Icons.Clock size={12} /> {t("meeting.history")}
+            </button>
+          </div>
+        }
+      />
       <ParticipantsBar active={activeIds} onToggle={toggleParticipant} />
 
       {/* Messages area */}
@@ -3135,6 +3309,22 @@ function CouncilPageInner() {
             meetingId={meetingId}
             chip={openFile}
             onClose={() => setOpenFile(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {historyOpen && (
+          <MeetingHistoryDrawer
+            key="meeting-history"
+            currentMeetingId={meetingId}
+            busy={busy}
+            empById={empById}
+            onClose={() => {
+              setHistoryOpen(false);
+              requestAnimationFrame(() => historyButtonRef.current?.focus());
+            }}
+            onContinue={continueMeeting}
           />
         )}
       </AnimatePresence>

@@ -78,14 +78,14 @@ function toolDefinitions(): ToolDefinition[] {
     {
       name: "list_team_meetings",
       description:
-        "Use this to list active in-memory team meetings for this Employee001 process; meetings reset on restart.",
+        "Use this to list stored team meetings, newest first, with their titles. Meetings persist across restarts.",
       inputSchema: noArgs,
       annotations: { title: "List team meetings", ...LOCAL_READ },
     },
     {
       name: "get_team_meeting",
       description:
-        "Use this to inspect an active in-memory team meeting, its latest transcript, and shared files.",
+        "Use this to inspect a stored team meeting, its latest transcript, and shared files.",
       inputSchema: meeting,
       annotations: { title: "Read a team meeting", ...LOCAL_READ },
     },

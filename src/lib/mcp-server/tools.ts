@@ -229,6 +229,7 @@ async function teamMeetings(): Promise<ToolResult> {
       .sort((left, right) => right.createdAt - left.createdAt)
       .map((meeting) => ({
         id: meeting.id,
+        title: meeting.title,
         participantIds: meeting.participantIds,
         turns: meeting.transcript.length,
         createdAt: meeting.createdAt,
