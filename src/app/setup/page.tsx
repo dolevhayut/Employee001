@@ -172,6 +172,7 @@ function StepTheme({
             <button
               key={themeOption.id}
               type="button"
+              aria-pressed={selected}
               onClick={() => setTheme(themeOption.id)}
               style={{
                 background: selected ? "var(--text)" : "var(--surface)",

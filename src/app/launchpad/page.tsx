@@ -98,7 +98,9 @@ const PALETTE = {
 
 export default function LaunchpadPage() {
   const router = useRouter();
-  const { t } = useT();
+  const { t, locale } = useT();
+  const isRtl = locale === "he";
+  const skipArrow = isRtl ? "←" : "→";
   const actions = ACTIONS.map((action) => ({ ...action, title: t(`launch.${action.id === "budgets" ? "budget" : action.id}` as "launch.knowledge"), blurb: t(`launch.${action.id === "budgets" ? "budget" : action.id}Sub` as "launch.knowledgeSub"), cta: t(`launch.${action.id === "budgets" ? "budget" : action.id}Cta` as "launch.knowledgeCta") }));
 
   return (
@@ -159,7 +161,7 @@ export default function LaunchpadPage() {
           fontFamily: "inherit",
         }}
       >
-        {t("launch.skip")} ←
+        {t("launch.skip")} {skipArrow}
       </button>
 
       <motion.div

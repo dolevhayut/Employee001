@@ -1605,20 +1605,35 @@ function InvitePanel({
                     ) : null}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => copy(inv.token)}
-                    className="btn sm"
-                    style={{ flexShrink: 0 }}
-                    title={t("twins.invite.shareTitle")}
-                  >
-                    {copied ? (
-                      <Icons.Check size={12} />
-                    ) : (
-                      <Icons.Send size={12} />
-                    )}
-                    {copied ? t("twins.invite.copied") : t("twins.invite.share")}
-                  </button>
+                  {expired && !started ? (
+                    <span
+                      className="btn sm"
+                      style={{
+                        flexShrink: 0,
+                        opacity: 0.55,
+                        cursor: "default",
+                        pointerEvents: "none",
+                      }}
+                      aria-disabled="true"
+                    >
+                      {t("twins.invite.expired")}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => copy(inv.token)}
+                      className="btn sm"
+                      style={{ flexShrink: 0 }}
+                      title={t("twins.invite.shareTitle")}
+                    >
+                      {copied ? (
+                        <Icons.Check size={12} />
+                      ) : (
+                        <Icons.Send size={12} />
+                      )}
+                      {copied ? t("twins.invite.copied") : t("twins.invite.share")}
+                    </button>
+                  )}
 
                   {started && (
                     <a

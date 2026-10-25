@@ -116,8 +116,8 @@ function OnboardingPageInner() {
     };
   }, [inviteToken]);
 
-  const defaultName = emp?.name ?? inviteHint.name ?? "Sarah Chen";
-  const defaultRole = emp?.role ?? inviteHint.role ?? "Head of Engineering";
+  const defaultName = emp?.name ?? inviteHint.name ?? (inviteToken ? "" : "Sarah Chen");
+  const defaultRole = emp?.role ?? inviteHint.role ?? "";
 
   // When arriving via an invite link the viewer is always the employee —
   // lock the mode so they can't flip to CEO view.
@@ -219,8 +219,8 @@ function OnboardingPageInner() {
   // Only overwrite when the field is still at the literal placeholder —
   // otherwise a refreshed/persisted edit would silently revert.
   useEffect(() => {
-    if (inviteHint.name && name === "Sarah Chen") setName(inviteHint.name);
-    if (inviteHint.role && role === "Head of Engineering") setRole(inviteHint.role);
+    if (inviteHint.name && (!name.trim() || name === "Sarah Chen")) setName(inviteHint.name);
+    if (inviteHint.role && !role.trim()) setRole(inviteHint.role);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inviteHint.name, inviteHint.role]);
 
@@ -467,7 +467,8 @@ function OnboardingPageInner() {
               const sourcesBlocked =
                 step === 2 && Boolean(inviteToken) && activeConnections === 0;
               const consentBlocked = step === 0 && !requiredScopesAccepted;
-              const profileBlocked = step === 1 && !domain.trim();
+              const profileBlocked =
+                step === 1 && (!name.trim() || !role.trim() || !domain.trim());
               const disabled = consentBlocked || sourcesBlocked || profileBlocked;
               return (
             <button
@@ -773,10 +774,20 @@ function StepYou({
           : t("onboarding.profileSub")}
       </p>
       <Field label={isCeo ? "שם תצוגה" : t("onboarding.name")} inputId="onboarding-name">
-        <TextInput id="onboarding-name" value={name} onChange={setName} />
+        <TextInput
+          id="onboarding-name"
+          value={name}
+          onChange={setName}
+          placeholder={t("onboarding.namePh")}
+        />
       </Field>
       <Field label={isCeo ? "תפקיד" : t("onboarding.role")} inputId="onboarding-role">
-        <TextInput id="onboarding-role" value={role} onChange={setRole} />
+        <TextInput
+          id="onboarding-role"
+          value={role}
+          onChange={setRole}
+          placeholder={t("onboarding.rolePh")}
+        />
       </Field>
       <Field
         label={isCeo ? `באיזה תחום ${firstName} הוא/היא סמכות מקצועית?` : t("onboarding.domain")}
