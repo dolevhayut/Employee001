@@ -213,12 +213,16 @@ function appendJsonl(filePath: string, value: unknown): void {
   fs.appendFileSync(filePath, `${JSON.stringify(value)}\n`, "utf8");
 }
 
+/** Rewrites a JSONL file atomically (temp file + rename): a crash mid-write
+ *  must not leave a twin's memory truncated. */
 function writeJsonl(filePath: string, values: unknown[]): void {
+  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(
-    filePath,
+    tmp,
     values.length === 0 ? "" : `${values.map((value) => JSON.stringify(value)).join("\n")}\n`,
     "utf8"
   );
+  fs.renameSync(tmp, filePath);
 }
 
 function truncate(text: string, max: number): string {
@@ -1018,7 +1022,7 @@ function extractFactsFrom(
         value,
         confidence: STRUCTURED_CONFIDENCE[source],
         source,
-        evidence: truncate(line, STRUCTURED_VALUE_MAX),
+        evidence: sanitize(truncate(line, STRUCTURED_VALUE_MAX)),
       });
       break; // one fact per line — first matching category wins
     }
@@ -1122,7 +1126,7 @@ function sanitizeLlmFacts(value: unknown): RawFact[] {
     if (!key || seen.has(dedupKey)) continue;
     seen.add(dedupKey);
     const evidence = truncate(
-      typeof o.evidence === "string" ? o.evidence.trim() : "",
+      typeof o.evidence === "string" ? sanitize(o.evidence) : "",
       STRUCTURED_VALUE_MAX
     );
     out.push({

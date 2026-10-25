@@ -74,6 +74,9 @@ function itemKey(item: PendingItem): string {
 // Client-only mount flag: false during SSR + hydration, true once mounted on the
 // client. Lets us defer the createPortal(document.body) render until after hydration.
 const subscribeNoop = () => () => {};
+// One shared empty list: a new [] per call makes useSyncExternalStore loop.
+const NO_PENDING: ReturnType<typeof pendingItemsSnapshot> = [];
+const noPending = () => NO_PENDING;
 function useMounted(): boolean {
   return useSyncExternalStore(
     subscribeNoop,
@@ -104,7 +107,7 @@ function pendingItemsSnapshot(): PendingItem[] {
 export function GlobalApprovalOverlay() {
   const { t } = useT();
   const roster = useRoster();
-  const pending = useSyncExternalStore(subscribePendingReviewPoll, pendingItemsSnapshot, () => []);
+  const pending = useSyncExternalStore(subscribePendingReviewPoll, pendingItemsSnapshot, noPending);
   const [editing, setEditing] = useState<Record<string, boolean>>({});
   const [editedJson, setEditedJson] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
