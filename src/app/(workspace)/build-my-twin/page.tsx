@@ -6,6 +6,7 @@ import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
 import { useT } from "@/components/ex/i18n-context";
+import { KNOWLEDGE_FOLDER_DISCLOSURE } from "@/lib/knowledge-folder-shared";
 
 // "Build my twin": the person running Employee001 builds their own twin from
 // what they write and upload. No invite and no connected tools: the builder
@@ -206,6 +207,7 @@ export default function BuildMyTwinPage() {
   const [folderPath, setFolderPath] = useState("");
   const [folderLabel, setFolderLabel] = useState("");
   const [folderAdded, setFolderAdded] = useState(false);
+  const [folderError, setFolderError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -266,6 +268,7 @@ export default function BuildMyTwinPage() {
   async function build() {
     if (!ready) return;
     setError(null);
+    setFolderError(null);
     try {
       let id = createdId;
       if (!id) {
@@ -282,10 +285,15 @@ export default function BuildMyTwinPage() {
       }
 
       if (folderPath.trim() && !folderAdded) {
-        const folder = await fetch(`/api/employees/${encodeURIComponent(id)}/knowledge-folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: folderPath, label: folderLabel || "Local folder" }) });
+        // An empty label is fine: the server names the folder after itself.
+        const folder = await fetch(`/api/employees/${encodeURIComponent(id)}/knowledge-folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: folderPath, label: folderLabel }) });
         if (!folder.ok) {
           const why = (await folder.json().catch(() => ({}))) as { error?: string };
-          throw new Error(why.error ?? `Couldn't add folder (${folder.status}).`);
+          // Shown next to the folder fields, which stay editable so the
+          // path can be fixed; the twin itself is kept for the retry.
+          setFolderError(`${why.error ?? `The folder couldn't be added (${folder.status}). Check the path and try again.`} Your twin is saved: fix the folder or clear the path, then select Continue the build.`);
+          setStage("idle");
+          return;
         }
         setFolderAdded(true);
       }
@@ -494,10 +502,38 @@ export default function BuildMyTwinPage() {
             )}
             {fileNote && <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>{fileNote}</div>}
             <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) minmax(140px, 220px)", gap: "var(--sp-8)", marginTop: "var(--sp-12)" }}>
-              <label><span style={labelStyle}>Add a folder (optional)</span><input value={folderPath} onChange={(e) => setFolderPath(e.target.value)} placeholder="/absolute/path/to/docs" style={fieldStyle} readOnly={profileLocked} /></label>
-              <label><span style={labelStyle}>Folder label</span><input value={folderLabel} onChange={(e) => setFolderLabel(e.target.value)} placeholder="Project docs" style={fieldStyle} readOnly={profileLocked} /></label>
+              <div>
+                <label htmlFor="twin-folder-path" style={labelStyle}>Add a folder (optional)</label>
+                <input
+                  id="twin-folder-path"
+                  value={folderPath}
+                  onChange={(e) => setFolderPath(e.target.value)}
+                  placeholder="/Users/me/Documents/project"
+                  style={fieldStyle}
+                  readOnly={folderAdded}
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-describedby={folderError ? "twin-folder-hint twin-folder-disclosure twin-folder-error" : "twin-folder-hint twin-folder-disclosure"}
+                  aria-invalid={folderError ? true : undefined}
+                />
+              </div>
+              <div>
+                <label htmlFor="twin-folder-label" style={labelStyle}>Folder label (optional)</label>
+                <input
+                  id="twin-folder-label"
+                  value={folderLabel}
+                  onChange={(e) => setFolderLabel(e.target.value)}
+                  placeholder="Defaults to the folder name"
+                  maxLength={120}
+                  style={fieldStyle}
+                  readOnly={folderAdded}
+                  autoComplete="off"
+                />
+              </div>
             </div>
-            <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>A read-only local folder can be your only source. The server validates it when the twin is created.</div>
+            <div id="twin-folder-hint" className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>A read-only local folder can be your only source. The server checks it when the twin is created.</div>
+            <div id="twin-folder-disclosure" className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-4)" }}>{KNOWLEDGE_FOLDER_DISCLOSURE}</div>
+            {folderError && <div id="twin-folder-error" role="alert" style={{ color: "var(--danger)", fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>{folderError}</div>}
           </div>
 
           <label htmlFor="twin-consent" style={{ display: "flex", gap: "var(--sp-10)", alignItems: "flex-start", fontSize: "var(--fs-sm)", lineHeight: 1.5 }}>

@@ -1,9 +1,12 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { checkConfiguredFolderRead, checkTwinRead, toDataRelative } from "./twin-read-scope";
 import { addKnowledgeFolder } from "./knowledge-folders";
+
+// Folder adds are audited; keep those writes out of the real data dir.
+vi.mock("./audit-log", () => ({ appendAuditEntry: vi.fn(() => true) }));
 
 const ROOT = "/home/u/.employee001/data";
 const ME = "noa-friedman";

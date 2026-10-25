@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { KnowledgeProposalsPanel } from "@/components/ex/knowledge-proposals-panel";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, useId, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
 import { useOrgName } from "@/components/ex/use-org-name";
@@ -21,6 +21,7 @@ import {
   type EmployeeWithTwin,
   type ClaudeModel,
 } from "@/lib/employees";
+import { KNOWLEDGE_FOLDER_DISCLOSURE, MAX_KNOWLEDGE_FOLDERS as MAX_FOLDERS } from "@/lib/knowledge-folder-shared";
 import type { OrgSkillPlaybook } from "@/lib/org-skills";
 import { DIFF_TOO_LARGE_TEXT, diffLines, isCollapsedUnchanged } from "@/lib/text-diff";
 import { formatDateTime, formatRelativeTime } from "@/lib/i18n/format";
@@ -2153,6 +2154,7 @@ function KnowledgeFolders({ employeeId }: { employeeId: string }) {
   const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const uid = useId();
   const inputStyle = { width: "100%", boxSizing: "border-box" as const, border: "1px solid var(--hairline)", background: "var(--surface)", color: "var(--text)", borderRadius: 7, padding: "8px 10px", font: "inherit", fontSize: "var(--fs-ui)" };
   const inputLabelStyle = { display: "block", color: "var(--text)", fontSize: "var(--fs-sm)", fontWeight: 600, marginBottom: "var(--sp-6)" };
   const load = useCallback(async () => {
@@ -2179,16 +2181,37 @@ function KnowledgeFolders({ employeeId }: { employeeId: string }) {
       setFolders((current) => current.filter((item) => item.path !== folder.path));
     } catch (err) { setError(err instanceof Error ? err.message : "Could not remove folder."); } finally { setSaving(false); }
   }
-  return <section className="card" style={{ padding: "var(--sp-14)", marginBottom: "var(--sp-16)" }}>
-    <div style={{ fontWeight: 600, fontSize: "var(--fs-ui)", marginBottom: "var(--sp-4)" }}>Folders</div>
+  const full = folders.length >= MAX_FOLDERS;
+  const pathId = `${uid}-path`;
+  const labelId = `${uid}-label`;
+  const disclosureId = `${uid}-disclosure`;
+  const errorId = `${uid}-error`;
+  const describedBy = error ? `${disclosureId} ${errorId}` : disclosureId;
+  return <section className="card" aria-labelledby={`${uid}-title`} style={{ padding: "var(--sp-14)", marginBottom: "var(--sp-16)" }}>
+    <div id={`${uid}-title`} style={{ fontWeight: 600, fontSize: "var(--fs-ui)", marginBottom: "var(--sp-4)" }}>Folders</div>
     <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginBottom: "var(--sp-10)" }}>Read-only local sources for this twin. Sensitive files and folders are blocked.</div>
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1fr) minmax(140px, 220px) auto", gap: "var(--sp-8)", alignItems: "end" }}>
-      <label><span style={inputLabelStyle}>Absolute path</span><input value={folderPath} onChange={(e) => setFolderPath(e.target.value)} placeholder="/Users/me/project" style={inputStyle} disabled={saving || folders.length >= 5} /></label>
-      <label><span style={inputLabelStyle}>Label</span><input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Product docs" style={inputStyle} disabled={saving || folders.length >= 5} /></label>
-      <button type="button" className="btn sm" onClick={() => void add()} disabled={saving || folders.length >= 5 || !folderPath.trim() || !label.trim()}><Icons.Plus size={11} /> Add</button>
-    </div>
-    {folders.map((folder) => <div key={folder.path} style={{ display: "flex", gap: "var(--sp-10)", alignItems: "center", paddingTop: "var(--sp-8)", fontSize: "var(--fs-sm)" }}><strong>{folder.label}</strong><code style={{ color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{folder.path}</code><button type="button" className="btn ghost sm" onClick={() => void remove(folder)} disabled={saving}>Remove</button></div>)}
-    {error && <div role="alert" style={{ color: "var(--danger)", fontSize: "var(--fs-sm)", marginTop: "var(--sp-8)" }}>{error}</div>}
+    {/* A form so Enter in either field adds the folder. Inputs go read-only,
+        not disabled, while saving so keyboard focus stays put. */}
+    <form
+      onSubmit={(e) => { e.preventDefault(); if (!saving && !full && folderPath.trim()) void add(); }}
+      style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1fr) minmax(140px, 220px) auto", gap: "var(--sp-8)", alignItems: "end" }}
+    >
+      <div>
+        <label htmlFor={pathId} style={inputLabelStyle}>Folder path</label>
+        <input id={pathId} value={folderPath} onChange={(e) => setFolderPath(e.target.value)} placeholder="/Users/me/Documents/project" style={inputStyle} readOnly={saving} disabled={full} aria-describedby={describedBy} aria-invalid={error ? true : undefined} autoComplete="off" spellCheck={false} />
+      </div>
+      <div>
+        <label htmlFor={labelId} style={inputLabelStyle}>Label (optional)</label>
+        <input id={labelId} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Defaults to the folder name" maxLength={120} style={inputStyle} readOnly={saving} disabled={full} autoComplete="off" />
+      </div>
+      <button type="submit" className="btn sm" disabled={saving || full || !folderPath.trim()}><Icons.Plus size={11} /> Add</button>
+    </form>
+    <div id={disclosureId} className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>{KNOWLEDGE_FOLDER_DISCLOSURE}</div>
+    {full && <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>This twin has {MAX_FOLDERS} of {MAX_FOLDERS} folders. Remove one to add another.</div>}
+    {error && <div id={errorId} role="alert" style={{ color: "var(--danger)", fontSize: "var(--fs-sm)", marginTop: "var(--sp-8)" }}>{error}</div>}
+    {folders.length > 0 && <ul aria-label="Added folders" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      {folders.map((folder) => <li key={folder.path} style={{ display: "flex", gap: "var(--sp-10)", alignItems: "center", paddingTop: "var(--sp-8)", fontSize: "var(--fs-sm)" }}><strong>{folder.label}</strong><code style={{ color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{folder.path}</code><button type="button" className="btn ghost sm" aria-label={`Remove folder ${folder.label}`} onClick={() => void remove(folder)} disabled={saving}>Remove</button></li>)}
+    </ul>}
   </section>;
 }
 
