@@ -4,7 +4,7 @@ import fs from "fs";
 import fsp from "fs/promises";
 import os from "os";
 import path from "path";
-import { appHome, dataDir } from "./app-home";
+import { dataDir } from "./app-home";
 import { withSidecarLock } from "./sidecar-lock";
 
 export type KnowledgeFolder = { path: string; label: string; addedAt: string };
@@ -28,21 +28,27 @@ function canonical(p: string): string {
   }
 }
 
+/** Names a twin never reads inside a configured folder: secrets, keys,
+ * git internals and dependencies. */
+const BLOCKED_NAME = /^(?:\.env[^/]*|\.dev\.vars|\.npmrc|\.netrc|\.pypirc|\.git|node_modules|id_(?:rsa|dsa|ecdsa|ed25519)[^/]*|credentials[^/]*|.*\.(?:pem|key|p12|pfx|keystore|jks))$/i;
+
+export function isBlockedFolderName(name: string): boolean {
+  return BLOCKED_NAME.test(name);
+}
+
+export function hasBlockedFolderSegment(value: string): boolean {
+  return value.split(/[\\/]/).some((part) => part !== "" && isBlockedFolderName(part));
+}
+
+/** Root, the home folder or anything above it, credential folders, and the
+ * app's own data. A folder that merely contains the data dir (the repo in
+ * dev) is allowed: reads that land in data/ keep the normal twin rules. */
 function forbiddenPath(folder: string): boolean {
   const home = canonical(os.homedir());
-  const install = canonical(appHome());
-  const data = canonical(dataDir());
-  const forbidden = [
-    path.parse(folder).root,
-    home,
-    path.join(home, ".ssh"),
-    path.join(home, ".claude"),
-    path.join(home, ".aws"),
-    path.join(home, ".config"),
-    install,
-    data,
-  ].map(canonical);
-  return folder === path.parse(folder).root || forbidden.slice(1).some((p) => isInside(folder, p));
+  if (folder === path.parse(folder).root || isInside(home, folder)) return true;
+  const sensitive = [".ssh", ".claude", ".aws", ".config", ".gnupg", ".kube", ".docker", ".azure", ".gcloud"]
+    .map((dir) => canonical(path.join(home, dir)));
+  return [...sensitive, canonical(dataDir())].some((p) => isInside(folder, p));
 }
 
 export function validateKnowledgeFolder(input: { path?: unknown; label?: unknown }):
@@ -122,7 +128,7 @@ export function knowledgeFoldersIndexMarkdown(employeeId: string): string {
   const lines: string[] = [];
   for (const folder of listKnowledgeFolders(employeeId)) {
     let entries: string[] = [];
-    try { entries = fs.readdirSync(folder.path).sort().slice(0, 40); } catch { /* unavailable folders stay visible */ }
+    try { entries = fs.readdirSync(folder.path).filter((name) => !isBlockedFolderName(name)).sort().slice(0, 40); } catch { /* unavailable folders stay visible */ }
     lines.push(`- **${folder.label}** — \`${folder.path}\`${entries.length ? `\n  Top level: ${entries.map((entry) => `\`${entry}\``).join(", ")}` : "\n  Top level: (unavailable or empty)"}`);
   }
   return lines.join("\n");

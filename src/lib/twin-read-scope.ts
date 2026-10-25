@@ -19,7 +19,8 @@
 
 import path from "path";
 import fs from "fs";
-import { listKnowledgeFolders } from "./knowledge-folders";
+import { dataDir } from "./app-home";
+import { hasBlockedFolderSegment, listKnowledgeFolders } from "./knowledge-folders";
 
 export const PEER_PROFILE_FILES = new Set([
   "CONTEXT.md",
@@ -52,12 +53,6 @@ function underRoot(rel: string, root: string): boolean {
   return rel === root || rel.startsWith(`${root}/`);
 }
 
-const FOLDER_BLOCKED_NAME = /^(?:\.env[^/]*|id_rsa[^/]*|.*\.(?:pem|key))$/i;
-
-function hasBlockedFolderSegment(value: string): boolean {
-  return value.split(/[\\/]/).some((part) => part === ".git" || part === "node_modules" || FOLDER_BLOCKED_NAME.test(part));
-}
-
 function realPath(value: string): string | null {
   try { return fs.realpathSync(value); } catch { return null; }
 }
@@ -72,6 +67,9 @@ function isWithin(child: string, parent: string): boolean {
 function configuredFolderDecision(rawPath: string, employeeId: string, cwd: string, toolName: string): ReadScopeDecision | null {
   const resolved = realPath(path.resolve(cwd, rawPath || "."));
   if (!resolved) return null;
+  // The app's data dir keeps the normal twin rules, even inside a folder.
+  const data = realPath(dataDir());
+  if (data && isWithin(resolved, data)) return null;
   const folder = listKnowledgeFolders(employeeId).find((entry) => {
     const configured = realPath(entry.path);
     return configured !== null && isWithin(resolved, configured);
@@ -82,6 +80,9 @@ function configuredFolderDecision(rawPath: string, employeeId: string, cwd: stri
   try {
     const stat = fs.statSync(resolved);
     if (stat.isFile() && stat.size > 1024 * 1024) return { ok: false, reason: `${toolName} cannot access files larger than 1 MB.` };
+    // Grep reads file contents recursively, so over a directory it would
+    // search .env and key files too. Glob lists names only.
+    if (toolName === "Grep" && stat.isDirectory()) return { ok: false, reason: "Grep one file at a time inside a configured folder; use Glob to find files first." };
   } catch { return { ok: false, reason: `${toolName} could not verify this configured-folder path.` }; }
   return { ok: true };
 }
@@ -120,11 +121,9 @@ export function checkTwinRead(
     const folderDecision = configuredFolderDecision(raw, employeeId, cwd, "Read");
     if (folderDecision) return folderDecision;
     const rel = relOf(raw);
-    if (rel === null || rel === "" || !canReadPath(rel, employeeId)) return deny("Read", raw, employeeId);
-    try {
-      if (fs.statSync(path.resolve(cwd, raw)).size > 1024 * 1024) return { ok: false, reason: "Read cannot access files larger than 1 MB." };
-    } catch { /* the SDK reports missing files after this scope check */ }
-    return { ok: true };
+    return rel !== null && rel !== "" && canReadPath(rel, employeeId)
+      ? { ok: true }
+      : deny("Read", raw, employeeId);
   }
 
   if (toolName === "Glob") {

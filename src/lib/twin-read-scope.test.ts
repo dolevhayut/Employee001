@@ -140,4 +140,18 @@ describe("configured folder scope", () => {
     fs.symlinkSync(outside, path.join(folder, "escape.txt"));
     expect(checkTwinRead("Read", { file_path: path.join(folder, "escape.txt") }, ME, ROOT).ok).toBe(false);
   });
+
+  it("refuses Grep over a whole folder but allows one file", () => {
+    expect(checkTwinRead("Grep", { path: folder, pattern: "secret" }, ME, ROOT).ok).toBe(false);
+    expect(checkTwinRead("Grep", { path: path.join(folder, "README.md"), pattern: "hello" }, ME, ROOT).ok).toBe(true);
+    expect(checkTwinRead("Grep", { path: path.join(folder, ".env.local"), pattern: "secret" }, ME, ROOT).ok).toBe(false);
+  });
+
+  it("keeps normal rules for the data dir inside a configured folder", async () => {
+    const peer = path.join(home, "data", "employees", "someone-else", "knowledge");
+    fs.mkdirSync(peer, { recursive: true });
+    fs.writeFileSync(path.join(peer, "notes.md"), "private");
+    await addKnowledgeFolder(ME, { path: home, label: "Install" });
+    expect(checkTwinRead("Read", { file_path: path.join(peer, "notes.md") }, ME, path.join(home, "data")).ok).toBe(false);
+  });
 });

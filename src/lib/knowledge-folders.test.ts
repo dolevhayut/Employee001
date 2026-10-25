@@ -27,11 +27,16 @@ describe("validateKnowledgeFolder", () => {
     expect(validateKnowledgeFolder({ path: link, label: "Source" })).toMatchObject({ ok: true, folder: { path: fs.realpathSync(source) } });
   });
 
-  it("refuses the installation home, data directory, root and protected home folders", () => {
-    fs.mkdirSync(path.join(home, "data"));
-    for (const folder of [home, path.join(home, "data"), path.parse(home).root, path.join(os.homedir(), ".ssh")]) {
+  it("refuses the data directory, root, the home folder and above, and protected home folders", () => {
+    fs.mkdirSync(path.join(home, "data", "employees"), { recursive: true });
+    for (const folder of [path.join(home, "data"), path.join(home, "data", "employees"), path.parse(home).root, os.homedir(), path.dirname(os.homedir()), path.join(os.homedir(), ".ssh")]) {
       if (!fs.existsSync(folder)) continue;
       expect(validateKnowledgeFolder({ path: folder, label: "No" }).ok).toBe(false);
     }
+  });
+
+  it("allows a folder that contains the data dir, such as the repo in dev", () => {
+    fs.mkdirSync(path.join(home, "data"));
+    expect(validateKnowledgeFolder({ path: home, label: "Repo" }).ok).toBe(true);
   });
 });
