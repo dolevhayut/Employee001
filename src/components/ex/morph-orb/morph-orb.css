@@ -27,6 +27,10 @@
 }
 
 .mo-root {
+  /* Shadows and glows. Dark's accent and text are near-white, so drawing
+     them from those colours turns the shadow under the input into a halo. */
+  --mo-shadow: var(--text);
+  --mo-glow: 1;
   position: relative;
   width: 100%;
   height: 100%;
@@ -119,11 +123,15 @@
   border-radius: 999px;
   background: linear-gradient(90deg, var(--accent), var(--text-subtle) 30%, var(--twin) 60%, var(--accent-deep));
   filter: blur(26px);
-  opacity: calc(var(--oGlow) * 0.32);
+  opacity: calc(var(--oGlow) * 0.32 * var(--mo-glow));
   animation: mo-drift 6s ease-in-out infinite alternate;
   pointer-events: none;
 }
-.mo-actor[data-typing] .mo-underglow { opacity: calc(var(--oGlow) * 0.5); }
+.mo-actor[data-typing] .mo-underglow { opacity: calc(var(--oGlow) * 0.5 * var(--mo-glow)); }
+[data-theme="dark"] .mo-root { --mo-shadow: #000; --mo-glow: 0.3; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .mo-root { --mo-shadow: #000; --mo-glow: 0.3; }
+}
 
 .mo-halo-green {
   inset: -36px;
@@ -141,7 +149,7 @@
   inset: 0;
   overflow: hidden;
   background: var(--surface);
-  box-shadow: 0 1px 0 color-mix(in oklab, var(--text) 4%, transparent), 0 12px 32px color-mix(in oklab, var(--text) 10%, transparent);
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--text) 4%, transparent), 0 12px 32px color-mix(in oklab, var(--mo-shadow) 10%, transparent);
   opacity: var(--oPill);
 }
 
@@ -149,7 +157,7 @@
 .mo-aurora {
   position: absolute;
   inset: 0;
-  opacity: var(--oAur);
+  opacity: calc(var(--oAur) * var(--mo-glow));
   filter: blur(14px);
 }
 .mo-aurora i {
@@ -169,7 +177,7 @@
 .mo-ball {
   inset: 0;
   background: radial-gradient(circle at 35% 30%, var(--surface) 0%, var(--bg-sunken) 70%, color-mix(in oklab, var(--bg-sunken) 85%, var(--text)) 100%);
-  box-shadow: 0 8px 24px color-mix(in oklab, var(--text) 14%, transparent);
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--mo-shadow) 14%, transparent);
   opacity: var(--oBall);
 }
 
@@ -194,7 +202,7 @@
       color-mix(in oklab, var(--accent) 16%, transparent), transparent 70%),
     var(--surface);
   border: 1px solid var(--hairline);
-  box-shadow: 0 18px 50px color-mix(in oklab, var(--text) 12%, transparent);
+  box-shadow: 0 18px 50px color-mix(in oklab, var(--mo-shadow) 12%, transparent);
   opacity: var(--oCard);
 }
 
@@ -405,7 +413,7 @@
   padding: 0 10px 0 20px;
   border-radius: 999px;
   background: var(--surface);
-  box-shadow: 0 12px 32px color-mix(in oklab, var(--text) 10%, transparent);
+  box-shadow: 0 12px 32px color-mix(in oklab, var(--mo-shadow) 10%, transparent);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.35s ease-out, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
