@@ -170,6 +170,20 @@ function fmtTime(ms: number): string {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+/** Remove a leading YAML frontmatter block before passing markdown to the preview. */
+export function previewMarkdown(content: string): {
+  body: string;
+  confidenceNote?: string;
+} {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  if (!match) return { body: content };
+
+  const confidenceNote = match[1]
+    .match(/^confidenceNote:\s*["']?(.+?)["']?\s*$/m)?.[1]
+    ?.trim();
+  return { body: content.slice(match[0].length), confidenceNote };
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 function TwinBuildContent() {
@@ -203,6 +217,9 @@ function TwinBuildContent() {
   const [lookbackDays, setLookbackDays] = useState<number>(90);
   const startedAtRef = useRef<number | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const streamBuildIdRef = useRef<string | null>(null);
+  const seenEventKeysRef = useRef<Set<string>>(new Set());
+  const feedSequenceRef = useRef(0);
   const feedScrollRef = useRef<HTMLDivElement | null>(null);
 
   // Resolve employee from /api/employees
@@ -242,13 +259,16 @@ function TwinBuildContent() {
   }, []);
 
   const handleEvent = useCallback((evt: TwinBuilderEvent) => {
+    const nextFeedId = (prefix: string) =>
+      `${prefix}-${evt.ts}-${++feedSequenceRef.current}`;
+
     switch (evt.type) {
       case "start":
         setActiveToolkits(evt.activeToolkits);
         setFeed((f) => [
           ...f,
           {
-            id: `info-${evt.ts}`,
+            id: nextFeedId("info"),
             kind: "info" as const,
             action:
               evt.activeToolkits.length > 0 ? "Connected" : "No personal tools connected",
@@ -272,7 +292,7 @@ function TwinBuildContent() {
           [
             ...f,
             {
-              id: `t-${evt.ts}-${Math.random().toString(36).slice(2, 7)}`,
+              id: nextFeedId("tool"),
               kind: desc.kind,
               action: desc.action,
               toolkit: desc.toolkit,
@@ -292,7 +312,7 @@ function TwinBuildContent() {
           [
             ...f,
             {
-              id: `b-${evt.ts}-${Math.random().toString(36).slice(2, 7)}`,
+              id: nextFeedId("blocked"),
               kind: "blocked" as const,
               action: "Blocked",
               detail:
@@ -318,7 +338,7 @@ function TwinBuildContent() {
           [
             ...f,
             {
-              id: `w-${evt.ts}-${evt.filename}`,
+              id: nextFeedId("writing"),
               kind: "write" as const,
               action: "Writing",
               detail: `${evt.filename} · ${evt.content.length.toLocaleString()} chars`,
@@ -341,7 +361,7 @@ function TwinBuildContent() {
           [
             ...f,
             {
-              id: `d-${evt.ts}-${evt.filename}`,
+              id: nextFeedId("done"),
               kind: "result" as const,
               action: "Saved",
               detail: `${evt.filename} · ${(evt.sizeBytes / 1024).toFixed(1)} KB`,
@@ -356,7 +376,7 @@ function TwinBuildContent() {
           [
             ...f,
             {
-              id: `e-${evt.ts}`,
+              id: nextFeedId("error"),
               kind: "blocked" as const,
               action: "Error",
               detail: evt.message,
@@ -371,7 +391,7 @@ function TwinBuildContent() {
           [
             ...f,
             {
-              id: `br-${evt.ts}`,
+              id: nextFeedId("recorded"),
               kind: "result" as const,
               action: `Saved as v${evt.version}`,
               detail: `${evt.filesInManifest.length} files in manifest`,
@@ -397,9 +417,25 @@ function TwinBuildContent() {
   const attachToBuild = useCallback(
     (buildId: string, options: { reset?: boolean; resuming?: boolean } = {}) => {
       if (!employee) return;
+
+      // Effects can be mounted twice in development, and the active-build
+      // probe can race the Start response. One EventSource owns a build view.
+      if (
+        eventSourceRef.current &&
+        streamBuildIdRef.current === buildId
+      ) {
+        return;
+      }
+
+      const isNewBuild = streamBuildIdRef.current !== buildId;
       closeStream();
 
-      if (options.reset !== false) {
+      if (isNewBuild) {
+        seenEventKeysRef.current.clear();
+        feedSequenceRef.current = 0;
+      }
+
+      if (options.reset !== false && (isNewBuild || seenEventKeysRef.current.size === 0)) {
         setFiles(emptyFileMap());
         setFeed([]);
         setNarration("");
@@ -423,10 +459,19 @@ function TwinBuildContent() {
         )}`
       );
       eventSourceRef.current = es;
+      streamBuildIdRef.current = buildId;
 
       es.onmessage = (msg) => {
+        // A closing EventSource can still have a queued message. Ignore it
+        // once another build (or connection) has become the active owner.
+        if (eventSourceRef.current !== es || streamBuildIdRef.current !== buildId) {
+          return;
+        }
         try {
           const evt = JSON.parse(msg.data) as TwinBuilderEvent;
+          const eventKey = JSON.stringify(evt);
+          if (seenEventKeysRef.current.has(eventKey)) return;
+          seenEventKeysRef.current.add(eventKey);
           handleEvent(evt);
         } catch {
           /* skip malformed line */
@@ -1037,7 +1082,8 @@ function FilePreview({
     };
   }, [filename, state.status, state.content, employeeId, shouldFetch, fetchKey]);
 
-  const body = state.content || diskBody;
+  const rawBody = state.content || diskBody;
+  const { body, confidenceNote } = previewMarkdown(rawBody);
 
   return (
     <div style={{ maxWidth: 800 }}>
@@ -1067,9 +1113,9 @@ function FilePreview({
             : "pending"}
         </span>
         <div className="spacer" />
-        {body && (
+        {rawBody && (
           <span className="subtle mono" style={{ fontSize: "var(--fs-meta)" }}>
-            {body.length.toLocaleString()} chars
+            {rawBody.length.toLocaleString()} chars
           </span>
         )}
       </div>
@@ -1083,17 +1129,27 @@ function FilePreview({
           <Icons.Loader size={12} /> Loading…
         </div>
       )}
-      {body && (
-        <article
-          className="markdown-body"
-          style={{
-            fontSize: 13.5,
-            lineHeight: 1.65,
-            color: "var(--text)",
-          }}
-        >
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
-        </article>
+      {rawBody && (
+        <>
+          {confidenceNote && (
+            <p
+              className="subtle"
+              style={{ fontSize: "var(--fs-meta)", margin: "0 0 var(--sp-12)" }}
+            >
+              {confidenceNote}
+            </p>
+          )}
+          <article
+            className="markdown-body"
+            style={{
+              fontSize: 13.5,
+              lineHeight: 1.65,
+              color: "var(--text)",
+            }}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
+          </article>
+        </>
       )}
     </div>
   );
