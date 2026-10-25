@@ -109,32 +109,11 @@ function StepOrg({
   );
 }
 
-type ThemeId = "light" | "dark" | "cool";
+// Exactly two themes: light (white, stone, dark brown) and dark (black, grey,
+// white). Labels and taglines come from the onboarding catalog.
+type ThemeId = "light" | "dark";
 
-const THEMES: ReadonlyArray<{
-  id: ThemeId;
-  name: string;
-  tagline: string;
-}> = [
-  {
-    id: "light",
-    name: "Cream",
-    tagline: "Museum-quiet. Warm. The brand surface.",
-  },
-  {
-    id: "dark",
-    name: "Studio",
-    tagline: "Cinematic. Focused. The workspace at night.",
-  },
-  {
-    id: "cool",
-    name: "Cool",
-    tagline: "Crisp. Cool grays. Clarity over warmth.",
-  },
-];
-
-// Catalog keys use the theme's display name, not its id.
-const THEME_KEY: Record<ThemeId, "cream" | "studio" | "cool"> = { light: "cream", dark: "studio", cool: "cool" };
+const THEMES: ReadonlyArray<{ id: ThemeId }> = [{ id: "light" }, { id: "dark" }];
 
 function StepTheme({
   theme,
@@ -179,7 +158,7 @@ function StepTheme({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
+          gridTemplateColumns: "repeat(2, 1fr)",
           gap: "var(--sp-12)",
         }}
       >
@@ -332,7 +311,7 @@ function StepTheme({
                     letterSpacing: "-0.01em",
                   }}
                 >
-                  {t(`setup.theme.${THEME_KEY[themeOption.id]}` as "setup.theme.cream")}
+                  {t(`setup.theme.${themeOption.id}`)}
                 </span>
                 <span
                   style={{
@@ -342,7 +321,7 @@ function StepTheme({
                     lineHeight: 1.5,
                   }}
                 >
-                  {t(`setup.theme.${THEME_KEY[themeOption.id]}Sub` as "setup.theme.creamSub")}
+                  {t(`setup.theme.${themeOption.id}Sub`)}
                 </span>
               </div>
             </button>

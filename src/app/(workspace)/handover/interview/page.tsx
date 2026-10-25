@@ -13,7 +13,7 @@ import { useT } from "@/components/ex/i18n-context";
 import { PackageReview, type HandoverState, type Message } from "@/components/relay/package-review";
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--hairline)", borderRadius: 10, padding: "var(--sp-16)" };
-const primary: React.CSSProperties = { background: "var(--accent)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: "var(--fs-ui)", cursor: "pointer" };
+const primary: React.CSSProperties = { background: "var(--accent)", color: "var(--bg)", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: "var(--fs-ui)", cursor: "pointer" };
 const secondary: React.CSSProperties = { background: "transparent", color: "var(--text)", border: "1px solid var(--hairline)", borderRadius: 8, padding: "8px 16px", fontSize: "var(--fs-ui)", cursor: "pointer" };
 
 async function readSse(res: Response, onDelta: (d: string) => void): Promise<Message[]> {

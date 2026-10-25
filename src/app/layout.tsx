@@ -58,7 +58,7 @@ export default function RootLayout({
   // Blocking, before paint — same idea as the theme script. Default is English.
   // Hebrew sets lang=he and dir=rtl so the sidebar mirrors and --font picks
   // up Open Sans Hebrew with no flash of LTR/Geist.
-  const bootScript = `(function(){try{var s=localStorage.getItem('em001-theme');var t=(s==='dark'||s==='light'||s==='cool')?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}try{var l=localStorage.getItem('em001-lang');var lang=l==='he'?'he':'en';var el=document.documentElement;el.lang=lang;el.dir=lang==='he'?'rtl':'ltr';}catch(e){}})();`;
+  const bootScript = `(function(){try{var s=localStorage.getItem('em001-theme');var t=(s==='dark'||s==='light')?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}try{var l=localStorage.getItem('em001-lang');var lang=l==='he'?'he':'en';var el=document.documentElement;el.lang=lang;el.dir=lang==='he'?'rtl':'ltr';}catch(e){}})();`;
   return (
     <html
       lang="en"

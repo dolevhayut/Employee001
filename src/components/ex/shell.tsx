@@ -100,8 +100,10 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-type ThemeId = "light" | "dark" | "cool";
-const THEME_ORDER: ThemeId[] = ["light", "dark", "cool"];
+// Exactly two themes. With nothing saved the OS preference decides (system
+// default); the toggle then flips between the two.
+type ThemeId = "light" | "dark";
+const THEME_ORDER: ThemeId[] = ["light", "dark"];
 const THEME_KEY = "em001-theme";
 
 // The theme is persisted in localStorage (falling back to the OS preference)
@@ -110,7 +112,7 @@ const THEME_KEY = "em001-theme";
 const themeListeners = new Set<() => void>();
 
 function isThemeId(v: string | null): v is ThemeId {
-  return v === "light" || v === "dark" || v === "cool";
+  return v === "light" || v === "dark";
 }
 
 function themeSubscribe(cb: () => void): () => void {

@@ -7,7 +7,7 @@ export function ThemeInit() {
     const saved = localStorage.getItem("em001-theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const theme =
-      saved === "dark" || saved === "light" || saved === "cool"
+      saved === "dark" || saved === "light"
         ? saved
         : prefersDark
           ? "dark"

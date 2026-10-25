@@ -597,7 +597,7 @@ export function NotificationBell({ count }: { count: number }) {
             padding: "0 3px",
             borderRadius: 999,
             background: "var(--warn)",
-            color: "#fff",
+            color: "var(--bg)",
             fontSize: "var(--fs-2xs)",
             fontWeight: 700,
             display: "grid",

@@ -1070,7 +1070,7 @@ export default function MarketplacePage() {
             insetInlineEnd: 24,
             zIndex: 9999,
             background: toast.kind === "success" ? "var(--text)" : "var(--danger)",
-            color: toast.kind === "success" ? "var(--bg)" : "#fff",
+            color: "var(--bg)",
             padding: "10px 16px",
             borderRadius: 10,
             fontSize: "var(--fs-ui)",

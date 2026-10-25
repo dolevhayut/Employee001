@@ -15,7 +15,7 @@ type Twin = { id: string; name: string; role: string; initials: string; avatarCo
 
 const card: React.CSSProperties = { background: "var(--surface)", border: "1px solid var(--hairline)", borderRadius: 10, padding: "var(--sp-16)" };
 const btn: React.CSSProperties = { background: "transparent", color: "var(--text)", border: "1px solid var(--hairline)", borderRadius: 8, padding: "6px 12px", fontSize: "var(--fs-ui)", cursor: "pointer", textDecoration: "none", display: "inline-block" };
-const primary: React.CSSProperties = { ...btn, background: "var(--accent)", color: "#fff", border: "1px solid var(--accent)" };
+const primary: React.CSSProperties = { ...btn, background: "var(--accent)", color: "var(--bg)", border: "1px solid var(--accent)" };
 const h2: React.CSSProperties = { fontSize: "var(--fs-meta)", textTransform: "uppercase", letterSpacing: 0.5, color: "var(--text-muted)", fontWeight: 600, margin: "var(--sp-24) 0 var(--sp-8)" };
 
 function Avatar({ t }: { t: Twin }) {

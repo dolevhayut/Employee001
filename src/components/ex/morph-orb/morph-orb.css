@@ -1,5 +1,5 @@
 /* MorphOrb styles, built on the app's theme tokens so the stage reads as part
-   of Employee001 in every theme (light, dark, cool). The 21st.dev registry
+   of Employee001 in every theme (light, dark). The 21st.dev registry
    shipped only the keyframes; the class styles are ours. The runtime drives
    everything through CSS variables on .mo-actor (--w, --h, --r and the --o*
    opacities), .mo-status (--sOp, --sTy) and .mo-root (--oCenter, --cardH).
@@ -110,14 +110,14 @@
 
 .mo-actor > * { position: absolute; border-radius: inherit; }
 
-/* warm light spilling under the pill */
+/* light spilling under the pill (neutral in dark) */
 .mo-underglow {
   left: 8%;
   right: 8%;
   bottom: -22px;
   height: 40px;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent), var(--warn) 30%, var(--twin) 60%, var(--accent-deep));
+  background: linear-gradient(90deg, var(--accent), var(--text-subtle) 30%, var(--twin) 60%, var(--accent-deep));
   filter: blur(26px);
   opacity: calc(var(--oGlow) * 0.32);
   animation: mo-drift 6s ease-in-out infinite alternate;
@@ -162,7 +162,7 @@
   animation: mo-drift 5s ease-in-out infinite alternate;
 }
 .mo-aurora i:nth-child(1) { left: 4%; background: var(--accent); animation-duration: 6.5s; }
-.mo-aurora i:nth-child(2) { left: 28%; background: var(--warn); animation-duration: 5.2s; animation-delay: -2s; }
+.mo-aurora i:nth-child(2) { left: 28%; background: var(--text-subtle); animation-duration: 5.2s; animation-delay: -2s; }
 .mo-aurora i:nth-child(3) { left: 52%; background: var(--twin); animation-duration: 7s; animation-delay: -1s; }
 .mo-aurora i:nth-child(4) { left: 74%; background: var(--accent-deep); animation-duration: 5.8s; animation-delay: -3s; }
 
@@ -202,7 +202,7 @@
 .mo-ring {
   inset: 0;
   padding: 1px;
-  background: conic-gradient(from var(--angle), var(--accent), var(--accent-soft), var(--twin), var(--warn), var(--accent-deep), var(--accent));
+  background: conic-gradient(from var(--angle), var(--accent), var(--accent-soft), var(--twin), var(--text-subtle), var(--accent-deep), var(--accent));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
@@ -422,7 +422,7 @@
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: conic-gradient(from var(--angle), var(--accent), var(--accent-soft), var(--twin), var(--warn), var(--accent-deep), var(--accent));
+  background: conic-gradient(from var(--angle), var(--accent), var(--accent-soft), var(--twin), var(--text-subtle), var(--accent-deep), var(--accent));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);

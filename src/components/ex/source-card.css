@@ -15,7 +15,7 @@
   border-radius: inherit;
   padding: 1.5px;
   pointer-events: none;
-  background-image: radial-gradient(transparent, transparent, var(--accent), var(--twin), var(--warn), transparent, transparent);
+  background-image: radial-gradient(transparent, transparent, var(--accent), var(--twin), var(--text-subtle), transparent, transparent);
   background-size: 300% 300%;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;

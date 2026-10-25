@@ -808,7 +808,7 @@ function OrgSkillModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 12, 8, 0.45)",
+        background: "rgba(0, 0, 0, 0.45)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -1163,7 +1163,7 @@ function BrainGraphModal({ onClose }: { onClose: () => void }) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 12, 8, 0.55)",
+        background: "rgba(0, 0, 0, 0.55)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -1433,7 +1433,7 @@ function BrainBuilderModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 12, 8, 0.45)",
+        background: "rgba(0, 0, 0, 0.45)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -1901,7 +1901,7 @@ function OrgBrainModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 12, 8, 0.45)",
+        background: "rgba(0, 0, 0, 0.45)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",
@@ -2589,7 +2589,7 @@ function McpModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 12, 8, 0.45)",
+        background: "rgba(0, 0, 0, 0.45)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "center",

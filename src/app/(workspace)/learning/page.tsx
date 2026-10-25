@@ -179,7 +179,7 @@ function Phase1Panel() {
               background: "var(--success)",
               display: "grid",
               placeItems: "center",
-              color: "#fff",
+              color: "var(--bg)",
               flexShrink: 0,
             }}
           >
@@ -809,7 +809,7 @@ function Phase1PanelCompact() {
               background: "var(--success)",
               display: "grid",
               placeItems: "center",
-              color: "#fff",
+              color: "var(--bg)",
               flexShrink: 0,
             }}
           >

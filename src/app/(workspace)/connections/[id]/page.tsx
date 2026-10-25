@@ -800,7 +800,7 @@ function ToolkitCard({
                 flex: 1,
                 padding: "6px 10px",
                 background: "var(--warn)",
-                color: "white",
+                color: "var(--bg)",
                 borderRadius: 6,
                 fontSize: "var(--fs-meta)",
                 fontWeight: 600,

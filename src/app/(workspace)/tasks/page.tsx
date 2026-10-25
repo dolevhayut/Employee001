@@ -1259,7 +1259,7 @@ export default function TasksPage() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(20,16,10,0.45)",
+            background: "rgba(0,0,0,0.45)",
             display: "grid",
             placeItems: "center",
             zIndex: 100,

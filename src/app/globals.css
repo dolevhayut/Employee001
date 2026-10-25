@@ -72,34 +72,36 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Employee001 — design tokens (warm minimalist pro tool)
+   Employee001 — design tokens (two themes: light stone, dark grey)
    ────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Warm palette (default). Every color is a Radix Colors step
-     (radix-ui.com/colors, @radix-ui/colors 3.0.0): neutrals and text from
-     sand (stone), surfaces/borders/accent from brown (clay/sahara), status
-     from the earthy olive/gold/tomato, twin from slate. Step roles: 1-2 app bg, 3-5
-     component bg (normal/hover/selected), 6-8 borders, 9-10 solids,
-     11-12 text. Dark themes use the matching -dark scale at the same step. */
-  --bg: #f6eee7; /* brown-3 */
-  --bg-elevated: #fefdfc; /* brown-1 */
-  --bg-sunken: #f0e4d9; /* brown-4 */
-  --surface: #fefdfc; /* brown-1 */
-  --surface-soft: #fcf9f6; /* brown-2 */
-  --hairline: #e4cdb7; /* brown-6 */
-  --hairline-strong: #dcbc9f; /* brown-7 */
-  --text: #21201c; /* sand-12 */
-  --text-muted: #63635e; /* sand-11 */
-  --text-subtle: #82827c; /* sand-10 */
-  --accent: #ad7f58; /* brown-9 */
-  --accent-soft: #ebdaca; /* brown-5 */
-  --accent-deep: #815e46; /* brown-11 */
-  --success: #60655f; /* olive-11 */
-  --warn: #71624b; /* gold-11 */
-  --danger: #d13415; /* tomato-11 */
-  --twin: #60646c; /* slate-11 */
-  --twin-soft: #f0f0f3; /* slate-3 */
+  /* Two themes only (2026-10-25):
+     light — white base, stone-beige surfaces and hairlines, dark-brown text
+             and accent (this :root default);
+     dark  — black base, neutral grey surfaces and hairlines, white text,
+             near-white accent. No warm tint in dark surfaces.
+     Fills in --accent / --accent-deep / status colours carry var(--bg) text,
+     so they read in both themes. */
+  color-scheme: light;
+  --bg: #ffffff; /* white base */
+  --bg-elevated: #ffffff;
+  --bg-sunken: #f2ede6; /* stone */
+  --surface: #fcfaf7; /* stone, lightest */
+  --surface-soft: #f7f3ee; /* stone, light */
+  --hairline: #e7e0d6; /* stone beige */
+  --hairline-strong: #d5cabb; /* stone beige, deeper */
+  --text: #2b1f17; /* dark brown */
+  --text-muted: #665445; /* brown-grey */
+  --text-subtle: #766455; /* brown-grey, lighter */
+  --accent: #6b4a33; /* dark brown */
+  --accent-soft: #efe6dc;
+  --accent-deep: #4a3222;
+  --success: #3f6b3a;
+  --warn: #7f5f14;
+  --danger: #c2321a;
+  --twin: #5c6068;
+  --twin-soft: #eef0f2;
 
   /* Legacy aliases — keep existing pages working during the migration */
   --cream: var(--bg);
@@ -183,77 +185,63 @@
   --sp-56: 56px;
   --sp-64: 64px;
 
-  --shadow-sm: 0 1px 0 rgba(22, 19, 17, 0.04);
-  --shadow: 0 1px 2px rgba(22, 19, 17, 0.05), 0 4px 16px -8px rgba(22, 19, 17, 0.08);
-  --shadow-lg: 0 4px 12px rgba(22, 19, 17, 0.06), 0 16px 48px -16px rgba(22, 19, 17, 0.12);
-  --shadow-dialog: 0 24px 80px rgba(22, 19, 17, 0.22);
-  --shadow-dropdown: 0 4px 12px rgba(22, 19, 17, 0.08);
+  --shadow-sm: 0 1px 0 rgba(43, 31, 23, 0.04);
+  --shadow: 0 1px 2px rgba(43, 31, 23, 0.05), 0 4px 16px -8px rgba(43, 31, 23, 0.08);
+  --shadow-lg: 0 4px 12px rgba(43, 31, 23, 0.06), 0 16px 48px -16px rgba(43, 31, 23, 0.12);
+  --shadow-dialog: 0 24px 80px rgba(43, 31, 23, 0.22);
+  --shadow-dropdown: 0 4px 12px rgba(43, 31, 23, 0.08);
 }
 
-/* Explicit light override — beats @media prefers-color-scheme: dark */
+/* Explicit light override — beats @media prefers-color-scheme: dark.
+   Unqualified (not :root[...]) so the /setup preview cards can scope a theme
+   to a child element. */
 [data-theme="light"] {
-  --bg: #f6eee7; /* brown-3 */
-  --bg-elevated: #fefdfc; /* brown-1 */
-  --bg-sunken: #f0e4d9; /* brown-4 */
-  --surface: #fefdfc; /* brown-1 */
-  --surface-soft: #fcf9f6; /* brown-2 */
-  --hairline: #e4cdb7; /* brown-6 */
-  --hairline-strong: #dcbc9f; /* brown-7 */
-  --text: #21201c; /* sand-12 */
-  --text-muted: #63635e; /* sand-11 */
-  --text-subtle: #82827c; /* sand-10 */
-  --accent: #ad7f58; /* brown-9 */
-  --accent-soft: #ebdaca; /* brown-5 */
-  --accent-deep: #815e46; /* brown-11 */
-  --success: #60655f; /* olive-11 */
-  --warn: #71624b; /* gold-11 */
-  --danger: #d13415; /* tomato-11 */
-  --twin: #60646c; /* slate-11 */
-  --twin-soft: #f0f0f3; /* slate-3 */
-  --shadow-sm: 0 1px 0 rgba(22, 19, 17, 0.04);
-  --shadow: 0 1px 2px rgba(22, 19, 17, 0.05), 0 4px 16px -8px rgba(22, 19, 17, 0.08);
-  --shadow-lg: 0 4px 12px rgba(22, 19, 17, 0.06), 0 16px 48px -16px rgba(22, 19, 17, 0.12);
-  --shadow-dialog: 0 24px 80px rgba(22, 19, 17, 0.22);
-  --shadow-dropdown: 0 4px 12px rgba(22, 19, 17, 0.08);
-}
-
-[data-theme="cool"] {
-  --bg: #f0f0f3; /* slate-3 */
-  --bg-elevated: #fcfcfd; /* slate-1 */
-  --bg-sunken: #e8e8ec; /* slate-4 */
-  --surface: #fcfcfd; /* slate-1 */
-  --surface-soft: #f9f9fb; /* slate-2 */
-  --hairline: #d9d9e0; /* slate-6 */
-  --hairline-strong: #cdced6; /* slate-7 */
-  --text: #1c2024; /* slate-12 */
-  --text-muted: #60646c; /* slate-11 */
-  --text-subtle: #80838d; /* slate-10 */
-  --accent: #0090ff; /* blue-9 */
-  --accent-soft: #c2e5ff; /* blue-5 */
-  --accent-deep: #0d74ce; /* blue-11 */
-  --twin: #0d74ce; /* blue-11 */
-  --twin-soft: #e6f4fe; /* blue-3 */
+  color-scheme: light;
+  --bg: #ffffff; /* white base */
+  --bg-elevated: #ffffff;
+  --bg-sunken: #f2ede6; /* stone */
+  --surface: #fcfaf7; /* stone, lightest */
+  --surface-soft: #f7f3ee; /* stone, light */
+  --hairline: #e7e0d6; /* stone beige */
+  --hairline-strong: #d5cabb; /* stone beige, deeper */
+  --text: #2b1f17; /* dark brown */
+  --text-muted: #665445; /* brown-grey */
+  --text-subtle: #766455; /* brown-grey, lighter */
+  --accent: #6b4a33; /* dark brown */
+  --accent-soft: #efe6dc;
+  --accent-deep: #4a3222;
+  --success: #3f6b3a;
+  --warn: #7f5f14;
+  --danger: #c2321a;
+  --twin: #5c6068;
+  --twin-soft: #eef0f2;
+  --shadow-sm: 0 1px 0 rgba(43, 31, 23, 0.04);
+  --shadow: 0 1px 2px rgba(43, 31, 23, 0.05), 0 4px 16px -8px rgba(43, 31, 23, 0.08);
+  --shadow-lg: 0 4px 12px rgba(43, 31, 23, 0.06), 0 16px 48px -16px rgba(43, 31, 23, 0.12);
+  --shadow-dialog: 0 24px 80px rgba(43, 31, 23, 0.22);
+  --shadow-dropdown: 0 4px 12px rgba(43, 31, 23, 0.08);
 }
 
 [data-theme="dark"] {
-  --bg: #1c1816; /* brown-2 */
-  --bg-elevated: #322922; /* brown-4 */
-  --bg-sunken: #12110f; /* brown-1 */
-  --surface: #28211d; /* brown-3 */
-  --surface-soft: #322922; /* brown-4 */
-  --hairline: #4d3c2f; /* brown-6 */
-  --hairline-strong: #614a39; /* brown-7 */
-  --text: #eeeeec; /* sand-12 */
-  --text-muted: #b5b3ad; /* sand-11 */
-  --text-subtle: #7c7b74; /* sand-10 */
-  --accent: #ad7f58; /* brown-9 */
-  --accent-soft: #3e3128; /* brown-5 */
-  --accent-deep: #dbb594; /* brown-11 */
-  --success: #afb5ad; /* olive-11 */
-  --warn: #cbb99f; /* gold-11 */
-  --danger: #ff977d; /* tomato-11 */
-  --twin: #b0b4ba; /* slate-11 */
-  --twin-soft: #212225; /* slate-3 */
+  color-scheme: dark;
+  --bg: #000000; /* black base */
+  --bg-elevated: #1c1c1c;
+  --bg-sunken: #161616; /* shell frame, hovers, chips */
+  --surface: #0f0f0f;
+  --surface-soft: #181818;
+  --hairline: #262626;
+  --hairline-strong: #3a3a3a;
+  --text: #f5f5f5; /* white */
+  --text-muted: #a8a8a8;
+  --text-subtle: #8c8c8c;
+  --accent: #e5e5e5; /* near-white: fills carry var(--bg) text */
+  --accent-soft: #262626;
+  --accent-deep: #ffffff;
+  --success: #7cc48a;
+  --warn: #e0b85c;
+  --danger: #ff8a73;
+  --twin: #b4b8be;
+  --twin-soft: #1c1d1f;
   /* Dark mode shadows use pure black at higher opacity — perceived depth on
      dark surfaces requires greater luminance contrast than on light ones */
   --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.25);
@@ -266,25 +254,28 @@
 /* System preference auto-detection — fires before JS (prevents FOUC on first
    load when the user's OS is in dark mode but no localStorage value exists) */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="cool"]):not([data-theme="dark"]) {
-    --bg: #1c1816; /* brown-2 */
-    --bg-elevated: #322922; /* brown-4 */
-    --bg-sunken: #12110f; /* brown-1 */
-    --surface: #28211d; /* brown-3 */
-    --surface-soft: #322922; /* brown-4 */
-    --hairline: #4d3c2f; /* brown-6 */
-    --hairline-strong: #614a39; /* brown-7 */
-    --text: #eeeeec; /* sand-12 */
-    --text-muted: #b5b3ad; /* sand-11 */
-    --text-subtle: #7c7b74; /* sand-10 */
-    --accent: #ad7f58; /* brown-9 */
-    --accent-soft: #3e3128; /* brown-5 */
-    --accent-deep: #dbb594; /* brown-11 */
-    --success: #afb5ad; /* olive-11 */
-    --warn: #cbb99f; /* gold-11 */
-    --danger: #ff977d; /* tomato-11 */
-    --twin: #b0b4ba; /* slate-11 */
-    --twin-soft: #212225; /* slate-3 */
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    color-scheme: dark;
+    --bg: #000000; /* black base */
+    --bg-elevated: #1c1c1c;
+    --bg-sunken: #161616; /* shell frame, hovers, chips */
+    --surface: #0f0f0f;
+    --surface-soft: #181818;
+    --hairline: #262626;
+    --hairline-strong: #3a3a3a;
+    --text: #f5f5f5; /* white */
+    --text-muted: #a8a8a8;
+    --text-subtle: #8c8c8c;
+    --accent: #e5e5e5; /* near-white: fills carry var(--bg) text */
+    --accent-soft: #262626;
+    --accent-deep: #ffffff;
+    --success: #7cc48a;
+    --warn: #e0b85c;
+    --danger: #ff8a73;
+    --twin: #b4b8be;
+    --twin-soft: #1c1d1f;
+    /* Dark mode shadows use pure black at higher opacity — perceived depth on
+       dark surfaces requires greater luminance contrast than on light ones */
     --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.25);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 16px -8px rgba(0, 0, 0, 0.45);
     --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.3), 0 16px 48px -16px rgba(0, 0, 0, 0.5);
@@ -340,7 +331,7 @@ input, textarea { font-family: inherit; color: inherit; }
 .btn:hover { background: var(--surface-soft); border-color: var(--text-subtle); }
 .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
 .btn.primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
-.btn.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.accent { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 .btn.accent:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
 .btn.ghost { border-color: transparent; background: transparent; }
 .btn.ghost:hover { background: var(--bg-sunken); }
@@ -486,5 +477,5 @@ input, textarea { font-family: inherit; color: inherit; }
 /* Logo — invert to white in dark mode (SVG fill is black) */
 [data-theme="dark"] .brand-logo { filter: invert(1); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="cool"]) .brand-logo { filter: invert(1); }
+  :root:not([data-theme="light"]) .brand-logo { filter: invert(1); }
 }

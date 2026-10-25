@@ -956,7 +956,7 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
             padding: "10px 20px",
             fontSize: "var(--fs-ui)",
             fontWeight: 600,
-            color: confirmed ? "#FFFFFF" : "var(--text-subtle)",
+            color: confirmed ? "var(--bg)" : "var(--text-subtle)",
             background: confirmed ? "var(--danger)" : "var(--bg-sunken)",
             border: `1px solid ${confirmed ? "var(--danger)" : "var(--hairline)"}`,
             borderRadius: 6,
@@ -1347,7 +1347,7 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
                   }}
                 >
                   {active && (
-                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--bg)" }} />
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1410,7 +1410,7 @@ function ModelPicker({ employee }: { employee: EmployeeWithTwin }) {
                   }}
                 >
                   {active && (
-                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--bg)" }} />
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1594,7 +1594,7 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
                       display: "grid", placeItems: "center", cursor: "pointer",
                     }}
                   >
-                    {active && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />}
+                    {active && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--bg)" }} />}
                   </button>
 
                   {/* Info */}

@@ -301,7 +301,7 @@ export default function BudgetsPage() {
                               fontSize: "var(--fs-xs)",
                               fontWeight: 600,
                               background: "var(--danger)",
-                              color: "#fff",
+                              color: "var(--bg)",
                               borderRadius: 4,
                               padding: "1px 5px",
                               textTransform: "uppercase",
