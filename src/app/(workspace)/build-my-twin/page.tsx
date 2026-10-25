@@ -24,6 +24,8 @@ const PROMPTS = [
 ];
 
 const ACCEPT = ".md,.txt,.pdf,.docx,.csv,.json";
+const ACCEPTED_EXTS = new Set(ACCEPT.split(","));
+const MAX_FILE_BYTES = 25 * 1024 * 1024; // the knowledge upload limit
 
 const fieldStyle = {
   width: "100%",
@@ -48,7 +50,7 @@ const transcript = (turns: Turn[]) => turns.map((x) => `**Q:** ${x.question.trim
 
 /** "Interview me": a short interview, one question at a time; the
  *  transcript becomes the twin's notes. */
-function InterviewPanel({ name, role, onTranscript }: { name: string; role: string; onTranscript: (text: string) => void }) {
+function InterviewPanel({ name, role, onTranscript }: { name: string; role: string; onTranscript: (text: string, answerChars: number) => void }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [question, setQuestion] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
@@ -88,7 +90,7 @@ function InterviewPanel({ name, role, onTranscript }: { name: string; role: stri
     const next = [...turns, { question, answer: answer.trim() }];
     setTurns(next);
     setAnswer("");
-    onTranscript(transcript(next));
+    onTranscript(transcript(next), next.reduce((n, x) => n + x.answer.trim().length, 0));
     void ask(next);
   }
 
@@ -166,11 +168,20 @@ export default function BuildMyTwinPage() {
   const [written, setWritten] = useState("");
   const [interviewed, setInterviewed] = useState("");
   const [mode, setMode] = useState<Mode>("write");
-  const notes = mode === "write" ? written : interviewed;
+  const [interviewAnswerChars, setInterviewAnswerChars] = useState(0);
+  // Both go to the builder: writing first and then doing the interview (or
+  // the reverse) keeps everything. The interview counts its answers only.
+  const notes = [written.trim(), interviewed.trim() && `## Interview\n\n${interviewed.trim()}`].filter(Boolean).join("\n\n");
+  const material = written.trim().length + interviewAnswerChars;
   const [files, setFiles] = useState<File[]>([]);
   const [consent, setConsent] = useState(false);
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [fileNote, setFileNote] = useState<string | null>(null);
+  // Set once the twin exists, so a retry after a failed upload or start
+  // continues with the same twin instead of creating a second one.
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [uploaded, setUploaded] = useState<Set<File>>(() => new Set());
   const fileInput = useRef<HTMLInputElement>(null);
 
   // Prefill the name from the signed-in account (not the loopback stand-in).
@@ -184,33 +195,45 @@ export default function BuildMyTwinPage() {
       .catch(() => {});
   }, []);
 
-  const notesShort = notes.trim().length < MIN_NOTES;
-  const ready = name.trim() && role.trim() && !notesShort && consent && stage === "idle";
+  const notesShort = material < MIN_NOTES;
+  const missing = [
+    !name.trim() && "your name",
+    !role.trim() && "your role",
+    notesShort && `${MIN_NOTES - material} more characters about your work`,
+    !consent && "your agreement below",
+  ].filter(Boolean) as string[];
+  const ready = missing.length === 0 && stage === "idle";
 
   async function build() {
     if (!ready) return;
     setError(null);
-    setStage("creating");
     try {
-      const res = await fetch("/api/twins/self", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, role, notes, consent, locale: document.documentElement.lang === "he" ? "he" : "en" }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { employeeId?: string; error?: string };
-      if (!res.ok || !body.employeeId) throw new Error(body.error ?? `Couldn't create the twin (${res.status}).`);
-      const id = body.employeeId;
+      let id = createdId;
+      if (!id) {
+        setStage("creating");
+        const res = await fetch("/api/twins/self", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, role, notes, consent, locale: document.documentElement.lang === "he" ? "he" : "en" }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { employeeId?: string; error?: string };
+        if (!res.ok || !body.employeeId) throw new Error(body.error ?? `Couldn't create the twin (${res.status}).`);
+        id = body.employeeId;
+        setCreatedId(id);
+      }
 
-      if (files.length) {
+      const pending = files.filter((f) => !uploaded.has(f));
+      if (pending.length) {
         setStage("uploading");
-        for (const file of files) {
+        for (const file of pending) {
           const form = new FormData();
           form.append("file", file);
           const up = await fetch(`/api/employees/${encodeURIComponent(id)}/knowledge`, { method: "POST", body: form });
           if (!up.ok) {
             const why = (await up.json().catch(() => ({}))) as { error?: string };
-            throw new Error(`${file.name}: ${why.error ?? `upload failed (${up.status})`}`);
+            throw new Error(`${file.name}: ${why.error ?? `upload failed (${up.status})`}. Remove it and build again; your twin is kept.`);
           }
+          setUploaded((cur) => new Set(cur).add(file));
         }
       }
 
@@ -232,9 +255,15 @@ export default function BuildMyTwinPage() {
     }
   }
 
+  // Dropped files skip the picker's accept filter, so check type and size
+  // here; a file with the same name replaces the earlier one.
   const addFiles = (list: FileList | null) => {
     if (!list) return;
-    setFiles((cur) => [...cur, ...Array.from(list).filter((f) => !cur.some((c) => c.name === f.name && c.size === f.size))]);
+    const incoming = Array.from(list);
+    const ok = incoming.filter((f) => ACCEPTED_EXTS.has(f.name.slice(f.name.lastIndexOf(".")).toLowerCase()) && f.size <= MAX_FILE_BYTES);
+    const skipped = incoming.filter((f) => !ok.includes(f)).map((f) => f.name);
+    setFileNote(skipped.length ? `Skipped ${skipped.join(", ")}: only Markdown, text, PDF, Word, CSV or JSON up to 25 MB.` : null);
+    setFiles((cur) => [...cur.filter((c) => !ok.some((f) => f.name === c.name)), ...ok]);
   };
 
   return (
@@ -280,7 +309,7 @@ export default function BuildMyTwinPage() {
             </div>
 {/* Kept mounted while hidden, so the interview survives a switch. */}
             <div hidden={mode !== "interview"}>
-              <InterviewPanel name={name} role={role} onTranscript={setInterviewed} />
+              <InterviewPanel name={name} role={role} onTranscript={(text, chars) => { setInterviewed(text); setInterviewAnswerChars(chars); }} />
             </div>
             {mode === "write" && (
               <>
@@ -304,10 +333,8 @@ export default function BuildMyTwinPage() {
             {/* Both modes: the build needs MIN_NOTES characters of material. */}
             <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>
               {notesShort
-                ? mode === "interview"
-                  ? `${notes.trim().length} / ${MIN_NOTES} characters so far: answer a little more to build`
-                  : `${notes.trim().length} / ${MIN_NOTES} characters minimum`
-                : `${notes.trim().length.toLocaleString("en-US")} characters`}
+                ? `${material} / ${MIN_NOTES} characters minimum${written.trim() && interviewAnswerChars ? " (your writing plus your interview answers)" : mode === "interview" ? " in your answers" : ""}`
+                : `${material.toLocaleString("en-US")} characters${written.trim() && interviewAnswerChars ? ": your writing and your interview both go to the builder" : ""}`}
             </div>
           </div>
           <div>
@@ -339,6 +366,7 @@ export default function BuildMyTwinPage() {
                 ))}
               </ul>
             )}
+            {fileNote && <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>{fileNote}</div>}
           </div>
 
           <label style={{ display: "flex", gap: "var(--sp-10)", alignItems: "flex-start", fontSize: "var(--fs-sm)", lineHeight: 1.5 }}>
@@ -358,10 +386,12 @@ export default function BuildMyTwinPage() {
 
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-12)" }}>
             <button type="button" className="btn primary" disabled={!ready} onClick={build}>
-              {stage === "creating" ? "Creating…" : stage === "uploading" ? "Uploading documents…" : stage === "starting" ? "Starting the build…" : "Build my twin"}
+              {stage === "creating" ? "Creating…" : stage === "uploading" ? "Uploading documents…" : stage === "starting" ? "Starting the build…" : createdId ? "Continue the build" : "Build my twin"}
             </button>
             <span className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
-              You&apos;ll watch it write its 9 profile files. Connect Gmail or Slack later to deepen it.
+              {stage === "idle" && missing.length
+                ? `Still needed: ${missing.join(", ")}.`
+                : "You'll watch it write its 9 profile files. Connect Gmail or Slack later to deepen it."}
             </span>
           </div>
         </div>
