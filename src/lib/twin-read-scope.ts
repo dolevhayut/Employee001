@@ -105,6 +105,24 @@ function deny(tool: string, rawPath: string, employeeId: string): ReadScopeDecis
   };
 }
 
+/** The configured-folder rules on their own, for runs that otherwise read
+ * freely (the twin builder): secret names, git internals and dependencies are
+ * denied everywhere, and inside a folder Grep works one file at a time. */
+export function checkConfiguredFolderRead(
+  toolName: string,
+  input: Record<string, unknown> | undefined,
+  employeeId: string,
+  cwd: string,
+): ReadScopeDecision {
+  const str = (key: string) => (typeof input?.[key] === "string" ? (input[key] as string) : "");
+  const raw = toolName === "Read" ? str("file_path") : str("path");
+  const extra = toolName === "Glob" ? str("pattern") : toolName === "Grep" ? str("glob") : "";
+  if (hasBlockedFolderSegment(raw) || hasBlockedFolderSegment(extra)) {
+    return { ok: false, reason: `${toolName} cannot access secrets, git internals or dependencies.` };
+  }
+  return configuredFolderDecision(raw, employeeId, cwd, toolName) ?? { ok: true };
+}
+
 export function checkTwinRead(
   toolName: string,
   input: Record<string, unknown> | undefined,

@@ -18,6 +18,7 @@ import {
 import { loadOrgCustomMcpServers } from "@/lib/custom-mcp";
 import { listKnowledgeFiles } from "@/lib/knowledge-files";
 import { listKnowledgeFolders, type KnowledgeFolder } from "@/lib/knowledge-folders";
+import { checkConfiguredFolderRead } from "@/lib/twin-read-scope";
 import { dataDir } from "@/lib/app-home";
 import { classifyTool, isReadOnlyAction } from "@/lib/tool-policy";
 import { filterProfilingContent, type FilterResult } from "@/lib/sensitive-content";
@@ -244,6 +245,11 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
     }
 
     if (toolName === "Read" || toolName === "Glob" || toolName === "Grep") {
+      const scope = checkConfiguredFolderRead(toolName, typedInput, employee.id, employeeDir);
+      if (!scope.ok) {
+        onEvent({ type: "tool_blocked", tool: toolName, reason: scope.reason, ts: ts() });
+        return { behavior: "deny", message: scope.reason };
+      }
       return { behavior: "allow", updatedInput: typedInput };
     }
 
@@ -386,7 +392,8 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
         systemPrompt,
         // Write is deliberately not auto-allowed: allowedTools skip canUseTool,
         // and canUseTool is what limits Write to the 9 profile files.
-        allowedTools: ["Read", "Glob", "Grep", "TodoWrite"],
+        // Read/Glob/Grep go through canUseTool too, for the folder rules.
+        allowedTools: ["TodoWrite"],
         mcpServers,
         // Bumped from 80 → 120: the knowledge-capture prompt requires deeper
         // multi-source cross-referencing (sent emails + Slack + calendar +

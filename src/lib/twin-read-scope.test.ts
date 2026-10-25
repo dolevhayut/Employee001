@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { checkTwinRead, toDataRelative } from "./twin-read-scope";
+import { checkConfiguredFolderRead, checkTwinRead, toDataRelative } from "./twin-read-scope";
 import { addKnowledgeFolder } from "./knowledge-folders";
 
 const ROOT = "/home/u/.employee001/data";
@@ -153,5 +153,14 @@ describe("configured folder scope", () => {
     fs.writeFileSync(path.join(peer, "notes.md"), "private");
     await addKnowledgeFolder(ME, { path: home, label: "Install" });
     expect(checkTwinRead("Read", { file_path: path.join(peer, "notes.md") }, ME, path.join(home, "data")).ok).toBe(false);
+  });
+});
+
+describe("checkConfiguredFolderRead (twin builder)", () => {
+  it("denies secret names anywhere and allows ordinary paths", () => {
+    expect(checkConfiguredFolderRead("Read", { file_path: "/x/project/.env.local" }, ME, "/tmp").ok).toBe(false);
+    expect(checkConfiguredFolderRead("Glob", { path: "/x", pattern: "**/id_rsa" }, ME, "/tmp").ok).toBe(false);
+    expect(checkConfiguredFolderRead("Grep", { path: "/x", glob: "**/.git/**" }, ME, "/tmp").ok).toBe(false);
+    expect(checkConfiguredFolderRead("Read", { file_path: "knowledge/notes.md" }, ME, "/tmp").ok).toBe(true);
   });
 });
