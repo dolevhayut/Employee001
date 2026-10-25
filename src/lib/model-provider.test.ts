@@ -162,4 +162,9 @@ describe("modelErrorMessage", () => {
   it("passes other failures through", () => {
     expect(modelErrorMessage("anthropic_unavailable: Overloaded", {})).toBe("Overloaded");
   });
+
+  it("turns a signed-out Claude Code's /login hint into the sign-in fix", () => {
+    expect(modelErrorMessage("Not logged in · Please run /login", { EMPLOYEE001_MODEL_PROVIDER: "claude-code" }))
+      .toBe("Not logged in. Run `claude` in a terminal and sign in with your Claude account, then try again.");
+  });
 });

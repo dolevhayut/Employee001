@@ -135,9 +135,10 @@ export function modelForProvider(model: string, env: Env = process.env): string 
 /** A failed model run, worded for the person who has to fix it. Auth failures
  *  name the setting to check for the configured provider. */
 export function modelErrorMessage(raw: string, env: Env = process.env): string {
-  // "· Fix external API key" is Claude Code's own CLI hint; the fix below replaces it.
-  const detail = raw.replace(/^anthropic_unavailable:\s*/, "").replace(/\s*·\s*Fix external API key\.?/i, "").trim() || "The model call failed";
-  if (!/invalid api key|authenticat|unauthori[sz]ed|\b401\b|credential/i.test(detail)) return detail;
+  // "· Fix external API key" and "· Please run /login" are Claude Code's own
+  // CLI hints (/login is a command inside its session); the fix below replaces them.
+  const detail = raw.replace(/^anthropic_unavailable:\s*/, "").replace(/\s*·\s*(?:Fix external API key|Please run \/login)\.?/i, "").trim() || "The model call failed";
+  if (!/invalid api key|authenticat|unauthori[sz]ed|\b401\b|credential|not logged in/i.test(detail)) return detail;
   const provider = currentProvider(env);
   const fix = provider === "anthropic"
     ? "Check ANTHROPIC_API_KEY in .env (or run `npx employee001 setup` again), then restart."
