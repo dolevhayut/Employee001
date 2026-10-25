@@ -12,22 +12,41 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.10.0] — 2026-10-25
 
-### Hardened twin sandbox (opt-in)
-- `EMPLOYEE001_SANDBOX=1` wraps every Agent SDK twin process in Anthropic
-  Sandbox Runtime for an OS-level filesystem and network boundary in addition
-  to the existing in-process tool hooks. It fails closed when dependencies are
-  unavailable and reports its off/on/unavailable state in system config.
-- Sandbox execution now uses a fixed argv launcher instead of injecting a twin
-  command into nested shells. Per-run write grants isolate scratch state, with
-  profile writes available only to Twin Builder; sensitive data and Claude Code
-  startup configuration are denied.
+### Run your twins on your Claude subscription, with no API key
+- `npx employee001 setup` now finds Claude Code on your machine. If it's
+  signed in, "Your Claude subscription" is the first choice and needs no API
+  key. Twins then run through your own `claude`, the unmodified CLI you
+  installed and signed in to. Employee001 never sees, passes or stores your
+  Claude token.
+- It covers one person. In this mode Employee001 refuses employee invites and
+  extra accounts, and stops if a second account becomes active. Before you
+  bring in colleagues, switch to an API key or your cloud (Bedrock, Vertex AI,
+  Foundry). Settings shows the Claude Code version, the sign-in and the plan.
+  `doctor` checks them too.
+- Meeting summaries, Ask's combined answer and the other direct-API extras stay
+  off in this mode, as they do on a cloud provider.
+- The org brain builder and the intent planner passed only the Anthropic key
+  to the model process, so on Bedrock, Vertex or a local model they couldn't
+  run. They now go through the configured provider. The memory dreamer handed
+  its model process the whole environment; it now gets only the allowlisted
+  variables, like every other model call.
 
-### The Docker image runs twins again
-- The container image (Fly and other single-tenant deploys) was missing the
-  Agent SDK's native Claude Code binary, so twins couldn't answer there.
-  The SDK picks the binary by a package name computed at run time, and the
-  standalone build doesn't trace it. The image now copies it in. Verified in
-  the container: Claude Code starts and reaches the API.
+### `npx employee001` is the whole install
+- With no command, `npx employee001` now starts the app, running setup first
+  in a folder without `.env`. It used to print help. `npx employee001 help`
+  still lists the commands.
+- The setup wizard asks only what a first answer needs. On a Claude
+  subscription that's the provider and telemetry. It no longer asks for
+  Composio, ElevenLabs or OpenAI keys; add them from Settings when you need
+  them. It no longer asks for a port either: it takes the next free one if
+  3000 is busy. Running setup again keeps the keys it doesn't ask about. It
+  used to blank any of those that weren't in the keychain.
+- Ask and Ask the company now say why a twin couldn't answer: an invalid key,
+  Claude Code signed out, or a demo question with no recording. Before, they
+  showed "didn't find an answer" or "No one on the team had anything on this".
+- On a cloud provider, a local model or a Claude subscription, Ask the company
+  now writes its combined answer through that provider. Before, it pasted the
+  raw notes.
 
 ### Build your own twin, no tools to connect
 - A new **Build my twin** page (`/build-my-twin`, first on the Launchpad) lets
@@ -52,42 +71,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The Launchpad's first three moves are now: your own twin, company knowledge,
   inviting an employee. Budgets stay in the sidebar.
 
-### `npx employee001` is the whole install
-- With no command, `npx employee001` now starts the app, running setup first
-  in a folder without `.env`. It used to print help. `npx employee001 help`
-  still lists the commands.
-- The setup wizard asks only what a first answer needs. On a Claude
-  subscription that's the provider and telemetry. It no longer asks for
-  Composio, ElevenLabs or OpenAI keys; add them from Settings when you need
-  them. It no longer asks for a port either: it takes the next free one if
-  3000 is busy. Running setup again keeps the keys it doesn't ask about. It
-  used to blank any of those that weren't in the keychain.
-- Ask and Ask the company now say why a twin couldn't answer: an invalid key,
-  Claude Code signed out, or a demo question with no recording. Before, they
-  showed "didn't find an answer" or "No one on the team had anything on this".
-- On a cloud provider, a local model or a Claude subscription, Ask the company
-  now writes its combined answer through that provider. Before, it pasted the
-  raw notes.
-
-### Run your twins on your Claude subscription, with no API key
-- `npx employee001 setup` now finds Claude Code on your machine. If it's
-  signed in, "Your Claude subscription" is the first choice and needs no API
-  key. Twins then run through your own `claude`, the unmodified CLI you
-  installed and signed in to. Employee001 never sees, passes or stores your
-  Claude token.
-- It covers one person. In this mode Employee001 refuses employee invites and
-  extra accounts, and stops if a second account becomes active. Before you
-  bring in colleagues, switch to an API key or your cloud (Bedrock, Vertex AI,
-  Foundry). Settings shows the Claude Code version, the sign-in and the plan.
-  `doctor` checks them too.
-- Meeting summaries, Ask's combined answer and the other direct-API extras stay
-  off in this mode, as they do on a cloud provider.
-- The org brain builder and the intent planner passed only the Anthropic key
-  to the model process, so on Bedrock, Vertex or a local model they couldn't
-  run. They now go through the configured provider. The memory dreamer handed
-  its model process the whole environment; it now gets only the allowlisted
-  variables, like every other model call.
-
 ### The demo shows Relay and voice, still with no keys
 - `npx employee001 demo` now has a sixth invented twin, Theo Lindqvist, a
   former Head of Revenue Operations: retired with his own consent, private
@@ -103,6 +86,25 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   so in the demo it says so instead of listening.
 - A retired twin's trace now shows it read its handover notes, and its
   answers cite them as "Handover notes".
+
+### The Docker image runs twins again
+- The container image (Fly and other single-tenant deploys) was missing the
+  Agent SDK's native Claude Code binary, so twins couldn't answer there.
+  The SDK picks the binary by a package name computed at run time, and the
+  standalone build doesn't trace it. The image now copies it in. Verified in
+  the container: Claude Code starts and reaches the API.
+
+### Hardened twin sandbox (opt-in)
+- `EMPLOYEE001_SANDBOX=1` wraps every Agent SDK twin process in Anthropic
+  Sandbox Runtime for an OS-level filesystem and network boundary in addition
+  to the existing in-process tool hooks. It fails closed when dependencies are
+  unavailable and reports its off/on/unavailable state in system config.
+- Sandbox execution now uses a fixed argv launcher instead of injecting a twin
+  command into nested shells. Per-run write grants isolate scratch state, with
+  profile writes available only to Twin Builder; sensitive data and Claude Code
+  startup configuration are denied.
+
+---
 
 ## [0.9.0] — 2026-10-24
 
