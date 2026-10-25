@@ -8,6 +8,7 @@ import { ClaudeAgentSDKProvider } from "@composio/claude-agent-sdk";
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import type { McpSdkServerConfigWithInstance } from "@anthropic-ai/claude-agent-sdk";
 import { dataDir } from "./app-home";
+import { cacheMcpToolAnnotations } from "./tool-policy";
 import { toolkitAllowed } from "./consent-policy";
 import { loadConsentStatus } from "./consent-status";
 import { disableEmailTrigger, ensureEmailTrigger } from "@/lib/email-intake-trigger";
@@ -389,6 +390,13 @@ export async function buildEmployeeMcpServer(
     }
   }
   const tools = merged as ToolList;
+
+  // canUseTool receives only the generated MCP tool name + input. Preserve
+  // safety annotations from Composio's list so policy can consult them later.
+  cacheMcpToolAnnotations("composio", tools as Iterable<{
+    name?: string;
+    annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };
+  }>);
 
   return createSdkMcpServer({
     name: "composio",
