@@ -888,20 +888,20 @@ export default function TasksPage() {
                     display: "flex",
                     alignItems: "center",
                     gap: "var(--sp-10)",
-                    padding: "8px 12px",
-                    background: "color-mix(in oklch, var(--warn) 12%, transparent)",
-                    border: "1px solid var(--warn)",
-                    borderRadius: 8,
+                    padding: "var(--sp-4) 0",
                     fontSize: "var(--fs-sm)",
                     lineHeight: 1.5,
+                    color: "var(--text-muted)",
                   }}
                 >
-                  <Icons.Plug size={14} style={{ color: "var(--warn)", flexShrink: 0 }} />
                   <div>
-                    <span style={{ fontWeight: 600 }}>{t("tasks.noTools")}</span>{" "}
-                    <span className="subtle">
-                      {t("tasks.noToolsDesc", { name: selected?.name.split(" ")[0] ?? "" })}
-                    </span>
+                    No personal tools connected. This twin works from its profile, documents and company tools;{" "}
+                    <Link
+                      href={`/connections/${selectedId}`}
+                      style={{ color: "var(--text)", textDecoration: "underline" }}
+                    >
+                      connect tools for more.
+                    </Link>
                   </div>
                 </div>
               ) : (
