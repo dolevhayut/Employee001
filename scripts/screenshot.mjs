@@ -1,153 +1,61 @@
-// One-off script: capture Employee001 screenshots via Playwright.
-// Run: node scripts/screenshot.mjs
-// Requires: npx playwright install chromium
+// README screenshots: docs/screenshots/{ask,relay,team-meeting,build-my-twin}.png.
+// Captured from the keyless demo (Lumen Labs, invented people), at 1440x900
+// and 2x, dark theme, with the demo banner hidden. No dependencies: headless
+// Chrome over the DevTools protocol with Node's built-in WebSocket.
 //
-// Two output sets:
+//   npx employee001 demo --no-open --port 3141     # or: node bin/cli.mjs demo …
+//   node scripts/screenshot.mjs [http://127.0.0.1:3141]
 //
-//   docs/screenshots/         — the 4 PNGs the public README references.
-//                               Names locked: 01-welcome, 02-employees,
-//                               03-flow, 04-settings.
-//   docs/local/screenshots/   — the expanded gallery for demos and Show HN
-//                               (gitignored, internal). Adds profile,
-//                               marketplace, council, cockpit, routines,
-//                               audit, inbox, and per-twin variants.
+// CHROME_PATH overrides the browser (default: Google Chrome on macOS).
 
-import { chromium } from "playwright";
-import { mkdir } from "fs/promises";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { spawn } from "node:child_process";
+import { writeFileSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const README_OUT = join(HERE, "..", "docs", "screenshots");
-const DEMO_OUT = join(HERE, "..", "docs", "local", "screenshots");
-const BASE = "http://localhost:3001";
+const BASE = (process.argv[2] ?? "http://127.0.0.1:3141").replace(/\/$/, "");
+const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "docs", "screenshots");
+const PORT = 9341;
+const CHROME = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const chrome = spawn(CHROME, [
+  "--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), "e001-shots-"))}`,
+  "--window-size=1440,900", "--hide-scrollbars", "--no-first-run", "--no-default-browser-check", "about:blank",
+], { stdio: "ignore" });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let info;
+for (let i = 0; i < 50 && !info; i++) { try { info = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json(); } catch { await sleep(200); } }
+const page = info.find((t) => t.type === "page");
+const ws = new WebSocket(page.webSocketDebuggerUrl);
+await new Promise((r) => ws.addEventListener("open", r, { once: true }));
+let id = 0; const pending = new Map();
+ws.addEventListener("message", (e) => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } });
+const send = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+const evalJs = async (expr) => (await send("Runtime.evaluate", { expression: `(async () => { ${expr} })()`, awaitPromise: true, returnByValue: true })).result?.result?.value;
 
-// The /flow page ignores ?employee= and picks readyEmployees[0] (sorted by
-// lastActiveAt). To screenshot a specific twin we have to click their chip
-// in the EmployeePickerBar after the page loads. selectTwin() does that
-// — chips render `<first-name>` text, so a text locator is enough.
-function selectTwin(firstName) {
-  return async (page) => {
-    // The picker bar at top has one button per ready twin. Click the one
-    // whose visible label matches the first name.
-    try {
-      await page.getByRole("button", { name: new RegExp(`^${firstName}$`, "i") }).first().click({ timeout: 4000 });
-    } catch {
-      // Fall back to a text selector if accessibility role isn't found.
-      await page.locator(`button:has-text("${firstName}")`).first().click({ timeout: 4000 }).catch(() => {});
-    }
-    // Wait for the chat pane to reload that twin's history.
-    await page.waitForTimeout(1500);
-  };
+await send("Page.enable"); await send("Runtime.enable");
+await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 2, mobile: false });
+await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: "dark" }] });
+
+const HIDE_BANNER = `for (const a of document.querySelectorAll("aside")) if (a.textContent.includes("no AI calls")) a.style.display = "none";`;
+const setInput = (sel, value) => `{ const el = document.querySelector(${JSON.stringify(sel)}); const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, "value").set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event("input", { bubbles: true })); }`;
+
+async function shot(name, path, actions, waitMs) {
+  await send("Page.navigate", { url: BASE + path });
+  await sleep(4000);
+  if (actions) console.log(name, "action:", await evalJs(actions));
+  await sleep(waitMs);
+  await evalJs(HIDE_BANNER + " return 'ok';");
+  await sleep(600);
+  const { result } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+  writeFileSync(join(OUT, `${name}.png`), Buffer.from(result.data, "base64"));
+  console.log("saved", name);
 }
 
-// Pages that ship in the public README — overwrite these on every run.
-const README_PAGES = [
-  { path: "/welcome", file: "01-welcome.png", wait: 4000 },
-  { path: "/employees", file: "02-employees.png", wait: 2500 },
-  { path: "/flow", file: "03-flow.png", wait: 3000, after: selectTwin("Maya") },
-  { path: "/settings", file: "04-settings.png", wait: 2500 },
-];
+const NOTES = "I run Customer Success: renewals, onboarding and the health score. I approve renewal discounts up to 10%; anything above goes to the CEO. A free month only with an annual renewal, never on monthly plans.\n\nThe question I get most: is this account at risk? Under 5 logins in 30 days plus 2 open tickets means red.\n\nHow I write: 'Quick one: Acme wants 15% off. I can do 10. Are you ok with 12 if they sign for two years?'";
+await shot("ask", "/ask?twin=marcus-reed", `const nc=[...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="New conversation"); nc?.click(); await new Promise(r=>setTimeout(r,1500)); const b=[...document.querySelectorAll("button")].find(b=>b.textContent.includes("Is SSO ready")); b?.click(); return (nc?"new+":"")+(b ? "clicked" : "missing");`, 16000);
+await shot("relay", "/ask?twin=theo-lindqvist", `const nc=[...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="New conversation"); nc?.click(); await new Promise(r=>setTimeout(r,1500)); const b=[...document.querySelectorAll("button")].find(b=>b.textContent.includes("Who approves a 20% discount")); b?.click(); return b ? "clicked" : "missing";`, 14000);
+await shot("team-meeting", "/council", `const el=[...document.querySelectorAll("button, div, p")].filter(e=>e.textContent.trim().startsWith("Should Lumen Labs move")).pop(); el?.click(); return el ? "clicked" : "missing";`, 32000);
+await shot("build-my-twin", "/build-my-twin", `${setInput("#self-name", "Maya Ortiz")} ${setInput("#self-role", "Head of Customer Success")} ${setInput("#notes", NOTES)} return "filled";`, 1500);
 
-// Expanded gallery for /docs/local/screenshots/. Each entry can optionally
-// run a Playwright action before the shot (e.g. click a tab).
-const DEMO_PAGES = [
-  { path: "/welcome", file: "01-welcome.png", wait: 4000 },
-  { path: "/launchpad", file: "02-launchpad.png", wait: 2500 },
-  { path: "/employees", file: "03-employees-roster.png", wait: 2500 },
-  { path: "/marketplace", file: "04-marketplace.png", wait: 2500 },
-
-  // Twin chat — one per persona so the README gallery can show variety.
-  { path: "/flow", file: "05-flow-maya.png", wait: 3000, after: selectTwin("Maya") },
-  { path: "/flow", file: "06-flow-daniel.png", wait: 3000, after: selectTwin("Daniel") },
-  { path: "/flow", file: "07-flow-yael.png", wait: 3000, after: selectTwin("Yael") },
-  { path: "/flow", file: "08-flow-tom.png", wait: 3000, after: selectTwin("Tom") },
-
-  // Profile — Overview tab + Files tab (click after load).
-  {
-    path: "/profile?employee=maya-chen",
-    file: "09-profile-overview.png",
-    wait: 3000,
-    after: async (page) => {
-      // Scroll until the Authoritative domains section is in view. The
-      // page uses multiple `.scrollbar` containers, so a targeted
-      // scrollIntoView is more reliable than scrollBy.
-      try {
-        await page.locator("text=Authoritative domains").first().scrollIntoViewIfNeeded({ timeout: 3000 });
-      } catch {
-        // Fallback: scroll all scrollable containers.
-        await page.evaluate(() => {
-          document.querySelectorAll(".scrollbar").forEach((el) => el.scrollBy(0, 900));
-        });
-      }
-      await page.waitForTimeout(800);
-    },
-  },
-  {
-    path: "/profile?employee=maya-chen",
-    file: "10-profile-files.png",
-    wait: 2500,
-    after: async (page) => {
-      // Files tab button — text-based locator.
-      try {
-        await page.getByRole("button", { name: /^Files$/i }).first().click({ timeout: 3000 });
-        await page.waitForTimeout(1500);
-      } catch {
-        // Fallback — locate by text only.
-        try { await page.locator("button:has-text('Files')").first().click({ timeout: 3000 }); } catch {}
-        await page.waitForTimeout(1500);
-      }
-    },
-  },
-
-  // Operational pages.
-  { path: "/cockpit", file: "11-cockpit.png", wait: 2500 },
-  { path: "/routines", file: "12-routines.png", wait: 2500 },
-  { path: "/audit", file: "13-audit.png", wait: 2500 },
-  { path: "/inbox", file: "14-inbox.png", wait: 2500 },
-  { path: "/council", file: "15-council.png", wait: 2500 },
-  { path: "/settings", file: "16-settings.png", wait: 2500 },
-];
-
-async function capture(set, outDir, label) {
-  await mkdir(outDir, { recursive: true });
-  console.log(`\n=== ${label} → ${outDir.replace(process.cwd() + "/", "")}/ ===`);
-
-  const browser = await chromium.launch();
-  const ctx = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    // Force light theme — the brand reads better there for marketing assets.
-    colorScheme: "light",
-    deviceScaleFactor: 2,
-  });
-  const page = await ctx.newPage();
-
-  let okCount = 0;
-  let failCount = 0;
-
-  for (const entry of set) {
-    const { path: urlPath, file, wait, after } = entry;
-    process.stdout.write(`  → ${urlPath.padEnd(46)} `);
-    try {
-      await page.goto(`${BASE}${urlPath}`, {
-        waitUntil: "domcontentloaded",
-        timeout: 15000,
-      });
-      await page.waitForTimeout(wait);
-      if (after) await after(page);
-      await page.screenshot({ path: join(outDir, file), fullPage: false });
-      process.stdout.write(`✓ ${file}\n`);
-      okCount += 1;
-    } catch (err) {
-      process.stdout.write(`✗ ${err.message}\n`);
-      failCount += 1;
-    }
-  }
-
-  await browser.close();
-  console.log(`  ${okCount} ok · ${failCount} failed`);
-}
-
-await capture(README_PAGES, README_OUT, "README screenshots");
-await capture(DEMO_PAGES, DEMO_OUT, "Demo gallery");
-console.log("\nDone.");
+ws.close(); chrome.kill();

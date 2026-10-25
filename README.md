@@ -4,7 +4,7 @@
 
 ### Your real team. Now with AI twins.
 
-**Employee001 builds an AI twin of each employee from their own work: the expertise, decisions and tools they choose to connect.** Ask the twin of the person who knows, ask the whole company for one cited answer, or convene the right twins in a Team Meeting. External actions wait for a person's approval. Open source, self-hosted.
+**Employee001 builds an AI twin of each employee from their own work: what they know, how they decide, and the tools they choose to connect.** Ask the twin of the person who knows, ask the whole company for one cited answer, or convene the right twins in a Team Meeting. External actions wait for a person's approval. Open source, self-hosted.
 
 **Every install is also your organization's own MCP server**, so your team can ask the twins from the agents they already use: Claude Code, Codex, Cursor, Claude Desktop.
 
@@ -21,123 +21,130 @@ Signed in to Claude Code? Your Claude subscription runs the twins, no API key ne
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg?style=flat-square)](https://nodejs.org)
 [![Discussions](https://img.shields.io/github/discussions/dolevhayut/Employee001?style=flat-square)](https://github.com/dolevhayut/Employee001/discussions)
 
-[**Why**](#why-it-exists) · [**What's different**](#what-makes-it-different) · [**How it works**](#how-it-works) · [**Features**](#features-shipped-today) · [**Install**](#installation) · [**MCP for your agents**](#your-twins-inside-every-agent-mcp) · [**Privacy & security**](#privacy-and-security-boundaries) · [**Compare**](#how-it-compares) · [**Roadmap**](#cloud-and-roadmap)
+[**Get started**](#get-started-in-five-minutes) · [**Why**](#why-it-exists) · [**How it works**](#how-it-works) · [**Features**](#features-shipped-today) · [**Install**](#installation) · [**MCP**](#your-twins-inside-every-agent-mcp) · [**Privacy & security**](#privacy-and-security-boundaries) · [**Compare**](#how-it-compares) · [**Roadmap**](#cloud-and-roadmap)
 
 </div>
 
+<p align="center">
+  <img src="docs/screenshots/ask.png" width="900" alt="Ask a twin, with the answer, its sources and its run drawn as a graph" /><br />
+  <sub>Ask a twin. The answer, the sources it used, and its run drawn as a graph.</sub>
+</p>
+
 <table>
   <tr>
-    <td><img src="docs/screenshots/01-welcome.png" alt="Employee001 welcome screen" /></td>
-    <td><img src="docs/screenshots/02-employees.png" alt="Employees roster with each twin's readiness" /></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/03-flow.png" alt="Chatting with one twin, with its run drawn as a workflow" /></td>
-    <td><img src="docs/screenshots/04-settings.png" alt="Settings: model provider, integrations and approvals" /></td>
+    <td width="33%" align="center" valign="top"><img src="docs/screenshots/build-my-twin.png" width="100%" alt="Build my twin: write or be interviewed" /><br /><sub>Build my twin: write or be interviewed</sub></td>
+    <td width="33%" align="center" valign="top"><img src="docs/screenshots/team-meeting.png" width="100%" alt="Team Meeting" /><br /><sub>Team Meeting</sub></td>
+    <td width="33%" align="center" valign="top"><img src="docs/screenshots/relay.png" width="100%" alt="Relay: a former employee's twin" /><br /><sub>Relay: a former employee's twin</sub></td>
   </tr>
 </table>
 
+## Get started in five minutes
+
+1. **Run it.** `npx employee001`. Setup finds your signed-in Claude Code and offers your Claude subscription, with no API key. Otherwise it asks for an Anthropic API key, your cloud provider (Bedrock, Vertex AI, Foundry) or a local model.
+2. **Build your own twin.** Open **Build my twin**, first on the Launchpad. Write about your work or answer a short interview, add documents if you like, and agree. The builder writes the nine profile files while you watch.
+3. **Ask it.** Open **Ask**, pick your twin, and ask it what people usually ask you.
+
+No keys yet? `npx employee001 demo` opens an invented company with six twins and replays recorded answers. [More on the demo](#try-the-demo).
+
 ## Why it exists
 
-In a growing company, the answers live in a few people's heads and in threads scattered across Slack, email, tickets and code. Everyone else waits for those people, cross-team questions wait for a meeting, and context is at risk whenever someone is on leave or changes roles.
+In a growing company, the answers live in a few people's heads and in threads scattered across Slack, email, tickets and code. Everyone else waits for those people. Cross-team questions wait for a meeting. Context is at risk whenever someone is on leave, changes roles or leaves.
 
 Search finds documents. A generic AI agent knows what a "Head of Sales" usually does. Neither knows what *your* colleague decided, why, and who else to pull in. Employee001 is built for that gap.
 
-## What makes it different
-
-**Twins of real, named people, not role templates.** A twin starts from one employee's own work history, from the tools they connect after a consent screen, and is written into nine Markdown files you can read and edit.
-
 | | A generic role agent | An Employee001 twin |
 |---|---|---|
-| Starts from | A job title and a prompt | One named employee's connected work history |
+| Starts from | A job title and a prompt | One named person's own account of their work, their documents and, if they choose, their connected tools |
 | Knows | What the role usually does | What this person worked on, decided and why, who they work with, their boundaries |
 | You can check it | Inside a system prompt | In `EXPERTISE.md`, `DECISIONS.md` and seven more plain files |
 | When it's wrong | Rewrite the prompt | Fix the line; the person is still there to ask |
 
-Twins are **not fine-tuned models** and they don't replace anyone. Each twin is its profile files plus its memory, run on Claude through the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview). (Employee001 also ships generic marketplace agents for roles you don't have a person for.)
+Twins are **not fine-tuned models** and they don't replace anyone. Each twin is its profile files plus its memory, run on Claude through the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview). Employee001 also ships generic marketplace agents for roles you don't have a person for.
 
 ## How it works
 
-**Invite → employee-authorized connection → grounded twin → Ask or Team Meeting → approve actions.**
+A twin can be built two ways. Both end in the same nine Markdown files: `CONTEXT`, `EXPERTISE`, `PROJECTS`, `PEOPLE`, `DECISIONS`, `PREFERENCES`, `TONE`, `BOUNDARIES`, `EMPLOYMENT`.
 
-1. **Invite.** An admin creates a private invite link for a named employee and picks a lookback window of 30 to 360 days.
-2. **The employee connects their work.** They open the link, review a consent screen (required scopes, plus opt-in scopes for acting on their behalf and for transcripts), answer a few role questions, and connect their tools (Slack, Gmail, Linear, GitHub, Calendar, Drive and more) through [Composio](https://composio.dev) OAuth. An admin can also start a connection from `/connections`.
-3. **A grounded twin is written.** A training agent reads that history through a read-only gate (120-turn and $5 budget) and writes nine profile files: `CONTEXT`, `EXPERTISE`, `PROJECTS`, `PEOPLE`, `DECISIONS`, `PREFERENCES`, `TONE`, `BOUNDARIES`, `EMPLOYMENT`.
-4. **Ask, or convene.** Ask one twin. Ask the company and get one answer with every claim cited. Or open a Team Meeting with the twins whose area it is.
-5. **Approve.** When a twin wants to send an email, post in Slack or file a ticket, it stops in the approval queue by default. Every tool call is written to a hash-chained audit log.
+**1. Build my twin (you).** The person running Employee001 briefs their own twin at `/build-my-twin`. Write a few paragraphs about your work (what you own, how you decide, what people ask you, a few messages you wrote), or choose **Interview me** and answer about eight questions, one at a time. Add documents if you like (PDF, Word, Markdown, text, CSV, JSON). The builder writes the profile files from that material and says where it falls short instead of making things up. No invite, no Composio, no OAuth.
+
+**2. Invite a colleague (them).** An admin creates a private invite link and picks a lookback window of 30 to 360 days. The colleague reviews a consent screen, answers a few role questions and connects their own tools (Slack, Gmail, Linear, GitHub, Calendar, Drive and more) through [Composio](https://composio.dev). A builder agent reads that history through a read-only gate (120 turns, $5 budget) and writes their profile files. Invites need an API key or a cloud provider, plus a Composio key; Claude subscription mode is for one person.
+
+**Then, for every twin:**
+- **Ask** one twin, **Ask the company** for one answer with every claim cited, or open a **Team Meeting** with the twins whose area it is.
+- When a twin wants to send an email, post in Slack or file a ticket, it stops in the **approval queue**.
+- Every tool call is written to a **hash-chained audit log**.
 
 ```mermaid
-sequenceDiagram
-    actor Admin
-    participant App as employee001 (your machine)
-    actor Employee
-    participant Composio
-    participant Model as Model provider
+flowchart LR
+    Self["Build my twin<br/>write or be interviewed<br/>+ documents"]
+    Invite["Invite a colleague"]
+    Connect["They consent and<br/>connect their tools"]
+    Builder["Twin builder<br/>read-only"]
+    Files[("9 profile files<br/>plain Markdown")]
+    Ask["Ask a twin<br/>Ask the company"]
+    Meeting["Team Meeting"]
+    Approve["Approval queue"]
+    Audit[("Hash-chained<br/>audit log")]
 
-    Note over Admin,Employee: 1. Invite
-    Admin->>App: create invite (lookback 30–360 days)
-    App-->>Admin: private link
-    Admin->>Employee: sends link
-
-    Note over Employee,Model: 2–3. Connect and build
-    Employee->>App: consent screen, role questions
-    Employee->>Composio: OAuth their own tools
-    App->>Model: training agent (read-only tools, 120 turns)
-    Model->>Composio: read Slack / Gmail / Linear / GitHub history
-    App->>App: write 9 profile files to data/employees/<id>/
-
-    Note over Admin,Model: 4–5. Ask, propose, approve, audit
-    Admin->>App: ask a twin, ask the company, or run a Team Meeting
-    App->>Model: prompt + profile files + org brain + memory
-    Model->>App: proposes a write (send email, file ticket)
-    App-->>Admin: approval queue
-    Admin->>App: Approve
-    App->>Composio: execute
-    App->>App: append to hash-chained audit log
+    Self --> Builder
+    Invite --> Connect --> Builder
+    Builder --> Files
+    Files --> Ask
+    Files --> Meeting
+    Ask -->|send, post, file| Approve
+    Meeting -->|tasks| Approve
+    Approve --> Audit
 ```
 
 ## Features shipped today
 
-Everything below is in the current npm release ([0.9.0](CHANGELOG.md)) unless marked otherwise.
+Everything below is in the current npm release ([0.10.0](CHANGELOG.md)).
+
+**Build twins**
+- **Build my twin** (`/build-my-twin`): brief your own twin by writing or by **Interview me**, with optional documents. No tools to connect.
+- **Invite a colleague**: they consent, connect their own tools, and their twin is built from that history. Connected tools also deepen a self-built twin.
+- **Editable profiles** (`/profile`): a split-pane editor over the nine files, with version history.
+- **Knowledge uploads**: PDF and Word files become Markdown the twin reads on demand.
 
 **Ask and collaborate**
-- **Ask a twin** (`/flow`): talk to one twin, see each source and tool it reaches for, or hand it a task.
-- **Ask the company** (`/ask`): one question goes to the 1–3 twins whose area it is, the Org Brain and org-wide MCP systems, in parallel and read-only. One answer comes back with each claim cited. The combined answer needs direct Anthropic API access; otherwise you see each source's brief.
-- **Team Meeting** (`/council`): selected or @mentioned twins take turns on a question, see the whole thread and can tag a colleague in. **Summarize & decide** turns it into a decision, owned actions and open questions. Export as Markdown.
-- **Org Brain**: keyword search over every twin's profile files plus knowledge nodes an admin curates. Peers can read each other's profile files; each twin's memory stays private to it.
+- **Ask** (`/ask`): talk to one twin, see each source and tool it reaches for, or hand it a task. Your conversations are saved per person; each person sees only their own.
+- **Ask the company** (`/brain`): one question goes to the 1 to 3 twins whose area it is, the Org Brain and org-wide MCP systems, in parallel and read-only. One answer comes back with each claim cited, written through whichever model provider you use.
+- **Team Meeting** (`/council`): selected or @mentioned twins take turns, see the whole thread and can tag a colleague in. **Summarize & decide** gives a decision, owned actions and open questions. Export as Markdown.
+- **Org Brain**: search over every twin's profile files plus knowledge an admin curates. Peers can read each other's profile files; each twin's memory stays private to it.
+- **Voice**: talk to a twin in Ask. Live transcription, the answer spoken sentence by sentence in the twin's voice, and you can talk over it (ElevenLabs; off in EU mode).
 
 **Twins that keep context**
-- **Memory**: per-twin episodic recall and distilled facts, stored locally, with a relevance gate. Semantic recall uses OpenAI embeddings only if you add `OPENAI_API_KEY`.
-- **Knowledge uploads**: PDF and Word files become Markdown the twin reads on demand.
-- **Editable profiles**: a split-pane editor over the nine files in `/profile`, with version history.
-- **Relay** (`/handover`): when someone leaves, a short handover interview asks what their twin's profile is missing. With their consent the twin stays as a read-only former employee's twin that everyone can keep asking, and the CEO can download the notes.
-- **Hebrew**: twins converse, write and remember in Hebrew with right-to-left rendering. UI translation is partial.
+- **Memory**: per-twin episodes and distilled facts, stored locally. Semantic recall uses embeddings only if you add `OPENAI_API_KEY` or `EMBEDDINGS_BASE_URL`.
+- **Relay** (`/handover`): when someone leaves, a short interview asks what their twin's profile is missing. With their consent the twin stays as a read-only "Former <role>" that everyone can keep asking. Admins can download the handover notes.
+- **Hebrew**: twins converse, write and remember in Hebrew with right-to-left rendering. Hebrew UI is in beta.
 
 **Work, with sign-off**
-- **Approvals** for write actions and web fetches, with a sidebar badge and an inbox. Per-employee tool policies can turn a tool off or allow it without asking.
-- **Slack**: a connected twin drafts answers to its @mentions and DMs; replies go through Approvals by default.
-- **Email intake**: a twin drafts replies to incoming mail; sending goes through the approval gate.
-- **Routines and autonomous shifts** (`/routines`, `/cockpit`) with per-run archives and a daily per-twin budget. They only run when Autonomy is switched on (off by default).
-- **Voice**: talk to a twin in Ask: live transcription as you speak, the answer spoken sentence by sentence in the twin's voice, and you can talk over it (ElevenLabs; off in EU mode).
+- **Approvals** for write actions and web fetches, with an inbox and a sidebar badge. Per-employee tool policies can turn a tool off or allow it without asking.
+- **Slack and email**: a connected twin drafts replies; sending goes through Approvals. Everything a twin sends starts with "🤖 AI twin of &lt;name&gt;:".
+- **Routines and autonomous shifts** (`/routines`, `/cockpit`) with per-run archives and a daily per-twin budget. They run only when Autonomy is on (off by default).
 
 **Platform**
-- **Your org's own MCP server**: every install includes one, so anyone on the team can ask the twins from Claude Code, Codex, Cursor and other MCP clients ([below](#your-twins-inside-every-agent-mcp), [docs/mcp.md](./docs/mcp.md)).
-- **Custom MCP servers** with Bearer auth or OAuth, from `/settings`.
-- **Marketplace**: 14 generic role agents (SDR, DevOps, Writer, Analyst, CSM and more) that need no invite.
+- **Model providers**: your Claude subscription through a signed-in Claude Code (one person, no API key), an Anthropic API key, Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible model.
+- **Your org's own MCP server**: anyone on the team can ask the twins from Claude Code, Codex, Cursor and other MCP clients ([below](#your-twins-inside-every-agent-mcp)).
+- **Custom MCP servers** with Bearer auth or OAuth, from Settings.
+- **Accounts and roles**: owner, admin, approver, member, employee. TOTP two-factor and OpenID Connect single sign-on.
+- **Opt-in OS sandbox**: `EMPLOYEE001_SANDBOX=1` wraps each twin process in Anthropic's Sandbox Runtime for an OS-level file and network boundary. It fails closed. Tested on macOS.
+- **Marketplace**: 14 generic role agents (SDR, DevOps, Writer, Analyst, CSM and more) that need no person behind them.
 - **Backup**: `export` / `import` of the whole `data/` folder, optionally encrypted.
 
-### Try the demo first
+### Try the demo
 
 ```bash
 npx employee001 demo
 ```
 
-Opens a made-up company, Lumen Labs, in a temporary folder: six invented twins, one of them a former employee. No API keys and no model calls: everything you see is replayed from recordings, and nothing is written to your current directory.
+Opens a made-up company, Lumen Labs, in a temporary folder: six invented twins, one of them a former employee. No API keys and no model calls. Everything is replayed from recordings, and nothing is written to your current directory.
 
 - **Team Meeting** opens first and replays five twins debating a launch date.
-- **Relay → Former employees** has Theo, a Head of Revenue Operations who has left. His twin stays read-only, answers only from his profile and his approved handover notes, and is labelled "Former Head of Revenue Operations". Download his notes as Markdown or as `rcp.json`.
-- **Ask** suggests recorded questions. Ask Theo who approves a 20% discount now and he answers from his handover notes; ask about this quarter's churn and he says he doesn't know. Turn on **Voice on** to hear each answer in the twin's voice.
+- **Relay → Former employees** has Theo, a Head of Revenue Operations who has left. His twin is read-only and answers only from his profile and his approved handover notes.
+- **Ask** suggests recorded questions. Ask Theo who approves a 20% discount now and he answers from his notes; ask about this quarter's churn and he says he doesn't know. Turn on **Voice on** to hear each answer.
 
-Anything outside the recordings gets a pointer to `--live`, which runs the demo against your own model provider (`ANTHROPIC_API_KEY=… npx employee001 demo --live`). Talking to a twin by microphone needs an ElevenLabs key.
+Any other question gets a pointer to `--live`, which runs the demo on your own model provider. The microphone needs an ElevenLabs key.
 
 ## Installation
 
@@ -145,52 +152,47 @@ Anything outside the recordings gets a pointer to `--live`, which runs the demo 
 npx employee001           # starts the server and opens http://localhost:3000
 ```
 
-With no command it runs `start`, which runs `setup` first if there's no `.env` in the current directory (the wizard writes `.env` and creates `data/`; run `npx employee001 setup` to change it later). `npx employee001 help` lists the commands. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop.
+With no command it runs `start`, which runs `setup` first if there's no `.env` in the current folder. Setup asks only what a first answer needs and takes the next free port if 3000 is busy. Add Composio, ElevenLabs or OpenAI keys later from Settings. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop.
 
 The folder you run `setup` in is your install: it holds `.env` and `data/`. Run `start` from the same folder, or set `EMPLOYEE001_HOME=/path/to/install` to use it from anywhere.
 
 ### First run: if something goes wrong
 
-- **"Port 3000 is already in use".** Another app (often a dev server) has it. Run `npx employee001 start --port 3001`, or change `PORT` in `.env`. The demo moves to the next free port by itself.
-- **A twin answers with "Invalid API key".** Fix `ANTHROPIC_API_KEY` in `.env` (or run `npx employee001 setup` again) and restart. On Bedrock, Vertex AI or Foundry, check that provider's credentials on this machine.
+- **A twin says the key is invalid, or Claude Code is signed out.** Fix the key in `.env`, sign in to Claude Code again, or run `npx employee001 setup`, then restart. On Bedrock, Vertex AI or Foundry, check that provider's credentials on this machine.
 - **"No .env found".** You're in a different folder from the one you set up. `cd` back to it, or set `EMPLOYEE001_HOME`.
-- **The browser didn't open.** Open the URL printed in the terminal (`http://localhost:3000` by default).
-- **Anything else.** `npx employee001 doctor` checks Node, `.env`, keys, port and the build. Employee001 is tested on Node 22 and 24 LTS.
+- **The browser didn't open.** Open the URL printed in the terminal.
+- **Anything else.** `npx employee001 doctor` checks Node, `.env`, keys, Claude Code sign-in, port and the build. Tested on Node 22 and 24 LTS.
 
 > [!NOTE]
-> **Requirements.** Node.js 22+. You need a model provider: your own Claude subscription through a signed-in [Claude Code](https://code.claude.com) on the same machine (no API key, for you alone), an [Anthropic API key](https://console.anthropic.com), or your own Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible endpoint. Inviting employees and building their twins also needs a [Composio API key](https://app.composio.dev); marketplace agents work without it. No keys at all? `npx employee001 demo` replays a meeting, a former employee's twin and spoken answers with six invented twins.
+> **Requirements.** Node.js 22+ and one model provider: your Claude subscription through a signed-in [Claude Code](https://code.claude.com) on the same machine (no API key, for you alone), an [Anthropic API key](https://console.anthropic.com), Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible endpoint. Inviting colleagues also needs a [Composio API key](https://app.composio.dev) and a provider other than the Claude subscription. Building your own twin and the marketplace agents need neither.
 
 ### Commands
 
 | Command | What it does |
 |---|---|
-| `npx employee001 setup` | Interactive first-run wizard. Writes `.env`, creates `data/`. |
+| `npx employee001 setup` | First-run wizard. Writes `.env`, creates `data/`. |
 | `npx employee001 start` | Starts the local server and opens the browser. Flags: `--no-open`, `--port <n>`, `--strict` (no nonessential traffic). |
-| `npx employee001 demo` | Try it with six invented twins (one a former employee) and no keys. Flags: `--live`, `--keep`, `--port <n>`. |
-| `npx employee001 doctor` | Health check: Node version, env, API keys, port, build. |
-| `npx employee001 doctor --egress` | Lists every outside host your current config talks to, and what is sent. |
+| `npx employee001 demo` | Six invented twins (one a former employee), no keys. Flags: `--live`, `--keep`, `--port <n>`. |
+| `npx employee001 doctor` | Health check: Node, env, keys, Claude Code, port, build. `--egress` lists every outside host your config talks to and what is sent. |
 | `npx employee001 secure` | Moves plaintext `.env` secrets into your OS keychain. |
 | `npx employee001 export <path>` | Snapshots `data/` to a tar.gz (excludes secrets). `--encrypt` adds a passphrase. |
 | `npx employee001 import <path>` | Restores `data/` from a tar.gz. `--force` overwrites. |
-| `npx employee001 mcp` | stdio bridge so Claude Code, Cursor and other MCP clients can use the running app. `--url <url>` / `--token <t>` for another endpoint (or `EMPLOYEE001_MCP_URL` / `EMPLOYEE001_MCP_TOKEN`). |
+| `npx employee001 audit verify [file]` | Verifies the audit log's hash chain. |
+| `npx employee001 mcp` | stdio bridge for MCP clients. `--url <url>` / `--token <t>` for another endpoint (or `EMPLOYEE001_MCP_URL` / `EMPLOYEE001_MCP_TOKEN`). |
 | `npx employee001 update` | Checks GitHub releases for a newer version. |
-| `npx employee001 help` | Shows help. |
+| `npx employee001 help` | Lists the commands. |
 
 ### Your twins, inside every agent (MCP)
 
-Every Employee001 install includes an MCP server. It belongs to your organization: it runs inside your installation, answers from your twins and your org brain, and is not published anywhere. Each person on the team connects their own local agent to it, the same way they would connect any MCP tool.
+Every install includes an MCP server. It belongs to your organization: it runs inside your installation, answers from your twins and your org brain, and is not published anywhere. Each person connects their own agent to it, like any MCP tool. So a developer in Claude Code checks what product decided before building, an engineer in Codex asks the sales twin what a customer requires, and a support lead in Claude Desktop asks who owns a migration.
 
-That makes the twins useful beyond the people who open the web app. A developer in Claude Code checks what product decided before building; an engineer in Codex asks the sales twin what a customer actually requires; a support lead in Claude Desktop asks who owns a migration. Each answer comes from the twin of the colleague who knows.
-
-Start Employee001 first (`npx employee001 start`), then connect a client.
-
-**Claude Code plugin** (recommended). Adds `/employee001:ask-company`, `/employee001:ask-twin` and `/employee001:team-meeting`, and lets Claude check what the team decided before it builds:
+Start Employee001 first (`npx employee001 start`), then connect a client. The **Claude Code plugin** is the easiest. It adds `/employee001:ask-company`, `/employee001:ask-twin` and `/employee001:team-meeting`:
 
 ```text
 /plugin install employee001 --marketplace dolevhayut/Employee001
 ```
 
-**Claude Code, MCP tools only** (connects straight to the app over HTTP):
+**Claude Code, MCP tools only:**
 
 ```bash
 claude mcp add --transport http employee001 http://127.0.0.1:3000/api/mcp
@@ -202,49 +204,47 @@ claude mcp add --transport http employee001 http://127.0.0.1:3000/api/mcp
 codex mcp add employee001 --url http://127.0.0.1:3000/api/mcp
 ```
 
-**Cursor**: add this to `.cursor/mcp.json`:
+**Cursor** (`.cursor/mcp.json`):
 
 ```json
 { "mcpServers": { "employee001": { "url": "http://127.0.0.1:3000/api/mcp" } } }
 ```
 
-**Claude Desktop and other clients that only launch a local command** use the stdio bridge:
+**Claude Desktop and other clients that launch a local command** use the stdio bridge:
 
 ```json
 { "mcpServers": { "employee001": { "command": "npx", "args": ["-y", "employee001", "mcp"] } } }
 ```
 
-**Teammates on other machines.** If Employee001 runs on a shared server for the team, each person points their client at its URL and sends the instance's MCP token (`EMPLOYEE001_MCP_TOKEN`, kept in their own environment, never in a committed file):
+**Teammates on other machines.** If Employee001 runs on a shared server, each person points their client at its URL and sends the instance's MCP token (`EMPLOYEE001_MCP_TOKEN`, kept in their own environment, never in a committed file):
 
 ```bash
 claude mcp add --transport http employee001 https://e001.example.com/api/mcp --header "Authorization: Bearer $EMPLOYEE001_MCP_TOKEN"
 codex mcp add employee001 --url https://e001.example.com/api/mcp --bearer-token-env-var EMPLOYEE001_MCP_TOKEN
 ```
 
-With the stdio bridge, set `EMPLOYEE001_MCP_URL` and `EMPLOYEE001_MCP_TOKEN` in the client's `env`, or pass `--url` / `--token`.
-
-**What an agent can do.** Read: `list_twins`, `get_twin_profile`, `search_org_brain`, `list_pending_approvals`, `list_team_meetings`, `get_team_meeting`. Ask: `ask_twin`, answer-only, rate- and cost-limited. Every tool is marked read-only for the client, and results come back as structured data. Agents get member access: no settings, no approvals, no external actions. Plugin guide: [plugins/claude-code](./plugins/claude-code/README.md). Full reference: [docs/mcp.md](./docs/mcp.md).
+**What an agent can do.** Read: `list_twins`, `get_twin_profile`, `search_org_brain`, `list_pending_approvals`, `list_team_meetings`, `get_team_meeting`. Ask: `ask_twin`, answer-only, rate- and cost-limited. Agents get member access: no settings, no approvals, no external actions. Full reference: [docs/mcp.md](./docs/mcp.md). Plugin guide: [plugins/claude-code](./plugins/claude-code/README.md).
 
 ## Privacy and security boundaries
 
-Four different things, stated separately. The full table is in [SECURITY.md](SECURITY.md#what-leaves-your-machine); `npx employee001 doctor --egress` prints the hosts for *your* configuration.
+Four different things, stated separately. The full list of subprocessors is in [SECURITY.md](SECURITY.md#what-leaves-your-machine); `npx employee001 doctor --egress` prints the hosts for *your* configuration.
 
 | Boundary | What | Notes |
 |---|---|---|
-| **Stored on your machine** | Profiles, knowledge files, memory, chat history, meetings, approvals, audit log, settings | Files under `./data/`. No database, no Employee001 account. Protect the folder with filesystem permissions. |
-| **Sent to your model provider** | Prompts and the profile context a twin needs | Anthropic API, your own Claude Code (Claude subscription), or your own Bedrock / Vertex AI / Azure AI Foundry / local endpoint for twin runs and twin building. Meeting summaries, Ask's combined answer, memory rerank and knowledge proposals call the Anthropic API directly (disabled in cloud-provider mode unless `EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1`). The provider's own terms apply. |
-| **Sent to tools you connect** | Tool calls and OAuth | Composio for employee-connected apps, plus any custom MCP server. `WebSearch` queries go out without approval; `WebFetch` waits for it. Optional: OpenAI (memory embeddings), ElevenLabs (text-to-speech, and microphone audio for speech-to-text). |
-| **Telemetry** | Off by default | Opt-in only, anonymous aggregate counts (version, OS, number of twins, meetings, approvals). No endpoint is configured out of the box. |
+| **Stored on your machine** | Profiles, knowledge files, memory, chat history, meetings, approvals, audit log, accounts, settings | Files under `./data/`. No database, no Employee001 account. Protect the folder with filesystem permissions. |
+| **Sent to your model provider** | Prompts and the profile context a twin needs | Your Claude Code (Claude subscription), the Anthropic API, or your own Bedrock / Vertex AI / Foundry / local endpoint. Meeting summaries, memory rerank and knowledge proposals call the Anthropic API directly, and are off on other providers unless `EMPLOYEE001_ALLOW_DIRECT_ANTHROPIC=1`. The provider's own terms apply. |
+| **Sent to tools you connect** | Tool calls and OAuth | Composio for employee-connected apps, plus any custom MCP server. Optional: OpenAI (memory embeddings), ElevenLabs (voice, including microphone audio). |
+| **Telemetry** | Off by default | Opt-in only, anonymous aggregate counts. No endpoint is configured out of the box. |
 
 ### What twins can and can't do
 
-- **Approval gate.** Write actions (send, post, create, update) and every `WebFetch` pause in the approval queue. Read-only calls (list, search, fetch messages, read PRs) run on their own. Deletes and payments are always blocked. Unanswered approvals expire as a deny: 10 minutes in chat, 6 hours for background work.
-- **Admin overrides are explicit.** A per-employee policy can allow a tool without asking, and an admin can opt a twin into direct Slack answers (action requests and external shared channels still need approval). Every such call is still audited.
-- **No shell.** `Bash`, `NotebookEdit`, `EnterWorktree` and `ExitWorktree` are hard-disallowed, enforced both by the SDK's `disallowedTools` and a `PreToolUse` hook.
-- **Scoped reads and writes.** A twin reads its own folder, colleagues' nine profile files, `org-brain/` and `org-skills/`. Other twins' memory and chats, invites, the audit log and settings are blocked. `Write` is sandboxed to `data/scratch/<employee-id>/`.
-- **Audit trail.** Every executed tool call is appended to `data/audit.jsonl` with run id, employee id, tool, input and verdict. Rows are SHA-256 hash-chained and verifiable (`/api/audit/verify`); browse them at `/audit`.
-- **Deletion.** Deleting a twin, or revoking its consent from the profile page, purges its profile, knowledge, memory, chats, runs, routines and pending approvals, and deletes its Composio connections. Audit rows keep time, tool and outcome with the input and name erased.
-- **Web citations.** After `WebSearch` or `WebFetch`, a hook tells the model to cite the URL and fetch date.
+- **Consent first.** A twin whose person hasn't recorded consent can't be trained, gets none of their tools and can't act for them.
+- **Approval gate.** Write actions (send, post, create, update) and every `WebFetch` wait for an approver. Reads that leave the machine ask unless an admin allowlisted the source. Deletes and payments are always blocked. Unanswered approvals expire as a deny: 10 minutes in chat, 6 hours for background work.
+- **No shell.** `Bash`, `NotebookEdit`, `EnterWorktree` and `ExitWorktree` are hard-disallowed, by the SDK's `disallowedTools` and a `PreToolUse` hook.
+- **Scoped reads and writes.** A twin reads its own folder, colleagues' nine profile files, `org-brain/` and `org-skills/`. Other twins' memory and chats, invites, the audit log and settings are blocked. `Write` is limited to `data/scratch/<employee-id>/`.
+- **Optional OS sandbox.** `EMPLOYEE001_SANDBOX=1` adds a second, OS-level boundary around the model process. macOS needs `ripgrep`; Linux also needs bubblewrap and socat. See [SECURITY.md](SECURITY.md).
+- **Audit trail.** Every executed tool call is appended to `data/audit.jsonl` with run id, employee id, tool, input, verdict and who approved. Rows are SHA-256 hash-chained; verify with `npx employee001 audit verify` and browse at `/audit`.
+- **Deletion.** Deleting a twin, or revoking consent, purges its profile, knowledge, memory, chats, runs, routines and pending approvals, and deletes its Composio connections.
 
 <details>
 <summary><b>Permissions per run type</b></summary>
@@ -256,9 +256,9 @@ Four different things, stated separately. The full table is in [SECURITY.md](SEC
 | **Scheduled routines** | `TodoWrite` | Composio³ |
 | **Org-brain summarisation** | none | none |
 
-¹ Sandboxed to `data/scratch/<employee-id>/`; path traversal is rejected.
+¹ Limited to `data/scratch/<employee-id>/`; path traversal is rejected. Only the twin builder writes profile files.
 ² Spawns a restricted sub-agent: a web-researcher (`WebSearch` + `WebFetch`) or a brain-explorer (`Read` + `Glob` + `Grep`), with the same hard-disallow list.
-³ External-effect tools. Every call that changes something hits the approval gate; read-only calls run without prompting.
+³ External-effect tools. Every call that changes something hits the approval gate.
 
 **Models.** `claude-sonnet-5-5` by default, `claude-sonnet-5` as fallback; switch to Opus per message in the chat UI. Source of truth: [`src/lib/sdk-defaults.ts`](src/lib/sdk-defaults.ts).
 
@@ -268,10 +268,10 @@ Four different things, stated separately. The full table is in [SECURITY.md](SEC
 
 ```
 ./
-├── .env                  # your API keys (chmod 600; `secure` moves them to the OS keychain)
+├── .env                  # your keys (chmod 600; `secure` moves them to the OS keychain)
 └── data/
     ├── employees/<id>/   # 9 Markdown profile files + knowledge/ per twin
-    ├── org-brain/        # shared knowledge nodes (Org Brain)
+    ├── org-brain/        # shared knowledge (Org Brain)
     ├── org/              # org settings: skills, Slack triggers, custom MCP servers
     ├── memory/<id>/      # per-twin memory: episodes and distilled facts
     ├── meetings/         # Team Meeting transcripts
@@ -279,9 +279,6 @@ Four different things, stated separately. The full table is in [SECURITY.md](SEC
     ├── routines.json     # scheduled work
     └── shifts/<runId>/   # autonomous-shift archives
 ```
-
-> [!TIP]
-> `npx employee001 export ~/Desktop/e001-backup.tar.gz` snapshots everything except secrets. `npx employee001 import <archive>` restores on a fresh install.
 
 ### Network exposure
 
@@ -291,7 +288,7 @@ The server binds to `127.0.0.1` by default, so only this machine can reach it. T
 EMPLOYEE001_BIND=0.0.0.0 npx employee001 start
 ```
 
-Off loopback, every request must carry the shared-secret token `setup` generates (`EMPLOYEE001_TOKEN`); `start` prints the access URL, and each device gets a 30-day httpOnly cookie. Invite links bypass the gate only for `/join`, `/onboarding` and `/api/invites/<token>`.
+Off loopback, the token `setup` generates (`EMPLOYEE001_TOKEN`) only opens the page that creates the first owner account. After that, everyone signs in with their own account. Invite links reach only `/join`, `/onboarding` and `/api/invites/<token>` without signing in.
 
 > [!WARNING]
 > The app is not hardened for the public internet. Use a firewall or [Tailscale](https://tailscale.com). **Don't put this on a port-forwarded box.**
@@ -305,8 +302,8 @@ Last reviewed **2026-10-21**, from each project's public pages. Both are good op
 | | [Paperclip](https://github.com/paperclipai/paperclip) | [Cabinet](https://github.com/cabinetai/cabinet) | **Employee001** |
 |---|---|---|---|
 | Focus | Managing a company of AI agents: org chart, goals, tickets, budgets, board governance | An AI workspace: git-versioned Markdown knowledge base plus an AI team | Making what your real people know askable |
-| What an agent represents | An AI employee with a title, role, instructions and budget; people can sit in the same org chart | An agent persona from about 20 templates (CEO, CTO, Marketer, SDR...) | **One named employee, built from the work history they connect** |
-| Runtime | Bring your own (Claude Code, Codex, Cursor, Gemini CLI, HTTP/shell...) | Several runtimes (Claude Code, Codex, OpenAI, Gemini, local models...) | Claude via the Claude Agent SDK |
+| What an agent represents | An AI employee with a title, role, instructions and budget; people can sit in the same org chart | An agent persona from about 20 templates (CEO, CTO, Marketer, SDR...) | **One named employee, built from their own account of their work and the tools they connect** |
+| Runtime | Bring your own (Claude Code, Codex, Cursor, Gemini CLI, HTTP/shell...) | Several runtimes (Claude Code, Codex, OpenAI, Gemini, local models...) | Claude via the Claude Agent SDK: your subscription, an API key, Bedrock, Vertex, Foundry or a local model |
 | Several agents at once | Delegation along the org chart, ticket threads | Channels where agents and people chat; @mention an agent | Team Meeting ending in a decision with owners; Ask the company |
 | External actions | Board approvals, per-tool Allowed / Ask first / Off, review stages; v2026.1001.0 notes say execution harnesses default to full auto unless a restrictive mode is set | Dispatched work waits in a human approval queue | Writes and web fetches wait for approval by default; hash-chained audit log |
 | Shared ground | MIT, self-hosted, routines, MCP + Composio, audit trail, cloud waitlist | MIT, local, files on disk, MCP, scheduled jobs, cloud waitlist | MIT, self-hosted, routines, MCP + Composio, cloud waitlist |
@@ -317,11 +314,9 @@ Sources: [paperclipai/paperclip](https://github.com/paperclipai/paperclip), [doc
 
 **Employee001 Cloud is not available.** A managed edition is planned as a separate paid service, not a feature gate on this code; join the waitlist at [employee001.com](https://employee001.com). Everything in this repo stays MIT and self-hostable.
 
-**Your own cloud instance, today.** Deploy a single-tenant instance to an always-on host you control: one org = one container + one persistent volume + its own secrets. The storage model is unchanged (`data/` on a mounted volume), and migration uses the same `export` / `import`. Recommended: [Fly.io](https://fly.io). Not Vercel or other serverless hosts, whose filesystems are ephemeral. Runbook: [docs/DEPLOY-CLOUD.md](./docs/DEPLOY-CLOUD.md). Keep it private (Fly private networking or Tailscale) until the access gate is hardened.
+**Your own cloud instance, today.** Deploy a single-tenant instance to an always-on host you control: one org = one container + one persistent volume + its own secrets. The storage model is unchanged (`data/` on a mounted volume), and migration uses the same `export` / `import`. Recommended: [Fly.io](https://fly.io). Not Vercel or other serverless hosts, whose filesystems are ephemeral. Runbook: [docs/DEPLOY-CLOUD.md](./docs/DEPLOY-CLOUD.md). Keep it private (Fly private networking or Tailscale).
 
-**In progress on `main` (not in a release yet):** consent deny-by-default for twins without a consent record, an AI-disclosure prefix on Slack and email a twin sends, an admin allowlist for Slack auto-replies, and voice input in Ask.
-
-**Planned:** SSO, roles and MFA; full UI internationalization; multi-admin / multi-tenant; a desktop wrapper for non-technical admins.
+**Planned:** SAML single sign-on, full UI translation, multi-tenant, and a desktop wrapper for non-technical admins.
 
 ## Architecture
 
@@ -333,18 +328,23 @@ Sources: [paperclipai/paperclip](https://github.com/paperclipai/paperclip), [doc
 
 ```mermaid
 flowchart LR
-    Admin(["Admin / employees<br/>(browser)"])
+    People(["You and your team<br/>(browser, MCP clients)"])
     subgraph local ["Your machine or server"]
-        Server["employee001<br/>Next.js + Node"]
+        Server["employee001<br/>Next.js + Agent SDK"]
         Data[("data/<br/>profiles · memory · audit")]
         Server <--> Data
     end
-    Model["Model provider<br/>Anthropic · Bedrock · Vertex · Foundry · local"]
-    Composio["Composio MCP<br/>+ custom MCP servers"]
+    subgraph models ["Model provider (pick one)"]
+        CC["Your Claude Code<br/>(subscription)"]
+        API["Anthropic API key"]
+        Cloud["Bedrock · Vertex · Foundry"]
+        Local["Local model"]
+    end
+    Tools["Composio<br/>+ custom MCP servers"]
 
-    Admin --> Server
-    Server -.->|prompts + profile context| Model
-    Server -->|tool calls, after approval for writes| Composio
+    People --> Server
+    Server -.->|prompts + profile context| models
+    Server -->|tool calls, writes after approval| Tools
 ```
 
 ## Open source, paid help
