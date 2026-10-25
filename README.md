@@ -75,24 +75,23 @@ A twin can be built two ways. Both end in the same nine Markdown files: `CONTEXT
 - Every tool call is written to a **hash-chained audit log**.
 
 ```mermaid
-flowchart LR
-    Self["Build my twin<br/>write or be interviewed<br/>+ documents"]
-    Invite["Invite a colleague"]
-    Connect["They consent and<br/>connect their tools"]
-    Builder["Twin builder<br/>read-only"]
-    Files[("9 profile files<br/>plain Markdown")]
-    Ask["Ask a twin<br/>Ask the company"]
+flowchart TB
+    Self["Build my twin<br/>write or be interviewed, + documents"]
+    Invite["Invite a colleague<br/>they consent and connect their tools"]
+    Builder["Twin builder (read-only)"]
+    Files[("9 profile files, plain Markdown")]
+    Ask["Ask a twin · Ask the company"]
     Meeting["Team Meeting"]
-    Approve["Approval queue"]
-    Audit[("Hash-chained<br/>audit log")]
+    Approve["Approval queue<br/>send, post, file"]
+    Audit[("Hash-chained audit log")]
 
     Self --> Builder
-    Invite --> Connect --> Builder
+    Invite --> Builder
     Builder --> Files
     Files --> Ask
     Files --> Meeting
-    Ask -->|send, post, file| Approve
-    Meeting -->|tasks| Approve
+    Ask --> Approve
+    Meeting --> Approve
     Approve --> Audit
 ```
 
@@ -327,20 +326,22 @@ Sources: [paperclipai/paperclip](https://github.com/paperclipai/paperclip), [doc
 - Published to npm as [`employee001`](https://www.npmjs.com/package/employee001); releases carry [build provenance](SECURITY.md#verifying-a-release)
 
 ```mermaid
-flowchart LR
-    People(["You and your team<br/>(browser, MCP clients)"])
+flowchart TB
+    People(["You and your team: browser, MCP clients"])
     subgraph local ["Your machine or server"]
+        direction LR
         Server["employee001<br/>Next.js + Agent SDK"]
         Data[("data/<br/>profiles · memory · audit")]
         Server <--> Data
     end
-    subgraph models ["Model provider (pick one)"]
+    subgraph models ["Model provider, pick one"]
+        direction LR
         CC["Your Claude Code<br/>(subscription)"]
-        API["Anthropic API key"]
-        Cloud["Bedrock · Vertex · Foundry"]
+        API["Anthropic<br/>API key"]
+        Cloud["Bedrock · Vertex<br/>· Foundry"]
         Local["Local model"]
     end
-    Tools["Composio<br/>+ custom MCP servers"]
+    Tools["Composio + custom MCP servers"]
 
     People --> Server
     Server -.->|prompts + profile context| models
