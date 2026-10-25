@@ -17,6 +17,7 @@ import {
   EMPLOYEES_WITH_TWIN,
   CLAUDE_MODELS,
   ELEVENLABS_VOICE_STORAGE_KEY,
+  displayRole,
   type EmployeeWithTwin,
   type ClaudeModel,
 } from "@/lib/employees";
@@ -140,6 +141,11 @@ function formatSnapshotSize(bytes: number): string {
 type EmployeeSkillsPayload = {
   skills: OrgSkillPlaybook[];
   assignedSkillIds: string[];
+};
+
+type RelayProfileState = {
+  lifecycle: "active" | "handover" | "retired";
+  package: unknown | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -501,6 +507,38 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function HandoverProfileCard({ employee, open }: { employee: EmployeeWithTwin; open: boolean }) {
+  const href = open
+    ? `/handover/interview?employee=${encodeURIComponent(employee.id)}`
+    : "/handover";
+
+  return (
+    <div
+      className="card"
+      style={{
+        maxWidth: 880,
+        marginTop: "var(--sp-12)",
+        padding: "var(--sp-12) var(--sp-16)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "var(--sp-12)",
+        flexWrap: "wrap",
+      }}
+    >
+      <div>
+        <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>Handover</div>
+        <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)", marginTop: "var(--sp-2)" }}>
+          {open ? "This handover is in progress." : "This handover is complete."}
+        </div>
+      </div>
+      <Link href={href} className="btn sm" style={{ textDecoration: "none" }}>
+        {open ? "Open interview" : "View handover"}
+      </Link>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function ProfilePageContent() {
@@ -529,6 +567,8 @@ function ProfilePageContent() {
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [activeToolkits, setActiveToolkits] = useState<string[]>([]);
+  const [relayState, setRelayState] = useState<{ employeeId: string; state: RelayProfileState | null } | null>(null);
+  const currentRelayState = relayState?.employeeId === employeeId ? relayState.state : null;
 
   // Reset to overview when switching employee. Done during render (the React
   // "storing information from previous renders" pattern) rather than in an
@@ -556,6 +596,24 @@ function ProfilePageContent() {
         setActiveToolkits(active);
       })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId]);
+
+  // A profile is often where a manager notices a twin's handover status, so
+  // read the canonical Relay state rather than inferring it from the roster.
+  useEffect(() => {
+    if (!employeeId) return;
+    let cancelled = false;
+    fetch(`/api/relay/${encodeURIComponent(employeeId)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((state: RelayProfileState | null) => {
+        if (!cancelled) setRelayState({ employeeId, state });
+      })
+      .catch(() => {
+        if (!cancelled) setRelayState({ employeeId, state: null });
+      });
     return () => {
       cancelled = true;
     };
@@ -639,6 +697,9 @@ function ProfilePageContent() {
         />
         {/* Hero (always shown) */}
         <Hero employee={employee} />
+        {currentRelayState && (currentRelayState.lifecycle === "handover" || Boolean(currentRelayState.package)) && (
+          <HandoverProfileCard employee={employee} open={currentRelayState.lifecycle === "handover"} />
+        )}
 
         {/* Tab bar */}
         <div
@@ -650,7 +711,7 @@ function ProfilePageContent() {
             borderBottom: "1px solid var(--hairline)",
           }}
         >
-          {(["overview", "files", "versions", "danger"] as const).map((tabName) => (
+          {(employee.lifecycle === "retired" ? (["overview"] as const) : (["overview", "files", "versions", "danger"] as const)).map((tabName) => (
             <button
               key={tabName}
               onClick={() => setTab(tabName)}
@@ -944,6 +1005,7 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const retired = employee.lifecycle === "retired";
 
   if (boundId !== employee.id) {
     setBoundId(employee.id);
@@ -1063,10 +1125,10 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
             ) : null}
           </h1>
           <div className="muted" style={{ fontSize: "var(--fs-ui)" }}>
-            {employee.role}
+            {displayRole(employee)}
             {orgName ? ` · ${orgName}` : ""}
           </div>
-          <div style={{ marginTop: "var(--sp-6)" }}>
+          {!retired && <div style={{ marginTop: "var(--sp-6)" }}>
             {editing ? (
               <div
                 style={{
@@ -1150,7 +1212,7 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
                 {error}
               </div>
             ) : null}
-          </div>
+          </div>}
         </div>
         <div
           className="row"
@@ -1160,25 +1222,27 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
             marginInlineStart: "auto",
           }}
         >
+          {!retired && (
+            <Link
+              href={`/twin-build?employee=${employee.id}`}
+              className="btn"
+              style={{ textDecoration: "none" }}
+              title={
+                employee.profileFilesComplete >= 9
+                  ? t("profile.hero.rebuildTitle")
+                  : t("profile.hero.buildTitle")
+              }
+            >
+              <Icons.Spark size={12} />{" "}
+              {employee.profileFilesComplete >= 9 ? t("profile.hero.rebuild") : t("profile.hero.build")}
+            </Link>
+          )}
           <Link
-            href={`/twin-build?employee=${employee.id}`}
-            className="btn"
-            style={{ textDecoration: "none" }}
-            title={
-              employee.profileFilesComplete >= 9
-                ? t("profile.hero.rebuildTitle")
-                : t("profile.hero.buildTitle")
-            }
-          >
-            <Icons.Spark size={12} />{" "}
-            {employee.profileFilesComplete >= 9 ? t("profile.hero.rebuild") : t("profile.hero.build")}
-          </Link>
-          <Link
-            href={`/flow?employee=${employee.id}`}
+            href={retired ? `/ask?twin=${encodeURIComponent(employee.id)}` : `/flow?employee=${employee.id}`}
             className="btn primary"
             style={{ textDecoration: "none" }}
           >
-            <Icons.Bot size={12} /> {t("profile.hero.chat")}
+            <Icons.Bot size={12} /> {retired ? "Ask" : t("profile.hero.chat")}
           </Link>
         </div>
       </div>
@@ -1772,6 +1836,7 @@ function OverviewTab({
   const { t } = useT();
   const [domains, setDomains] = useState<string[]>([]);
   const [boundaries, setBoundaries] = useState<string[]>([]);
+  const retired = employee.lifecycle === "retired";
 
   useEffect(() => {
     let cancelled = false;
@@ -1796,6 +1861,17 @@ function OverviewTab({
       cancelled = true;
     };
   }, [employee.id]);
+
+  if (retired) {
+    return (
+      <div className="card" style={{ padding: "var(--sp-20)", maxWidth: 880 }}>
+        <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600 }}>Read-only profile</div>
+        <p className="muted" style={{ fontSize: "var(--fs-sm)", lineHeight: 1.5, margin: "var(--sp-6) 0 0" }}>
+          This former employee&apos;s twin is available for questions, but its profile and settings can no longer be changed.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-56)" }}>

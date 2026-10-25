@@ -189,7 +189,7 @@ function ParticipantsBar({
 }) {
   const { t } = useT();
   const readyEmployees = useRoster().filter(
-    (e) => e.twinStatus === "ready"
+    (e) => e.twinStatus === "ready" && e.lifecycle !== "retired"
   );
 
   return (
@@ -1871,7 +1871,7 @@ function CouncilPageInner() {
     () =>
       activeIdsOverride ??
       new Set(
-        roster.filter((e) => e.twinStatus === "ready").map((e) => e.id)
+        roster.filter((e) => e.twinStatus === "ready" && e.lifecycle !== "retired").map((e) => e.id)
       ),
     [activeIdsOverride, roster]
   );
@@ -1907,7 +1907,7 @@ function CouncilPageInner() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const readyEmployees = useMemo(
-    () => roster.filter((e) => e.twinStatus === "ready"),
+    () => roster.filter((e) => e.twinStatus === "ready" && e.lifecycle !== "retired"),
     [roster]
   );
 
@@ -1971,7 +1971,7 @@ function CouncilPageInner() {
       : quoting
         ? [quoting.employeeId]
         : roster.filter(
-          (e) => activeIds.has(e.id) && e.twinStatus === "ready"
+          (e) => activeIds.has(e.id) && e.twinStatus === "ready" && e.lifecycle !== "retired"
         ).map((e) => e.id);
 
     if (respondingIds.length === 0) return;
@@ -2696,7 +2696,7 @@ function CouncilPageInner() {
   const empById = Object.fromEntries(
     roster.map((e) => [e.id, e])
   );
-  const readyCount = roster.filter((e) => e.twinStatus === "ready").length;
+  const readyCount = roster.filter((e) => e.twinStatus === "ready" && e.lifecycle !== "retired").length;
 
   return (
     <div

@@ -1600,7 +1600,12 @@ export type RunCouncilArgs = {
 };
 
 export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: string }> {
-  const { responders, question, allParticipants, onEvent } = args;
+  // Retired twins are available for a one-to-one Ask only. Keep this guard at
+  // the runner boundary too: callers can otherwise pass an old roster entry
+  // directly, bypassing the meeting picker.
+  const responders = args.responders.filter((employee) => !isRetired(employee));
+  const allParticipants = args.allParticipants.filter((employee) => !isRetired(employee));
+  const { question, onEvent } = args;
 
   const modelRun = canRunModel();
   if (!modelRun.ok) {
