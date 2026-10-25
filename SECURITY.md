@@ -87,16 +87,25 @@ runtime or an operating-system dependency is unavailable. macOS needs a real
 `rg`/ripgrep binary on `PATH`. Linux additionally needs bubblewrap and socat.
 Windows is refused while upstream support remains alpha. Public web research is
 still permitted through the sandbox's approval callback and every such host is
-written to the audit log as `sandboxNetwork`; loopback, link-local, cloud
-metadata and private-network targets remain blocked by resolved-address checks,
-except the explicit port-qualified loopback literal required for a configured
-local model or enabled local MCP server. Claude Code session state remains
+written to the audit log as `sandboxNetwork`. Loopback, link-local, cloud
+metadata and private-network targets are refused, both as hostnames (by
+resolved address) and as IP literals or `localhost`, except the explicit
+port-qualified loopback literal required for a configured local model or
+enabled local MCP server. The sandboxed child gets only the scrubbed twin
+environment plus the sandbox's proxy variables, never the server's own
+environment.
+
+On Linux, bubblewrap needs unprivileged user namespaces (Ubuntu 24.04 may also
+need `kernel.apparmor_restrict_unprivileged_userns=0`). A default Docker
+container can't provide them, so hardened mode refuses to start there with a
+clear reason. Running the container with `--privileged` works but gives up the
+container's own isolation; this is not tested on Fly yet. Claude Code session state remains
 writable for subscription sign-in, but sandboxed twins cannot modify Claude
 Code settings, plugins, hooks, skills, agents, commands, output styles, or
 `~/.claude.json`.
 
 - **Consent first**: a twin whose employee hasn't recorded consent can't be trained, gets none of the employee's tools or meeting transcripts, and can't act through their accounts. The synthetic demo twins are exempt. Consent is recorded with evidence (who, when, which consent text by SHA-256, scopes, IP, user agent) in the audit chain.
-- **Reads**: a twin's `Read`, `Glob` and `Grep` are limited to its own folder, colleagues' nine profile files, `org-brain/` and `org-skills/`, in every run type (chat, meeting, routines, work items, shifts, training). Other twins' memory and chat history, invites, the audit log and settings are blocked.
+- **Reads**: a twin's `Read`, `Glob` and `Grep` are limited to its own folder, colleagues' nine profile files, `org-brain/` and `org-skills/`, in every run type (chat, meeting, routines, work items, shifts, training). A local folder an admin adds as a twin's knowledge source is readable by that twin only, never `.env*`, key files, `.git` or `node_modules`, and `Grep` there works one file at a time. Other twins' memory and chat history, invites, the audit log and settings are blocked.
 - **External reads**: a read through a connected tool or MCP server sends query content out, so it runs on its own only when an admin listed that source in the read allowlist (seeded with what was already connected); otherwise it asks. `WebSearch` asks unless the admin turns it on. A per-employee "allow" can't open `WebFetch` or `WebSearch` without the admin's switch.
 - **Approvals**: write actions (send, post, create, update) and every `WebFetch` wait for an approver. The audit row records who approved, where (UI, Telegram, Slack), who asked, and the organization.
 - **AI disclosure**: every Slack message and email a twin sends starts with "🤖 AI twin of &lt;name&gt;:" (EU AI Act Art. 50). It is added at the last step, after any human edit, so it can't be dropped.

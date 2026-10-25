@@ -2,7 +2,7 @@ import "server-only";
 import os from "os";
 import path from "path";
 import { mkdtemp, writeFile } from "fs/promises";
-import { spawn, type ChildProcess } from "child_process";
+import { spawn, spawnSync, type ChildProcess } from "child_process";
 import { isIP } from "net";
 import type { SandboxRuntimeConfig } from "@anthropic-ai/sandbox-runtime";
 import type { SpawnOptions, SpawnedProcess } from "@anthropic-ai/claude-agent-sdk";
@@ -13,7 +13,7 @@ const PRIVATE_NETWORKS = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.
 const SYSTEM_SCOPE = "system";
 type Env = Record<string, string | undefined>;
 type SandboxManager = typeof import("@anthropic-ai/sandbox-runtime").SandboxManager;
-type WrappedSandbox = { argv: string[]; env: NodeJS.ProcessEnv };
+type WrappedSandbox = { argv: string[]; env: Env };
 let launcherPath: string | undefined;
 let unavailableReason: string | undefined;
 let initializing: Promise<void> | undefined;
@@ -96,10 +96,43 @@ child.on("close", (code, signal) => { if (signal) process.kill(process.pid, sign
 `, { mode: 0o600 });
   return launcherPath = file;
 }
+/** Loopback, private, link-local and unspecified addresses, by literal.
+ * srt checks resolved addresses only for hostnames, so a direct IP literal
+ * (or localhost) that reached this callback would otherwise pass. */
+export function isNonPublicHost(rawHost: string): boolean {
+  const host = rawHost.trim().toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  const kind = isIP(host);
+  if (kind === 4) {
+    const [a, b] = host.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+  }
+  if (kind === 6) {
+    const mapped = host.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) return isNonPublicHost(mapped[1]);
+    return host === "::" || host === "::1" || /^f[cd]/.test(host) || /^fe[89ab]/.test(host) || /^ff/.test(host);
+  }
+  return false;
+}
 async function allowPublicNetworkHost({ host, port }: { host: string; port?: number }): Promise<boolean> {
+  if (isNonPublicHost(host)) return false;
   const { appendAuditEntry } = await import("@/lib/audit-log");
   appendAuditEntry({ runId: `sandbox_network_${Date.now()}`, employeeId: "sandbox", employeeName: "Sandbox runtime", toolName: "sandboxNetwork", bareName: "sandboxNetwork", input: { host, port }, verdict: "executed" });
   return true;
+}
+let probed = false;
+/** On Linux the runtime initializes even when bubblewrap can't create a
+ * namespace (an unprivileged Docker container), and every twin run would
+ * then die with a raw bwrap error. Run one no-op child up front instead. */
+function probeLinuxSandbox(wrapped: WrappedSandbox): void {
+  const result = spawnSync(wrapped.argv[0], wrapped.argv.slice(1), {
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, ...wrapped.env, E001_TWIN_ARGV: JSON.stringify([process.execPath, "-e", ""]) } as unknown as NodeJS.ProcessEnv,
+    timeout: 20_000, encoding: "utf8",
+  });
+  if (result.status === 0) return;
+  const detail = (result.stderr || result.error?.message || `exit ${result.status}`).trim().split("\n").slice(-2).join(" ");
+  throw new Error(`the Linux sandbox could not start a process (${detail}). It needs unprivileged user namespaces; in Docker run with --security-opt seccomp=unconfined, see SECURITY.md.`);
 }
 export async function ensureTwinSandbox(scope = SYSTEM_SCOPE): Promise<void> {
   if (!twinSandboxEnabled()) return;
@@ -118,8 +151,15 @@ export async function ensureTwinSandbox(scope = SYSTEM_SCOPE): Promise<void> {
       const mcp = await listCustomMcp();
       await SandboxManager.initialize(buildTwinSandboxPolicy(process.env, mcp), allowPublicNetworkHost);
       const policy = buildTwinSandboxPolicy(process.env, mcp, scope);
-      const wrapped = await SandboxManager.wrapWithSandboxArgv(`${JSON.stringify(process.execPath)} ${JSON.stringify(await writeLauncher())}`, undefined, policy);
-      if (!wrapped.argv.length) throw new Error("Sandbox runtime returned no argv.");
+      const raw = await SandboxManager.wrapWithSandboxArgv(`${JSON.stringify(process.execPath)} ${JSON.stringify(await writeLauncher())}`, undefined, policy);
+      if (!raw.argv.length) throw new Error("Sandbox runtime returned no argv.");
+      // srt returns the whole server env plus its proxy variables. Keep only
+      // what it added or changed: the twin's own env is the scrubbed one the
+      // SDK passes, and the server's secrets must not ride along.
+      const env: Env = {};
+      for (const [key, value] of Object.entries(raw.env ?? {})) if (process.env[key] !== value) env[key] = value;
+      const wrapped = { argv: raw.argv, env };
+      if (process.platform === "linux" && !probed) { probeLinuxSandbox(wrapped); probed = true; }
       wrappedByScope.set(scope, wrapped);
       while (wrappedByScope.size > 64) wrappedByScope.delete(wrappedByScope.keys().next().value as string);
     } catch (error) {
@@ -137,7 +177,7 @@ export function spawnClaudeCodeProcess(options: SpawnOptions): SpawnedProcess {
   const childEnv = { ...options.env };
   delete childEnv.E001_SANDBOX_SCOPE;
   const wrapped = wrappedByScope.get(scope)!;
-  return spawn(wrapped.argv[0], wrapped.argv.slice(1), { cwd: options.cwd, env: { ...wrapped.env, ...childEnv, E001_TWIN_ARGV: JSON.stringify([options.command, ...options.args]) }, signal: options.signal, stdio: ["pipe", "pipe", "pipe"] }) as unknown as ChildProcess as SpawnedProcess;
+  return spawn(wrapped.argv[0], wrapped.argv.slice(1), { cwd: options.cwd, env: { ...wrapped.env, ...childEnv, E001_TWIN_ARGV: JSON.stringify([options.command, ...options.args]) } as unknown as NodeJS.ProcessEnv, signal: options.signal, stdio: ["pipe", "pipe", "pipe"] }) as unknown as ChildProcess as SpawnedProcess;
 }
 export function twinSandboxStatus(): { status: "off" | "on" | "unavailable"; reason?: string } {
   if (!twinSandboxEnabled()) return { status: "off" };
