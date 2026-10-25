@@ -213,6 +213,14 @@ function appendJsonl(filePath: string, value: unknown): void {
   fs.appendFileSync(filePath, `${JSON.stringify(value)}\n`, "utf8");
 }
 
+function writeJsonl(filePath: string, values: unknown[]): void {
+  fs.writeFileSync(
+    filePath,
+    values.length === 0 ? "" : `${values.map((value) => JSON.stringify(value)).join("\n")}\n`,
+    "utf8"
+  );
+}
+
 function truncate(text: string, max: number): string {
   const compact = text.replace(/\s+/g, " ").trim();
   if (compact.length <= max) return compact;
@@ -881,6 +889,11 @@ export type TwinStructuredFact = {
   value: string;
   confidence: number;
   source: "user" | "agent";
+  /** Short source quote when the extractor can provide one. */
+  evidence?: string;
+  /** Set on historical facts after a newer fact replaces their current value. */
+  supersededBy?: string;
+  supersededAt?: string;
   createdAt: string;
 };
 
@@ -978,9 +991,9 @@ function slugFromValue(value: string): string {
 function extractFactsFrom(
   text: string,
   source: TwinStructuredFact["source"]
-): Array<Pick<TwinStructuredFact, "type" | "key" | "value" | "confidence" | "source">> {
+): Array<Pick<TwinStructuredFact, "type" | "key" | "value" | "confidence" | "source" | "evidence">> {
   const out: Array<
-    Pick<TwinStructuredFact, "type" | "key" | "value" | "confidence" | "source">
+    Pick<TwinStructuredFact, "type" | "key" | "value" | "confidence" | "source" | "evidence">
   > = [];
   const seen = new Set<string>();
   // Split on sentence + clause boundaries (incl. ? and ! so interrogative and
@@ -999,7 +1012,14 @@ function extractFactsFrom(
       const dedupKey = `${type}::${key}`;
       if (!key || seen.has(dedupKey)) continue;
       seen.add(dedupKey);
-      out.push({ type, key, value, confidence: STRUCTURED_CONFIDENCE[source], source });
+      out.push({
+        type,
+        key,
+        value,
+        confidence: STRUCTURED_CONFIDENCE[source],
+        source,
+        evidence: truncate(line, STRUCTURED_VALUE_MAX),
+      });
       break; // one fact per line — first matching category wins
     }
   }
@@ -1016,7 +1036,7 @@ function extractFactsFrom(
 // query() + json_schema pattern in employee-intent-planner.ts.
 type RawFact = Pick<
   TwinStructuredFact,
-  "type" | "key" | "value" | "confidence" | "source"
+  "type" | "key" | "value" | "confidence" | "source" | "evidence"
 >;
 
 const DREAMER_MODEL_DEFAULT = TWIN_MODEL_HAIKU; // cheap/fast; runs per turn
@@ -1048,6 +1068,10 @@ const DREAMER_SCHEMA = {
             description: "the fact in its ORIGINAL language, ≤ 200 chars",
           },
           source: { type: "string", enum: ["user", "agent"] },
+          evidence: {
+            type: "string",
+            description: "optional short source quote supporting the fact, ≤ 200 chars",
+          },
         },
         required: ["type", "value", "source"],
         additionalProperties: false,
@@ -1062,7 +1086,7 @@ const DREAMER_SYSTEM = [
   "You distill durable, long-lived facts from a single conversation turn between a CEO (user) and their digital twin (agent), for Employee001's structured memory.",
   "Work in ANY language — Hebrew and English are both first-class. Keep each fact's value in its ORIGINAL language, ≤ 200 chars.",
   "Extract ONLY durable knowledge worth remembering long-term, each classified as exactly one of: decision, preference, fact, contact, todo, milestone, problem, emotional.",
-  "Set source to 'user' for things the CEO stated and 'agent' for things the twin asserted.",
+  "Set source to 'user' for things the CEO stated and 'agent' for things the twin asserted. When practical, include a short supporting evidence quote.",
   "Do NOT extract from questions, hypotheticals (if/suppose/maybe), negations (\"we did NOT decide\"), or narration about third parties. When unsure, omit it — false positives are worse than misses.",
   'Return {"facts": []} when the turn has no durable facts (small talk, acknowledgements, pure Q&A).',
 ].join(" ");
@@ -1097,7 +1121,18 @@ function sanitizeLlmFacts(value: unknown): RawFact[] {
     const dedupKey = `${type}::${key}`;
     if (!key || seen.has(dedupKey)) continue;
     seen.add(dedupKey);
-    out.push({ type, key, value: val, confidence: STRUCTURED_CONFIDENCE[source], source });
+    const evidence = truncate(
+      typeof o.evidence === "string" ? o.evidence.trim() : "",
+      STRUCTURED_VALUE_MAX
+    );
+    out.push({
+      type,
+      key,
+      value: val,
+      confidence: STRUCTURED_CONFIDENCE[source],
+      source,
+      ...(evidence ? { evidence } : {}),
+    });
   }
   return out;
 }
@@ -1188,13 +1223,18 @@ async function promoteStructuredMemory(input: {
           ];
     if (candidates.length === 0) return;
 
-    const existing = readJsonl<TwinStructuredFact>(structuredPath(input.employeeId));
-    const known = new Set(existing.map((fact) => `${fact.type}::${fact.key}`));
+    const facts = readJsonl<TwinStructuredFact>(structuredPath(input.employeeId));
+    const currentByKey = new Map<string, TwinStructuredFact>();
+    for (const fact of facts) {
+      // Older files have no supersession fields, so they remain current.
+      if (!fact.supersededBy) currentByKey.set(`${fact.type}::${fact.key}`, fact);
+    }
+    let changed = false;
 
     for (const cand of candidates) {
       const dedupKey = `${cand.type}::${cand.key}`;
-      if (known.has(dedupKey)) continue;
-      known.add(dedupKey);
+      const current = currentByKey.get(dedupKey);
+      if (current?.value === cand.value) continue;
       const fact: TwinStructuredFact = {
         id: randomUUID(),
         employeeId: input.employeeId,
@@ -1202,8 +1242,22 @@ async function promoteStructuredMemory(input: {
         createdAt: input.createdAt,
         ...cand,
       };
-      appendJsonl(structuredPath(input.employeeId), fact);
+      if (current) {
+        // A twin assertion must not overwrite a person's own statement: it is
+        // retained as historical context, while the user-sourced fact stays current.
+        if (current.source === "user" && cand.source === "agent") {
+          facts.push({ ...fact, supersededBy: current.id, supersededAt: input.createdAt });
+          changed = true;
+          continue;
+        }
+        current.supersededBy = fact.id;
+        current.supersededAt = input.createdAt;
+      }
+      facts.push(fact);
+      currentByKey.set(dedupKey, fact);
+      changed = true;
     }
+    if (changed) writeJsonl(structuredPath(input.employeeId), facts);
   } catch {
     /* consolidation is advisory; never break the run */
   }
@@ -1217,7 +1271,9 @@ export function searchStructuredMemory(
   limit = 6
 ): TwinStructuredFact[] {
   if (!isEnabled() || !structuredEnabled()) return [];
-  const facts = readJsonl<TwinStructuredFact>(structuredPath(employeeId));
+  const facts = readJsonl<TwinStructuredFact>(structuredPath(employeeId)).filter(
+    (fact) => !fact.supersededBy
+  );
   if (facts.length === 0) return [];
 
   const factCorpus = facts.map((fact) => `${fact.key} ${fact.value}`);
