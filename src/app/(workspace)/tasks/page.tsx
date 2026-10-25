@@ -20,6 +20,7 @@ import {
   type TaskTemplate,
 } from "@/lib/task-templates";
 import { humanizeToolAction } from "@/lib/tool-humanize";
+import { TaskBoard } from "@/components/tasks/task-board";
 
 // ─── SSE event types ─────────────────────────────────────────────────────────
 
@@ -288,10 +289,29 @@ function eventsToLog(events: PersistedEvent[]): TaskLogEntry[] {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const roster = useRoster();
   const readyEmployees = roster.filter((e) => e.twinStatus === "ready");
   const [selectedId, setSelectedId] = useState<string>("");
+  const [historyView, setHistoryView] = useState<"list" | "board">("list");
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("employee001:tasks-view");
+      if (saved === "list" || saved === "board") setHistoryView(saved);
+    } catch {
+      // View preferences are optional; private browsing can reject storage access.
+    }
+  }, []);
+
+  const changeHistoryView = useCallback((view: "list" | "board") => {
+    setHistoryView(view);
+    try {
+      window.localStorage.setItem("employee001:tasks-view", view);
+    } catch {
+      // Keep the in-memory preference when storage is unavailable.
+    }
+  }, []);
 
   // Default to the first ready twin once the roster hydrates.
   useEffect(() => {
@@ -732,12 +752,57 @@ export default function TasksPage() {
         style={{ overflow: "auto", padding: "32px 40px 60px" }}
       >
         <div style={{ maxWidth: 880 }}>
-          <PageHead
-            icon="Arrow"
-            title={t("tasks.title")}
-            subtitle={t("tasks.subtitle")}
-            style={{ marginBottom: "var(--sp-20)" }}
-          />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--sp-12)",
+              marginBottom: "var(--sp-20)",
+            }}
+          >
+            <PageHead
+              icon="Arrow"
+              title={t("tasks.title")}
+              subtitle={t("tasks.subtitle")}
+              style={{ flex: 1, marginBottom: 0 }}
+            />
+            <div
+              aria-label="Task history view"
+              role="group"
+              style={{
+                display: "flex",
+                padding: 3,
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--hairline)",
+                borderRadius: 8,
+                flexShrink: 0,
+              }}
+            >
+              {(["list", "board"] as const).map((view) => {
+                const active = historyView === view;
+                return (
+                  <button
+                    key={view}
+                    onClick={() => changeHistoryView(view)}
+                    aria-pressed={active}
+                    style={{
+                      border: "none",
+                      borderRadius: 5,
+                      padding: "6px 9px",
+                      background: active ? "var(--surface)" : "transparent",
+                      color: active ? "var(--text)" : "var(--text-muted)",
+                      fontFamily: "inherit",
+                      fontSize: "var(--fs-sm)",
+                      fontWeight: active ? 600 : 500,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {view === "list" ? "List" : "Board"}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Employee picker + task input */}
           <div
@@ -1144,6 +1209,17 @@ export default function TasksPage() {
               >
                 {t("tasks.noTasks")}
               </div>
+            ) : historyView === "board" ? (
+              <TaskBoard
+                runs={history}
+                roster={roster}
+                locale={locale}
+                onOpen={(run) => {
+                  setExpandedRunId(run.id);
+                  changeHistoryView("list");
+                }}
+                onRerun={handleRerun}
+              />
             ) : (
               <div
                 className="card"
