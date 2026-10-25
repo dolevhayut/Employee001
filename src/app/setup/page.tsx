@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FocusEvent } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "iconoir-react";
@@ -12,7 +12,17 @@ const stepVariants = {
   exit: { opacity: 0, y: -12 },
 };
 
-const FOCUS_RING = "2px solid var(--accent-deep)";
+const FOCUS_RING = "2px solid var(--accent)";
+
+const focusRingHandlers = {
+  onFocus: (e: FocusEvent<HTMLElement>) => {
+    e.currentTarget.style.outline = FOCUS_RING;
+    e.currentTarget.style.outlineOffset = "2px";
+  },
+  onBlur: (e: FocusEvent<HTMLElement>) => {
+    e.currentTarget.style.outline = "none";
+  },
+};
 
 function StepOrg({
   company,
@@ -84,8 +94,15 @@ function StepOrg({
             boxSizing: "border-box",
             transition: "border-color .15s",
           }}
-          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--text)")}
-          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--hairline-strong)")}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = "var(--text)";
+            e.currentTarget.style.outline = FOCUS_RING;
+            e.currentTarget.style.outlineOffset = "2px";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = "var(--hairline-strong)";
+            e.currentTarget.style.outline = "none";
+          }}
         />
       </div>
     </motion.div>
@@ -188,13 +205,7 @@ function StepTheme({
                 transition: "0.15s",
                 outline: "none",
               }}
-              onFocus={(e) => {
-                e.currentTarget.style.outline = FOCUS_RING;
-                e.currentTarget.style.outlineOffset = "2px";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.outline = "none";
-              }}
+              {...focusRingHandlers}
             >
               {/* Preview window */}
               <div
@@ -493,16 +504,30 @@ export default function SetupPage() {
       </div>
 
       {/* Step dots */}
-      <div style={{ position: "fixed", top: 38, insetInlineEnd: 40, display: "flex", gap: "var(--sp-7)" }}>
+      <ol
+        aria-label="Setup progress"
+        style={{
+          position: "fixed",
+          top: 38,
+          insetInlineEnd: 40,
+          display: "flex",
+          gap: "var(--sp-7)",
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+        }}
+      >
         {[0, 1, 2].map((i) => (
-          <motion.div
-            key={i}
-            animate={{ background: i <= step ? "var(--text)" : "var(--hairline-strong)" }}
-            transition={{ duration: 0.2 }}
-            style={{ width: 6, height: 6, borderRadius: "50%" }}
-          />
+          <li key={i} aria-current={i === step ? "step" : undefined}>
+            <motion.span
+              aria-hidden="true"
+              animate={{ background: i <= step ? "var(--text)" : "var(--hairline-strong)" }}
+              transition={{ duration: 0.2 }}
+              style={{ display: "block", width: 6, height: 6, borderRadius: "50%" }}
+            />
+          </li>
         ))}
-      </div>
+      </ol>
 
       {/* Step content */}
       <AnimatePresence mode="wait">
@@ -533,9 +558,10 @@ export default function SetupPage() {
           <button
             type="button"
             onClick={back}
+            {...focusRingHandlers}
             style={{
               fontSize: "var(--fs-ui)",
-              color: "var(--text-subtle)",
+              color: "var(--text-muted)",
               background: "none",
               border: "none",
               cursor: "pointer",
@@ -552,6 +578,7 @@ export default function SetupPage() {
           disabled={!canContinue}
           whileHover={canContinue ? { scale: 1.02 } : {}}
           whileTap={canContinue ? { scale: 0.97 } : {}}
+          {...focusRingHandlers}
           style={{
             padding: step === 2 ? "16px 52px" : "14px 44px",
             background: canContinue ? "var(--text)" : "var(--bg-sunken)",

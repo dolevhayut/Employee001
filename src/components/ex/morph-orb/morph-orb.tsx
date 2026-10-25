@@ -1164,7 +1164,7 @@ export default function MorphOrb({ ref, ...props }: MorphOrbProps) {
               value={value}
               maxLength={200}
               placeholder={copy.placeholder}
-              aria-label="Ask anything"
+              aria-label={copy.placeholder}
               spellCheck={false}
               onChange={onChange}
               onKeyDown={onKeyDown}

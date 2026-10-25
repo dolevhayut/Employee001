@@ -1,5 +1,6 @@
 "use client";
 
+import { type FocusEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useT } from "@/components/ex/i18n-context";
@@ -15,12 +16,12 @@ type Action = {
   blurb: string;
   cta: string;
   href: string;
-  glyph: React.ReactNode;
+  glyph: ReactNode;
 };
 
 // Stroke-only SVG glyphs, hairline weight — matches the brand surface in the
 // campaigns rather than filled iconography from a UI kit.
-function Glyph({ children }: { children: React.ReactNode }) {
+function Glyph({ children }: { children: ReactNode }) {
   return (
     <svg
       width="36"
@@ -86,6 +87,18 @@ const ACTIONS: Action[] = [
   },
 ];
 
+const FOCUS_RING = "2px solid var(--accent)";
+
+const focusRingHandlers = {
+  onFocus: (e: FocusEvent<HTMLElement>) => {
+    e.currentTarget.style.outline = FOCUS_RING;
+    e.currentTarget.style.outlineOffset = "2px";
+  },
+  onBlur: (e: FocusEvent<HTMLElement>) => {
+    e.currentTarget.style.outline = "none";
+  },
+};
+
 const PALETTE = {
   surface: "var(--bg)",
   surfaceCard: "var(--surface)",
@@ -146,7 +159,9 @@ export default function LaunchpadPage() {
 
       {/* Skip */}
       <button
+        type="button"
         onClick={() => router.push("/employees")}
+        {...focusRingHandlers}
         style={{
           position: "fixed",
           top: 30,
@@ -204,8 +219,11 @@ export default function LaunchpadPage() {
         >
           {actions.map((a, i) => (
             <motion.button
+              type="button"
               key={a.id}
               onClick={() => router.push(a.href)}
+              aria-label={`${a.title}. ${a.cta}`}
+              {...focusRingHandlers}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.1 + i * 0.08, ease: "easeOut" }}
@@ -288,7 +306,9 @@ export default function LaunchpadPage() {
         {/* Inviting a real employee needs Composio and their sign-off; a
             marketplace agent answers with just the model provider. */}
         <button
+          type="button"
           onClick={() => router.push("/marketplace")}
+          {...focusRingHandlers}
           style={{
             marginTop: 28,
             background: "transparent",

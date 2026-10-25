@@ -254,6 +254,13 @@
 .mo-send svg { width: 18px; height: 18px; }
 .mo-send[data-ready] { background: var(--text); color: var(--bg-elevated); }
 .mo-send[data-ready]:hover { transform: scale(1.06); }
+.mo-field:focus-visible,
+.mo-send:focus-visible,
+.mo-reset:focus-visible,
+.mo-follow .mo-field:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 .mo-orb {
   left: 50%;

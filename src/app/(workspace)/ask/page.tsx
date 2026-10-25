@@ -7,7 +7,7 @@
 // reasoning when the model streams it. Read-only by design: a tool call that
 // would need approval is declined, so the orb never waits on a hidden card.
 
-import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type FocusEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { displayRole } from "@/lib/employees";
 import { Topbar } from "@/components/ex/shell";
@@ -30,6 +30,17 @@ import { FlowCanvas } from "@/components/ex/morph-orb/flow-canvas";
 import { CitedAnswer, type CitedSource } from "@/components/ex/cited-answer";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { parseCitedAnswer } from "@/lib/org-answer";
+
+const FOCUS_RING = "2px solid var(--accent)";
+const focusRingHandlers = {
+  onFocus: (e: FocusEvent<HTMLElement>) => {
+    e.currentTarget.style.outline = FOCUS_RING;
+    e.currentTarget.style.outlineOffset = "2px";
+  },
+  onBlur: (e: FocusEvent<HTMLElement>) => {
+    e.currentTarget.style.outline = "none";
+  },
+};
 
 const ANSWER_STYLE =
   "Answer in the language of the question, in at most three short sentences and " +
@@ -340,12 +351,13 @@ type AudioState = { id: number; status: "loading" | "playing" } | null;
 function SpeakButton({ state, onClick, label, size = 26 }: { state: "idle" | "loading" | "playing"; onClick: () => void; label: string; size?: number }) {
   const icon = size * 0.5;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      style={{
+      <button
+        type="button"
+        onClick={onClick}
+        title={label}
+        aria-label={label}
+        {...focusRingHandlers}
+        style={{
         width: size,
         height: size,
         flex: "none",
@@ -388,6 +400,8 @@ function Trace({ turn, live }: { turn: Turn; live: boolean }) {
         onClick={() => setOpen((o) => !o)}
         disabled={live}
         aria-expanded={visible}
+        aria-label={live ? t("ask.trace.working") : t("ask.trace.steps", { count: turn.steps.length })}
+        {...focusRingHandlers}
         style={{
           alignSelf: "flex-start",
           display: "flex",
@@ -538,6 +552,8 @@ export default function AskPage() {
   const twins = roster.filter((e) => e.twinStatus === "ready");
   const [selected, setSelected] = useState<string | null>(null);
   const [modePick, setMode] = useState<"ask" | "task">("ask");
+  const askModeTabRef = useRef<HTMLButtonElement>(null);
+  const taskModeTabRef = useRef<HTMLButtonElement>(null);
   const panelWidth = useSyncExternalStore(panelSubscribe, panelSnapshot, () => PANEL_DEFAULT);
   const [dragging, setDragging] = useState(false);
   useEffect(() => {
@@ -614,6 +630,23 @@ export default function AskPage() {
   // Someone who has left takes no tasks (the work queue refuses them): ask only.
   const retired = twin?.lifecycle === "retired";
   const mode = retired || demoReplay ? "ask" : modePick;
+
+  function onAskModeTabKey(e: ReactKeyboardEvent<HTMLDivElement>) {
+    if (retired || demoReplay) return;
+    const tabs: { mode: "ask" | "task"; ref: typeof askModeTabRef }[] = [
+      { mode: "ask", ref: askModeTabRef },
+      { mode: "task", ref: taskModeTabRef },
+    ];
+    const i = tabs.findIndex((tab) => tab.mode === modePick);
+    if (i < 0) return;
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      const dir = e.key === "ArrowRight" ? 1 : -1;
+      const next = tabs[(i + dir + tabs.length) % tabs.length];
+      setMode(next.mode);
+      next.ref.current?.focus();
+    }
+  }
 
   // Your last conversation with each twin comes back when you pick it; each
   // person sees only what they asked. "New conversation" starts a fresh one.
@@ -1285,6 +1318,9 @@ export default function AskPage() {
                 stopAudio();
               }}
               title={t("ask.voiceTitle")}
+              aria-pressed={voiceOn}
+              aria-label={t("ask.voiceTitle")}
+              {...focusRingHandlers}
               style={{ height: 28, display: "flex", alignItems: "center", gap: 6 }}
             >
               {voiceOn ? <Icons.Volume size={12} /> : <Icons.VolumeOff size={12} />}
@@ -1304,6 +1340,7 @@ export default function AskPage() {
                 type="button"
                 onClick={stopAudio}
                 aria-label={t("ask.stopSpeaking")}
+                {...focusRingHandlers}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 6 }}
@@ -1468,8 +1505,8 @@ export default function AskPage() {
               pointerEvents: busy ? "none" : "auto",
             }}
           >
-            <div style={{ fontSize: 13, color: "var(--text-subtle)" }}>{t("ask.title")}</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", padding: "0 16px" }}>
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{t("ask.title")}</div>
+            <div role="group" aria-label="Choose a twin" style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", padding: "0 16px" }}>
               {twins.map((e) => {
                 const active = e.id === twinId;
                 return (
@@ -1478,6 +1515,9 @@ export default function AskPage() {
                     type="button"
                     onClick={() => setSelected(e.id)}
                     title={`${e.name} · ${displayRole(e)}`}
+                    aria-pressed={active}
+                    aria-label={`${e.name}, ${displayRole(e)}`}
+                    {...focusRingHandlers}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -1501,16 +1541,24 @@ export default function AskPage() {
               })}
             </div>
             {/* ask a question, or hand over a task, like you would a colleague */}
-            <div role="tablist" style={{ display: "flex", padding: 3, gap: 2, borderRadius: 10, background: "var(--bg-sunken)", border: "1px solid var(--hairline)" }}>
+            <div
+              role="tablist"
+              aria-label="Ask or hand off a task"
+              onKeyDown={onAskModeTabKey}
+              style={{ display: "flex", padding: 3, gap: 2, borderRadius: 10, background: "var(--bg-sunken)", border: "1px solid var(--hairline)" }}
+            >
               {(retired || demoReplay ? (["ask"] as const) : (["ask", "task"] as const)).map((m) => {
                 const on = mode === m;
                 return (
                   <button
                     key={m}
+                    ref={m === "ask" ? askModeTabRef : taskModeTabRef}
                     role="tab"
                     aria-selected={on}
+                    tabIndex={on ? 0 : -1}
                     type="button"
                     onClick={() => setMode(m)}
+                    {...focusRingHandlers}
                     style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", font: "inherit", fontSize: 12.5, fontWeight: 600, color: on ? "var(--text)" : "var(--text-muted)" }}
                   >
                     {on && (
@@ -1549,6 +1597,8 @@ export default function AskPage() {
                             setSelected(a.employeeId);
                           }
                         }}
+                        aria-label={`${who.name}: ${a.question}`}
+                        {...focusRingHandlers}
                         style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px 4px 4px", borderRadius: 999, border: "1px dashed var(--hairline-strong)", background: "var(--surface)", color: "var(--text)", fontSize: 12.5, cursor: "pointer", textAlign: "start" }}
                       >
                         <Avatar initials={who.initials} color={who.avatarColor} size={20} />
@@ -1575,6 +1625,8 @@ export default function AskPage() {
             setDragging(true);
           }}
           onDoubleClick={() => writePanelWidth(PANEL_DEFAULT)}
+          tabIndex={0}
+          {...focusRingHandlers}
           style={{ flex: "0 0 12px", cursor: "col-resize", display: "grid", placeItems: "center", touchAction: "none" }}
         >
           <motion.span
@@ -1624,6 +1676,8 @@ export default function AskPage() {
                 onClick={newConversation}
                 disabled={busy}
                 title={t("ask.newConversationTitle")}
+                aria-label={t("ask.newConversationTitle")}
+                {...focusRingHandlers}
                 style={{ marginInlineStart: "auto", padding: "3px 8px", borderRadius: 6, border: "1px solid var(--hairline)", background: "transparent", color: "var(--text-muted)", fontSize: 11, fontWeight: 500, letterSpacing: 0, textTransform: "none", cursor: busy ? "default" : "pointer" }}
               >
                 {t("ask.newConversation")}
@@ -1672,6 +1726,8 @@ export default function AskPage() {
                 {turn.answer !== null && (
                   <motion.div
                     dir="auto"
+                    aria-live="polite"
+                    aria-atomic="true"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.4 }}

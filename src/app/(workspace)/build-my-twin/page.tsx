@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
@@ -40,6 +40,17 @@ const fieldStyle = {
 };
 
 const labelStyle = { display: "block", color: "var(--text)", fontSize: "var(--fs-sm)", fontWeight: 600, marginBottom: "var(--sp-6)" };
+
+const FOCUS_RING = "2px solid var(--accent)";
+const focusRingHandlers = {
+  onFocus: (e: FocusEvent<HTMLElement>) => {
+    e.currentTarget.style.outline = FOCUS_RING;
+    e.currentTarget.style.outlineOffset = "2px";
+  },
+  onBlur: (e: FocusEvent<HTMLElement>) => {
+    e.currentTarget.style.outline = "none";
+  },
+};
 
 type Stage = "idle" | "creating" | "uploading" | "starting";
 type Mode = "write" | "interview";
@@ -201,6 +212,32 @@ export default function BuildMyTwinPage() {
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState<Set<File>>(() => new Set());
   const fileInput = useRef<HTMLInputElement>(null);
+  const writeTabRef = useRef<HTMLButtonElement>(null);
+  const interviewTabRef = useRef<HTMLButtonElement>(null);
+
+  function onBriefingTabKey(e: ReactKeyboardEvent<HTMLDivElement>) {
+    const tabs: { mode: Mode; ref: RefObject<HTMLButtonElement | null> }[] = [
+      { mode: "write", ref: writeTabRef },
+      { mode: "interview", ref: interviewTabRef },
+    ];
+    const i = tabs.findIndex((t) => t.mode === mode);
+    if (i < 0) return;
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      const dir = e.key === "ArrowRight" ? 1 : -1;
+      const next = tabs[(i + dir + tabs.length) % tabs.length];
+      if (!profileLocked) setMode(next.mode);
+      next.ref.current?.focus();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      if (!profileLocked) setMode("write");
+      writeTabRef.current?.focus();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      if (!profileLocked) setMode("interview");
+      interviewTabRef.current?.focus();
+    }
+  }
 
   // Prefill the name from the signed-in account (not the loopback stand-in).
   useEffect(() => {
@@ -331,17 +368,27 @@ export default function BuildMyTwinPage() {
 
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-12)", marginBottom: "var(--sp-6)", flexWrap: "wrap" }}>
-              <span style={{ ...labelStyle, marginBottom: 0 }}>About your work</span>
-              <div role="tablist" aria-label="How to brief your twin" style={{ display: "flex", gap: "var(--sp-4)" }}>
+              <label id="about-work-label" htmlFor="notes" style={{ ...labelStyle, marginBottom: 0 }}>About your work</label>
+              <div
+                role="tablist"
+                aria-label="How to brief your twin"
+                style={{ display: "flex", gap: "var(--sp-4)" }}
+                onKeyDown={onBriefingTabKey}
+              >
                 {(["write", "interview"] as const).map((m) => (
                   <button
                     key={m}
+                    ref={m === "write" ? writeTabRef : interviewTabRef}
+                    id={`briefing-tab-${m}`}
                     type="button"
                     role="tab"
                     aria-selected={mode === m}
+                    aria-controls={`briefing-panel-${m}`}
+                    tabIndex={mode === m ? 0 : -1}
                     className={mode === m ? "btn sm" : "btn ghost sm"}
                     onClick={() => setMode(m)}
                     disabled={profileLocked}
+                    {...focusRingHandlers}
                   >
                     {m === "write" ? "Write it" : "Interview me"}
                   </button>
@@ -349,7 +396,12 @@ export default function BuildMyTwinPage() {
               </div>
             </div>
 {/* Kept mounted while hidden, so the interview survives a switch. */}
-            <div hidden={mode !== "interview"}>
+            <div
+              id="briefing-panel-interview"
+              role="tabpanel"
+              aria-labelledby="briefing-tab-interview"
+              hidden={mode !== "interview"}
+            >
               <InterviewPanel
                 name={name}
                 role={role}
@@ -357,11 +409,16 @@ export default function BuildMyTwinPage() {
                 onTranscript={(text, chars) => { setInterviewed(text); setInterviewAnswerChars(chars); }}
               />
             </div>
-            {mode === "write" && (
-              <>
+            <div
+              id="briefing-panel-write"
+              role="tabpanel"
+              aria-labelledby="briefing-tab-write"
+              hidden={mode !== "write"}
+            >
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "var(--sp-12)", alignItems: "start" }}>
                   <textarea
                     id="notes"
+                    aria-labelledby="about-work-label"
                     style={{ ...fieldStyle, minHeight: 320, resize: "vertical", lineHeight: 1.55 }}
                     value={notes}
                     onChange={(e) => setWritten(e.target.value)}
@@ -376,8 +433,7 @@ export default function BuildMyTwinPage() {
                     </ul>
                   </div>
                 </div>
-              </>
-            )}
+            </div>
             {/* Both modes: the build needs MIN_NOTES characters of material. */}
             <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>
               {notesShort
@@ -386,19 +442,29 @@ export default function BuildMyTwinPage() {
             </div>
           </div>
           <div>
-            <span style={labelStyle}>Documents (optional)</span>
+            <span id="twin-docs-label" style={labelStyle}>Documents (optional)</span>
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
               style={{ border: "1px dashed var(--hairline)", borderRadius: 10, padding: "var(--sp-16)", display: "flex", alignItems: "center", gap: "var(--sp-12)", flexWrap: "wrap" }}
             >
-              <button type="button" className="btn ghost sm" onClick={() => fileInput.current?.click()}>
+              <button type="button" className="btn ghost sm" onClick={() => fileInput.current?.click()} {...focusRingHandlers}>
                 <Icons.Plus size={12} /> Add files
               </button>
-              <span className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
+              <span id="twin-docs-hint" className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
                 Docs you wrote, playbooks, specs, FAQs: Markdown, text, PDF or Word. Drop them here.
               </span>
-              <input ref={fileInput} type="file" multiple accept={ACCEPT} hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
+              <input
+                ref={fileInput}
+                id="twin-docs-input"
+                type="file"
+                multiple
+                accept={ACCEPT}
+                hidden
+                aria-labelledby="twin-docs-label"
+                aria-describedby="twin-docs-hint"
+                onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
+              />
             </div>
             {files.length > 0 && (
               <ul style={{ listStyle: "none", margin: "var(--sp-8) 0 0", padding: 0, display: "grid", gap: "var(--sp-4)" }}>
@@ -417,8 +483,8 @@ export default function BuildMyTwinPage() {
             {fileNote && <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>{fileNote}</div>}
           </div>
 
-          <label style={{ display: "flex", gap: "var(--sp-10)", alignItems: "flex-start", fontSize: "var(--fs-sm)", lineHeight: 1.5 }}>
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
+          <label htmlFor="twin-consent" style={{ display: "flex", gap: "var(--sp-10)", alignItems: "flex-start", fontSize: "var(--fs-sm)", lineHeight: 1.5 }}>
+            <input id="twin-consent" type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
             <span>
               <strong>{t("onboarding.scopeData")}</strong>
               <br />
