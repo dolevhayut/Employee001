@@ -5,14 +5,20 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const originalCwd = process.cwd();
 let tempDir: string | undefined;
+let previousHome: string | undefined;
 
 async function auditModule() {
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "employee001-audit-"));
-  process.chdir(tempDir);
+  previousHome = process.env.EMPLOYEE001_HOME;
+  process.env.EMPLOYEE001_HOME = tempDir;
   vi.resetModules();
   return import("./audit-log");
+}
+
+function auditFile(name: string) {
+  if (!tempDir) throw new Error("audit rotation test has no temporary home");
+  return path.join(tempDir, "data", name);
 }
 
 function entry(input: Record<string, unknown> = {}) {
@@ -29,9 +35,11 @@ function entry(input: Record<string, unknown> = {}) {
 
 afterEach(() => {
   vi.useRealTimers();
-  process.chdir(originalCwd);
+  if (previousHome === undefined) delete process.env.EMPLOYEE001_HOME;
+  else process.env.EMPLOYEE001_HOME = previousHome;
   if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
   tempDir = undefined;
+  previousHome = undefined;
   vi.resetModules();
 });
 
@@ -44,7 +52,7 @@ describe("audit rotation", () => {
     vi.setSystemTime(new Date("2026-10-04T00:00:00.000Z"));
     appendAuditEntry(entry({ afterRotation: true }));
 
-    expect(fs.existsSync(path.join(process.cwd(), "data", "audit.2020-01.jsonl"))).toBe(true);
+    expect(fs.existsSync(auditFile("audit.2020-01.jsonl"))).toBe(true);
     expect(verifyAuditChain()).toEqual({ ok: true, checked: 2, legacy: 0 });
   }, 15_000);
 });
