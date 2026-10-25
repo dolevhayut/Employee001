@@ -274,6 +274,8 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
   }
   const filesWrittenThisRun = new Set<TwinFileName>();
 
+  const buildId = args.buildId ?? newBuildId();
+  const buildStartedAt = new Date();
   const systemPrompt = buildBuilderSystemPrompt({
     employee,
     ceoContext,
@@ -283,10 +285,8 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
     materialFiles,
     existingFiles: present,
     lookbackDays,
+    generatedAt: buildStartedAt.toISOString(),
   });
-
-  const buildId = args.buildId ?? newBuildId();
-  const buildStartedAt = new Date();
   let turns = 0;
   let costUsd = 0;
   let stoppedReason: "max_budget" | "max_turns" | "natural" = "natural";
@@ -349,7 +349,8 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
               sources: {
                 type: "array",
                 items: { type: "string" },
-                description: "Toolkit + action names used as evidence (e.g. 'gmail.fetch_emails').",
+                description:
+                  "Toolkit + action names used as evidence (e.g. 'gmail.fetch_emails'), plus knowledge/<filename> for each uploaded file read.",
               },
               summary: {
                 type: "string",
@@ -616,7 +617,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
 
 // ─── System prompt ───────────────────────────────────────────────────────────
 
-function buildBuilderSystemPrompt(args: {
+export function buildBuilderSystemPrompt(args: {
   employee: EmployeeWithTwin;
   ceoContext?: string;
   employeeDir: string;
@@ -626,6 +627,8 @@ function buildBuilderSystemPrompt(args: {
   materialFiles: string[];
   existingFiles: TwinFileName[];
   lookbackDays: number;
+  /** Exact ISO timestamp for YAML frontmatter generatedAt on every profile file. */
+  generatedAt: string;
 }): string {
   const {
     employee,
@@ -636,6 +639,7 @@ function buildBuilderSystemPrompt(args: {
     materialFiles,
     existingFiles,
     lookbackDays,
+    generatedAt,
   } = args;
   const toolsConnected = activeToolkits.length > 0 || orgMcpNames.length > 0;
   const firstName = employee.firstName;
@@ -785,11 +789,12 @@ ${existingFiles.length > 0 ? `\n# Existing files on disk (you may overwrite to i
    ---
    employee: ${employee.id}
    file: <FILENAME>.md
-   generatedAt: <ISO timestamp>
-   sources: [list of toolkits + specific tool actions used]
+   generatedAt: ${generatedAt}
+   sources: [list of toolkits + specific tool actions used; for each file you read under knowledge/, include \`knowledge/<filename>\`]
    confidenceNote: "high|medium|low — one short reason"
    ---
    \`\`\`
+   Use the **exact** \`generatedAt\` value shown above — do not invent a timestamp or round to midnight.
 6. **Quality bar.** Each file should be 600–2,500 chars of substantive, evidence-grounded content. Use markdown sections, lists, and verbatim quotes. Never write "Lorem ipsum", "TBD", or filler.
 7. **One file per Write call.** Always invoke \`Write\` with \`file_path\` set to just the filename (\`CONTEXT.md\`) — the cwd is already \`${employeeDir}\`. Do not batch multiple files into one Write.
 8. **Don't quote PII.** Phone numbers, home addresses, government IDs, banking details, customer lists with full names — never include these. Verbatim quotes about style and decisions are fine.

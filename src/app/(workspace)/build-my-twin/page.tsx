@@ -50,7 +50,17 @@ const transcript = (turns: Turn[]) => turns.map((x) => `**Q:** ${x.question.trim
 
 /** "Interview me": a short interview, one question at a time; the
  *  transcript becomes the twin's notes. */
-function InterviewPanel({ name, role, onTranscript }: { name: string; role: string; onTranscript: (text: string, answerChars: number) => void }) {
+function InterviewPanel({
+  name,
+  role,
+  locked,
+  onTranscript,
+}: {
+  name: string;
+  role: string;
+  locked: boolean;
+  onTranscript: (text: string, answerChars: number) => void;
+}) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [question, setQuestion] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
@@ -101,6 +111,14 @@ function InterviewPanel({ name, role, onTranscript }: { name: string; role: stri
 
   if (!name.trim() || !role.trim()) {
     return <div className="subtle" style={{ fontSize: "var(--fs-sm)" }}>Fill in your name and role first.</div>;
+  }
+
+  if (locked) {
+    return (
+      <div className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
+        Your twin is created; edit its profile after the build.
+      </div>
+    );
   }
 
   return (
@@ -203,6 +221,7 @@ export default function BuildMyTwinPage() {
     !consent && "your agreement below",
   ].filter(Boolean) as string[];
   const ready = missing.length === 0 && stage === "idle";
+  const profileLocked = createdId !== null;
 
   async function build() {
     if (!ready) return;
@@ -278,14 +297,35 @@ export default function BuildMyTwinPage() {
         />
 
         <div style={{ maxWidth: 880, display: "grid", gap: "var(--sp-18)" }}>
+          {profileLocked && (
+            <p className="subtle" style={{ margin: 0, fontSize: "var(--fs-sm)" }}>
+              Your twin is created; edit its profile after the build.
+            </p>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--sp-12)" }}>
             <label htmlFor="self-name">
               <span style={labelStyle}>Your name</span>
-              <input id="self-name" style={fieldStyle} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+              <input
+                id="self-name"
+                style={fieldStyle}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+                readOnly={profileLocked}
+                aria-readonly={profileLocked}
+              />
             </label>
             <label htmlFor="self-role">
               <span style={labelStyle}>Your role</span>
-              <input id="self-role" style={fieldStyle} value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Head of Customer Success" />
+              <input
+                id="self-role"
+                style={fieldStyle}
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="e.g. Head of Customer Success"
+                readOnly={profileLocked}
+                aria-readonly={profileLocked}
+              />
             </label>
           </div>
 
@@ -301,6 +341,7 @@ export default function BuildMyTwinPage() {
                     aria-selected={mode === m}
                     className={mode === m ? "btn sm" : "btn ghost sm"}
                     onClick={() => setMode(m)}
+                    disabled={profileLocked}
                   >
                     {m === "write" ? "Write it" : "Interview me"}
                   </button>
@@ -309,7 +350,12 @@ export default function BuildMyTwinPage() {
             </div>
 {/* Kept mounted while hidden, so the interview survives a switch. */}
             <div hidden={mode !== "interview"}>
-              <InterviewPanel name={name} role={role} onTranscript={(text, chars) => { setInterviewed(text); setInterviewAnswerChars(chars); }} />
+              <InterviewPanel
+                name={name}
+                role={role}
+                locked={profileLocked}
+                onTranscript={(text, chars) => { setInterviewed(text); setInterviewAnswerChars(chars); }}
+              />
             </div>
             {mode === "write" && (
               <>
@@ -320,6 +366,8 @@ export default function BuildMyTwinPage() {
                     value={notes}
                     onChange={(e) => setWritten(e.target.value)}
                     placeholder="Write freely, in any language. Bullet points are fine."
+                    readOnly={profileLocked}
+                    aria-readonly={profileLocked}
                   />
                   <div className="card" style={{ padding: "var(--sp-14)", fontSize: "var(--fs-sm)", background: "var(--surface-soft)" }}>
                     <div style={{ fontWeight: 600, marginBottom: "var(--sp-8)" }}>Worth covering</div>

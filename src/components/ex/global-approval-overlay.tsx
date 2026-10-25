@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useState, useCallback, useSyncExternalStore } from "react";
+import { useState, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
 import { useRoster } from "@/components/ex/roster-context";
 import { useT } from "@/components/ex/i18n-context";
+import {
+  getPendingReviewPollSnapshot,
+  optimisticallyRemovePendingReview,
+  subscribePendingReviewPoll,
+} from "@/components/ex/pending-review-poll";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -77,45 +82,33 @@ function useMounted(): boolean {
   );
 }
 
+let pendingItemsCacheVersion = -1;
+let pendingItemsCache: PendingItem[] = [];
+
+function pendingItemsSnapshot(): PendingItem[] {
+  const { live, feed, version } = getPendingReviewPollSnapshot();
+  if (version === pendingItemsCacheVersion) return pendingItemsCache;
+  pendingItemsCacheVersion = version;
+  const liveItems: PendingItem[] = live.map((a) => ({ ...a, kind: "live" }));
+  const feedItems: PendingItem[] = feed.map((f) => ({
+    ...f,
+    kind: "feed",
+    source: f.source as FeedReviewSource,
+  }));
+  pendingItemsCache = [...liveItems, ...feedItems];
+  return pendingItemsCache;
+}
+
 // ─── Overlay ─────────────────────────────────────────────────────────────────
 
 export function GlobalApprovalOverlay() {
   const { t } = useT();
   const roster = useRoster();
-  const [pending, setPending] = useState<PendingItem[]>([]);
+  const pending = useSyncExternalStore(subscribePendingReviewPoll, pendingItemsSnapshot, () => []);
   const [editing, setEditing] = useState<Record<string, boolean>>({});
   const [editedJson, setEditedJson] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const mounted = useMounted();
-
-  // Poll both sources every 2s — live approval-bus + persistent feed
-  // needs-review items. Every CEO approval must surface in the main app shell
-  // regardless of which subsystem produced it.
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [liveRes, feedRes] = await Promise.all([
-          fetch("/api/approvals/pending", { cache: "no-store" }),
-          fetch("/api/feed?status=open&type=needs-review", { cache: "no-store" }),
-        ]);
-        const liveRaw = liveRes.ok ? ((await liveRes.json()) as Omit<LiveApproval, "kind">[]) : [];
-        const feedRaw = feedRes.ok ? ((await feedRes.json()) as Omit<FeedReview, "kind">[]) : [];
-        const live: PendingItem[] = liveRaw.map((a) => ({ ...a, kind: "live" }));
-        const feed: PendingItem[] = feedRaw.map((f) => ({ ...f, kind: "feed" }));
-        // Live approvals first (they block an in-flight agent), then feed items
-        if (!cancelled) setPending([...live, ...feed]);
-      } catch {
-        /* ignore */
-      }
-    }
-    load();
-    const id = setInterval(load, 2000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, []);
 
   const resolveLive = useCallback(
     async (approvalId: string, action: "allow" | "deny", updatedInput?: Record<string, unknown>) => {
@@ -130,7 +123,7 @@ export function GlobalApprovalOverlay() {
             ...(updatedInput !== undefined ? { updatedInput } : {}),
           }),
         });
-        setPending((p) => p.filter((a) => itemKey(a) !== approvalId));
+        optimisticallyRemovePendingReview(approvalId);
       } finally {
         setBusyId(null);
       }
@@ -147,7 +140,7 @@ export function GlobalApprovalOverlay() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ resolution }),
         });
-        setPending((p) => p.filter((a) => itemKey(a) !== feedId));
+        optimisticallyRemovePendingReview(feedId);
       } finally {
         setBusyId(null);
       }
@@ -168,7 +161,7 @@ export function GlobalApprovalOverlay() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ resolution: "approved", note: t("inbox.routineStarted") }),
         });
-        setPending((p) => p.filter((a) => itemKey(a) !== feedId));
+        optimisticallyRemovePendingReview(feedId);
       } finally {
         setBusyId(null);
       }
@@ -566,34 +559,13 @@ export function GlobalApprovalOverlay() {
 // ─── Bell with badge ──────────────────────────────────────────────────────────
 
 // Pending approvals = live tool-call approvals + open needs-review feed items.
-// Shared by the bell and the sidebar's Approvals badge (one poller per caller).
+// Shared poll with GlobalApprovalOverlay (pending-review-poll.ts).
 export function usePendingApprovalCount(): number {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [liveRes, feedRes] = await Promise.all([
-          fetch("/api/approvals/pending", { cache: "no-store" }),
-          fetch("/api/feed?status=open&type=needs-review", { cache: "no-store" }),
-        ]);
-        const live = liveRes.ok ? ((await liveRes.json()) as unknown[]) : [];
-        const feed = feedRes.ok ? ((await feedRes.json()) as unknown[]) : [];
-        if (!cancelled) setCount(live.length + feed.length);
-      } catch {
-        /* ignore */
-      }
-    }
-    load();
-    const id = setInterval(load, 2500);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, []);
-
-  return count;
+  return useSyncExternalStore(
+    subscribePendingReviewPoll,
+    () => getPendingReviewPollSnapshot().count,
+    () => 0,
+  );
 }
 
 export function NotificationBell({ count }: { count: number }) {
