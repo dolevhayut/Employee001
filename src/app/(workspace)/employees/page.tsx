@@ -603,7 +603,7 @@ function EmployeeCard({
           </button>
         ) : (
           <Link
-            href={`/flow?employee=${emp.id}`}
+            href={`/ask?twin=${encodeURIComponent(emp.id)}`}
             className="btn primary sm"
             style={{ flex: 1, justifyContent: "center", textDecoration: "none" }}
           >

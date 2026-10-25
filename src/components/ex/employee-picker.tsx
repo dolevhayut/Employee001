@@ -14,7 +14,7 @@ type Props = {
    *  instead of reading `?employee=` from the URL. */
   value?: string;
   onSelect?: (id: string) => void;
-  /** When true (default), picking navigates to /flow?employee=<id> — the
+  /** When true (default), picking navigates to /ask?twin=<id> — the
    *  original top-bar behaviour. Pass false to use it as a pure form control
    *  (e.g. inside a modal) with no routing side effects. */
   navigate?: boolean;
@@ -77,7 +77,7 @@ export function EmployeePicker({ value, onSelect, navigate = true, readyOnly, pl
 
   function pick(emp: EmployeeWithTwin) {
     setOpen(false);
-    if (navigate) router.replace(`/flow?employee=${emp.id}`);
+    if (navigate) router.replace(`/ask?twin=${encodeURIComponent(emp.id)}`);
     onSelect?.(emp.id);
   }
 

@@ -1240,7 +1240,7 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
             </Link>
           )}
           <Link
-            href={retired ? `/ask?twin=${encodeURIComponent(employee.id)}` : `/flow?employee=${employee.id}`}
+            href={`/ask?twin=${encodeURIComponent(employee.id)}`}
             className="btn primary"
             style={{ textDecoration: "none" }}
           >
@@ -1900,7 +1900,7 @@ function OverviewTab({
                 </span>
                 <div className="spacer" />
                 <span className="subtle mono" style={{ fontSize: "var(--fs-meta)" }}>
-                  {t("profile.overview.ask")} <Link href={`/flow?employee=${employee.id}`} style={{ color: "var(--twin)" }}><bdi>/flow</bdi></Link>
+                  {t("profile.overview.ask")} <Link href={`/ask?twin=${encodeURIComponent(employee.id)}`} style={{ color: "var(--twin)" }}><bdi>Ask</bdi></Link>
                 </span>
               </div>
               <p style={{ fontSize: "var(--fs-base)", lineHeight: 1.6, margin: 0, color: "var(--text-muted)" }}>

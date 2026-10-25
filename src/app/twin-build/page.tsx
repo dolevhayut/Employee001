@@ -1507,7 +1507,7 @@ function FinalSummary({
           <Icons.Eye size={12} /> Open profile
         </Link>
         <Link
-          href={`/flow?employee=${employeeId}`}
+          href={`/ask?twin=${encodeURIComponent(employeeId)}`}
           className="btn"
           style={{ textDecoration: "none" }}
         >

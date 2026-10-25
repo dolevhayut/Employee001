@@ -200,7 +200,7 @@ const STATIC_COMMANDS: StaticCommand[] = [
   { id: "cockpit", labelKey: "nav.cockpit", href: "/cockpit", icon: "Activity", group: "popular", hintKey: "shell.cmd.cockpit.hint", keywords: "live agents running cockpit monitor real-time קוקפיט הרצות סוכנים חי" },
   { id: "tasks", labelKey: "nav.tasks", href: "/tasks", icon: "Zap", group: "popular", hintKey: "shell.cmd.tasks.hint", keywords: "agent execution work runs retry משימות הרצה עבודה" },
   { id: "goals", labelKey: "nav.goals", href: "/goals", icon: "Flow", group: "navigate", hintKey: "shell.cmd.goals.hint", keywords: "goals objectives strategy company priorities יעדים מטרות אסטרטגיה" },
-  { id: "twins", labelKey: "nav.chat", href: "/flow", icon: "Bot", group: "popular", hintKey: "shell.cmd.chat.hint", keywords: "chat with twin memory graph ask clone flow צ'אט תאום זיכרון גרף" },
+  { id: "twins", labelKey: "nav.chat", href: "/ask", icon: "Bot", group: "popular", hintKey: "shell.cmd.chat.hint", keywords: "chat with twin memory graph ask clone flow צ'אט תאום זיכרון גרף" },
   { id: "connections", labelKey: "nav.tools", href: "/connections", icon: "Plug", group: "navigate", hintKey: "shell.cmd.tools.hint", keywords: "connections integrations composio slack github gmail tools mcp כלים חיבורים" },
   { id: "marketplace", labelKey: "nav.hire", href: "/marketplace", icon: "Store", group: "navigate", hintKey: "shell.cmd.hire.hint", keywords: "marketplace agents hire catalog גיוס סוכנים" },
   { id: "council", labelKey: "nav.teamMeeting", href: "/council", icon: "Team", group: "navigate", hintKey: "shell.cmd.meeting.hint", keywords: "council meeting team debate room ישיבת צוות מועצה" },
@@ -389,7 +389,7 @@ function buildTwinCommands(
   t: (key: MessageKey, vars?: Record<string, string | number>) => string,
 ): CommandItem[] {
   return roster.flatMap((emp) => {
-    const flowHref = emp.twinStatus === "ready" ? `/flow?employee=${emp.id}` : "/clone";
+    const flowHref = emp.twinStatus === "ready" ? `/ask?twin=${encodeURIComponent(emp.id)}` : "/clone";
     const statusKeyword = emp.twinStatus === "ready" ? "ready live chat memory" : "onboarding setup clone";
     const bothLang = "twin profile chat onboarding תאום פרופיל צ'אט קליטה";
 
@@ -738,7 +738,7 @@ function TwinSwitcher() {
     setSelected(emp);
     setOpen(false);
     if (emp.twinStatus === "ready") {
-      router.push(`/flow?employee=${emp.id}`);
+      router.push(`/ask?twin=${encodeURIComponent(emp.id)}`);
     }
   }
 
