@@ -183,13 +183,15 @@ export async function buildBrainNodesFromText(
       model,
       fallbackModel: modelForProvider(TWIN_MODEL_FALLBACK),
       systemPrompt: SYSTEM_PROMPT,
-      allowedTools: [],
+      // No tools at all: an empty allowedTools restricts nothing under a
+      // permissive mode, and these prompts carry untrusted text.
+      tools: [],
       maxTurns: 1,
       outputFormat: {
         type: "json_schema",
         schema: BRAIN_NODE_SCHEMA,
       },
-      permissionMode: "bypassPermissions",
+      permissionMode: "dontAsk",
       settingSources: [],
       ...providerRuntimeOptions(),
     },

@@ -327,13 +327,15 @@ export async function planEmployeeResponseIntent(
           "Prefer canvas only when a visual layout would materially improve comprehension.",
           "Set riskLevel high for writes, sends, deletes, approvals, external posts, purchases, or destructive actions.",
         ].join(" "),
-        allowedTools: [],
+        // No tools at all: an empty allowedTools restricts nothing under a
+        // permissive mode, and these prompts carry untrusted text.
+        tools: [],
         maxTurns: 1,
         outputFormat: {
           type: "json_schema",
           schema: INTENT_PLAN_SCHEMA,
         },
-        permissionMode: "bypassPermissions",
+        permissionMode: "dontAsk",
         settingSources: [],
         ...providerRuntimeOptions(),
       },
