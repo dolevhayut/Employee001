@@ -10,6 +10,28 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.10.1] — 2026-10-26
+
+Security fix release. Upgrade with `npx employee001@latest`.
+
+- **Twin prompts can no longer pull in files through `@path`.** Claude Code
+  expands `@/some/path` in a prompt into that file's contents before any tool
+  runs, so no hook or approval saw it. Anyone who could message a twin could
+  read files the server can read (for example `.env` or `~/.ssh`). Prompts are
+  now delivered exactly as written, which also stops `/command` dispatch.
+- **Twins are isolated from the signed-in user's Claude Code.** No auto
+  memory, no claude.ai connectors, no bundled or personal skills, and only the
+  MCP servers a run is given. Three background helpers (brain builder, intent
+  planner, memory consolidation) now run with no tools instead of skipping
+  permission checks.
+- **An approved `Edit` stays inside the twin's scratch folder**, like `Write`.
+- **Hardened mode** (`EMPLOYEE001_SANDBOX=1`): a twin no longer inherits the
+  server's environment variables; private addresses and `localhost` are
+  refused when reached by IP; on Linux, a host that can't run the sandbox says
+  so up front.
+
+---
+
 ## [0.10.0] — 2026-10-25
 
 ### Run your twins on your Claude subscription, with no API key
