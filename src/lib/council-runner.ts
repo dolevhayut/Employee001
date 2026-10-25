@@ -71,6 +71,7 @@ import {
   type TwinSubagentName,
 } from "@/lib/twin-subagents";
 import { knowledgeIndexMarkdown } from "@/lib/knowledge-files";
+import { knowledgeFoldersIndexMarkdown } from "@/lib/knowledge-folders";
 import { buildConsultMcpServer } from "@/lib/consult-mcp";
 import type { ConsultContext } from "@/lib/twin-consult";
 import { ceoOf, orgClause, readOrgIdentity } from "@/lib/org-identity";
@@ -322,6 +323,7 @@ function buildSystemPromptBlocks(
   }
   const profileContent = loadProfileFiles(employeeDir, publicOnly);
   const knowledgeIndex = publicOnly ? "" : knowledgeIndexMarkdown(employee.id);
+  const knowledgeFolders = publicOnly ? "" : knowledgeFoldersIndexMarkdown(employee.id);
   const knowledgeBlock = knowledgeIndex
     ? `
 
@@ -330,6 +332,15 @@ function buildSystemPromptBlocks(
 The CEO has uploaded extra reference material to enrich your brain. These are **NOT** pre-loaded — only the index below is. When a question might be answered by one of them, **Read** the relevant file on demand from \`employees/${employee.id}/knowledge/\`.
 
 ${knowledgeIndex}`
+    : "";
+  const knowledgeFoldersBlock = knowledgeFolders
+    ? `
+
+# Folders you can read
+
+These configured local folders are not pre-loaded. Use Read, Glob, or Grep only within these folders when needed. Sensitive files, git internals, dependencies, and files over 1 MB are blocked.
+
+${knowledgeFolders}`
     : "";
 
   // Static block — eligible for cross-session prompt cache when nothing else
@@ -351,7 +362,7 @@ ${twinLanguageBlock()}
 
 The following are your actual profile files — they are pre-loaded so you can reference them directly without any tool calls. Use them as your default source of truth about yourself.
 
-${profileContent}${knowledgeBlock}
+${profileContent}${knowledgeBlock}${knowledgeFoldersBlock}
 
 # Reading from disk — when and how
 

@@ -101,6 +101,8 @@ type KnowledgeFileMeta = {
   mtime: string;
 };
 
+type KnowledgeFolderMeta = { path: string; label: string; addedAt: string };
+
 type KnowledgeVersionRow = {
   ts: string;
   name: string;
@@ -2117,6 +2119,7 @@ function FilesTab({
   return (
     <>
     <KnowledgeProposalsPanel employeeId={employeeId} onAccepted={() => void loadKnowledge()} />
+    <KnowledgeFolders employeeId={employeeId} />
     <div
       style={{
         display: "grid",
@@ -2142,6 +2145,51 @@ function FilesTab({
     </div>
     </>
   );
+}
+
+function KnowledgeFolders({ employeeId }: { employeeId: string }) {
+  const [folders, setFolders] = useState<KnowledgeFolderMeta[]>([]);
+  const [folderPath, setFolderPath] = useState("");
+  const [label, setLabel] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const inputStyle = { width: "100%", boxSizing: "border-box" as const, border: "1px solid var(--hairline)", background: "var(--surface)", color: "var(--text)", borderRadius: 7, padding: "8px 10px", font: "inherit", fontSize: "var(--fs-ui)" };
+  const inputLabelStyle = { display: "block", color: "var(--text)", fontSize: "var(--fs-sm)", fontWeight: 600, marginBottom: "var(--sp-6)" };
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/employees/${employeeId}/knowledge-folders`, { cache: "no-store" });
+    if (!res.ok) return;
+    const body = (await res.json()) as { folders?: KnowledgeFolderMeta[] };
+    setFolders(body.folders ?? []);
+  }, [employeeId]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+  async function add() {
+    setSaving(true); setError(null);
+    try {
+      const res = await fetch(`/api/employees/${employeeId}/knowledge-folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: folderPath, label }) });
+      const body = (await res.json().catch(() => ({}))) as { folder?: KnowledgeFolderMeta; error?: string };
+      if (!res.ok || !body.folder) throw new Error(body.error ?? "Could not add folder.");
+      setFolders((current) => [...current, body.folder!]); setFolderPath(""); setLabel("");
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not add folder."); } finally { setSaving(false); }
+  }
+  async function remove(folder: KnowledgeFolderMeta) {
+    setSaving(true); setError(null);
+    try {
+      const res = await fetch(`/api/employees/${employeeId}/knowledge-folders`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: folder.path }) });
+      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "Could not remove folder.");
+      setFolders((current) => current.filter((item) => item.path !== folder.path));
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not remove folder."); } finally { setSaving(false); }
+  }
+  return <section className="card" style={{ padding: "var(--sp-14)", marginBottom: "var(--sp-16)" }}>
+    <div style={{ fontWeight: 600, fontSize: "var(--fs-ui)", marginBottom: "var(--sp-4)" }}>Folders</div>
+    <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginBottom: "var(--sp-10)" }}>Read-only local sources for this twin. Sensitive files and folders are blocked.</div>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1fr) minmax(140px, 220px) auto", gap: "var(--sp-8)", alignItems: "end" }}>
+      <label><span style={inputLabelStyle}>Absolute path</span><input value={folderPath} onChange={(e) => setFolderPath(e.target.value)} placeholder="/Users/me/project" style={inputStyle} disabled={saving || folders.length >= 5} /></label>
+      <label><span style={inputLabelStyle}>Label</span><input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Product docs" style={inputStyle} disabled={saving || folders.length >= 5} /></label>
+      <button type="button" className="btn sm" onClick={() => void add()} disabled={saving || folders.length >= 5 || !folderPath.trim() || !label.trim()}><Icons.Plus size={11} /> Add</button>
+    </div>
+    {folders.map((folder) => <div key={folder.path} style={{ display: "flex", gap: "var(--sp-10)", alignItems: "center", paddingTop: "var(--sp-8)", fontSize: "var(--fs-sm)" }}><strong>{folder.label}</strong><code style={{ color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{folder.path}</code><button type="button" className="btn ghost sm" onClick={() => void remove(folder)} disabled={saving}>Remove</button></div>)}
+    {error && <div role="alert" style={{ color: "var(--danger)", fontSize: "var(--fs-sm)", marginTop: "var(--sp-8)" }}>{error}</div>}
+  </section>;
 }
 
 // ─── File tree (left pane) ────────────────────────────────────────────────────

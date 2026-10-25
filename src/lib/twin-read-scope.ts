@@ -18,6 +18,8 @@
 // knowledge/ notes inside a colleague's folder stay out.
 
 import path from "path";
+import fs from "fs";
+import { listKnowledgeFolders } from "./knowledge-folders";
 
 export const PEER_PROFILE_FILES = new Set([
   "CONTEXT.md",
@@ -50,6 +52,40 @@ function underRoot(rel: string, root: string): boolean {
   return rel === root || rel.startsWith(`${root}/`);
 }
 
+const FOLDER_BLOCKED_NAME = /^(?:\.env[^/]*|id_rsa[^/]*|.*\.(?:pem|key))$/i;
+
+function hasBlockedFolderSegment(value: string): boolean {
+  return value.split(/[\\/]/).some((part) => part === ".git" || part === "node_modules" || FOLDER_BLOCKED_NAME.test(part));
+}
+
+function realPath(value: string): string | null {
+  try { return fs.realpathSync(value); } catch { return null; }
+}
+
+function isWithin(child: string, parent: string): boolean {
+  const rel = path.relative(parent, child);
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
+/** Own configured folders are deliberately checked from the sidecar here,
+ * rather than accepted from a caller, so one twin cannot name another's. */
+function configuredFolderDecision(rawPath: string, employeeId: string, cwd: string, toolName: string): ReadScopeDecision | null {
+  const resolved = realPath(path.resolve(cwd, rawPath || "."));
+  if (!resolved) return null;
+  const folder = listKnowledgeFolders(employeeId).find((entry) => {
+    const configured = realPath(entry.path);
+    return configured !== null && isWithin(resolved, configured);
+  });
+  if (!folder) return null;
+  const relative = path.relative(folder.path, resolved);
+  if (hasBlockedFolderSegment(relative)) return { ok: false, reason: `${toolName} cannot access sensitive files in configured folders.` };
+  try {
+    const stat = fs.statSync(resolved);
+    if (stat.isFile() && stat.size > 1024 * 1024) return { ok: false, reason: `${toolName} cannot access files larger than 1 MB.` };
+  } catch { return { ok: false, reason: `${toolName} could not verify this configured-folder path.` }; }
+  return { ok: true };
+}
+
 /** May the twin read file contents at this data-relative path? */
 export function canReadPath(rel: string, employeeId: string): boolean {
   if (SHARED_ROOTS.some((root) => underRoot(rel, root))) return true;
@@ -80,17 +116,24 @@ export function checkTwinRead(
 
   if (toolName === "Read") {
     const raw = str("file_path");
+    if (hasBlockedFolderSegment(raw)) return deny("Read", raw, employeeId);
+    const folderDecision = configuredFolderDecision(raw, employeeId, cwd, "Read");
+    if (folderDecision) return folderDecision;
     const rel = relOf(raw);
-    return rel !== null && rel !== "" && canReadPath(rel, employeeId)
-      ? { ok: true }
-      : deny("Read", raw, employeeId);
+    if (rel === null || rel === "" || !canReadPath(rel, employeeId)) return deny("Read", raw, employeeId);
+    try {
+      if (fs.statSync(path.resolve(cwd, raw)).size > 1024 * 1024) return { ok: false, reason: "Read cannot access files larger than 1 MB." };
+    } catch { /* the SDK reports missing files after this scope check */ }
+    return { ok: true };
   }
 
   if (toolName === "Glob") {
     const raw = str("path");
     const pattern = str("pattern");
     // A pattern that climbs out (../) or is absolute is judged on its own.
-    if (pattern.includes("..") || path.isAbsolute(pattern)) return deny("Glob", pattern, employeeId);
+    if (pattern.includes("..") || path.isAbsolute(pattern) || hasBlockedFolderSegment(pattern)) return deny("Glob", pattern, employeeId);
+    const folderDecision = configuredFolderDecision(raw, employeeId, cwd, "Glob");
+    if (folderDecision) return folderDecision;
     const rel = relOf(raw);
     if (rel === null) return deny("Glob", raw, employeeId);
     // Glob returns names only, so listing peers under employees/ is fine.
@@ -101,6 +144,9 @@ export function checkTwinRead(
 
   if (toolName === "Grep") {
     const raw = str("path");
+    if (hasBlockedFolderSegment(str("glob"))) return deny("Grep", str("glob"), employeeId);
+    const folderDecision = configuredFolderDecision(raw, employeeId, cwd, "Grep");
+    if (folderDecision) return folderDecision;
     const rel = relOf(raw);
     if (rel === null || rel === "") return deny("Grep", raw, employeeId);
     if (canReadPath(rel, employeeId)) return { ok: true };

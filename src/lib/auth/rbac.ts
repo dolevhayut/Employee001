@@ -76,6 +76,7 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/employees/[id]/file/[name]": { GET: role("member", "id"), PUT: admin },
   "/api/employees/[id]/graph": { GET: role("member", "id") },
   "/api/employees/[id]/knowledge": { GET: role("member", "id"), POST: admin },
+  "/api/employees/[id]/knowledge-folders": { GET: admin, POST: admin, DELETE: admin },
   "/api/employees/[id]/knowledge/[name]": { GET: role("member", "id"), PUT: admin, DELETE: admin },
   "/api/employees/[id]/knowledge/[name]/versions": { GET: role("member", "id") },
   "/api/employees/[id]/knowledge/[name]/versions/[ts]": { GET: role("member", "id") },

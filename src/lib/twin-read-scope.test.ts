@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
-
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { checkTwinRead, toDataRelative } from "./twin-read-scope";
+import { addKnowledgeFolder } from "./knowledge-folders";
 
 const ROOT = "/home/u/.employee001/data";
 const ME = "noa-friedman";
@@ -97,5 +100,44 @@ describe("Grep and Glob scope", () => {
 
   it("leaves other tools alone", () => {
     expect(checkTwinRead("WebSearch", { query: "x" }, ME, ROOT).ok).toBe(true);
+  });
+});
+
+describe("configured folder scope", () => {
+  let home = "";
+  let folder = "";
+  const originalHome = process.env.EMPLOYEE001_HOME;
+
+  beforeEach(async () => {
+    home = fs.mkdtempSync(path.join(os.tmpdir(), "employee001-folders-"));
+    folder = fs.mkdtempSync(path.join(os.tmpdir(), "employee001-folder-source-"));
+    fs.writeFileSync(path.join(folder, "README.md"), "hello");
+    fs.writeFileSync(path.join(folder, ".env.local"), "secret");
+    fs.writeFileSync(path.join(folder, "private.key"), "secret");
+    fs.mkdirSync(path.join(home, "data", "employees", ME), { recursive: true });
+    fs.writeFileSync(path.join(home, "data", "employees", ME, "employee.json"), JSON.stringify({ id: ME }));
+    process.env.EMPLOYEE001_HOME = home;
+    await addKnowledgeFolder(ME, { path: folder, label: "Source" });
+  });
+
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.EMPLOYEE001_HOME;
+    else process.env.EMPLOYEE001_HOME = originalHome;
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(folder, { recursive: true, force: true });
+  });
+
+  it("allows only own configured folder files and blocks sensitive names", () => {
+    expect(checkTwinRead("Read", { file_path: path.join(folder, "README.md") }, ME, ROOT).ok).toBe(true);
+    expect(checkTwinRead("Read", { file_path: path.join(folder, ".env.local") }, ME, ROOT).ok).toBe(false);
+    expect(checkTwinRead("Read", { file_path: path.join(folder, "private.key") }, ME, ROOT).ok).toBe(false);
+    expect(checkTwinRead("Glob", { path: folder, pattern: "**/.git/**" }, ME, ROOT).ok).toBe(false);
+  });
+
+  it("does not follow a symlink out of the configured folder", () => {
+    const outside = path.join(home, "outside.txt");
+    fs.writeFileSync(outside, "nope");
+    fs.symlinkSync(outside, path.join(folder, "escape.txt"));
+    expect(checkTwinRead("Read", { file_path: path.join(folder, "escape.txt") }, ME, ROOT).ok).toBe(false);
   });
 });

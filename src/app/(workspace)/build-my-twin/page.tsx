@@ -203,6 +203,9 @@ export default function BuildMyTwinPage() {
   const notes = [written.trim(), interviewed.trim() && `## Interview\n\n${interviewed.trim()}`].filter(Boolean).join("\n\n");
   const material = written.trim().length + interviewAnswerChars;
   const [files, setFiles] = useState<File[]>([]);
+  const [folderPath, setFolderPath] = useState("");
+  const [folderLabel, setFolderLabel] = useState("");
+  const [folderAdded, setFolderAdded] = useState(false);
   const [consent, setConsent] = useState(false);
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -250,7 +253,7 @@ export default function BuildMyTwinPage() {
       .catch(() => {});
   }, []);
 
-  const notesShort = material < MIN_NOTES;
+  const notesShort = material < MIN_NOTES && !folderPath.trim();
   const missing = [
     !name.trim() && "your name",
     !role.trim() && "your role",
@@ -276,6 +279,15 @@ export default function BuildMyTwinPage() {
         if (!res.ok || !body.employeeId) throw new Error(body.error ?? `Couldn't create the twin (${res.status}).`);
         id = body.employeeId;
         setCreatedId(id);
+      }
+
+      if (folderPath.trim() && !folderAdded) {
+        const folder = await fetch(`/api/employees/${encodeURIComponent(id)}/knowledge-folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: folderPath, label: folderLabel || "Local folder" }) });
+        if (!folder.ok) {
+          const why = (await folder.json().catch(() => ({}))) as { error?: string };
+          throw new Error(why.error ?? `Couldn't add folder (${folder.status}).`);
+        }
+        setFolderAdded(true);
       }
 
       const pending = files.filter((f) => !uploaded.has(f));
@@ -481,6 +493,11 @@ export default function BuildMyTwinPage() {
               </ul>
             )}
             {fileNote && <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>{fileNote}</div>}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) minmax(140px, 220px)", gap: "var(--sp-8)", marginTop: "var(--sp-12)" }}>
+              <label><span style={labelStyle}>Add a folder (optional)</span><input value={folderPath} onChange={(e) => setFolderPath(e.target.value)} placeholder="/absolute/path/to/docs" style={fieldStyle} readOnly={profileLocked} /></label>
+              <label><span style={labelStyle}>Folder label</span><input value={folderLabel} onChange={(e) => setFolderLabel(e.target.value)} placeholder="Project docs" style={fieldStyle} readOnly={profileLocked} /></label>
+            </div>
+            <div className="subtle" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-6)" }}>A read-only local folder can be your only source. The server validates it when the twin is created.</div>
           </div>
 
           <label htmlFor="twin-consent" style={{ display: "flex", gap: "var(--sp-10)", alignItems: "flex-start", fontSize: "var(--fs-sm)", lineHeight: 1.5 }}>

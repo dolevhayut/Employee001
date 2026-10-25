@@ -17,6 +17,7 @@ import {
 } from "@/lib/composio-client";
 import { loadOrgCustomMcpServers } from "@/lib/custom-mcp";
 import { listKnowledgeFiles } from "@/lib/knowledge-files";
+import { listKnowledgeFolders, type KnowledgeFolder } from "@/lib/knowledge-folders";
 import { dataDir } from "@/lib/app-home";
 import { classifyTool, isReadOnlyAction } from "@/lib/tool-policy";
 import { filterProfilingContent, type FilterResult } from "@/lib/sensitive-content";
@@ -41,6 +42,10 @@ export type { TwinFileName, TwinBuilderEvent };
 
 const EMPLOYEE_DATA_DIR = (id: string) =>
   dataDir("employees", id);
+
+export function hasBuildMaterial(materialFiles: string[], materialFolders: KnowledgeFolder[]): boolean {
+  return materialFiles.length > 0 || materialFolders.length > 0;
+}
 
 function existingFiles(employeeId: string): TwinFileName[] {
   const dir = EMPLOYEE_DATA_DIR(employeeId);
@@ -137,8 +142,9 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
   // What the person wrote and uploaded (knowledge/): enough on its own to
   // build from, so a twin doesn't need connected tools ("Build my twin").
   const materialFiles = listKnowledgeFiles(employee.id).map((f) => f.name);
+  const materialFolders = listKnowledgeFolders(employee.id);
 
-  if (!composioMcp && Object.keys(orgMcpServers).length === 0 && materialFiles.length === 0) {
+  if (!composioMcp && Object.keys(orgMcpServers).length === 0 && !hasBuildMaterial(materialFiles, materialFolders)) {
     onEvent({
       type: "error",
       message:
@@ -283,6 +289,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
     activeToolkits,
     orgMcpNames: Object.keys(orgMcpServers),
     materialFiles,
+    materialFolders,
     existingFiles: present,
     lookbackDays,
     generatedAt: buildStartedAt.toISOString(),
@@ -625,6 +632,8 @@ export function buildBuilderSystemPrompt(args: {
   orgMcpNames: string[];
   /** Files in knowledge/ (cwd-relative), the person's own material. */
   materialFiles: string[];
+  /** Configured local folders, readable material for this twin only. */
+  materialFolders: KnowledgeFolder[];
   existingFiles: TwinFileName[];
   lookbackDays: number;
   /** Exact ISO timestamp for YAML frontmatter generatedAt on every profile file. */
@@ -637,6 +646,7 @@ export function buildBuilderSystemPrompt(args: {
     activeToolkits,
     orgMcpNames,
     materialFiles,
+    materialFolders,
     existingFiles,
     lookbackDays,
     generatedAt,
@@ -738,7 +748,9 @@ All evidence gathering should focus on the **last ${lookbackDays} days** of ${fi
 
 # Available systems
 
-${materialFiles.length > 0 ? `- **What ${firstName} wrote and uploaded** — \`knowledge/\` in your cwd: ${materialFiles.map((f) => `\`knowledge/${f}\``).join(", ")}. Authored, first-person material: the strongest signal you have, for every file including TONE.md (quote their own sentences). Read all of it with Read before writing anything.${toolsConnected ? "" : ` There are no connected tools: build only from these files, and the lookback window doesn't apply. Where they don't cover a file, say so (rule 4) instead of filling it in.`}` : ""}
+${materialFiles.length > 0 ? `- **What ${firstName} wrote and uploaded** — \`knowledge/\` in your cwd: ${materialFiles.map((f) => `\`knowledge/${f}\``).join(", ")}. Authored, first-person material: the strongest signal you have, for every file including TONE.md (quote their own sentences). Read all of it with Read before writing anything.` : ""}
+${materialFolders.length > 0 ? `- **Configured local folders** — read these sources on demand with Read/Glob/Grep. Start with README and docs files before drawing conclusions: ${materialFolders.map((folder) => `**${folder.label}** (\`${folder.path}\`)`).join(", ")}.` : ""}
+${!toolsConnected && (materialFiles.length > 0 || materialFolders.length > 0) ? ` There are no connected tools: build only from these local sources, and the lookback window doesn't apply. Where they don't cover a file, say so (rule 4) instead of filling it in.` : ""}
 ${activeToolkits.length > 0 ? `- **Composio MCP** (\`mcp__composio__*\`) — ${firstName}'s personal SaaS connections currently ACTIVE: ${activeToolkits.join(", ")}.\n  - Discover with the toolkit-specific list/search tools, then read.\n  - Pattern: \`mcp__composio__<TOOLKIT>_<VERB>_<OBJECT>\` — e.g. \`mcp__composio__GITHUB_LIST_PULL_REQUESTS\`, \`mcp__composio__SLACK_SEARCH_MESSAGES\`, \`mcp__composio__GMAIL_FETCH_EMAILS\`, \`mcp__composio__GOOGLECALENDAR_LIST_EVENTS\`.` : (toolsConnected ? "- (No Composio toolkits active — rely on org-level MCP only.)" : "")}
 ${orgMcpNames.length > 0 ? `- **Org-wide MCP servers** — workspace-level tools: ${orgMcpNames.map((n) => `\`mcp__${n}__*\``).join(", ")}.` : ""}
 - **Local Read/Write/Glob/Grep** — write the 9 markdown files into \`${employeeDir}\`. The Write tool is sandboxed to that directory and to the 9 known filenames; any other path will be denied.
