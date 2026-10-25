@@ -183,6 +183,7 @@ describe("classifyTool", () => {
       "query_csv",
       "consult_twin",
       "request_approval",
+      "request_connection",
     ]) {
       expect(classifyTool(name, {})).toEqual({ kind: "allow" });
     }

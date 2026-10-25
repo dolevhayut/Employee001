@@ -145,6 +145,9 @@ const LOCAL_SAFE_TOOLS = new Set([
   // human to override. No external side effects of their own.
   "consult_twin",
   "request_approval",
+  // Connection requests only write an Inbox item on this host. They never
+  // reach the requested external system, so no approval prompt is needed.
+  "request_connection",
 ]);
 
 /** SDK tools that are never available to an employee twin. */

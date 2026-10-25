@@ -73,6 +73,7 @@ import {
 import { knowledgeIndexMarkdown } from "@/lib/knowledge-files";
 import { knowledgeFoldersIndexMarkdown } from "@/lib/knowledge-folders";
 import { buildConsultMcpServer } from "@/lib/consult-mcp";
+import { buildConnectionRequestMcpServer } from "@/lib/connection-request-mcp";
 import type { ConsultContext } from "@/lib/twin-consult";
 import { ceoOf, orgClause, readOrgIdentity } from "@/lib/org-identity";
 import { proposalsEnabled, proposeKnowledgeFromMeeting } from "@/lib/knowledge-proposals";
@@ -480,6 +481,7 @@ When the CEO asks for something that requires acting on a real system — sendin
 - For destructive or external-facing actions (sending emails, posting to Slack channels, mutating shared data), describe what you're about to do in chat BEFORE calling the tool, so the CEO can interrupt.
 - After acting, summarize what you did and link/cite the result.
 - If a connected account is missing for what you need, say so plainly. Personal toolkits live at \`/connections/${employee.id}\`; org-wide MCP servers live at \`/settings\`.`
+    + `\n- If a question needs a system you cannot reach, say so in your answer and call \`request_connection\` once with the service and why.`
     : "";
 
   const sharedFilesSection =
@@ -975,6 +977,9 @@ export async function runSingleTwin(
       // gate (the twin can already Read these files directly; the MCP
       // tool is just a more efficient retrieval surface).
       org_brain: buildOrgBrainMcpServer(),
+      // Connection requests write a local Inbox item for the admin. They do
+      // not contact or configure the requested external service.
+      connection_requests: buildConnectionRequestMcpServer(employee),
       // Twin-to-twin consultation — only when the caller threaded a context.
       // Lets this twin synchronously consult / request approval from peers;
       // the context's depth cap + shared visited-set guard against loops.

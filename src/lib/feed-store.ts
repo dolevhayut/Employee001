@@ -5,7 +5,7 @@ import { dataDir } from "@/lib/app-home";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type FeedItemType = "update" | "alert" | "needs-review" | "task-handoff";
+export type FeedItemType = "update" | "alert" | "needs-review" | "task-handoff" | "connection_request";
 export type FeedItemStatus = "open" | "resolved" | "dismissed";
 
 export type FeedSource =
@@ -30,6 +30,16 @@ export type FeedSource =
       runId: string;
       toolName: string;
       input: Record<string, unknown>;
+    }
+  | {
+      kind: "connection_request";
+      employeeId: string;
+      employeeName: string;
+      service: string;
+      reason: string;
+      scope?: string;
+      count: number;
+      lastAskedAt: string;
     }
   | { kind: "off-track"; departmentId: string; metric: string };
 
@@ -137,6 +147,8 @@ function sourceMatchesEmployee(source: FeedSource, employeeId: string): boolean 
       return source.fromId === employeeId || source.toId === employeeId;
     case "approval":
       return source.employeeId === employeeId;
+    case "connection_request":
+      return source.employeeId === employeeId;
     case "off-track":
       return false;
   }
@@ -222,6 +234,25 @@ export function resolveFeedItem(
     return items[idx];
   } catch (err) {
     console.warn("[feed-store] resolve failed", id, err);
+    return null;
+  }
+}
+
+/** Update local feed metadata without changing its open/resolved status. */
+export function updateFeedItem(
+  id: string,
+  update: Pick<FeedItem, "source" | "title" | "detail" | "priority">
+): FeedItem | null {
+  try {
+    const items = readAllLines();
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx === -1) return null;
+    items[idx] = { ...items[idx], ...update };
+    ensureDir();
+    fs.writeFileSync(FEED_FILE, items.map((item) => JSON.stringify(item)).join("\n") + "\n", "utf8");
+    return items[idx];
+  } catch (err) {
+    console.warn("[feed-store] update failed", id, err);
     return null;
   }
 }

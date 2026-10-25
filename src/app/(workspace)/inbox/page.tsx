@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
@@ -19,9 +20,10 @@ type FeedSource =
   | { kind: "task-run"; employeeId: string; runId: string; task: string }
   | { kind: "twin-task"; taskId: string; fromId: string; toId: string }
   | { kind: "approval"; employeeId: string; runId: string; toolName: string; input: Record<string, unknown> }
+  | { kind: "connection_request"; employeeId: string; employeeName: string; service: string; reason: string; scope?: string; count: number; lastAskedAt: string }
   | { kind: "off-track"; departmentId: string; metric: string };
 
-type FeedType = "update" | "alert" | "needs-review" | "task-handoff";
+type FeedType = "update" | "alert" | "needs-review" | "task-handoff" | "connection_request";
 type FeedStatus = "open" | "resolved" | "dismissed";
 
 type FeedItem = {
@@ -39,19 +41,21 @@ type FeedItem = {
 
 type FilterKey = "all" | FeedType;
 
-const TYPE_META: Record<FeedType, { label: MessageKey; color: string; bg: string }> = {
+const TYPE_META: Record<FeedType, { label: MessageKey | "Connection request"; color: string; bg: string }> = {
   "update":        { label: "inbox.type.update", color: "var(--text-subtle)", bg: "color-mix(in oklch, var(--text-subtle) 12%, transparent)" },
   "alert":         { label: "inbox.type.alert",  color: "var(--danger)", bg: "color-mix(in oklch, var(--danger) 12%, transparent)" },
   "needs-review":  { label: "inbox.type.review", color: "var(--warn)", bg: "color-mix(in oklch, var(--warn) 12%, transparent)" },
   "task-handoff":  { label: "inbox.type.handoff", color: "var(--twin)", bg: "color-mix(in oklch, var(--twin) 12%, transparent)" },
+  "connection_request": { label: "Connection request", color: "var(--accent)", bg: "color-mix(in oklch, var(--accent) 12%, transparent)" },
 };
 
-const FILTERS: { key: FilterKey; label: MessageKey }[] = [
+const FILTERS: { key: FilterKey; label: MessageKey | "Connection requests" }[] = [
   { key: "all", label: "inbox.filter.all" },
   { key: "update", label: "inbox.filter.updates" },
   { key: "alert", label: "inbox.filter.alerts" },
   { key: "needs-review", label: "inbox.filter.review" },
   { key: "task-handoff", label: "inbox.filter.handoffs" },
+  { key: "connection_request", label: "Connection requests" },
 ];
 
 function relTime(ts: string | undefined, locale: Locale): string {
@@ -77,7 +81,7 @@ function TypeBadge({ type }: { type: FeedType }) {
         letterSpacing: "0.04em",
       }}
     >
-      {t(m.label)}
+      {type === "connection_request" ? m.label : t(m.label as MessageKey)}
     </span>
   );
 }
@@ -184,6 +188,17 @@ function SourceLine({ source }: { source: FeedSource }) {
         >
           <bdi>{source.toolName}</bdi>
         </code>
+      </div>
+    );
+  }
+  if (source.kind === "connection_request") {
+    return (
+      <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-6)" }}>
+        <EmpAvatar employeeId={source.employeeId} size={18} />
+        <span style={{ fontSize: "var(--fs-meta)", color: "var(--text-muted)", fontWeight: 500 }}>
+          <bdi>{source.employeeName}</bdi>
+        </span>
+        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-subtle)" }}>· requested <bdi>{source.service}</bdi></span>
       </div>
     );
   }
@@ -363,7 +378,7 @@ export default function InboxPage() {
                 transition: "background .12s, color .12s",
               }}
             >
-              {t(f.label)}
+              {f.key === "connection_request" ? f.label : t(f.label as MessageKey)}
             </button>
           );
         })}
@@ -455,6 +470,8 @@ export default function InboxPage() {
             <AnimatePresence initial={false}>
               {filteredItems.map((item) => {
                 const isOpenReview = item.type === "needs-review" && item.status === "open";
+                const connectionRequest = item.source.kind === "connection_request" ? item.source : null;
+                const isOpenConnectionRequest = item.type === "connection_request" && item.status === "open" && Boolean(connectionRequest);
                 const isResolved = item.status !== "open";
                 const routineSource = item.source.kind === "routine" ? item.source : null;
                 return (
@@ -517,9 +534,35 @@ export default function InboxPage() {
                     )}
 
                     {/* Source line */}
-                    <div style={{ marginBottom: isOpenReview || isResolved ? 10 : 0 }}>
+                    <div style={{ marginBottom: isOpenReview || isOpenConnectionRequest || isResolved ? 10 : 0 }}>
                       <SourceLine source={item.source} />
                     </div>
+
+                    {isOpenConnectionRequest && connectionRequest && (
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--sp-6)", paddingTop: "var(--sp-8)", borderTop: "1px solid var(--hairline)" }}>
+                        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", marginInlineEnd: "var(--sp-4)" }}>
+                          {connectionRequest.scope ? `Scope: ${connectionRequest.scope}` : "No scope specified"}
+                          {connectionRequest.count > 1 ? ` · asked ${connectionRequest.count} times` : ""}
+                        </span>
+                        <Link href={`/connections/${connectionRequest.employeeId}`} className="btn ghost sm" style={{ height: 26 }}>
+                          Composio connections
+                        </Link>
+                        <Link href="/settings#custom-mcp" className="btn ghost sm" style={{ height: 26 }}>
+                          Custom MCP
+                        </Link>
+                        <button
+                          onClick={() => resolve(item.id, "approved")}
+                          disabled={resolvingId === item.id}
+                          className="btn sm"
+                          style={{ height: 26, background: "var(--success)", borderColor: "var(--success)", color: "var(--bg)" }}
+                        >
+                          <Icons.Check size={11} /> Mark done
+                        </button>
+                        <button onClick={() => resolve(item.id, "dismissed")} disabled={resolvingId === item.id} className="btn ghost sm" style={{ height: 26 }}>
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
 
                     {/* Approval actions */}
                     {isOpenReview && (
