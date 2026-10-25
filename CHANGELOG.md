@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.10.0] — 2026-10-25
+
 ### Hardened twin sandbox (opt-in)
 - `EMPLOYEE001_SANDBOX=1` wraps every Agent SDK twin process in Anthropic
   Sandbox Runtime for an OS-level filesystem and network boundary in addition
