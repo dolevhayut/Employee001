@@ -18,6 +18,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   profile writes available only to Twin Builder; sensitive data and Claude Code
   startup configuration are denied.
 
+### The Docker image runs twins again
+- The container image (Fly and other single-tenant deploys) was missing the
+  Agent SDK's native Claude Code binary, so twins couldn't answer there.
+  The SDK picks the binary by a package name computed at run time, and the
+  standalone build doesn't trace it. The image now copies it in. Verified in
+  the container: Claude Code starts and reaches the API.
+
 ### Build your own twin, no tools to connect
 - A new **Build my twin** page (`/build-my-twin`, first on the Launchpad) lets
   the person running Employee001 brief their own twin. You give it your name,

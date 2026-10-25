@@ -26,6 +26,13 @@ WORKDIR /app
 # Next.js standalone output (server.js at the standalone root). The post-build
 # step already copies .next/static and public/ into it.
 COPY --from=build /app/.next/standalone ./
+# The Agent SDK finds its native Claude Code binary by a package name it
+# computes at run time (@anthropic-ai/claude-agent-sdk-linux-<arch>), which
+# the standalone file tracer can't follow, so twin runs had no binary here.
+# Same versions as the build: this adds the platform package (and puts
+# sandbox-runtime alongside; hardened mode still needs bubblewrap, socat and
+# ripgrep, which this image doesn't install).
+COPY --from=deps /app/node_modules/@anthropic-ai/ ./node_modules/@anthropic-ai/
 
 # server.js reads HOSTNAME/PORT; the app's proxy.ts middleware reads EMPLOYEE001_BIND
 # to enforce the token gate on a non-loopback bind. EMPLOYEE001_TOKEN comes from
