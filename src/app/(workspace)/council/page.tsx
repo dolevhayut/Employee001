@@ -1944,14 +1944,15 @@ function CouncilPageInner() {
   const [activeIdsOverride, setActiveIdsOverride] = useState<Set<string> | null>(
     null
   );
-  const activeIds = useMemo(
-    () =>
-      activeIdsOverride ??
-      new Set(
-        roster.filter((e) => e.twinStatus === "ready" && e.lifecycle !== "retired").map((e) => e.id)
-      ),
-    [activeIdsOverride, roster]
-  );
+  // The override is narrowed to twins that can answer now: a meeting continued
+  // from History may list twins since retired or not ready. If none are left,
+  // fall back to every ready twin so the CEO can still ask.
+  const activeIds = useMemo(() => {
+    const ready = roster.filter((e) => e.twinStatus === "ready" && e.lifecycle !== "retired").map((e) => e.id);
+    if (!activeIdsOverride) return new Set(ready);
+    const kept = ready.filter((id) => activeIdsOverride.has(id));
+    return new Set(kept.length > 0 ? kept : ready);
+  }, [activeIdsOverride, roster]);
   const [threads, setThreads] = useState<MessageThread[]>([]);
   // Stable across CEO messages — server uses it to load the meeting transcript
   // so every twin sees prior CEO asks and prior twin turns. Meetings are stored
@@ -2019,8 +2020,8 @@ function CouncilPageInner() {
 
   function toggleParticipant(id: string) {
     setActiveIdsOverride((prev) => {
-      const base = prev ?? activeIds;
-      const next = new Set(base);
+      // Toggle on the effective room, so the "at least one" guard counts real twins.
+      const next = new Set(activeIds);
       if (next.has(id)) {
         if (next.size <= 1) return prev;
         next.delete(id);
