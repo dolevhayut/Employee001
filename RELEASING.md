@@ -66,10 +66,16 @@ and creates the GitHub Release. Watch progress under the Actions tab.
 Run locally before tagging:
 
 ```bash
+node scripts/release-gate.mjs
+# On macOS/Linux, also exercise the OS sandbox boundary:
+node scripts/release-gate.mjs --sandbox
 npm run lint
 npm run build
 node bin/cli.mjs doctor
 npm pack --dry-run    # eyeball the file list
 ```
+
+Run the release gate before `npm version`; it packs the already-built tree into
+a fresh install, then checks first-answer and twin safety flows.
 
 If any of those fail or print surprises, fix them before tagging.
