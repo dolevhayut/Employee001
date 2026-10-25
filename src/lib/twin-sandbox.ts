@@ -20,9 +20,10 @@ let initializing: Promise<void> | undefined;
 const wrappedByScope = new Map<string, WrappedSandbox>();
 
 export function twinSandboxEnabled(env: Env = process.env): boolean { return env.EMPLOYEE001_SANDBOX === "1"; }
+// Marketplace trial chats run as ".trial-<agentId>", the only id with a dot.
 function scopeEmployeeId(scope: string): string | null {
   if (scope === SYSTEM_SCOPE) return "system";
-  return /^(builder|chat|meeting|routine|relay):([A-Za-z0-9][A-Za-z0-9_-]*)$/.exec(scope)?.[2] ?? null;
+  return /^(builder|chat|meeting|routine|relay):((?:\.trial-)?[A-Za-z0-9][A-Za-z0-9_-]*)$/.exec(scope)?.[2] ?? null;
 }
 function localLiterals(url: string | undefined): string[] {
   try {

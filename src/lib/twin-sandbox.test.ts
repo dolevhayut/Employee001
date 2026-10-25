@@ -92,6 +92,16 @@ describe("twin sandbox policy", () => {
     else process.env.EMPLOYEE001_SANDBOX = previous;
   });
 
+  it("accepts marketplace trial scopes and still rejects other dotted ids", async () => {
+    const previous = process.env.EMPLOYEE001_SANDBOX;
+    process.env.EMPLOYEE001_SANDBOX = "1";
+    await expect(ensureTwinSandbox("chat:.trial-sdr")).resolves.toBeUndefined();
+    await expect(ensureTwinSandbox("chat:../escape")).rejects.toThrow("Invalid twin sandbox scope");
+    await expect(ensureTwinSandbox("chat:.hidden")).rejects.toThrow("Invalid twin sandbox scope");
+    if (previous === undefined) delete process.env.EMPLOYEE001_SANDBOX;
+    else process.env.EMPLOYEE001_SANDBOX = previous;
+  });
+
   it("fails closed when the SDK child did not receive a prepared scope", () => {
     const previous = process.env.EMPLOYEE001_SANDBOX;
     process.env.EMPLOYEE001_SANDBOX = "1";

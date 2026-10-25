@@ -137,6 +137,21 @@ describe("configured folder scope", () => {
     expect(checkTwinRead("Glob", { path: folder, pattern: "**/.git/**" }, ME, ROOT).ok).toBe(false);
   });
 
+  it("the builder's folder check refuses a symlink out of the folder", () => {
+    const outside = path.join(home, "outside-builder.txt");
+    fs.writeFileSync(outside, "nope");
+    fs.symlinkSync(outside, path.join(folder, "escape-builder.txt"));
+    expect(checkConfiguredFolderRead("Read", { file_path: path.join(folder, "escape-builder.txt") }, ME, "/tmp").ok).toBe(false);
+    expect(checkConfiguredFolderRead("Read", { file_path: path.join(folder, "README.md") }, ME, "/tmp").ok).toBe(true);
+    // A linked directory part-way down the path.
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "employee001-outside-"));
+    fs.writeFileSync(path.join(outsideDir, "secret.md"), "nope");
+    fs.symlinkSync(outsideDir, path.join(folder, "linked-dir"));
+    const real = fs.realpathSync(folder);
+    expect(checkConfiguredFolderRead("Read", { file_path: path.join(real, "linked-dir", "secret.md") }, ME, "/tmp").ok).toBe(false);
+    fs.rmSync(outsideDir, { recursive: true, force: true });
+  });
+
   it("does not follow a symlink out of the configured folder", () => {
     const outside = path.join(home, "outside.txt");
     fs.writeFileSync(outside, "nope");

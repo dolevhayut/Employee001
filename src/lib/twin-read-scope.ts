@@ -120,6 +120,22 @@ export function checkConfiguredFolderRead(
   if (hasBlockedFolderSegment(raw) || hasBlockedFolderSegment(extra)) {
     return { ok: false, reason: `${toolName} cannot access secrets, git internals or dependencies.` };
   }
+  // A path that sits inside a configured folder but resolves outside it is a
+  // symlink leading out: chat runs fall back to the normal twin rules there,
+  // but this check is the builder's only one, so refuse it here.
+  const absolute = path.resolve(cwd, raw || ".");
+  // Canonicalize the parent only, so /var vs /private/var still compares,
+  // while the last segment (the possible link) is kept as written.
+  const parent = realPath(path.dirname(absolute));
+  const lexical = parent ? path.join(parent, path.basename(absolute)) : absolute;
+  const resolved = realPath(absolute);
+  for (const folder of listKnowledgeFolders(employeeId)) {
+    const configured = realPath(folder.path) ?? folder.path;
+    const viaFolder = [absolute, lexical].some((p) => isWithin(p, folder.path) || isWithin(p, configured));
+    if (viaFolder && resolved && !isWithin(resolved, configured)) {
+      return { ok: false, reason: `${toolName} cannot follow a link out of a configured folder.` };
+    }
+  }
   return configuredFolderDecision(raw, employeeId, cwd, toolName) ?? { ok: true };
 }
 
