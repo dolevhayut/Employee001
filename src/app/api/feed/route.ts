@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listFeed, type FeedItemType, type FeedItemStatus } from "@/lib/feed-store";
+import { ROLE_RANK } from "@/lib/auth/rbac";
+import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
@@ -26,6 +28,10 @@ export async function GET(req: NextRequest) {
     if (!Number.isNaN(n) && n > 0) filter.limit = n;
   }
 
-  const items = listFeed(filter);
+  // Connection requests are for whoever can connect systems: admins, or the
+  // local owner when there are no accounts (no session headers).
+  const user = sessionUserFromHeaders(req.headers);
+  const canConnect = !user || ROLE_RANK[user.role] >= ROLE_RANK.admin;
+  const items = listFeed(filter).filter((item) => canConnect || item.type !== "connection_request");
   return NextResponse.json(items);
 }

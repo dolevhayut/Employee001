@@ -123,8 +123,8 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/council/file": { GET: member },
   "/api/council/approve": { POST: approver },
   "/api/approvals/pending": { GET: member },
-  "/api/feed": { GET: admin },
-  "/api/feed/[id]/resolve": { POST: admin },
+  "/api/feed": { GET: member },
+  "/api/feed/[id]/resolve": { POST: approver },
   "/api/stt": { POST: member },
   "/api/stt/token": { POST: member },
   "/api/tts": { POST: member },
@@ -192,7 +192,7 @@ const PUBLIC_PAGES = [/^\/login(\/|$)/, /^\/signup(\/|$)/, /^\/forgot-password(\
 /** Pages an employee-role user may open. */
 const EMPLOYEE_PAGES = [/^\/$/, /^\/profile(\/|$)/, /^\/account(\/|$)/, /^\/handover\/interview(\/|$)/];
 /** Admin-only pages. */
-const ADMIN_PAGES = [/^\/build-my-twin(\/|$)/, /^\/settings(\/|$)/, /^\/audit(\/|$)/, /^\/connections(\/|$)/, /^\/budgets(\/|$)/, /^\/handover\/?$/, /^\/inbox(\/|$)/];
+const ADMIN_PAGES = [/^\/build-my-twin(\/|$)/, /^\/settings(\/|$)/, /^\/audit(\/|$)/, /^\/connections(\/|$)/, /^\/budgets(\/|$)/, /^\/handover\/?$/];
 
 type Compiled = { pattern: string; re: RegExp; params: string[]; methods: Methods };
 
