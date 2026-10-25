@@ -86,6 +86,8 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
   | "promptSuggestions"
   | "agentProgressSummaries"
   | "strictMcpConfig"
+  | "verbatimPrompts"
+  | "skills"
 > {
   const runtimeOptions = providerRuntimeOptions();
   const effort: EffortLevel =
