@@ -1,6 +1,6 @@
 {
   "name": "employee001",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Your company's organizational brain: agent twins of your real employees, self-hosted on your own machine. MIT. Telemetry is opt-in and off by default.",
   "license": "MIT",
   "author": "Dolev Hayut",
