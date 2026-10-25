@@ -116,7 +116,7 @@ function OnboardingPageInner() {
     };
   }, [inviteToken]);
 
-  const defaultName = emp?.name ?? inviteHint.name ?? (inviteToken ? "" : "Sarah Chen");
+  const defaultName = emp?.name ?? inviteHint.name ?? "";
   const defaultRole = emp?.role ?? inviteHint.role ?? "";
 
   // When arriving via an invite link the viewer is always the employee —
@@ -219,7 +219,7 @@ function OnboardingPageInner() {
   // Only overwrite when the field is still at the literal placeholder —
   // otherwise a refreshed/persisted edit would silently revert.
   useEffect(() => {
-    if (inviteHint.name && (!name.trim() || name === "Sarah Chen")) setName(inviteHint.name);
+    if (inviteHint.name && !name.trim()) setName(inviteHint.name);
     if (inviteHint.role && !role.trim()) setRole(inviteHint.role);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inviteHint.name, inviteHint.role]);
