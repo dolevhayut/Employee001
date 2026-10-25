@@ -79,6 +79,31 @@ describe("claude-code provider", () => {
     expect(() => claudeCodeExecutable()).toThrow(/isn't installed/);
   });
 
+  it("isolates every twin run from the signed-in user's Claude Code, in any provider", () => {
+    for (const provider of ["claude-code", "anthropic"]) {
+      process.env.EMPLOYEE001_MODEL_PROVIDER = provider;
+      process.env.PATH = dir;
+      const options = buildBaseOptions({ surface: "chat", runId: "r", employeeId: "e" });
+      // "@/path" and "/command" in prompt text must stay text.
+      expect(options.verbatimPrompts, provider).toBe(true);
+      expect(options.skills, provider).toEqual([]);
+      expect(options.strictMcpConfig, provider).toBe(true);
+      expect(options.env, provider).toMatchObject({
+        CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+        ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+        CLAUDE_CODE_DISABLE_BUNDLED_SKILLS: "1",
+      });
+    }
+  });
+
+  it("no SDK run skips permission checks", () => {
+    const lib = path.resolve(import.meta.dirname);
+    const files = fs.readdirSync(lib, { recursive: true }) as string[];
+    for (const file of files.filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))) {
+      expect(fs.readFileSync(path.join(lib, file), "utf8"), file).not.toMatch(/permissionMode:\s*"bypassPermissions"/);
+    }
+  });
+
   it("leaves the bundled runtime alone for other providers", () => {
     process.env.EMPLOYEE001_MODEL_PROVIDER = "anthropic";
     expect(claudeCodeExecutable()).toBeUndefined();

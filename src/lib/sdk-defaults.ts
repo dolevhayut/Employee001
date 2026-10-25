@@ -132,22 +132,44 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
  *  allowlisted env (sdk-env.ts) with the provider's flags, and, in
  *  claude-code mode, the user's own `claude` instead of the bundled runtime.
  *  Spread it into any query() options that don't use buildBaseOptions. */
-export function providerRuntimeOptions(): Pick<Options, "env" | "pathToClaudeCodeExecutable" | "spawnClaudeCodeProcess"> {
+export function providerRuntimeOptions(): Pick<Options, "env" | "pathToClaudeCodeExecutable" | "spawnClaudeCodeProcess" | "verbatimPrompts" | "skills" | "strictMcpConfig"> {
   const executable = claudeCodeExecutable();
   return {
     // providerEnvForAgentSdk() unsets other providers' flags with undefined,
-    // which sdkChildEnv drops.
+    // which sdkChildEnv drops. The isolation flags go last: claude-code mode
+    // strips every CLAUDE_* variable first.
     env: {
       ...sdkChildEnv(process.env, {
       ...providerEnvForAgentSdk(),
       CLAUDE_AGENT_SDK_CLIENT_APP: PKG_VERSION,
+      ...TWIN_ISOLATION_ENV,
       }),
       E001_SANDBOX_SCOPE: "system",
     },
     ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
     ...(twinSandboxEnabled() ? { spawnClaudeCodeProcess } : {}),
+    // Prompts carry text the end user, an inbound message or another twin
+    // wrote. Without this, "@/any/path" in that text makes the CLI read the
+    // file into context (no tool call, so no hook or canUseTool sees it), and
+    // "/name" dispatches a skill or command. Needs Claude Code 2.1.248+
+    // (MIN_CLAUDE_CODE_VERSION is above that; the bundled runtime too).
+    verbatimPrompts: true,
+    // No Claude Code skills (bundled or the user's); org skills are ours.
+    skills: [],
+    // No MCP servers beyond the ones a run passes.
+    strictMcpConfig: true,
   };
 }
+
+/** Claude Code state that must not reach a twin: the auto memory of the git
+ *  repo around cwd (in dev, the founder's own notes), claude.ai connectors
+ *  (the signed-in user's Gmail, Drive...) and bundled skills. settingSources
+ *  [] doesn't cover these. */
+export const TWIN_ISOLATION_ENV = {
+  CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+  ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+  CLAUDE_CODE_DISABLE_BUNDLED_SKILLS: "1",
+} as const;
 
 // ─── Hooks factory ───────────────────────────────────────────────────────────
 

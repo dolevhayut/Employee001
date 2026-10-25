@@ -1128,14 +1128,16 @@ async function extractFactsViaLLM(
         model,
         fallbackModel: modelForProvider(DREAMER_FALLBACK_MODEL),
         systemPrompt: DREAMER_SYSTEM,
-        allowedTools: [],
+        // No tools at all: an empty allowedTools restricts nothing under a
+        // permissive mode, and these prompts carry untrusted text.
+        tools: [],
         // Structured-output extraction needs a couple of internal turns (the
         // model answers, then the SDK has it conform to the schema); 1–2 flaked
         // ~12% of the time → silent regex fallback. 4 gives reliable headroom
         // and stays cheap on Haiku.
         maxTurns: 4,
         outputFormat: { type: "json_schema", schema: DREAMER_SCHEMA },
-        permissionMode: "bypassPermissions",
+        permissionMode: "dontAsk",
         settingSources: [],
         ...providerRuntimeOptions(),
       },
