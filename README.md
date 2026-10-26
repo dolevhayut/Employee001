@@ -12,7 +12,7 @@
 npx employee001     # first run: a short setup, then it opens http://localhost:3000
 ```
 
-Signed in to Claude Code? Your Claude subscription runs the twins, no API key needed.
+Signed in to Claude Code? Your Claude subscription runs the twins, no API key needed, and it covers one person.
 
 [![npm version](https://img.shields.io/npm/v/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
 [![npm downloads](https://img.shields.io/npm/dm/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
@@ -40,7 +40,7 @@ Signed in to Claude Code? Your Claude subscription runs the twins, no API key ne
 
 ## Get started in five minutes
 
-1. **Run it.** `npx employee001`. Setup finds your signed-in Claude Code and offers your Claude subscription, with no API key. Otherwise it asks for an Anthropic API key, your cloud provider (Bedrock, Vertex AI, Foundry) or a local model.
+1. **Run it.** `npx employee001`. Setup finds your signed-in Claude Code and offers your Claude subscription, with no API key; it covers one person. Otherwise it asks for an Anthropic API key, your cloud provider (Bedrock, Vertex AI, Foundry) or a local model.
 2. **Build your own twin.** Open **Build my twin**, first on the Launchpad. Write about your work or answer a short interview, add documents if you like, and agree. The builder writes the nine profile files while you watch.
 3. **Ask it.** Open **Ask**, pick your twin, and ask it what people usually ask you.
 
