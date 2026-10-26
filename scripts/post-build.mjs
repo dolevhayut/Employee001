@@ -15,7 +15,7 @@
 // list ships only .next/standalone/, so these copies are the only ones in
 // the tarball (shipping the root originals too doubled ~9 MB, E-130).
 
-import { cpSync, existsSync, mkdirSync, rmSync, readdirSync, statSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -121,6 +121,36 @@ if (existsSync(PUBLIC_SRC)) {
   console.log(`[post-build] copied public → standalone/public`);
 } else {
   console.warn("[post-build] public/ missing — skipping");
+}
+
+// serverExternalPackages are loaded through hashed aliases that Next writes
+// as symlinks, e.g. .next/node_modules/@anthropic-ai/sandbox-runtime-<hash>
+// -> ../../../node_modules/@anthropic-ai/sandbox-runtime. npm pack drops
+// symlinks, so in an installed package the alias was missing and hardened
+// mode (EMPLOYEE001_SANDBOX=1) couldn't load. Replace each one with a small
+// real package that re-exports the original, which Node then finds by walking
+// up to the standalone node_modules.
+const ALIASES = join(STANDALONE, ".next", "node_modules");
+function aliasLinks(dir) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).flatMap((name) => {
+    const full = join(dir, name);
+    const stat = lstatSync(full);
+    if (stat.isSymbolicLink()) return [full];
+    return name.startsWith("@") && stat.isDirectory() ? aliasLinks(full) : [];
+  });
+}
+for (const link of aliasLinks(ALIASES)) {
+  const target = resolve(dirname(link), readlinkSync(link));
+  const pkg = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
+  const esm = pkg.type === "module";
+  rmSync(link, { force: true });
+  mkdirSync(link, { recursive: true });
+  writeFileSync(join(link, "package.json"), JSON.stringify({ name: link.slice(ALIASES.length + 1), private: true, ...(esm ? { type: "module" } : {}), main: "./index.js" }, null, 2) + "\n");
+  writeFileSync(join(link, "index.js"), esm
+    ? `export * from ${JSON.stringify(pkg.name)};\n`
+    : `module.exports = require(${JSON.stringify(pkg.name)});\n`);
+  console.log(`[post-build] replaced alias symlink ${link.slice(STANDALONE.length + 1)} with a re-export of ${pkg.name}`);
 }
 
 console.log("[post-build] done.");

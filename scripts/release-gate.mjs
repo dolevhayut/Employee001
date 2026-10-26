@@ -493,8 +493,12 @@ async function main() {
     await step("attack: folder reads", () => folderAttack(baseUrl, employeeId, homeDir));
   } finally {
     await Promise.all(servers.map(stopServer));
-    if (tempRoot) await rm(tempRoot, { recursive: true, force: true });
+    // Report first: a cleanup error must not hide the results.
     printReport();
+    // A child that is still exiting can write into the temp tree.
+    if (tempRoot) await rm(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 }).catch((error) => {
+      console.warn(`Could not remove ${tempRoot}: ${error instanceof Error ? error.message : error}`);
+    });
   }
 }
 
