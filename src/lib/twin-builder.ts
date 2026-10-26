@@ -250,7 +250,7 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
         onEvent({ type: "tool_blocked", tool: toolName, reason: scope.reason, ts: ts() });
         return { behavior: "deny", message: scope.reason };
       }
-      return { behavior: "allow", updatedInput: typedInput };
+      return { behavior: "allow", updatedInput: scope.updatedInput ?? typedInput };
     }
 
     // Composio + org MCP: read-only actions only. Training reads the

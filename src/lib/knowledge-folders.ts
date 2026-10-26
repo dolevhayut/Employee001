@@ -41,6 +41,23 @@ function canonical(p: string): string {
  * git internals and dependencies. */
 const BLOCKED_NAME = /^(?:\.env[^/]*|\.dev\.vars|\.npmrc|\.netrc|\.pypirc|\.git|node_modules|id_(?:rsa|dsa|ecdsa|ed25519)[^/]*|credentials[^/]*|.*\.(?:pem|key|p12|pfx|keystore|jks))$/i;
 
+/** A ripgrep glob that leaves out every name BLOCKED_NAME covers. A Grep
+ * over a whole configured folder runs with it, so search covers the folder
+ * without reading secrets, keys, git internals or dependencies. */
+export const SECRET_EXCLUDE_GLOB =
+  "!{**/.env*,**/.dev.vars,**/.npmrc,**/.netrc,**/.pypirc,**/.git/**,**/node_modules/**,**/id_rsa*,**/id_dsa*,**/id_ecdsa*,**/id_ed25519*,**/credentials*,**/*.pem,**/*.key,**/*.p12,**/*.pfx,**/*.keystore,**/*.jks}";
+
+const BLOCKED_EXTENSIONS = new Set(["pem", "key", "p12", "pfx", "keystore", "jks", "env"]);
+
+/** Is this Grep glob an extension filter ("*.ts", "**\/*.{ts,tsx}") that
+ * can't match a blocked name? Those are kept as the twin wrote them. */
+export function isSafeExtensionGlob(glob: string): boolean {
+  const m = /^(?:\*\*\/)?\*\.(?:([A-Za-z0-9]+)|\{([A-Za-z0-9]+(?:,[A-Za-z0-9]+)*)\})$/.exec(glob.trim());
+  if (!m) return false;
+  const exts = (m[1] ?? m[2]).split(",").map((e) => e.toLowerCase());
+  return exts.every((e) => !BLOCKED_EXTENSIONS.has(e));
+}
+
 export function isBlockedFolderName(name: string): boolean {
   return BLOCKED_NAME.test(name);
 }

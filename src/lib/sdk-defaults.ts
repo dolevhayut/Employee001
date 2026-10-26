@@ -414,7 +414,17 @@ export function buildTwinHooks(
     if (!["Read", "Glob", "Grep"].includes(pre.tool_name)) return {};
     const toolInput = (pre.tool_input ?? {}) as Record<string, unknown>;
     const decision = checkTwinRead(pre.tool_name, toolInput, ctx.employeeId, dataDir(), ctx.cwd ?? dataDir());
-    if (decision.ok) return {};
+    if (decision.ok) {
+      // A Grep over a configured folder runs with the secret-excluding glob.
+      if (!decision.updatedInput) return {};
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse" as const,
+          permissionDecision: "allow" as const,
+          updatedInput: decision.updatedInput,
+        },
+      };
+    }
     try {
       appendAuditEntry({
         runId: ctx.runId,
