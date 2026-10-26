@@ -7,6 +7,13 @@
 
 import { useMemo, useState } from "react";
 import DOMPurify from "dompurify";
+import { isSafeImageSrc, styleLoadsResource } from "@/lib/safe-image-src";
+
+function stripRemoteLoads(_node: Element, data: { attrName: string; attrValue: string; keepAttr: boolean }) {
+  const name = data.attrName.toLowerCase();
+  if (name === "style" && styleLoadsResource(data.attrValue)) data.keepAttr = false;
+  if ((name === "src" || name === "href" || name === "xlink:href") && _node.nodeName.toLowerCase() !== "a" && !isSafeImageSrc(data.attrValue)) data.keepAttr = false;
+}
 import { motion } from "framer-motion";
 import type { ClarificationQuestion } from "@/lib/council-runner";
 import { useT } from "@/components/ex/i18n-context";
@@ -192,11 +199,18 @@ function OptionCard({
   // Sanitise the HTML preview defensively — the model emits this string.
   const safePreview = useMemo(() => {
     if (!preview) return null;
-    return DOMPurify.sanitize(preview, {
-      // Block scripts, iframes, embed tags, on* event handlers.
-      FORBID_TAGS: ["script", "iframe", "object", "embed", "form", "input", "button"],
-      FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus"],
-    });
+    // Nothing in the preview may fetch from elsewhere: a remote image, media
+    // source or CSS url() loads on render and could carry data out.
+    DOMPurify.addHook("uponSanitizeAttribute", stripRemoteLoads);
+    try {
+      return DOMPurify.sanitize(preview, {
+        // Block scripts, iframes, embed tags, on* event handlers.
+        FORBID_TAGS: ["script", "iframe", "object", "embed", "form", "input", "button", "link", "style", "video", "audio", "source", "track", "picture"],
+        FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "srcset", "poster", "background", "ping"],
+      });
+    } finally {
+      DOMPurify.removeHook("uponSanitizeAttribute");
+    }
   }, [preview]);
 
   return (

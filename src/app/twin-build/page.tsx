@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import { isSafeImageSrc } from "@/lib/safe-image-src";
 import remarkGfm from "remark-gfm";
 import { Icons } from "@/components/ex/icons";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
@@ -1147,7 +1148,7 @@ function FilePreview({
               color: "var(--text)",
             }}
           >
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: ({ src, alt }) => (isSafeImageSrc(src) ? <img src={src} alt={alt ?? ""} style={{ maxWidth: "100%" }} /> : <span>[image not loaded{alt ? `: ${alt}` : ""}]</span>) }}>{body}</ReactMarkdown>
           </article>
         </>
       )}

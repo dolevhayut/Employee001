@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ReactNode } from "react";
 import { useRoster } from "@/components/ex/roster-context";
+import { isSafeImageSrc } from "@/lib/safe-image-src";
 
 /** Turn `@FirstName` for the given people into mention links Markdown renders as chips. */
 export function linkMentions(text: string, people: { id: string; firstName: string }[]): string {
@@ -63,6 +64,17 @@ export function Markdown({ children }: Props) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          // Remote images would load as soon as the reply renders (an exfil
+          // channel that skips approvals); show them as text instead.
+          img: ({ src, alt }: { src?: unknown; alt?: string }) =>
+            isSafeImageSrc(src) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={src} alt={alt ?? ""} style={{ maxWidth: "100%" }} />
+            ) : (
+              <span style={{ color: "var(--text-muted)", fontSize: "0.92em" }}>
+                [image not loaded{alt ? `: ${alt}` : ""}{typeof src === "string" ? ` (${src.slice(0, 120)})` : ""}]
+              </span>
+            ),
           // Render as <div> instead of <p> — react-markdown can produce
           // <pre>/<table>/<ul> as children of <p> during streaming, which is
           // invalid HTML and triggers a hydration error. <div> accepts any block.
