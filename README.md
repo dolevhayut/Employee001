@@ -14,6 +14,16 @@ npx employee001     # first run: a short setup, then it opens http://localhost:3
 
 Signed in to Claude Code? Your Claude subscription runs the twins, no API key needed.
 
+<table>
+  <tr>
+    <td width="33%" valign="top"><b>1. Run it</b><br /><code>npx employee001</code><br /><sub>A short setup, then it opens http://localhost:3000.</sub></td>
+    <td width="33%" valign="top"><b>2. Build my twin</b><br /><img src="docs/screenshots/build-my-twin.png" width="100%" alt="Build my twin: write or be interviewed" /><br /><sub>Write about your work or be interviewed.</sub></td>
+    <td width="33%" valign="top"><b>3. Get a first answer</b><br /><img src="docs/screenshots/ask.png" width="100%" alt="Ask a twin, with the answer, its sources and its run drawn as a graph" /><br /><sub>Ask your twin. The answer comes with its sources.</sub></td>
+  </tr>
+</table>
+
+Claude subscription covers one person. For a team, use an Anthropic API key, a cloud provider or a local model.
+
 [![npm version](https://img.shields.io/npm/v/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
 [![npm downloads](https://img.shields.io/npm/dm/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
 [![CI](https://img.shields.io/github/actions/workflow/status/dolevhayut/Employee001/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/dolevhayut/Employee001/actions/workflows/ci.yml)
