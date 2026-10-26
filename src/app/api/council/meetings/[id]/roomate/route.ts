@@ -78,21 +78,21 @@ export async function POST(request: Request, { params }: Params) {
   const meeting = getMeeting(id);
   if (!meeting) return json({ error: "meeting not found" }, 404);
 
-  if (body.phase === "done") {
+  if (body.phase === "done" || body.phase === "failed") {
+    // An approval can wait minutes; "Summarize again" meanwhile keeps the
+    // action (and its sent state) but may move it. Follow it by its text.
+    const actions = meeting.summary?.actions ?? [];
+    const at = actions[index]?.action === actionText ? index : actions.findIndex((a) => a.action === actionText);
+    if (at < 0) return json({ error: "not_found", message: "That action isn't in the meeting's summary." }, 404);
+    if (body.phase === "failed") {
+      const result = releaseActionSent(meeting.id, at, actionText);
+      return result.ok ? json({ summary: result.summary }) : refused(result);
+    }
     const reply = typeof body.reply === "string" ? body.reply.slice(0, 50_000) : "";
     const taskId = extractTaskId(reply);
-    if (!taskId) {
-      const current = meeting.summary?.actions[index];
-      if (!current || current.action !== actionText) return json({ error: "not_found" }, 404);
-      return json({ taskId: null, summary: meeting.summary });
-    }
-    const result = recordActionTaskId(meeting.id, index, actionText, taskId);
+    if (!taskId) return json({ taskId: null, summary: meeting.summary });
+    const result = recordActionTaskId(meeting.id, at, actionText, taskId);
     return result.ok ? json({ taskId, summary: result.summary }) : refused(result);
-  }
-
-  if (body.phase === "failed") {
-    const result = releaseActionSent(meeting.id, index, actionText);
-    return result.ok ? json({ summary: result.summary }) : refused(result);
   }
 
   if (body.phase !== "start") return json({ error: "invalid_body" }, 400);

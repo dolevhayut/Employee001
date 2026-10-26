@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
@@ -202,6 +202,7 @@ export function SendToRoomate({
   action,
   ownerName,
   ownerLeft,
+  inDialog = false,
   onSummary,
 }: {
   meetingId: string;
@@ -210,6 +211,8 @@ export function SendToRoomate({
   ownerName: string;
   /** The owner's twin is retired: it can't file, someone else must. */
   ownerLeft: boolean;
+  /** Rendered inside a modal that traps Tab: the approval overlay is outside it. */
+  inDialog?: boolean;
   onSummary?: (s: RoomateSummary) => void;
 }) {
   const { t, locale } = useT();
@@ -220,10 +223,27 @@ export function SendToRoomate({
   const [showReply, setShowReply] = useState(false);
   const selectId = useId();
   const replyId = useId();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  /** The user pressed one of our buttons: the button they pressed is replaced
+   *  by the next state, so focus must follow instead of dropping to <body>. */
+  const acted = useRef(false);
+
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!acted.current || !wrapper) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && active !== wrapper && wrapper.contains(active)) return;
+    if (active && active !== document.body) {
+      acted.current = false;
+      return;
+    }
+    (wrapper.querySelector<HTMLElement>("select, button:not([disabled])") ?? wrapper).focus();
+  }, [state, action.sentAt, action.taskId]);
 
   if (!available) return null;
 
-  const send = (opts: { force?: boolean; ownerId?: string } = {}) =>
+  const send = (opts: { force?: boolean; ownerId?: string } = {}) => {
+    acted.current = true;
     void fileAction({
       key,
       meetingId,
@@ -234,6 +254,12 @@ export function SendToRoomate({
       errorText: t("meeting.roomate.error"),
       runFailedText: (message) => t("meeting.roomate.runFailed", { message }),
     });
+  };
+
+  const cancel = () => {
+    acted.current = true;
+    setLive(key, undefined);
+  };
 
   const sendAgain = () => {
     if (!window.confirm(t("meeting.roomate.sendAgainConfirm"))) return;
@@ -260,7 +286,7 @@ export function SendToRoomate({
           </motion.span>
           {t("meeting.roomate.filing")}
         </span>
-        <span style={note}>{t("meeting.roomate.approveHint")}</span>
+        <span style={note}>{t(inDialog ? "meeting.roomate.approveHintDialog" : "meeting.roomate.approveHint")}</span>
       </>
     );
   } else if (state?.status === "done") {
@@ -309,7 +335,7 @@ export function SendToRoomate({
             </button>
           </>
         )}
-        <button type="button" className="btn sm ghost" onClick={() => setLive(key, undefined)}>
+        <button type="button" className="btn sm ghost" onClick={cancel}>
           {t("meeting.roomate.cancel")}
         </button>
       </>
@@ -355,7 +381,7 @@ export function SendToRoomate({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    <div ref={wrapperRef} tabIndex={-1} style={{ display: "flex", flexDirection: "column", gap: 4, outline: "none" }}>
       <div aria-live="polite" style={row}>
         {body}
       </div>

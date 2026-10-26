@@ -421,6 +421,7 @@ export function MeetingHistoryDrawer({
                                 action={a}
                                 ownerName={nameOf(a.employeeId)}
                                 ownerLeft={empById[a.employeeId]?.lifecycle === "retired"}
+                                inDialog
                                 onSummary={(summary) => setDetail((d) => (d && d.id === detail.id ? { ...d, summary } : d))}
                               />
                             </li>

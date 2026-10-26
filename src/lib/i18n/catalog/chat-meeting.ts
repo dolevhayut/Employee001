@@ -215,6 +215,7 @@ export const chatMeetingEn = {
   "meeting.roomate.sendLabel": "Send to Roomate: {action}",
   "meeting.roomate.filing": "Filing…",
   "meeting.roomate.approveHint": "Approve the request when it appears.",
+  "meeting.roomate.approveHintDialog": "Approve the request when it appears. With a keyboard, press Esc to close this panel and reach it; filing goes on.",
   "meeting.roomate.filed": "Filed: {id}",
   "meeting.roomate.doneCheck": "Done, check the reply",
   "meeting.roomate.showReply": "Show reply",
