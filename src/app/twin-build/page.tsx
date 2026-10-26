@@ -1148,6 +1148,7 @@ function FilePreview({
               color: "var(--text)",
             }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element -- src is vetted by isSafeImageSrc */}
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: ({ src, alt }) => (isSafeImageSrc(src) ? <img src={src} alt={alt ?? ""} style={{ maxWidth: "100%" }} /> : <span>[image not loaded{alt ? `: ${alt}` : ""}]</span>) }}>{body}</ReactMarkdown>
           </article>
         </>

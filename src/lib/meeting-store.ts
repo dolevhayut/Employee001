@@ -264,9 +264,17 @@ export function deleteMeeting(id: string): boolean {
 export function setMeetingSummary(id: string, decision: MeetingDecision): MeetingSummary | undefined {
   const m = load(id);
   if (!m) return undefined;
+  // "Summarize again" must not reset what was already sent to Roomate: an
+  // action with the same owner and text keeps its sent state.
+  const sent = new Map(
+    (m.summary?.actions ?? []).filter((a) => a.sentAt).map((a) => [`${a.employeeId}\n${a.action}`, a] as const),
+  );
   const summary: MeetingSummary = {
     decision: decision.decision,
-    actions: decision.actions,
+    actions: decision.actions.map((a) => {
+      const prev = sent.get(`${a.employeeId}\n${a.action}`);
+      return prev ? { ...a, sentAt: prev.sentAt, ...(prev.taskId ? { taskId: prev.taskId } : {}) } : a;
+    }),
     open: decision.open,
     generatedAt: Date.now(),
     throughTurn: m.transcript.length,
@@ -274,6 +282,77 @@ export function setMeetingSummary(id: string, decision: MeetingDecision): Meetin
   m.summary = summary;
   persistQuietly(m);
   return summary;
+}
+
+export type ActionSendResult =
+  | { ok: true; summary: MeetingSummary }
+  | {
+      ok: false;
+      /** not_found: no meeting, summary or action; changed: the action at
+       *  that index isn't the one the caller saw (re-summarized in between);
+       *  already_sent: claimed before, pass `force` to send again. */
+      error: "not_found" | "changed" | "already_sent";
+      summary?: MeetingSummary;
+    };
+
+type ActionLookup =
+  | { ok: true; m: Meeting; summary: MeetingSummary; action: MeetingSummary["actions"][number] }
+  | { ok: false; error: "not_found" | "changed"; summary?: MeetingSummary };
+
+function actionAt(id: string, index: number, expectedAction: string): ActionLookup {
+  const m = load(id);
+  const summary = m?.summary;
+  if (!m || !summary || !Number.isInteger(index) || index < 0) return { ok: false, error: "not_found", summary };
+  const action = summary.actions[index];
+  if (!action) return { ok: false, error: "not_found", summary };
+  if (action.action !== expectedAction) return { ok: false, error: "changed", summary };
+  return { ok: true, m, summary, action };
+}
+
+/**
+ * Claim a summary action for "Send to Roomate" before the owner's twin runs,
+ * so a reload mid-run still shows it as sent and nobody files it twice by
+ * accident. `expectedAction` is the text the caller saw: a summary
+ * regenerated in between can shift indexes. A new claim clears an old task id.
+ */
+export function markActionSent(
+  id: string,
+  index: number,
+  expectedAction: string,
+  opts: { force?: boolean; now?: number } = {},
+): ActionSendResult {
+  const found = actionAt(id, index, expectedAction);
+  if (!found.ok) return found;
+  const { m, summary, action } = found;
+  if (action.sentAt && !opts.force) return { ok: false, error: "already_sent", summary };
+  const { taskId: _previous, ...rest } = action;
+  void _previous;
+  summary.actions[index] = { ...rest, sentAt: opts.now ?? Date.now() };
+  persistQuietly(m);
+  return { ok: true, summary };
+}
+
+/** Store the Roomate task id the owner's twin reported for a sent action. */
+export function recordActionTaskId(id: string, index: number, expectedAction: string, taskId: string): ActionSendResult {
+  const found = actionAt(id, index, expectedAction);
+  if (!found.ok) return found;
+  const { m, summary, action } = found;
+  summary.actions[index] = { ...action, sentAt: action.sentAt ?? Date.now(), taskId };
+  persistQuietly(m);
+  return { ok: true, summary };
+}
+
+/** Undo a claim whose twin run never started (it can be sent again freely). */
+export function releaseActionSent(id: string, index: number, expectedAction: string): ActionSendResult {
+  const found = actionAt(id, index, expectedAction);
+  if (!found.ok) return found;
+  const { m, summary, action } = found;
+  if (action.taskId) return { ok: true, summary };
+  const { sentAt: _sentAt, ...rest } = action;
+  void _sentAt;
+  summary.actions[index] = rest;
+  persistQuietly(m);
+  return { ok: true, summary };
 }
 
 /**

@@ -123,6 +123,8 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/council/file": { GET: member },
   "/api/council/meetings": { GET: member },
   "/api/council/meetings/[id]": { GET: member, DELETE: admin },
+  "/api/council/meetings/[id]/roomate": { POST: member },
+  "/api/council/roomate": { GET: member },
   "/api/council/approve": { POST: approver },
   "/api/approvals/pending": { GET: member },
   "/api/feed": { GET: member },

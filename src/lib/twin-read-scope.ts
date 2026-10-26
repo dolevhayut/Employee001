@@ -20,7 +20,7 @@
 import path from "path";
 import fs from "fs";
 import { dataDir } from "./app-home";
-import { hasBlockedFolderSegment, listKnowledgeFolders } from "./knowledge-folders";
+import { SECRET_EXCLUDE_GLOB, hasBlockedFolderSegment, isSafeExtensionGlob, listKnowledgeFolders } from "./knowledge-folders";
 
 export const PEER_PROFILE_FILES = new Set([
   "CONTEXT.md",
@@ -36,7 +36,9 @@ export const PEER_PROFILE_FILES = new Set([
 
 const SHARED_ROOTS = ["org-brain", "org-skills"];
 
-export type ReadScopeDecision = { ok: true } | { ok: false; reason: string };
+/** ok may carry a rewritten tool input (a Grep over a folder runs with the
+ *  secret-excluding glob). */
+export type ReadScopeDecision = { ok: true; updatedInput?: Record<string, unknown> } | { ok: false; reason: string };
 
 /** Data-root-relative POSIX path, or null if it points outside the data root.
  *  Relative paths resolve against the agent's cwd (the data root by default). */
@@ -64,7 +66,7 @@ function isWithin(child: string, parent: string): boolean {
 
 /** Own configured folders are deliberately checked from the sidecar here,
  * rather than accepted from a caller, so one twin cannot name another's. */
-function configuredFolderDecision(rawPath: string, employeeId: string, cwd: string, toolName: string): ReadScopeDecision | null {
+function configuredFolderDecision(rawPath: string, employeeId: string, cwd: string, toolName: string, input?: Record<string, unknown>): ReadScopeDecision | null {
   const resolved = realPath(path.resolve(cwd, rawPath || "."));
   if (!resolved) return null;
   // The app's data dir keeps the normal twin rules, even inside a folder.
@@ -81,8 +83,15 @@ function configuredFolderDecision(rawPath: string, employeeId: string, cwd: stri
     const stat = fs.statSync(resolved);
     if (stat.isFile() && stat.size > 1024 * 1024) return { ok: false, reason: `${toolName} cannot access files larger than 1 MB.` };
     // Grep reads file contents recursively, so over a directory it would
-    // search .env and key files too. Glob lists names only.
-    if (toolName === "Grep" && stat.isDirectory()) return { ok: false, reason: "Grep one file at a time inside a configured folder; use Glob to find files first." };
+    // search .env and key files too. Allow it only with a glob that can't
+    // match them: the twin's own extension filter, or the exclusion glob.
+    if (toolName === "Grep" && stat.isDirectory()) {
+      const glob = typeof input?.glob === "string" ? input.glob : "";
+      if (glob && !isSafeExtensionGlob(glob)) {
+        return { ok: false, reason: 'Inside a configured folder, Grep a directory with no glob or an extension glob such as "*.ts" or "**/*.{ts,tsx}".' };
+      }
+      return glob ? { ok: true } : { ok: true, updatedInput: { ...(input ?? {}), glob: SECRET_EXCLUDE_GLOB } };
+    }
   } catch { return { ok: false, reason: `${toolName} could not verify this configured-folder path.` }; }
   return { ok: true };
 }
@@ -136,7 +145,7 @@ export function checkConfiguredFolderRead(
       return { ok: false, reason: `${toolName} cannot follow a link out of a configured folder.` };
     }
   }
-  return configuredFolderDecision(raw, employeeId, cwd, toolName) ?? { ok: true };
+  return configuredFolderDecision(raw, employeeId, cwd, toolName, input) ?? { ok: true };
 }
 
 export function checkTwinRead(
@@ -178,7 +187,7 @@ export function checkTwinRead(
   if (toolName === "Grep") {
     const raw = str("path");
     if (hasBlockedFolderSegment(str("glob"))) return deny("Grep", str("glob"), employeeId);
-    const folderDecision = configuredFolderDecision(raw, employeeId, cwd, "Grep");
+    const folderDecision = configuredFolderDecision(raw, employeeId, cwd, "Grep", input);
     if (folderDecision) return folderDecision;
     const rel = relOf(raw);
     if (rel === null || rel === "") return deny("Grep", raw, employeeId);

@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { checkConfiguredFolderRead, checkTwinRead, toDataRelative } from "./twin-read-scope";
-import { addKnowledgeFolder } from "./knowledge-folders";
+import { SECRET_EXCLUDE_GLOB, addKnowledgeFolder } from "./knowledge-folders";
 
 // Folder adds are audited; keep those writes out of the real data dir.
 vi.mock("./audit-log", () => ({ appendAuditEntry: vi.fn(() => true) }));
@@ -159,8 +159,18 @@ describe("configured folder scope", () => {
     expect(checkTwinRead("Read", { file_path: path.join(folder, "escape.txt") }, ME, ROOT).ok).toBe(false);
   });
 
-  it("refuses Grep over a whole folder but allows one file", () => {
-    expect(checkTwinRead("Grep", { path: folder, pattern: "secret" }, ME, ROOT).ok).toBe(false);
+  it("lets Grep search a whole folder only with secrets left out", () => {
+    const whole = checkTwinRead("Grep", { path: folder, pattern: "secret" }, ME, ROOT);
+    expect(whole).toMatchObject({ ok: true, updatedInput: { path: folder, pattern: "secret", glob: SECRET_EXCLUDE_GLOB } });
+    // An extension filter can't match a secret file, so it's kept as written.
+    expect(checkTwinRead("Grep", { path: folder, pattern: "x", glob: "**/*.{ts,tsx}" }, ME, ROOT)).toEqual({ ok: true });
+    // Anything else that could reach .env or keys is refused.
+    for (const glob of ["*", "**/*", "*.pem", "*.{ts,key}", ".env*", "**/.env.local"]) {
+      expect(checkTwinRead("Grep", { path: folder, pattern: "x", glob }, ME, ROOT).ok, glob).toBe(false);
+    }
+  });
+
+  it("refuses Grep on a secret file and allows one ordinary file", () => {
     expect(checkTwinRead("Grep", { path: path.join(folder, "README.md"), pattern: "hello" }, ME, ROOT).ok).toBe(true);
     expect(checkTwinRead("Grep", { path: path.join(folder, ".env.local"), pattern: "secret" }, ME, ROOT).ok).toBe(false);
   });
