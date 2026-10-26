@@ -210,6 +210,25 @@ export const chatMeetingEn = {
   "meeting.new": "New meeting",
   "meeting.ceo": "CEO",
   "meeting.sharedFiles": "Shared files",
+  // Send to Roomate (English only; Hebrew falls back).
+  "meeting.roomate.send": "Send to Roomate",
+  "meeting.roomate.sendLabel": "Send to Roomate: {action}",
+  "meeting.roomate.filing": "Filing…",
+  "meeting.roomate.approveHint": "Approve the request when it appears.",
+  "meeting.roomate.filed": "Filed: {id}",
+  "meeting.roomate.doneCheck": "Done, check the reply",
+  "meeting.roomate.showReply": "Show reply",
+  "meeting.roomate.hideReply": "Hide reply",
+  "meeting.roomate.sent": "Sent {when}",
+  "meeting.roomate.sendAgain": "Send again",
+  "meeting.roomate.sendAgainConfirm": "This action was already sent to Roomate. Send it again? The twin checks for duplicates, but this can file a second task.",
+  "meeting.roomate.pickOwner": "Who files it",
+  "meeting.roomate.ownerLeft": "{name} has left, so their twin can't file it. You'll pick who does.",
+  "meeting.roomate.noOne": "Nobody in this meeting can file it.",
+  "meeting.roomate.cancel": "Cancel",
+  "meeting.roomate.retry": "Try again",
+  "meeting.roomate.error": "Couldn't send it. Try again.",
+  "meeting.roomate.runFailed": "The twin's run failed: {message}",
 } as const;
 
 export const chatMeetingHe: Partial<Record<keyof typeof chatMeetingEn, string>> = {

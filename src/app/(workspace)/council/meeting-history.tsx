@@ -6,13 +6,14 @@ import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { useT } from "@/components/ex/i18n-context";
 import type { EmployeeWithTwin } from "@/lib/employees";
+import { SendToRoomate, type RoomateAction } from "./send-to-roomate";
 
 // Team Meeting history: a drawer that lists stored meetings and opens one
 // read-only, with its summary on top, an .md export and "Continue".
 
 export type HistoryDecision = {
   decision: string;
-  actions: { employeeId: string; action: string; due?: string }[];
+  actions: RoomateAction[];
   open: string[];
 };
 
@@ -77,7 +78,7 @@ export async function fetchMeetingDetail(id: string): Promise<HistoryDetail | nu
   }
 }
 
-const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE = 'button:not([disabled]), a[href], select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const sectionLabel = {
   fontSize: "var(--fs-xs)",
@@ -411,9 +412,17 @@ export function MeetingHistoryDrawer({
                         <div style={sectionLabel}>{t("meeting.nextSteps")}</div>
                         <ul style={{ margin: "6px 0 0", paddingInlineStart: 18, fontSize: "var(--fs-sm)", lineHeight: 1.5 }}>
                           {detail.summary.actions.map((a, i) => (
-                            <li key={i} dir="auto">
+                            <li key={i} dir="auto" style={{ marginBottom: 6 }}>
                               <b><bdi>{nameOf(a.employeeId)}</bdi></b> — {a.action}
                               {a.due && <span style={{ color: "var(--text-subtle)" }}> · {a.due}</span>}
+                              <SendToRoomate
+                                meetingId={detail.id}
+                                index={i}
+                                action={a}
+                                ownerName={nameOf(a.employeeId)}
+                                ownerLeft={empById[a.employeeId]?.lifecycle === "retired"}
+                                onSummary={(summary) => setDetail((d) => (d && d.id === detail.id ? { ...d, summary } : d))}
+                              />
                             </li>
                           ))}
                         </ul>
