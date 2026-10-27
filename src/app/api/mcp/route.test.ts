@@ -165,7 +165,7 @@ describe("POST /api/mcp per-person identity and audit", () => {
     const before = rows.length;
     const res = await chunkedCall(ana, Array.from({ length: 200 }, () => "x".repeat(100_000)), pulled);
     expect(res.status).toBe(413);
-    expect(pulled.count).toBeLessThan(200);
+    expect(pulled.count).toBeLessThanOrEqual(15); // 1 MB cap / 100 KB chunks, plus stream read-ahead
     expect(rows).toHaveLength(before);
   });
 

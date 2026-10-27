@@ -92,7 +92,10 @@ export async function POST(request: Request): Promise<Response> {
   });
   await server.connect(transport);
   // The body stream is spent; hand the transport the text we already read.
-  return transport.handleRequest(new Request(request.url, { method: request.method, headers: request.headers, body }));
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  headers.delete("transfer-encoding");
+  return transport.handleRequest(new Request(request.url, { method: request.method, headers, body }));
 }
 
 export async function GET(): Promise<Response> {

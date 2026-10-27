@@ -101,7 +101,11 @@ function load(): StoreShape {
   };
 }
 
-/** Token of the lock this process holds while a mutation runs (mutations are synchronous). */
+/**
+ * Token of the lock this process holds while a mutation runs. Module-global, so
+ * `fn` passed to withLock must stay synchronous. The fence narrows the window in
+ * which a reclaimed holder can write; it is not a hard guarantee without OS locks.
+ */
 let heldToken: string | null = null;
 
 function save(store: StoreShape): void {
@@ -188,9 +192,10 @@ async function withLock<T>(fn: () => T): Promise<T> {
 
 /**
  * Remove a lock whose holder stalled past LOCK_STALE_MS. Reclaiming is itself
- * serialized by an exclusive `.reclaim` file, so two waiters never both remove a
- * lock (the old rename-then-link-back could hand the slot to two processes).
- * Under that guard the lock is re-read, and only the exact stale owner is removed.
+ * serialized by an exclusive `.reclaim` file, so waiters do not normally both
+ * remove a lock (the old rename-then-link-back could hand the slot to two
+ * processes). Under that guard the lock is re-read, and only the exact stale owner
+ * is removed. Best effort: a holder stalled past the timeout is the residual risk.
  */
 function reclaimIfStale(lock: string, token: string): void {
   const guard = `${lock}.reclaim`;

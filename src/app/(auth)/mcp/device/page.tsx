@@ -35,7 +35,7 @@ function DeviceInner() {
 
   return (
     <div style={cardStyle}>
-      <Heading title="Approve a device" sub="Enter the code shown by the app you are connecting to Employee001. Only approve a code you just requested yourself." />
+      <Heading title="Approve a device" sub="Enter the code shown by the app you are connecting to Employee001. Only approve if the code matches the one on your own screen, and you started this sign-in yourself. Never approve a code someone sent you." />
       <form onSubmit={submit}>
         <Field id="user-code" label="Device code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ABCD-2345" autoComplete="off" autoFocus />
         <ErrorLine>{error}</ErrorLine>
