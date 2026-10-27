@@ -6,6 +6,7 @@ import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { useT } from "@/components/ex/i18n-context";
 import type { EmployeeWithTwin } from "@/lib/employees";
+import type { MeetingStance } from "@/lib/meeting-stances";
 import { SendToRoomate, type RoomateAction } from "./send-to-roomate";
 
 // Team Meeting history: a drawer that lists stored meetings and opens one
@@ -16,7 +17,7 @@ export type HistoryDecision = {
   actions: RoomateAction[];
   open: string[];
   /** Absent on meetings summarized before stances were recorded. */
-  stances?: { employeeId: string; stance: "accept" | "object"; turn: number }[];
+  stances?: MeetingStance[];
 };
 
 export type HistorySummary = HistoryDecision & { generatedAt: number; throughTurn: number };
@@ -117,6 +118,10 @@ export function MeetingHistoryDrawer({
   const [deleteError, setDeleteError] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
   const [flashTurn, setFlashTurn] = useState<number | null>(null);
+  const flashTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (flashTimer.current) window.clearTimeout(flashTimer.current);
+  }, []);
 
   const fmt = (ts: number) =>
     new Date(ts).toLocaleString(locale === "he" ? "he-IL" : "en-US", {
@@ -180,6 +185,7 @@ export function MeetingHistoryDrawer({
 
   function open(id: string) {
     setSelectedId(id);
+    setFlashTurn(null);
     setDetail(null);
     setDetailError(false);
     setSummarizing("idle");
@@ -192,6 +198,7 @@ export function MeetingHistoryDrawer({
 
   function back() {
     setSelectedId(null);
+    setFlashTurn(null);
     setDetail(null);
     setDetailError(false);
   }
@@ -241,7 +248,8 @@ export function MeetingHistoryDrawer({
     el.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
     el.focus({ preventScroll: true });
     setFlashTurn(turn);
-    window.setTimeout(() => setFlashTurn((cur) => (cur === turn ? null : cur)), 1800);
+    if (flashTimer.current) window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlashTurn(null), 1800);
   }
 
   return (
@@ -437,7 +445,7 @@ export function MeetingHistoryDrawer({
                                 <button
                                   type="button"
                                   onClick={() => jumpToTurn(s.turn)}
-                                  aria-label={t("meeting.jumpToTurn", { name, stance: label, n: s.turn + 1 })}
+                                  aria-label={t("meeting.jumpToTurn", { name, stance: label })}
                                   style={{
                                     display: "inline-flex",
                                     alignItems: "center",
@@ -456,7 +464,7 @@ export function MeetingHistoryDrawer({
                                     {accepted ? <Icons.Check size={11} /> : <span aria-hidden>✕</span>}
                                   </span>
                                   <b><bdi>{name}</bdi></b>
-                                  <span style={{ color: "var(--text-muted)" }}>{label} · <bdi>#{s.turn + 1}</bdi></span>
+                                  <span style={{ color: "var(--text-muted)" }}>{label}</span>
                                 </button>
                               </li>
                             );

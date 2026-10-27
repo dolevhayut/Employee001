@@ -62,7 +62,9 @@ export async function GET(request: NextRequest) {
       lines.push("**Accepted / objected**");
       lines.push("");
       for (const st of s.stances) {
-        lines.push(`- ${st.employeeId}: ${st.stance === "accept" ? "accepted" : "objected"} (turn ${st.turn + 1})`);
+        const spoke = meeting.transcript[st.turn];
+        const who = spoke?.kind === "twin" ? spoke.employeeName : st.employeeId;
+        lines.push(`- ${who}: ${st.stance === "accept" ? "accepted" : "objected"} (message ${st.turn + 1})`);
       }
       lines.push("");
     }
@@ -77,17 +79,17 @@ export async function GET(request: NextRequest) {
   lines.push("---");
   lines.push("");
 
-  for (const turn of meeting.transcript) {
+  for (const [i, turn] of meeting.transcript.entries()) {
     const ts = new Date(turn.ts).toISOString();
     if (turn.kind === "ceo") {
-      lines.push(`## CEO — ${ts}`);
+      lines.push(`## ${i + 1}. CEO — ${ts}`);
       lines.push("");
       lines.push(turn.text);
     } else {
       const tag = turn.delegatedFromName
         ? ` _(called in by ${turn.delegatedFromName})_`
         : "";
-      lines.push(`## ${turn.employeeName}${tag} — ${ts}`);
+      lines.push(`## ${i + 1}. ${turn.employeeName}${tag} — ${ts}`);
       lines.push("");
       lines.push(turn.text);
     }

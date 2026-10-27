@@ -55,10 +55,12 @@ export async function summarizeMeeting(
 ): Promise<MeetingDecision | null> {
   const c = getClient();
   if (!c || turns.length < 2) return null;
-  const text = turns
-    .map((t, i) => (t.kind === "ceo" ? `[${turnOffset + i}] CEO: ${t.text}` : `[${turnOffset + i}] ${t.employeeName}: ${t.text}`))
-    .join("\n\n")
-    .slice(-14_000);
+  // Keep the newest turns that fit, cutting at turn boundaries so a "[n]" label is never split.
+  const labelled = turns.map((t, i) => (t.kind === "ceo" ? `[${turnOffset + i}] CEO: ${t.text}` : `[${turnOffset + i}] ${t.employeeName}: ${t.text}`));
+  let size = 0;
+  let from = labelled.length;
+  while (from > 0 && size + labelled[from - 1].length + 2 <= 14_000) size += labelled[--from].length + 2;
+  const text = (from === labelled.length ? [labelled[labelled.length - 1].slice(-14_000)] : labelled.slice(from)).join("\n\n");
   const hebrew = turns.some((t) => t.kind === "ceo" && /[֐-׿]/.test(t.text));
   const roster = people.map((p) => `- ${p.id}: ${p.name}, ${p.role}`).join("\n");
 
@@ -85,10 +87,7 @@ Write in ${hebrew ? "Hebrew" : "English"}. Respond with ONLY JSON: {"decision": 
       decision: String(json.decision ?? "").trim(),
       actions: (json.actions ?? []).filter((a): a is MeetingAction => Boolean(a && ids.has(a.employeeId) && a.action)).slice(0, 6),
       open: (json.open ?? []).map(String).slice(0, 3),
-      stances: normalizeStances(
-        json.stances,
-        [...Array.from({ length: turnOffset }, () => ({ kind: "ceo" as const })), ...turns],
-      ),
+      stances: normalizeStances(json.stances, turns, turnOffset, ids),
     };
   } catch {
     console.warn(`[meeting-summary] unparseable reply (${res.stop_reason}): ${raw.slice(0, 300)}`);

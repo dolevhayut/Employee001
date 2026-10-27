@@ -52,6 +52,27 @@ describe("normalizeStances", () => {
     ).toEqual([{ employeeId: "a", stance: "accept", turn: 3 }]);
   });
 
+  it("maps turns of a transcript tail back to full-transcript indices", () => {
+    expect(normalizeStances([{ employeeId: "b", stance: "object", turn: 12 }], transcript.slice(1), 11)).toEqual([
+      { employeeId: "b", stance: "object", turn: 12 },
+    ]);
+    expect(normalizeStances([{ employeeId: "a", stance: "accept", turn: 1 }], transcript.slice(1), 11)).toEqual([]);
+  });
+
+  it("drops speakers that are not on the roster", () => {
+    expect(
+      normalizeStances(
+        [
+          { employeeId: "a", stance: "accept", turn: 1 },
+          { employeeId: "b", stance: "object", turn: 2 },
+        ],
+        transcript,
+        0,
+        new Set(["a"]),
+      ),
+    ).toEqual([{ employeeId: "a", stance: "accept", turn: 1 }]);
+  });
+
   it("returns [] for missing data (old meetings)", () => {
     expect(normalizeStances(undefined, transcript)).toEqual([]);
   });
