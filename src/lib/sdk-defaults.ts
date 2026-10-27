@@ -56,6 +56,9 @@ export const CLAUDE_BUILTIN_SUBAGENTS_DENY: readonly string[] = [
   "Agent(claude)",
   "Agent(Plan)",
   "Agent(Explore)",
+  // Behind feature flags on current runtimes, denied ahead of time.
+  "Agent(fork)",
+  "Agent(claude-code-guide)",
 ];
 
 /** disallowedTools for a twin run: the hard list, Claude Code's subagents,

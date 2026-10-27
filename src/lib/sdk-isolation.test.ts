@@ -70,7 +70,7 @@ describe("twin built-in tool allowlists", () => {
     for (const t of [...TWIN_HARD_DISALLOWED, ...CLAUDE_BUILTIN_SUBAGENTS_DENY, "Read"]) expect(list).toContain(t);
     expect(list.filter((t) => t === "Bash")).toHaveLength(1);
     expect([...CLAUDE_BUILTIN_SUBAGENTS_DENY].sort()).toEqual([
-      "Agent(Explore)", "Agent(Plan)", "Agent(claude)", "Agent(general-purpose)", "Agent(statusline-setup)",
+      "Agent(Explore)", "Agent(Plan)", "Agent(claude)", "Agent(claude-code-guide)", "Agent(fork)", "Agent(general-purpose)", "Agent(statusline-setup)",
     ]);
   });
 });

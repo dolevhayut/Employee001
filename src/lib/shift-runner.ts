@@ -421,7 +421,8 @@ export async function runShift(args: {
         // agents of its own, so only Claude Code's would be reachable. No
         // AskUserQuestion: nobody is there to answer.
         tools: [...TWIN_SHIFT_TOOLS],
-        allowedTools: ["TodoWrite"],
+        // TaskCreate/TaskUpdate need no permission; nothing is auto-allowed.
+        allowedTools: [],
         disallowedTools: twinDisallowedTools(),
         mcpServers: mcpServersWithConsult,
         maxTurns: 12,
