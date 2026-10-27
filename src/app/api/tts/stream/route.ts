@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { AI_AUDIO_HEADERS } from "@/lib/ai-disclosure";
 import { elevenLabsBase, voiceEnabled } from "@/lib/data-residency";
 import { fetchSpeech } from "@/lib/tts-model";
 import { liveVoiceId } from "@/lib/voice-live";
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
       "Content-Type": "audio/mpeg",
       "Cache-Control": "no-cache",
       "X-Content-Type-Options": "nosniff",
+      ...AI_AUDIO_HEADERS,
     },
   });
 }

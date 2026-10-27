@@ -1,5 +1,7 @@
 "use client";
 
+import { ApprovalArgs } from "@/components/ex/approval-args";
+
 import { Suspense, useState, useRef, useEffect, useMemo, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -628,26 +630,7 @@ function ApprovalCard({
 
       <div>
         {!editing ? (
-          <pre
-            style={{
-              margin: 0,
-              padding: "8px 10px",
-              background: "var(--bg-sunken)",
-              border: "1px solid var(--hairline)",
-              borderRadius: 6,
-              fontSize: "var(--fs-meta)",
-              lineHeight: 1.5,
-              fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-              maxHeight: 160,
-              overflow: "auto",
-              color: "var(--text-muted)",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
-            {JSON.stringify(approval.input, null, 2)}
-          </pre>
+          <ApprovalArgs input={(approval.input ?? {}) as Record<string, unknown>} />
         ) : (
           <textarea
             value={edited}
@@ -1961,12 +1944,16 @@ function CouncilPageInner() {
   // The override is narrowed to twins that can answer now: a meeting continued
   // from History may list twins since retired or not ready. If none are left,
   // fall back to every ready twin so the CEO can still ask.
+  // `?with=a,b` opens the room with just those twins (an Inbox conflict item
+  // links here); a toggle by the CEO replaces it.
+  const withParam = searchParams.get("with");
   const activeIds = useMemo(() => {
     const ready = roster.filter((e) => e.twinStatus === "ready" && e.lifecycle !== "retired").map((e) => e.id);
-    if (!activeIdsOverride) return new Set(ready);
-    const kept = ready.filter((id) => activeIdsOverride.has(id));
+    const requested = activeIdsOverride ?? (withParam ? new Set(withParam.split(",")) : null);
+    if (!requested) return new Set(ready);
+    const kept = ready.filter((id) => requested.has(id));
     return new Set(kept.length > 0 ? kept : ready);
-  }, [activeIdsOverride, roster]);
+  }, [activeIdsOverride, roster, withParam]);
   const [threads, setThreads] = useState<MessageThread[]>([]);
   // Stable across CEO messages — server uses it to load the meeting transcript
   // so every twin sees prior CEO asks and prior twin turns. Meetings are stored

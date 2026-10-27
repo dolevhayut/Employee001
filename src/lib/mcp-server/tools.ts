@@ -12,6 +12,8 @@ import {
 } from "@/lib/meeting-store";
 import { searchOrgBrain } from "@/lib/org-brain-search";
 import { isUnderBudget, recordSpend } from "@/lib/twin-budget";
+import { stripHiddenCharsFields } from "@/lib/hidden-chars";
+import { auditHiddenCharsRemoved } from "@/lib/hidden-chars-audit";
 import { takeAskTwinRateLimit } from "./rate-limit";
 
 export const PROFILE_FILES = [
@@ -262,6 +264,9 @@ async function askTwin(args: ToolArgs): Promise<ToolResult> {
     (candidate) => candidate.id === args.twinId,
   );
   if (!employee) return fail("not_found", "Twin not found");
+  // Nothing left once invisible characters are removed: no real question.
+  if (typeof args.question !== "string" || !args.question.trim())
+    return fail("bad_request", "Question is empty");
   if (employee.twinStatus !== "ready")
     return fail("not_ready", "Twin is not ready");
   if (inFlight().has(employee.id))
@@ -338,11 +343,19 @@ export async function executeTool(
 ): Promise<ToolResult> {
   const start = Date.now();
   let twin: { id: string; name: string } | undefined;
+  // A question or search query from an outside AI client is untrusted text
+  // headed for a twin's prompt: remove invisible characters that could hide
+  // instructions, before the handler or the audit row sees it.
+  const cleaned = stripHiddenCharsFields(args, ["question", "query"]);
+  args = cleaned.value;
   try {
     if (typeof args.twinId === "string")
       twin = (await loadEmployeesFromDisk()).find(
         (candidate) => candidate.id === args.twinId,
       );
+    if (cleaned.total > 0) {
+      auditHiddenCharsRemoved({ source: name === "ask_twin" ? "mcp-ask_twin" : "mcp", employeeId: twin?.id ?? "mcp", removed: cleaned.removed, ref: { tool: name } });
+    }
     const handler = handlers[name as ToolName];
     const result = handler
       ? await handler(args)

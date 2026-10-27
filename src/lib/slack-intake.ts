@@ -2,6 +2,8 @@ import { enqueueWorkItem } from "@/lib/work-items";
 import { isRetiredSync } from "@/lib/twin-lifecycle";
 import { toolkitAllowed } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
+import { addHiddenCharCounts, hiddenCharTotal, stripHiddenChars } from "@/lib/hidden-chars";
+import { auditHiddenCharsRemoved } from "@/lib/hidden-chars-audit";
 
 export type RawSlackMessage = Record<string, unknown>;
 export type IncomingSlackMessage = {
@@ -71,12 +73,25 @@ export function ingestSlackMessage(
   if (!toolkitAllowed(loadConsentStatus(employeeId), "slack")) {
     return { deduped: false, workItemId: null, skipped: "consent" };
   }
+  // Invisible characters can hide instructions a reader never sees.
+  const text = stripHiddenChars(message.text);
+  const removed = { ...text.removed };
+  const threadMessages = message.threadMessages?.map((m) => {
+    const clean = stripHiddenChars(m.text);
+    addHiddenCharCounts(removed, clean.removed);
+    return { ...m, text: clean.text };
+  });
+  const total = hiddenCharTotal(removed);
   const { item, deduped } = enqueueWorkItem({
     type: "slack", assigneeEmployeeId: employeeId,
     title: message.isDm ? "Slack DM" : "Slack mention",
-    payload: { channel: message.channel, ts: message.ts, threadTs: message.threadTs, text: message.text, userId: message.userId, workspaceId: message.workspaceId, externalWorkspace: message.externalWorkspace, isDm: message.isDm, mentionedTwinUserId: message.mentionedUserIds[0], threadMessages: message.threadMessages },
+    payload: { channel: message.channel, ts: message.ts, threadTs: message.threadTs, text: text.text, userId: message.userId, workspaceId: message.workspaceId, externalWorkspace: message.externalWorkspace, isDm: message.isDm, mentionedTwinUserId: message.mentionedUserIds[0], threadMessages },
     idempotencyKey: `slack:${message.channel}:${message.ts}`,
+    ...(total > 0 ? { hiddenCharsRemoved: removed } : {}),
   });
+  if (total > 0 && !deduped) {
+    auditHiddenCharsRemoved({ source: "slack", employeeId, removed, ref: { workItemId: item.id, channel: message.channel, ts: message.ts } });
+  }
   return { deduped, workItemId: item.id };
 }
 

@@ -8,7 +8,9 @@ const mocks = vi.hoisted(() => ({
     _employee: unknown,
     _question: string,
     onEvent: (event: Record<string, unknown>) => void,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _history?: unknown,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _options?: unknown,
   ) => {
     onEvent({ type: "text_delta", delta: "a private answer" });

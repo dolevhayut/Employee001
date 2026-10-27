@@ -67,7 +67,9 @@ describe("read scope per run type", () => {
   it("a retired twin runs with no tools, no MCP servers and no memory write", () => {
     const text = source("lib/council-runner.ts");
     expect(text).toMatch(/isRetired\(lifecycle\)\) options = \{ \.\.\.options, retired: true, resumeSessionId: undefined/);
-    expect(text).toMatch(/\.\.\.\(retired \? \{ tools: \[\] \} : \{\}\)/);
+    // buildToolConfig gives a retired twin tools: [] (sdk-isolation.test.ts).
+    expect(text).toMatch(/if \(options\.publicReply \|\| options\.retired\) \{[^}]*tools: \[\],/);
+    expect(text).toMatch(/tools: toolConfig\.tools,/);
     expect(text).toMatch(/const mcpServers = publicReply \? \{\}/);
     expect(text).toMatch(/if \(!retired && !options\.temporary\) void rememberTwinRun/);
   });
@@ -88,7 +90,8 @@ describe("read scope per run type", () => {
 
   it("the Ask-the-company systems agent can't read files at all", () => {
     const text = source("lib/org-ask.ts");
-    expect(text).toMatch(/disallowedTools:\s*\[[^\]]*"Read", "Glob", "Grep"/);
+    expect(text).toMatch(/tools: \["ToolSearch"\],/);
+    expect(text).toMatch(/disallowedTools:\s*twinDisallowedTools\(\[[^\]]*"Read", "Glob", "Grep"/);
   });
 });
 

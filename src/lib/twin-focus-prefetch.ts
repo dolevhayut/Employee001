@@ -4,6 +4,8 @@ import path from "path";
 import { getComposio, composioUserIdFor } from "@/lib/composio-client";
 import { getFocusConfig, type FocusPrefetch } from "@/lib/twin-focus";
 import { dataDir } from "@/lib/app-home";
+import { stripHiddenChars, stripHiddenCharsDeep } from "@/lib/hidden-chars";
+import { auditHiddenCharsRemoved } from "@/lib/hidden-chars-audit";
 
 const DATA_ROOT = dataDir("employees");
 
@@ -115,7 +117,13 @@ export async function runPrefetches(employeeId: string): Promise<PrefetchResult[
         userId,
         arguments: prefetch.arguments,
       });
-      const data = extractData(response);
+      // Mail, Slack and tickets from outside: remove invisible characters
+      // that could hide instructions before they are cached or prompted.
+      const clean = stripHiddenCharsDeep(extractData(response));
+      if (clean.total > 0) {
+        auditHiddenCharsRemoved({ source: "focus-preload", employeeId, removed: clean.removed, ref: { tool: prefetch.toolSlug } });
+      }
+      const data = clean.value;
       const ts = new Date().toISOString();
       cache[key] = { ts, data };
       results.push({
@@ -186,7 +194,9 @@ export function formatFocusBlock(results: PrefetchResult[]): string {
   if (!results.length) return "";
   const header = `# Focus snapshot (as of ${new Date().toISOString()})`;
   const rendered = results.map((r) => renderResult(r, r.maxItems ?? 5));
-  const block = [header, ...rendered].join("\n\n");
+  // Fresh fetches are cleaned (and audited) in runPrefetches; this second
+  // pass covers cache entries written before that existed.
+  const block = stripHiddenChars([header, ...rendered].join("\n\n")).text;
   if (block.length <= TOTAL_CHAR_CAP) return block;
   const room = TOTAL_CHAR_CAP - TRUNCATION_NOTICE.length;
   return block.slice(0, Math.max(0, room)) + TRUNCATION_NOTICE;

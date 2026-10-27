@@ -28,6 +28,7 @@ import { bcp47 } from "@/lib/i18n/format";
 import { describeToolCall, words } from "@/components/ex/morph-orb/tool-nodes";
 import { FlowCanvas } from "@/components/ex/morph-orb/flow-canvas";
 import { CitedAnswer, type CitedSource } from "@/components/ex/cited-answer";
+import { AnswerFeedback } from "@/components/ex/answer-feedback";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { parseCitedAnswer } from "@/lib/org-answer";
 
@@ -112,6 +113,8 @@ type Turn = {
   steps: Step[];
   thinking: string;
   answer: string | null;
+  /** The answer is an error or "stopped" notice, not something the twin said. */
+  failed?: boolean;
   /** Set when the CEO handed this as a task instead of asking. */
   task?: {
     itemId?: string;
@@ -353,7 +356,12 @@ type AudioState = { id: number; status: "loading" | "playing" } | null;
 /** Speaker button: plays an answer in the twin's voice (ElevenLabs). */
 function SpeakButton({ state, onClick, label, size = 26 }: { state: "idle" | "loading" | "playing"; onClick: () => void; label: string; size?: number }) {
   const icon = size * 0.5;
+  const { t } = useT();
   return (
+    <>
+      {state !== "idle" && (
+        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", marginInlineEnd: 6 }}>{t("ask.aiVoice")}</span>
+      )}
       <button
         type="button"
         onClick={onClick}
@@ -377,6 +385,7 @@ function SpeakButton({ state, onClick, label, size = 26 }: { state: "idle" | "lo
     >
       {state === "loading" ? <Icons.Loader size={icon} /> : state === "playing" ? <Icons.VolumeOff size={icon} /> : <Icons.Volume size={icon} />}
     </button>
+    </>
   );
 }
 
@@ -633,6 +642,25 @@ export default function AskPage() {
   // Someone who has left takes no tasks (the work queue refuses them): ask only.
   const retired = twin?.lifecycle === "retired";
   const mode = retired || demoReplay ? "ask" : modePick;
+
+  // Answered / corrected counts for the picked twin.
+  const [stats, setStats] = useState<{ twinId: string; answered: number; corrected: number } | null>(null);
+  const statsTwinId = twin?.id;
+  const answeredTurns = turns.filter((x) => x.answer !== null && !x.task).length;
+  const [statsTick, setStatsTick] = useState(0);
+  const refreshStats = useEffectEvent(() => {
+    if (!statsTwinId) return;
+    fetch(`/api/employees/${encodeURIComponent(statsTwinId)}/knowledge/proposals`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { stats?: { answered: number; corrected: number } } | null) => setStats(d?.stats ? { ...d.stats, twinId: statsTwinId } : null))
+      .catch(() => setStats(null));
+  });
+  useEffect(() => {
+    const id = setTimeout(() => refreshStats(), answeredTurns > 0 ? 800 : 0);
+    return () => {
+      clearTimeout(id);
+    };
+  }, [statsTwinId, answeredTurns, statsTick]);
 
   function onAskModeTabKey(e: ReactKeyboardEvent<HTMLDivElement>) {
     if (retired || demoReplay) return;
@@ -1165,7 +1193,7 @@ export default function AskPage() {
       window.clearTimeout(ackTimer);
     }
     if (!signal.aborted) sayStreamed("", true);
-    patchTurn(id, (turn) => ({ ...turn, answer }));
+    patchTurn(id, (turn) => ({ ...turn, answer, failed: !answered }));
     // A temporary ask is never saved: it lives on this screen only.
     if (answered && !signal.aborted && !temp) {
       const conversationId = (conversationRef.current[twinId] ??= newConversationId());
@@ -1731,6 +1759,13 @@ export default function AskPage() {
             ref={listRef}
             style={{ flex: 1, overflowY: "auto", padding: "18px", display: "flex", flexDirection: "column", gap: 22 }}
           >
+            {twin && stats && stats.twinId === twin.id && (
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                {stats.answered === 0
+                  ? t("ask.stats.empty", { name: twin.name })
+                  : t("ask.stats", { answered: stats.answered, corrected: stats.corrected })}
+              </div>
+            )}
             {turns.length === 0 && (
               <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--text-subtle)" }}>{t("ask.conversationEmpty")}</div>
             )}
@@ -1803,6 +1838,15 @@ export default function AskPage() {
                         onClick={() => void speak(turn.id, turn.answer ?? "", turn.voiceId)}
                       />
                     </div>
+                    {!turn.task && !turn.failed && (
+                      <AnswerFeedback
+                        twinId={turn.twinId}
+                        twinName={turn.twinName}
+                        question={turn.question}
+                        answer={turn.answer ?? ""}
+                        onSent={() => setStatsTick((n) => n + 1)}
+                      />
+                    )}
                   </motion.div>
                 )}
               </motion.div>

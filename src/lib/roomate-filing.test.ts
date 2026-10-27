@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFilingPrompt, extractTaskId, isTaskId, meetingPeople, resolveActionOwner, roomateAvailable } from "./roomate-filing";
+import { buildFilingPrompt, extractTaskId, meetingPeople, resolveActionOwner, roomateAvailable } from "./roomate-filing";
 
 describe("roomateAvailable", () => {
   const server = (name: string, enabled = true, url = "https://mcp.roomate.example/mcp") => ({ name, enabled, url });
