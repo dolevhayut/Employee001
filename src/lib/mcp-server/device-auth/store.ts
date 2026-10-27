@@ -137,50 +137,76 @@ function prune(store: StoreShape, now: number): void {
 const LOCK_STALE_MS = 5_000;
 const LOCK_WAIT_MS = 6_000; // longer than the stale timeout, so a crashed holder never makes waiters fail
 
-/** Cross-process mutex: mkdir is atomic. Serialises every read-modify-write. */
-function withLock<T>(fn: () => T): T {
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function readLockOwner(lock: string): string | null {
+  try {
+    return fs.readFileSync(lock, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cross-process mutex: an exclusively created lock file holding an owner token.
+ * Release removes the lock only if we still own it. A stale lock is reclaimed by
+ * an atomic rename, and put back if what we moved turns out to be someone's fresh
+ * lock. Waiting is async, so the event loop is never blocked.
+ */
+async function withLock<T>(fn: () => T): Promise<T> {
   const lock = `${file()}.lock`;
   fs.mkdirSync(path.dirname(lock), { recursive: true });
+  const token = randomBytes(16).toString("hex");
   const started = Date.now();
   for (;;) {
     try {
-      fs.mkdirSync(lock);
+      fs.writeFileSync(lock, token, { flag: "wx", mode: 0o600 });
       break;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
       try {
-        if (Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS) fs.rmdirSync(lock);
+        const seen = readLockOwner(lock);
+        if (seen !== null && Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS) {
+          const moved = `${lock}.stale.${token}`;
+          fs.renameSync(lock, moved);
+          if (readLockOwner(moved) === seen) fs.rmSync(moved, { force: true });
+          else {
+            // We moved a lock that was replaced meanwhile: give it back if the slot is free.
+            try {
+              fs.linkSync(moved, lock);
+            } catch {
+              /* slot already retaken */
+            }
+            fs.rmSync(moved, { force: true });
+          }
+        }
       } catch {
         /* released or reclaimed by someone else */
       }
       if (Date.now() - started > LOCK_WAIT_MS) throw new Error("mcp-device-auth store is busy");
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+      await sleep(10);
     }
   }
   try {
     return fn();
   } finally {
-    try {
-      fs.rmdirSync(lock);
-    } catch {
-      /* already reclaimed as stale */
-    }
+    if (readLockOwner(lock) === token) fs.rmSync(lock, { force: true });
   }
 }
 
-export function issueDeviceCode(): IssuedDeviceCode {
+export function issueDeviceCode(): Promise<IssuedDeviceCode> {
   return withLock(issueUnlocked);
 }
-export function approveUserCode(userCode: string, personId: string): ApproveResult {
+export function approveUserCode(userCode: string, personId: string): Promise<ApproveResult> {
   return withLock(() => approveUnlocked(userCode, personId));
 }
-export function exchangeDeviceCode(deviceCode: string): ExchangeResult {
+export function exchangeDeviceCode(deviceCode: string): Promise<ExchangeResult> {
   return withLock(() => exchangeUnlocked(deviceCode));
 }
-export function revokePersonSessions(personId: string): number {
+export function revokePersonSessions(personId: string): Promise<number> {
   return withLock(() => revokePersonUnlocked(personId));
 }
-export function revokeBearer(bearer: string): boolean {
+export function revokeBearer(bearer: string): Promise<boolean> {
   return withLock(() => revokeBearerUnlocked(bearer));
 }
 
