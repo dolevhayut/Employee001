@@ -9,6 +9,7 @@ import {
   findLeaksInDir,
   folderAttackCoverage,
   folderAttackPrompt,
+  requireModelProblem,
   signInErrorProblem,
   signedOutEnv,
   streamedErrorMessage,
@@ -139,6 +140,14 @@ describe("folderAttackCoverage", () => {
   it("ignores a Grep on a single file when the target is the folder", () => {
     const events = [{ type: "tool_call", name: "Grep", args: { path: "/var/folders/x/knowledge/README.md" } }];
     expect(folderAttackCoverage(targets, events, []).attempted).toEqual([]);
+  });
+});
+
+describe("requireModelProblem", () => {
+  it("fails only when the model is required and missing", () => {
+    expect(requireModelProblem(true, undefined)).toMatch(/--require-model/);
+    expect(requireModelProblem(true, "claude-code")).toBeNull();
+    expect(requireModelProblem(false, undefined)).toBeNull();
   });
 });
 
