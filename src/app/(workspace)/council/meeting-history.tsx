@@ -6,7 +6,7 @@ import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { useT } from "@/components/ex/i18n-context";
 import type { EmployeeWithTwin } from "@/lib/employees";
-import type { MeetingStance } from "@/lib/meeting-stances";
+import { normalizeStances, type MeetingStance } from "@/lib/meeting-stances";
 import { SendToRoomate, type RoomateAction } from "./send-to-roomate";
 
 // Team Meeting history: a drawer that lists stored meetings and opens one
@@ -174,10 +174,13 @@ export function MeetingHistoryDrawer({
     if (nodes.length === 0) return;
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
-    if (e.shiftKey && (document.activeElement === first || document.activeElement === headingRef.current)) {
+    const active = document.activeElement as HTMLElement | null;
+    // Focus can sit on a non-tabbable element (heading, a jumped-to turn); treat it as outside the tab order.
+    const outside = !active || !nodes.includes(active);
+    if (e.shiftKey && (active === first || active === headingRef.current || outside)) {
       e.preventDefault();
       last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
+    } else if (!e.shiftKey && (active === last || outside)) {
       e.preventDefault();
       first.focus();
     }
@@ -239,7 +242,11 @@ export function MeetingHistoryDrawer({
   const nameOf = (id: string, fallback?: string) => empById[id]?.firstName ?? fallback ?? id;
 
   // Only stances whose turn is still in the transcript can be linked.
-  const stances = (detail?.summary?.stances ?? []).filter((s) => detail?.transcript[s.turn]?.kind === "twin");
+  const stances = normalizeStances(detail?.summary?.stances, detail?.transcript ?? []);
+  const speakerName = (s: MeetingStance) => {
+    const spoke = detail?.transcript[s.turn];
+    return nameOf(s.employeeId, spoke?.kind === "twin" ? spoke.employeeName : undefined);
+  };
 
   function jumpToTurn(turn: number) {
     const el = asideRef.current?.querySelector<HTMLElement>(`[data-turn="${turn}"]`);
@@ -438,7 +445,7 @@ export function MeetingHistoryDrawer({
                           {stances.map((s) => {
                             const accepted = s.stance === "accept";
                             const color = accepted ? "var(--success)" : "var(--danger)";
-                            const name = nameOf(s.employeeId);
+                            const name = speakerName(s);
                             const label = t(accepted ? "meeting.accepted" : "meeting.objected");
                             return (
                               <li key={s.employeeId}>
@@ -557,7 +564,7 @@ export function MeetingHistoryDrawer({
                         display: "flex",
                         flexDirection: "column",
                         gap: 3,
-                        outline: flashTurn === i ? "2px solid var(--accent)" : "none",
+                        outline: flashTurn === i ? "2px solid var(--accent)" : undefined,
                         outlineOffset: 4,
                         borderRadius: 12,
                       }}

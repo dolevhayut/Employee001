@@ -66,7 +66,7 @@ export async function summarizeMeeting(
 
   const res = await c.messages.create({
     model: TWIN_MODEL_PRIMARY,
-    max_tokens: 1600,
+    max_tokens: 2400,
     system: `You close a team meeting for the CEO. From the discussion, write:
 - "decision": what the team converged on, in at most two short sentences (or the best recommendation if they didn't fully agree).
 - "actions": 2 to 5 concrete next steps, each owned by one team member (use their id from the roster), phrased as a short task they can start now: an imperative of at most 15 words, like a ticket title; add "due" only if a date or timeframe was mentioned (a few words).
