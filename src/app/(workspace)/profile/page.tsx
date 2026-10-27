@@ -25,6 +25,7 @@ import { KNOWLEDGE_FOLDER_DISCLOSURE, MAX_KNOWLEDGE_FOLDERS as MAX_FOLDERS } fro
 import type { OrgSkillPlaybook } from "@/lib/org-skills";
 import { DIFF_TOO_LARGE_TEXT, diffLines, isCollapsedUnchanged } from "@/lib/text-diff";
 import { formatDateTime, formatRelativeTime } from "@/lib/i18n/format";
+import { STALE_AFTER_DAYS, describeAge, staleProfileFiles, type ProfileFileAge } from "@/lib/profile-age";
 
 const MODELS_STORAGE_KEY = "employee001.models.v1";
 
@@ -2117,8 +2118,37 @@ function FilesTab({
     })();
   }, [loadKnowledge]);
 
+  const [ages, setAges] = useState<ProfileFileAge[]>([]);
+  const loadAges = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/employees/${employeeId}/file-age`, { cache: "no-store" });
+      if (!r.ok) return;
+      setAges(((await r.json()) as { ages?: ProfileFileAge[] }).ages ?? []);
+    } catch {
+      /* leave ages as-is on transient error */
+    }
+  }, [employeeId]);
+  useEffect(() => {
+    void (async () => {
+      await loadAges();
+    })();
+  }, [loadAges]);
+  const confirmStillTrue = useCallback(
+    async (file: string) => {
+      const r = await fetch(`/api/employees/${employeeId}/file-age`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file }),
+      });
+      if (!r.ok) throw new Error(`Couldn't confirm (${r.status})`);
+      await loadAges();
+    },
+    [employeeId, loadAges],
+  );
+
   return (
     <>
+    <StaleFilesNudge employeeId={employeeId} ages={ages} onSelect={onSelect} onConfirm={confirmStillTrue} />
     <KnowledgeProposalsPanel employeeId={employeeId} onAccepted={() => void loadKnowledge()} />
     <KnowledgeFolders employeeId={employeeId} />
     <div
@@ -2142,9 +2172,116 @@ function FilesTab({
         employeeId={employeeId}
         selected={selected}
         onKnowledgeChanged={loadKnowledge}
+        age={selected?.group === "profile" ? ages.find((a) => a.file === selected.name) : undefined}
+        onConfirm={confirmStillTrue}
+        onProfileSaved={loadAges}
       />
     </div>
     </>
+  );
+}
+
+/**
+ * Once a month at most: profile files nobody has touched in 30+ days, each with
+ * one next step. Confirming only updates the date the file shows; it changes
+ * no content and no consent.
+ */
+function StaleFilesNudge({
+  employeeId,
+  ages,
+  onSelect,
+  onConfirm,
+}: {
+  employeeId: string;
+  ages: ProfileFileAge[];
+  onSelect: (sel: SelectedFile) => void;
+  onConfirm: (file: string) => Promise<void>;
+}) {
+  const key = `employee001.fileNudgeDismissed.${employeeId}`;
+  const [snoozed, setSnoozed] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let at = 0;
+    try {
+      at = Number(localStorage.getItem(key)) || 0;
+    } catch {
+      /* storage unavailable: show the nudge */
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads browser-only storage after mount
+    setSnoozed(Date.now() - at < STALE_AFTER_DAYS * 86_400_000);
+  }, [key]);
+  const stale = staleProfileFiles(ages);
+  if (snoozed || stale.length === 0) return null;
+
+  function dismiss() {
+    try {
+      localStorage.setItem(key, String(Date.now()));
+    } catch {
+      /* ignore */
+    }
+    setSnoozed(true);
+  }
+  async function confirm(file: string) {
+    setBusy(file);
+    setError("");
+    try {
+      await onConfirm(file);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't confirm");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div
+      role="region"
+      aria-label="Profile files to re-check"
+      className="card"
+      style={{ padding: "var(--sp-12) var(--sp-16)", marginBottom: "var(--sp-16)", background: "var(--bg-elevated)" }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-10)" }}>
+        <strong style={{ fontSize: "var(--fs-ui)" }}>Still true?</strong>
+        <span className="muted" style={{ fontSize: "var(--fs-meta)", flex: 1 }}>
+          These files haven&apos;t changed in over {STALE_AFTER_DAYS} days. Confirming only updates the date; your
+          content and consent stay as they are.
+        </span>
+        <button type="button" className="btn sm" style={{ height: 28 }} onClick={dismiss}>
+          Remind me next month
+        </button>
+      </div>
+      <ul style={{ listStyle: "none", margin: "var(--sp-8) 0 0", padding: 0, display: "grid", gap: "var(--sp-6)" }}>
+        {stale.map((a) => (
+          <li key={a.file} style={{ display: "flex", alignItems: "center", gap: "var(--sp-10)" }}>
+            <button
+              type="button"
+              className="mono"
+              onClick={() => onSelect({ group: "profile", name: a.file })}
+              style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--text)", fontSize: "var(--fs-ui)" }}
+            >
+              {a.file}
+            </button>
+            <span className="muted" style={{ fontSize: "var(--fs-meta)", flex: 1 }}>
+              {describeAge(a.days, a.basis)}
+              {a.basis === "written" ? " (last written)" : " (last confirmed)"}
+            </span>
+            <button
+              type="button"
+              className="btn sm"
+              style={{ height: 28 }}
+              disabled={busy === a.file}
+              onClick={() => void confirm(a.file)}
+            >
+              Still true
+            </button>
+          </li>
+        ))}
+      </ul>
+      {error && (
+        <div style={{ fontSize: "var(--fs-sm)", color: "var(--danger)", marginTop: "var(--sp-8)" }}>{error}</div>
+      )}
+    </div>
   );
 }
 
@@ -2931,12 +3068,20 @@ function FileEditorPane({
   employeeId,
   selected,
   onKnowledgeChanged,
+  age,
+  onConfirm,
+  onProfileSaved,
 }: {
   employeeId: string;
   selected: SelectedFile | null;
   onKnowledgeChanged: () => void | Promise<void>;
+  /** Age of the selected profile file (profile group only). */
+  age?: ProfileFileAge;
+  onConfirm?: (file: string) => Promise<void>;
+  onProfileSaved?: () => void | Promise<void>;
 }) {
   const { t } = useT();
+  const [confirming, setConfirming] = useState(false);
   const [body, setBody] = useState("");
   const [original, setOriginal] = useState("");
   const [loading, setLoading] = useState(false);
@@ -3014,6 +3159,7 @@ function FileEditorPane({
       setSavedAt(Date.now());
       // A knowledge file's token count / mtime may have changed — refresh the tree.
       if (selected.group === "knowledge") await onKnowledgeChanged();
+      else await onProfileSaved?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save");
     } finally {
@@ -3080,6 +3226,33 @@ function FileEditorPane({
           {selected.group}/{selected.name}
         </span>
         <div style={{ flex: 1 }} />
+        {selected.group === "profile" && age && (
+          <>
+            <span className="muted" style={{ fontSize: "var(--fs-meta)" }}>
+              {describeAge(age.days, age.basis)} · {age.basis === "confirmed" ? "last confirmed" : "last written"}
+            </span>
+            <button
+              type="button"
+              className="btn sm"
+              style={{ height: 28 }}
+              disabled={confirming || dirty}
+              title="Mark this file as still true. Only its date changes."
+              onClick={async () => {
+                setConfirming(true);
+                setError("");
+                try {
+                  await onConfirm?.(selected.name);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Couldn't confirm");
+                } finally {
+                  setConfirming(false);
+                }
+              }}
+            >
+              Still true
+            </button>
+          </>
+        )}
         {knowledgeText && (
           <button
             type="button"

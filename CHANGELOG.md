@@ -8,6 +8,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### See how old a twin's profile is
+- Ask shows how old the profile files related to an answer are. The profile's
+  Files tab nudges you once a month about files older than 30 days, and
+  "Still true" marks one as checked without changing it. Only the twin's own
+  person or an admin can confirm, it is audited, and a retired twin stays
+  read-only.
+
 ### A meeting's decision shows who agreed and who objected
 - Open a past meeting and its decision now lists who accepted and who
   objected. Each name jumps to the message where they said so. Meetings
