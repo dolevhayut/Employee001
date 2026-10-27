@@ -73,6 +73,9 @@ describe("contradiction scan", () => {
     expect(items[0].status).toBe("open");
     expect(items[0].detail).toContain("profile: CONTEXT.md line 3");
     expect(items[0].detail).toContain("memory: durable fact fact_1");
+    // Memory-sourced values are cited, never quoted.
+    expect(items[0].detail).not.toContain("Omer\"");
+    expect(items[0].detail).toContain('Dana Katz: "Dana"');
     expect(items[0].source).toMatchObject({ kind: "contradiction" });
 
     const second = await mod.scanContradictions(null);

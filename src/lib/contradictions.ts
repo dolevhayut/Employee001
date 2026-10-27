@@ -260,18 +260,24 @@ async function runScan(viewer: Viewer): Promise<ScanResult> {
   for (const conflict of conflicts) {
     if (filed.has(conflict.fingerprint)) continue;
     filed.add(conflict.fingerprint);
-    const { a, b } = conflict;
+    // Durable memory comes from private conversations and the Inbox is
+    // member-readable, so a memory-sourced side is cited but not quoted.
+    const side = (s: ContradictionSide): ContradictionSide =>
+      s.source.startsWith("memory:") ? { ...s, value: "" } : { ...s, value: show(s.value) };
+    const a = side(conflict.a);
+    const b = side(conflict.b);
+    const said = (s: ContradictionSide) => (s.value ? `"${s.value}"` : "something different (kept private)");
     appendFeedItem({
       source: {
         kind: "contradiction",
         fingerprint: conflict.fingerprint,
         subject: show(conflict.subject),
-        a: { ...a, value: show(a.value) },
-        b: { ...b, value: show(b.value) },
+        a,
+        b,
       },
       type: "alert",
       title: `${a.employeeName} and ${b.employeeName} disagree: ${show(conflict.subject)}`,
-      detail: `${a.employeeName}: "${show(a.value)}" (${a.source}). ${b.employeeName}: "${show(b.value)}" (${b.source}).`,
+      detail: `${a.employeeName}: ${said(a)} (${a.source}). ${b.employeeName}: ${said(b)} (${b.source}).`,
       priority: 2,
     });
     created++;

@@ -28,7 +28,8 @@ type ContradictionSide = { employeeId: string; employeeName: string; value: stri
 
 /** Team Meeting with both twins; the disagreement is prefilled, not sent. */
 function meetingHref(c: { subject: string; a: ContradictionSide; b: ContradictionSide }): string {
-  const q = `${c.a.employeeName} says "${c.a.value}" but ${c.b.employeeName} says "${c.b.value}" about ${c.subject}. Which is right?`.slice(0, 500);
+  const says = (s: ContradictionSide) => `${s.employeeName} says ${s.value ? `"${s.value}"` : "something different"}`;
+  const q = `${says(c.a)} but ${says(c.b)} about ${c.subject}. Which is right?`.slice(0, 500);
   return `/council?${new URLSearchParams({ with: `${c.a.employeeId},${c.b.employeeId}`, q })}`;
 }
 
