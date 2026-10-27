@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getMeeting } from "@/lib/meeting-store";
+import { normalizeStances } from "@/lib/meeting-stances";
 
 /**
  * Export a council meeting transcript as a Markdown file.
@@ -48,6 +49,11 @@ export async function GET(request: NextRequest) {
 
   if (meeting.summary) {
     const s = meeting.summary;
+    // Names come from the transcript; a twin who never spoke keeps its id.
+    const names = new Map<string, string>();
+    for (const t of meeting.transcript) if (t.kind === "twin") names.set(t.employeeId, t.employeeName);
+    const nameOf = (id: string) => names.get(id) ?? id;
+    const stances = normalizeStances(s.stances, meeting.transcript);
     lines.push("## Decision");
     lines.push("");
     lines.push(s.decision);
@@ -55,7 +61,15 @@ export async function GET(request: NextRequest) {
     if (s.actions.length > 0) {
       lines.push("**Next steps**");
       lines.push("");
-      for (const a of s.actions) lines.push(`- ${a.employeeId}: ${a.action}${a.due ? ` (due: ${a.due})` : ""}`);
+      for (const a of s.actions) lines.push(`- ${nameOf(a.employeeId)}: ${a.action}${a.due ? ` (due: ${a.due})` : ""}`);
+      lines.push("");
+    }
+    if (stances.length > 0) {
+      lines.push("**Accepted / objected**");
+      lines.push("");
+      for (const st of stances) {
+        lines.push(`- ${nameOf(st.employeeId)}: ${st.stance === "accept" ? "accepted" : "objected"} (message ${st.turn + 1})`);
+      }
       lines.push("");
     }
     if (s.open.length > 0) {
@@ -69,17 +83,17 @@ export async function GET(request: NextRequest) {
   lines.push("---");
   lines.push("");
 
-  for (const turn of meeting.transcript) {
+  for (const [i, turn] of meeting.transcript.entries()) {
     const ts = new Date(turn.ts).toISOString();
     if (turn.kind === "ceo") {
-      lines.push(`## CEO — ${ts}`);
+      lines.push(`## ${i + 1}. CEO — ${ts}`);
       lines.push("");
       lines.push(turn.text);
     } else {
       const tag = turn.delegatedFromName
         ? ` _(called in by ${turn.delegatedFromName})_`
         : "";
-      lines.push(`## ${turn.employeeName}${tag} — ${ts}`);
+      lines.push(`## ${i + 1}. ${turn.employeeName}${tag} — ${ts}`);
       lines.push("");
       lines.push(turn.text);
     }

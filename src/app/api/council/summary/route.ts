@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getMeeting, setMeetingSummary } from "@/lib/meeting-store";
-import { lastDiscussion, summarizeMeeting } from "@/lib/meeting-summary";
+import { lastDiscussion, lastDiscussionStart, summarizeMeeting } from "@/lib/meeting-summary";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const spoke = new Set(turns.flatMap((t) => (t.kind === "twin" ? [t.employeeId] : [])));
   const people = roster.filter((e) => spoke.has(e.id)).map((e) => ({ id: e.id, name: e.firstName, role: e.role }));
 
-  const summary = await summarizeMeeting(turns, people);
+  const summary = await summarizeMeeting(turns, people, lastDiscussionStart(meeting.transcript));
   if (!summary) return Response.json({ error: "could not summarize" }, { status: 500 });
   const stored = setMeetingSummary(meeting.id, summary);
   return Response.json(stored ?? summary, { headers: { "Cache-Control": "no-store" } });

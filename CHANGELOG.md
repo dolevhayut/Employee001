@@ -8,6 +8,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### A meeting's decision shows who agreed and who objected
+- Open a past meeting and its decision now lists who accepted and who
+  objected. Each name jumps to the message where they said so. Meetings
+  summarized before this show the decision as before. The exported
+  meeting file now numbers each message and lists who accepted or
+  objected, with the message number.
+
 ### The security policy no longer names out-of-date versions
 - SECURITY.md now says "the latest minor release" and "the one before it"
   instead of 0.7.x and 0.6.x, so it stays true with every release. The support

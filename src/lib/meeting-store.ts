@@ -276,6 +276,7 @@ export function setMeetingSummary(id: string, decision: MeetingDecision): Meetin
       return prev ? { ...a, sentAt: prev.sentAt, ...(prev.taskId ? { taskId: prev.taskId } : {}) } : a;
     }),
     open: decision.open,
+    ...(decision.stances ? { stances: decision.stances } : {}),
     generatedAt: Date.now(),
     throughTurn: m.transcript.length,
   };
