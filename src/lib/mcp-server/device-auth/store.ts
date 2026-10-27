@@ -36,7 +36,7 @@ interface SessionRecord {
 interface StoreShape {
   devices: Record<string, DeviceRecord>; // key: hash(deviceCode)
   sessions: Record<string, SessionRecord>; // key: hash(bearer)
-  failedApprovals?: number[]; // timestamps of unknown-code approval attempts
+  failedApprovals?: Record<string, number[]>; // personId -> times of unknown-code attempts
 }
 
 export interface McpSession {
@@ -97,7 +97,7 @@ function load(): StoreShape {
   return {
     devices: raw.devices ?? {},
     sessions: raw.sessions ?? {},
-    failedApprovals: Array.isArray(raw.failedApprovals) ? raw.failedApprovals : [],
+    failedApprovals: isMap(raw.failedApprovals) ? raw.failedApprovals : {},
   };
 }
 
@@ -111,8 +111,12 @@ function save(store: StoreShape): void {
 
 function randomUserCode(): string {
   let out = "";
-  const bytes = randomBytes(8);
-  for (let i = 0; i < 8; i++) out += USER_CODE_ALPHABET[bytes[i] % USER_CODE_ALPHABET.length];
+  const limit = 256 - (256 % USER_CODE_ALPHABET.length); // reject biased bytes
+  while (out.length < 8) {
+    for (const byte of randomBytes(16)) {
+      if (byte < limit && out.length < 8) out += USER_CODE_ALPHABET[byte % USER_CODE_ALPHABET.length];
+    }
+  }
   return out;
 }
 
@@ -130,8 +134,8 @@ function prune(store: StoreShape, now: number): void {
   }
 }
 
-const LOCK_STALE_MS = 10_000;
-const LOCK_WAIT_MS = 3_000;
+const LOCK_STALE_MS = 5_000;
+const LOCK_WAIT_MS = 6_000; // longer than the stale timeout, so a crashed holder never makes waiters fail
 
 /** Cross-process mutex: mkdir is atomic. Serialises every read-modify-write. */
 function withLock<T>(fn: () => T): T {
@@ -204,12 +208,20 @@ function approveUnlocked(userCode: string, personId: string): ApproveResult {
   const now = clock();
   if (!personId) return { ok: false, reason: "unknown" };
   const store = load();
-  const recent = (store.failedApprovals ?? []).filter((t) => t > now - DEVICE_CODE_TTL_MS);
+  // The cap is per approving person, so one member's typos never block another's
+  // valid approval. It is checked before the lookup so a locked-out person cannot
+  // keep guessing.
+  const failures = store.failedApprovals ?? {};
+  const recent = (failures[personId] ?? []).filter((t) => t > now - DEVICE_CODE_TTL_MS);
   if (recent.length >= MAX_FAILED_APPROVALS) return { ok: false, reason: "rate_limited" };
   const hash = sha(normalizeUserCode(userCode));
   const entry = Object.values(store.devices).find((d) => d.userCodeHash === hash);
   if (!entry) {
-    store.failedApprovals = [...recent, now];
+    failures[personId] = [...recent, now];
+    for (const [id, times] of Object.entries(failures)) {
+      if (id !== personId && !times.some((t) => t > now - DEVICE_CODE_TTL_MS)) delete failures[id];
+    }
+    store.failedApprovals = failures;
     save(store);
     return { ok: false, reason: "unknown" };
   }
@@ -233,9 +245,7 @@ function exchangeUnlocked(deviceCode: string): ExchangeResult {
   if (!entry) return { status: "invalid" };
   if (entry.expiresAt <= now) return { status: "expired" };
   if (entry.lastPolledAt !== undefined && now - entry.lastPolledAt < POLL_INTERVAL_SECONDS * 1000) {
-    entry.lastPolledAt = now;
-    save(store);
-    return { status: "slow_down" };
+    return { status: "slow_down" }; // keep the window anchored so jitter cannot loop forever
   }
   entry.lastPolledAt = now;
   if (!entry.approvedBy) {

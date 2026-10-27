@@ -102,13 +102,20 @@ describe("abuse limits", () => {
     for (let i = 0; i < 10; i++) {
       expect(approveUserCode("ZZZZ-ZZZZ", "eve")).toEqual({ ok: false, reason: "unknown" });
     }
-    expect(approveUserCode(issued.userCode, "ada")).toEqual({
+    expect(approveUserCode(issued.userCode, "eve")).toEqual({
       ok: false,
       reason: "rate_limited",
     });
     now += DEVICE_CODE_TTL_MS;
     const fresh = issueDeviceCode();
-    expect(approveUserCode(fresh.userCode, "ada").ok).toBe(true);
+    expect(approveUserCode(fresh.userCode, "eve").ok).toBe(true);
+  });
+
+  it("one person's wrong guesses never block another person's valid approval", () => {
+    const issued = issueDeviceCode();
+    for (let i = 0; i < 12; i++) approveUserCode("ZZZZ-ZZZZ", "eve");
+    expect(approveUserCode(issued.userCode, "eve")).toEqual({ ok: false, reason: "rate_limited" });
+    expect(approveUserCode(issued.userCode, "ada")).toMatchObject({ ok: true });
   });
 });
 
