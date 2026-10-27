@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { dataDir } from "./app-home";
+import type { HiddenCharCounts } from "./hidden-chars";
 
 // Durable work queue — the autonomy work plane, file-backed like everything
 // else in this repo. A WorkItem is a unit of unattended work (an inbound
@@ -61,6 +62,9 @@ export type WorkItem = {
   leaseExpiresAt?: string;
   runId?: string;
   resultSummary?: string;
+  /** Invisible characters stripped from the inbound text at intake, by
+   *  category (counts only; the removed characters are never kept). */
+  hiddenCharsRemoved?: HiddenCharCounts;
   createdAt: string;
   updatedAt: string;
 };
@@ -111,6 +115,7 @@ export function enqueueWorkItem(input: {
   payload: WorkItem["payload"];
   idempotencyKey: string;
   maxAttempts?: number;
+  hiddenCharsRemoved?: HiddenCharCounts;
 }): { item: WorkItem; deduped: boolean } {
   const items = load();
   const existing = items.find((i) => i.idempotencyKey === input.idempotencyKey);
@@ -127,6 +132,7 @@ export function enqueueWorkItem(input: {
     status: "queued",
     attemptCount: 0,
     maxAttempts: input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+    ...(input.hiddenCharsRemoved ? { hiddenCharsRemoved: input.hiddenCharsRemoved } : {}),
     createdAt: now,
     updatedAt: now,
   };

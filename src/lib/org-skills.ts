@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import type { EmployeeWithTwin } from "@/lib/employees";
 import { dataDir } from "@/lib/app-home";
+import { stripHiddenCharsDeep } from "@/lib/hidden-chars";
+import { auditHiddenCharsRemoved, ORG_AUDIT_EMPLOYEE_ID } from "@/lib/hidden-chars-audit";
 
 const ORG_SKILLS_DIR = dataDir("org-skills");
 const ASSIGNMENTS_FILE = dataDir("org", "skill-assignments.json");
@@ -97,12 +99,25 @@ export function writeOrgSkill(input: OrgSkillInput): OrgSkillPlaybook {
   const id = safeSegment(input.id.trim().toLowerCase());
   if (!id) throw new Error("skill id is required");
 
+  // Every twin can read org skills: invisible characters (a pasted or
+  // imported playbook can carry them) go before the file is written.
+  const cleaned = stripHiddenCharsDeep({
+    label: input.label,
+    description: input.description,
+    triggers: input.triggers,
+    body: input.body,
+  });
+  const text = cleaned.value as Pick<OrgSkillInput, "label" | "description" | "triggers" | "body">;
+  if (cleaned.total > 0) {
+    auditHiddenCharsRemoved({ source: "org-skill-write", employeeId: ORG_AUDIT_EMPLOYEE_ID, removed: cleaned.removed, ref: { skill: id } });
+  }
+
   const skill: OrgSkillPlaybook = {
     id,
-    label: input.label.trim() || id,
-    description: input.description.trim(),
-    triggers: input.triggers.map((t) => t.trim()).filter(Boolean),
-    body: input.body.trim(),
+    label: text.label.trim() || id,
+    description: text.description.trim(),
+    triggers: text.triggers.map((t) => t.trim()).filter(Boolean),
+    body: text.body.trim(),
   };
 
   const dir = path.join(ORG_SKILLS_DIR, id);
