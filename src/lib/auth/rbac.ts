@@ -132,6 +132,9 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/stt": { POST: member },
   "/api/stt/token": { POST: member },
   "/api/tts": { POST: member },
+  // Consent: the employeeId is in the body, so the route itself limits it to
+  // the person or an admin.
+  "/api/tts/consent": { GET: member, POST: member },
   "/api/tts/stream": { POST: member },
   "/api/tts/token": { POST: member },
   "/api/tts/voices": { GET: member },

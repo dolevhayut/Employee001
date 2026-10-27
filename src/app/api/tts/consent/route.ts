@@ -12,10 +12,12 @@ const VOICE_ID = /^[A-Za-z0-9]{1,64}$/;
 export async function GET(req: NextRequest) {
   const employeeId = req.nextUrl.searchParams.get("employeeId") ?? "";
   if (!EMPLOYEE_ID.test(employeeId)) return Response.json({ error: "employeeId is required" }, { status: 400 });
+  // Status only: the IP and user agent stay in the record and the audit log.
+  const c = await loadVoiceConsent(employeeId);
   return Response.json({
     text: VOICE_CONSENT_TEXT,
     textSha256: voiceConsentDigest(),
-    consent: await loadVoiceConsent(employeeId),
+    consent: c ? { voiceId: c.voiceId, grantedAt: c.grantedAt, onBehalf: c.onBehalf === true } : null,
   });
 }
 
@@ -36,6 +38,10 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "voiceId is required to give consent" }, { status: 400 });
   }
   const me = sessionUserFromHeaders(req.headers);
+  // With accounts on, only the person themself or an admin may speak for a voice.
+  if (me && me.role !== "admin" && me.employeeId !== body.employeeId) {
+    return Response.json({ error: "Only the person or an admin can record voice consent" }, { status: 403 });
+  }
   const result = await recordVoiceConsent(body.employeeId, {
     agree: body.agree,
     voiceId: typeof body.voiceId === "string" ? body.voiceId : "",
