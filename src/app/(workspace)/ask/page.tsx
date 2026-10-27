@@ -350,7 +350,12 @@ type AudioState = { id: number; status: "loading" | "playing" } | null;
 /** Speaker button: plays an answer in the twin's voice (ElevenLabs). */
 function SpeakButton({ state, onClick, label, size = 26 }: { state: "idle" | "loading" | "playing"; onClick: () => void; label: string; size?: number }) {
   const icon = size * 0.5;
+  const { t } = useT();
   return (
+    <>
+      {state !== "idle" && (
+        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", marginInlineEnd: 6 }}>{t("ask.aiVoice")}</span>
+      )}
       <button
         type="button"
         onClick={onClick}
@@ -374,6 +379,7 @@ function SpeakButton({ state, onClick, label, size = 26 }: { state: "idle" | "lo
     >
       {state === "loading" ? <Icons.Loader size={icon} /> : state === "playing" ? <Icons.VolumeOff size={icon} /> : <Icons.Volume size={icon} />}
     </button>
+    </>
   );
 }
 
