@@ -73,22 +73,34 @@ describe("proxy: personal MCP bearers (accounts mode)", () => {
   async function setup() {
     const { proxy, store } = await load();
     store.createUser({ email: "o@x.io", name: "O", role: "owner" });
+    const ana = store.createUser({ email: "ana@x.io", name: "Ana", role: "member" });
     const device = await import("./lib/mcp-server/device-auth");
     const issued = await device.issueDeviceCode();
-    await device.approveUserCode(issued.userCode, "person_ana");
+    await device.approveUserCode(issued.userCode, ana.id);
     const exchanged = await device.exchangeDeviceCode(issued.deviceCode);
     if (exchanged.status !== "approved") throw new Error("not approved");
-    return { proxy, device, bearer: exchanged.bearer };
+    return { proxy, device, store, ana, bearer: exchanged.bearer };
   }
   const mcp = (bearer: string) =>
     req("http://127.0.0.1:3000/api/mcp", { method: "POST", headers: { authorization: `Bearer ${bearer}` } });
 
   it("admits a live personal bearer, and refuses it after revoke", async () => {
     process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "1";
-    const { proxy, device, bearer } = await setup();
+    const { proxy, device, ana, bearer } = await setup();
     expect(proxy(mcp(bearer)).headers.get("x-middleware-next")).toBe("1");
     expect(proxy(mcp("not-a-session-bearer")).status).toBe(401);
-    await device.revokePersonSessions("person_ana");
+    await device.revokePersonSessions(ana.id);
+    expect(proxy(mcp(bearer)).status).toBe(401);
+  });
+
+  it("refuses the bearer of a person who was deleted or disabled", async () => {
+    process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "1";
+    const { proxy, store, ana, bearer } = await setup();
+    store.updateUser(ana.id, { disabled: true });
+    expect(proxy(mcp(bearer)).status).toBe(401);
+    store.updateUser(ana.id, { disabled: false });
+    expect(proxy(mcp(bearer)).headers.get("x-middleware-next")).toBe("1");
+    store.deleteUser(ana.id);
     expect(proxy(mcp(bearer)).status).toBe(401);
   });
 

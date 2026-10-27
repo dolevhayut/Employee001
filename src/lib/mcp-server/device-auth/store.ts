@@ -2,6 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "@/lib/app-home";
+import { ROLE_RANK } from "@/lib/auth/rbac";
+import { getUser, listUsers } from "@/lib/auth/store";
 
 // Personal MCP sign-in (device-code flow), server-side model only. Raw device
 // codes, user codes and bearers are never stored: only their SHA-256 hashes.
@@ -329,6 +331,17 @@ export function resolveBearer(bearer: string): McpSession | null {
     return null; // unreadable store: fail closed
   }
   if (!session || session.revokedAt || session.expiresAt <= clock()) return null;
+  // With accounts on, the person must still exist, be enabled and hold a role
+  // that may use MCP (member or above), checked on every request so a deleted,
+  // disabled or demoted person is cut off at once, not 30 days later.
+  try {
+    if (listUsers().length > 0) {
+      const user = getUser(session.personId);
+      if (!user || user.disabled || ROLE_RANK[user.role] < ROLE_RANK.member) return null;
+    }
+  } catch {
+    return null; // unreadable user store: fail closed
+  }
   return { personId: session.personId, createdAt: session.createdAt, expiresAt: session.expiresAt };
 }
 

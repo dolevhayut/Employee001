@@ -14,6 +14,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   commitment itself is unchanged.
 
 ### Personal sign-in for MCP clients: follow-ups
+- A personal MCP sign-in stops working immediately when the person is deleted,
+  disabled or demoted below member, instead of lasting up to 30 days.
 - A personal MCP sign-in now gets through the access gate in front of `/api/mcp`
   when accounts are on; before, only the shared token did.
 - `/api/mcp` caps the request body as it reads it, so a chunked upload with no

@@ -241,6 +241,42 @@ describe("resolve", () => {
   });
 });
 
+describe("resolve with accounts on", () => {
+  async function accounts() {
+    return import("@/lib/auth/store");
+  }
+
+  it("cuts off a person who was deleted, disabled or demoted below member", async () => {
+    const auth = await accounts();
+    const ana = auth.createUser({ email: "ana@x.io", name: "Ana", role: "member" });
+    const ben = auth.createUser({ email: "ben@x.io", name: "Ben", role: "member" });
+    const cy = auth.createUser({ email: "cy@x.io", name: "Cy", role: "admin" });
+    const a = await signIn(ana.id);
+    const b = await signIn(ben.id);
+    const c = await signIn(cy.id);
+    expect(resolveBearer(a.bearer)?.personId).toBe(ana.id);
+
+    auth.deleteUser(ana.id);
+    expect(resolveBearer(a.bearer)).toBeNull();
+
+    auth.updateUser(ben.id, { disabled: true });
+    expect(resolveBearer(b.bearer)).toBeNull();
+    auth.updateUser(ben.id, { disabled: false });
+    expect(resolveBearer(b.bearer)).not.toBeNull();
+    auth.updateUser(ben.id, { role: "employee" });
+    expect(resolveBearer(b.bearer)).toBeNull();
+
+    expect(resolveBearer(c.bearer)?.personId).toBe(cy.id); // others unaffected
+  });
+
+  it("refuses a person id that matches no account once accounts exist", async () => {
+    const auth = await accounts();
+    auth.createUser({ email: "o@x.io", name: "O", role: "owner" });
+    const ghost = await signIn("local-owner");
+    expect(resolveBearer(ghost.bearer)).toBeNull();
+  });
+});
+
 describe("corrupt store", () => {
   it("resolves nothing and refuses to overwrite it", async () => {
     const { bearer } = await signIn();
