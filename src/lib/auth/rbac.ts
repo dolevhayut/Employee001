@@ -74,6 +74,7 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/employees/[id]": { PATCH: admin, DELETE: role("admin", "id") }, // employee: revoke own consent
   "/api/employees/[id]/chat-history": { GET: member, POST: member, DELETE: admin },
   "/api/employees/[id]/file/[name]": { GET: role("member", "id"), PUT: admin },
+  "/api/employees/[id]/file-age": { GET: role("member", "id"), POST: role("member", "id") },
   "/api/employees/[id]/graph": { GET: role("member", "id") },
   "/api/employees/[id]/knowledge": { GET: role("member", "id"), POST: admin },
   "/api/employees/[id]/knowledge-folders": { GET: admin, POST: admin, DELETE: admin },
