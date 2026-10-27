@@ -22,6 +22,7 @@ import { TWIN_DENIED_DATA_PATHS, checkTwinRead } from "@/lib/twin-read-scope";
 import { sdkChildEnv } from "@/lib/sdk-env";
 import { discloseOutbound, isOutboundMessageTool } from "@/lib/ai-disclosure";
 import { spawnClaudeCodeProcess, twinSandboxEnabled } from "@/lib/twin-sandbox";
+import { buildCleanMcpOutputHook } from "@/lib/hidden-chars-tools";
 
 const PKG_VERSION = "Employee001/0.2.0";
 
@@ -541,7 +542,7 @@ export function buildTwinHooks(
 
   return {
     PreToolUse: [{ hooks: [blockHardDisallowed, restrictWriteToScratch, restrictReadsToTwinScope, discloseAiOnSends] }],
-    PostToolUse: [{ hooks: [auditPostToolUse, injectWebCitation] }],
+    PostToolUse: [{ hooks: [auditPostToolUse, injectWebCitation, buildCleanMcpOutputHook(ctx.employeeId)] }],
     Notification: [{ hooks: [forwardNotification] }],
     Stop: [{ hooks: [onStopHook] }],
   };

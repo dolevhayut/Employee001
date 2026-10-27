@@ -11,6 +11,8 @@
 import fs from "fs";
 import path from "path";
 import { dataDir } from "./app-home";
+import { stripHiddenCharsDeep } from "./hidden-chars";
+import { auditHiddenCharsRemoved, ORG_AUDIT_EMPLOYEE_ID } from "./hidden-chars-audit";
 
 const ORG_BRAIN_DIR = dataDir("org-brain");
 const NODES_DIR = path.join(ORG_BRAIN_DIR, "nodes");
@@ -164,18 +166,32 @@ export function writeOrgBrainNode(input: OrgBrainInput): OrgBrainNode {
   const slug = safeSlug(input.slug);
   if (!slug) throw new Error("node slug is required");
 
+  // Every twin reads the Org Brain: invisible characters (pasted from a web
+  // page or a document) go before the node is written.
+  const cleaned = stripHiddenCharsDeep({
+    label: input.label,
+    description: input.description ?? "",
+    triggers: input.triggers ?? [],
+    sources: input.sources ?? [],
+    body: input.body,
+  });
+  const text = cleaned.value as { label: string; description: string; triggers: string[]; sources: string[]; body: string };
+  if (cleaned.total > 0) {
+    auditHiddenCharsRemoved({ source: "org-brain-write", employeeId: ORG_AUDIT_EMPLOYEE_ID, removed: cleaned.removed, ref: { node: slug } });
+  }
+
   const node: OrgBrainNode = {
     slug,
-    label: input.label.trim() || slug,
+    label: text.label.trim() || slug,
     type: coerceType(input.type ?? "note"),
-    description: (input.description ?? "").trim(),
-    triggers: (input.triggers ?? []).map((t) => t.trim()).filter(Boolean),
-    sources: (input.sources ?? []).map((s) => s.trim()).filter(Boolean),
+    description: text.description.trim(),
+    triggers: text.triggers.map((t) => t.trim()).filter(Boolean),
+    sources: text.sources.map((s) => s.trim()).filter(Boolean),
     linkedNodes: (input.linkedNodes ?? [])
       .map((l) => safeSlug(l))
       .filter(Boolean),
     lastUpdated: new Date().toISOString(),
-    body: input.body.trim(),
+    body: text.body.trim(),
   };
 
   fs.mkdirSync(NODES_DIR, { recursive: true });
