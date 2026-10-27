@@ -676,6 +676,13 @@ export type RunOptions = {
   /** The signed-in user who asked (audit requesterId), when there is one. */
   requesterId?: string;
   /**
+   * Temporary ask: nothing from this run is kept. No episodic or durable memory
+   * is written (and recall does not reinforce cards), no Claude Code session
+   * transcript is saved, and the run cannot resume one. Tools, approvals, read
+   * scope and the audit log are exactly as in a normal run.
+   */
+  temporary?: boolean;
+  /**
    * The question was spoken (live voice on Ask) and the answer will be too.
    * Unless it needs a connected system or asks for an action (voice-lane.ts,
    * the previous question included), the run skips Composio and org MCP
@@ -1032,7 +1039,7 @@ export async function runSingleTwin(
     let memoryBlock = "";
     if (!publicReply) try {
       const [episodic, structured] = await Promise.all([
-        searchTwinMemory(employee.id, question),
+        searchTwinMemory(employee.id, question, undefined, !options.temporary),
         Promise.resolve(searchStructuredMemory(employee.id, question)),
       ]);
       // Durable facts first (higher authority), then episodic recall.
@@ -1336,8 +1343,9 @@ export async function runSingleTwin(
       prompt,
       options: {
         ...baseOptions,
-        ...(options.resumeSessionId ? { resume: options.resumeSessionId } : {}),
-        ...(options.resumeSessionId && options.forkSession ? { forkSession: true } : {}),
+        ...(options.temporary ? { persistSession: false } : {}),
+        ...(options.resumeSessionId && !options.temporary ? { resume: options.resumeSessionId } : {}),
+        ...(options.resumeSessionId && !options.temporary && options.forkSession ? { forkSession: true } : {}),
         cwd: dataRoot,
         systemPrompt: buildSystemPromptBlocks(
           employee,
@@ -1586,8 +1594,8 @@ export async function runSingleTwin(
       ts: ts(),
     });
 
-    // A retired twin learns nothing new.
-    if (!retired) void rememberTwinRun({
+    // A retired twin learns nothing new; neither does a temporary ask.
+    if (!retired && !options.temporary) void rememberTwinRun({
       employeeId: employee.id,
       runId,
       surface: memorySurfaceFor(options),

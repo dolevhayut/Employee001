@@ -71,7 +71,21 @@ describe("read scope per run type", () => {
     expect(text).toMatch(/if \(options\.publicReply \|\| options\.retired\) \{[^}]*tools: \[\],/);
     expect(text).toMatch(/tools: toolConfig\.tools,/);
     expect(text).toMatch(/const mcpServers = publicReply \? \{\}/);
-    expect(text).toMatch(/if \(!retired\) void rememberTwinRun/);
+    expect(text).toMatch(/if \(!retired && !options\.temporary\) void rememberTwinRun/);
+  });
+
+  it("a temporary ask changes only what is kept: same tools, hooks and audit, no memory, no saved session", () => {
+    const text = source("lib/council-runner.ts");
+    // Memory: no episodic/durable write, no recall reinforcement.
+    expect(text).toMatch(/!options\.temporary\) void rememberTwinRun/);
+    expect(text).toMatch(/searchTwinMemory\(employee\.id, question, undefined, !options\.temporary\)/);
+    expect(text).toMatch(/options\.temporary \? \{ persistSession: false \}/);
+    // Nothing else in the runner branches on it: tool policy, hooks, read scope
+    // and the audit log are not conditional on a temporary ask.
+    expect(text.slice(text.indexOf("buildTwinHooks({"), text.indexOf("const toolConfig"))).not.toMatch(/temporary/);
+    expect(text).not.toMatch(/appendAuditEntry\(\{[^}]*temporary/);
+    const toolConfig = text.slice(text.indexOf("function buildToolConfig"), text.indexOf("export async function runSingleTwin"));
+    expect(toolConfig).not.toMatch(/temporary/);
   });
 
   it("the Ask-the-company systems agent can't read files at all", () => {
