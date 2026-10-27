@@ -35,11 +35,16 @@ function getClient(): Anthropic | null {
 
 /** The turns since the CEO's last question (the discussion being decided). */
 export function lastDiscussion(transcript: MeetingTurn[]): MeetingTurn[] {
+  return transcript.slice(lastDiscussionStart(transcript));
+}
+
+/** Index in the transcript where lastDiscussion() begins. */
+export function lastDiscussionStart(transcript: MeetingTurn[]): number {
   let start = 0;
   transcript.forEach((t, i) => {
     if (t.kind === "ceo") start = i;
   });
-  return transcript.slice(start);
+  return start;
 }
 
 export async function summarizeMeeting(
