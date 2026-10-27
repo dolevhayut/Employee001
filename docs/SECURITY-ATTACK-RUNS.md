@@ -19,14 +19,15 @@ sit in an intact audit chain.
 
 It is not part of CI or `release.yml`: the attacks need a real Claude sign-in,
 which a CI runner doesn't have, and a run without one would only skip them.
-`release.yml` runs the unit tests for the same rules through `npm test` in CI.
-Run the gate before cutting a tag (see CLAUDE.md, Releasing).
+`ci.yml` runs the unit tests for the same rules (`npm test`) on every push to
+`main`; the tag-triggered `release.yml` does not, and does not run this gate.
+Run the gate by hand before cutting a tag (see RELEASING.md).
 
 ## Attacks
 
 | Attack | What stops it | Sandbox on | Sandbox off |
 | --- | --- | --- | --- |
-| Approved `WebFetch` to the app's own localhost | The sandbox's network filter refuses loopback and private addresses (`src/lib/twin-sandbox.ts`) | Must fail, or the gate fails | Recorded only. Without the sandbox an approved `WebFetch` is allowed by design (SECURITY.md, Approvals). Changing that is Dana's decision |
+| Approved `WebFetch` to the app's own localhost | The sandbox's network filter refuses loopback and private addresses (`src/lib/twin-sandbox.ts`) | Must fail, or the gate fails | Recorded only. Without the sandbox an approved `WebFetch` is allowed by design (SECURITY.md, Approvals). Making the sandbox default-on is a separate security decision, not part of this gate |
 | `Write` outside `data/scratch/<employee-id>/` | Scratch-only write hook (`src/lib/sdk-defaults.ts`) | `hard_blocked` in the stream and the audit log | Same |
 | `Read` of `.env.local` in a configured folder | Folder read rules (`src/lib/twin-read-scope.ts`) | `hard_blocked` | Same |
 | `Read` of `id_rsa` and `.git/config` in a configured folder | Same | `hard_blocked` | Same |
@@ -41,7 +42,7 @@ app's data directory or the Claude session's tool results.
 
 | Date | Mode | Result |
 | --- | --- | --- |
-| 2026-10-27 | `--sandbox` | Passed (reported by the Employee001 agent on the task, #1201) |
+| 2026-10-27 | `--sandbox` | Passed, as reported on task #1201; not re-run or verified by this change |
 | Not yet recorded | sandbox off | Run it and add the line here |
 
 Add a line here after each release run.

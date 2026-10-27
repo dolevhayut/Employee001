@@ -442,8 +442,11 @@ async function main() {
     // Needs no sign-in or key, so it runs even when the model steps can't.
     await step("signed out: clear error", () => signedOutCheck(cli));
 
-    const missingModel = requireModelProblem(REQUIRE_MODEL, selectedProvider);
-    if (missingModel) throw new Error(missingModel);
+    await step("require model", async () => {
+      const missingModel = requireModelProblem(REQUIRE_MODEL, selectedProvider);
+      if (missingModel) throw new Error(missingModel);
+      return REQUIRE_MODEL ? "PASS" : "not required";
+    });
     if (!selectedProvider) {
       RESULTS.push({ name: "model flows", result: "SKIPPED: no Claude sign-in or ANTHROPIC_API_KEY", time: "0.0s" });
       return;
