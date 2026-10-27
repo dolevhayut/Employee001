@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   if (off) return off;
   if (!takeSlot("start", 30)) return fail(429, "rate_limited", "Too many sign-in attempts. Try again in a minute.");
   const issued = await issueDeviceCode();
-  const verificationUri = `${new URL(request.url).origin}/mcp/device`;
+  const verificationUri = `${new URL(request.url).origin}/device`;
   return json({
     device_code: issued.deviceCode,
     user_code: issued.userCode,
