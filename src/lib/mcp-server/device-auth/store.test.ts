@@ -20,8 +20,10 @@ import {
 
 // Everyone signing in below is a member unless a test overrides or removes them (null).
 const people = vi.hoisted(() => new Map<string, { id: string; role: string; disabled?: boolean } | null>());
+const accounts = vi.hoisted(() => ({ none: false }));
 vi.mock("@/lib/auth/store", () => ({
   getUser: (id: string) => (people.has(id) ? (people.get(id) ?? undefined) : { id, role: "member" }),
+  listUsers: () => (accounts.none ? [] : [{ id: "ada", role: "member" }]),
 }));
 
 let home: string;
@@ -30,6 +32,7 @@ const prevHome = process.env.EMPLOYEE001_HOME;
 
 beforeEach(() => {
   people.clear();
+  accounts.none = false;
   home = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-device-auth-"));
   process.env.EMPLOYEE001_HOME = home;
   now = Date.parse("2026-10-27T09:00:00Z");
@@ -384,12 +387,24 @@ describe("resolve checks the person", () => {
     expect(resolveBearer(bearer)).toBeNull();
   });
 
-  it("rejects a deleted person and a local-owner bearer when no user exists", async () => {
+  it("rejects a deleted person and a local-owner bearer while other users exist", async () => {
     const ada = await signIn("ada");
     const owner = await signIn("local-owner");
     people.set("ada", null);
     people.set("local-owner", null);
     expect(resolveBearer(ada.bearer)).toBeNull();
+    expect(resolveBearer(owner.bearer)).toBeNull();
+  });
+
+  it("lets local-owner through only while no user record exists at all", async () => {
+    const owner = await signIn("local-owner");
+    const ada = await signIn("ada");
+    people.set("local-owner", null);
+    people.set("ada", null);
+    accounts.none = true;
+    expect(resolveBearer(owner.bearer)?.personId).toBe("local-owner");
+    expect(resolveBearer(ada.bearer)).toBeNull(); // other ids keep the member check
+    accounts.none = false; // accounts appear, even if all are disabled
     expect(resolveBearer(owner.bearer)).toBeNull();
   });
 });

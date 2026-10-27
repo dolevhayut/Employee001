@@ -3,7 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "@/lib/app-home";
 import { ROLE_RANK } from "@/lib/auth/rbac";
-import { getUser } from "@/lib/auth/store";
+import { getUser, listUsers } from "@/lib/auth/store";
+
+const LOCAL_OWNER_ID = "local-owner";
 
 // Personal MCP sign-in (device-code flow), server-side model only. Raw device
 // codes, user codes and bearers are never stored: only their SHA-256 hashes.
@@ -394,8 +396,13 @@ export function resolveBearer(bearer: string): McpSession | null {
   if (!session || session.revokedAt || session.expiresAt <= clock()) return null;
   // A session belongs to a person who can still approve one: deleted, disabled or
   // demoted below member means no session, even if revocation never ran.
-  const person = getUser(session.personId);
-  if (!person || person.disabled || ROLE_RANK[person.role] < ROLE_RANK.member) return null;
+  // The one exception: with no user record at all (disabled ones count), the app
+  // runs without accounts and the loopback owner is "local-owner".
+  const noAccounts = session.personId === LOCAL_OWNER_ID && listUsers().length === 0;
+  if (!noAccounts) {
+    const person = getUser(session.personId);
+    if (!person || person.disabled || ROLE_RANK[person.role] < ROLE_RANK.member) return null;
+  }
   return { personId: session.personId, createdAt: session.createdAt, expiresAt: session.expiresAt };
 }
 

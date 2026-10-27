@@ -8,6 +8,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Personal MCP sign-in keeps the local owner working without accounts
+- A personal MCP session for the local owner now works only while the app has
+  no user records at all. Once any account exists, even a disabled one, every
+  session is checked against an enabled member again.
+
 ### The security policy no longer names out-of-date versions
 - SECURITY.md now says "the latest minor release" and "the one before it"
   instead of 0.7.x and 0.6.x, so it stays true with every release. The support
