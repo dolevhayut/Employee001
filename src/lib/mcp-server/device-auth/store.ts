@@ -137,7 +137,7 @@ function prune(store: StoreShape, now: number): void {
 }
 
 const LOCK_STALE_MS = 5_000;
-const LOCK_WAIT_MS = 6_000; // longer than the stale timeout, so a crashed holder never makes waiters fail
+const LOCK_WAIT_MS = 12_000; // twice the stale timeout: a crashed holder plus a crashed reclaimer guard still clears
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 

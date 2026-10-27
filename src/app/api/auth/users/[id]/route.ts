@@ -45,11 +45,10 @@ export async function PATCH(request: Request, { params }: Params) {
     patch.passwordHash = hashPassword(body.password);
   }
   const updated = updateUser(id, patch);
-  if (body.role || body.disabled || body.password !== undefined) {
-    revokeUserSessions(id);
-    await revokePersonSessions(id);
-  }
+  if (body.role || body.disabled || body.password !== undefined) revokeUserSessions(id);
+  // Audit first: if the MCP store is busy the request fails, but the change is on record.
   audit("userUpdated", { userId: id, ...(body.role ? { role: body.role } : {}), ...(typeof body.disabled === "boolean" ? { disabled: body.disabled } : {}), ...(body.password !== undefined ? { passwordReset: true } : {}) }, me.id);
+  if (body.role || body.disabled || body.password !== undefined) await revokePersonSessions(id);
   return NextResponse.json({ user: publicUser(updated) });
 }
 
