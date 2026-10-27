@@ -8,6 +8,31 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.11.0] — 2026-10-27
+
+### Your twin works from your real files, not from a summary someone uploaded
+- Point a twin at a folder on your machine and it answers from your actual
+  files, with nothing uploaded or synced. Add up to five folders on the
+  twin's profile, or one while you build your own twin.
+- The twin reads them; it can't change them. Write and Edit stay inside the
+  twin's own scratch folder, and shell access is off for every twin.
+- `.env` files, keys, `.git` and `node_modules` are never read, a symlink
+  can't lead out of the folder, and `Grep` there works one file at a time.
+  Your home folder itself, `~/.ssh`, `~/.claude` and the app's own data
+  can't be added.
+- Every add and remove is written to the audit log. The files a twin reads
+  go to your model provider to answer, and the add-folder screen says so.
+
+### Ask without leaving a trace, and flag a wrong answer
+- **Temporary ask.** Turn it on in Ask and the chat isn't saved to history and
+  the twin remembers nothing from it. Tool calls and approvals are still
+  written to the audit log.
+- **"Wrong or outdated?"** under every answer files a correction proposal
+  on the twin's profile. Nothing changes until someone accepts it. Members
+  can file one; pending proposals are capped.
+
 ### Start your twin from an example
 - "Build my twin" now shows a few example briefs, each labelled "Example".
   Preview one, then start from it: it fills the form and you rewrite it so it
@@ -16,6 +41,30 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Editing your notes after an interview no longer copies the interview
   answers into the notes.
 
+### Team Meetings are kept
+- Meetings are saved to disk, so they survive a restart. Reopen one from
+  History, read it again, or continue it with the twins that can still
+  answer. Each meeting is titled by its first question and keeps its latest
+  decision.
+- Open a past meeting and its decision now lists who accepted and who
+  objected. Each name jumps to the message where they said so. Meetings
+  summarized before this show the decision as before. The exported
+  meeting file now numbers each message and lists who accepted or
+  objected, with the message number.
+- If you connected a Roomate MCP server, each action item in a decision gets
+  "Send to Roomate": the owner's twin files it as a task, through the normal
+  approval.
+
+### Twins ask for what they're missing, and find where they disagree
+- When a question needs a system a twin can't reach, it files a request in
+  the admin's Inbox, with the reason and the access it needs. Nothing is
+  contacted or configured until you act on it.
+- Tasks run on twins with no connected tools: they work from their profile,
+  files and folders.
+- "Scan for conflicts" in the Inbox compares what twins say about the same
+  thing and raises an item when two disagree, with a link to start a meeting
+  about it. Claims from memory are cited, not quoted.
+
 ### See how old a twin's profile is
 - Ask shows how old the profile files related to an answer are. The profile's
   Files tab nudges you once a month about files older than 30 days, and
@@ -23,44 +72,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   person or an admin can confirm, it is audited, and a retired twin stays
   read-only.
 
-### A meeting's decision shows who agreed and who objected
-- Open a past meeting and its decision now lists who accepted and who
-  objected. Each name jumps to the message where they said so. Meetings
-  summarized before this show the decision as before. The exported
-  meeting file now numbers each message and lists who accepted or
-  objected, with the message number.
+### Easier to read
+- Approvals show what you are approving as a card, with every field readable
+  and the raw JSON one click away. The approval dialog is calmer.
+- Cockpit shows a run as a conversation, not a terminal log.
+- Tasks has a board view of task history.
 
-### The security policy no longer names out-of-date versions
-- SECURITY.md now says "the latest minor release" and "the one before it"
-  instead of 0.7.x and 0.6.x, so it stays true with every release. The support
-  commitment itself is unchanged.
+### Two themes
+- Light (white, stone and dark brown) and dark (black, gray and white). The
+  OS setting picks one until you choose.
 
-### Personal sign-in for MCP clients: follow-ups
-- A personal MCP sign-in stops working immediately when the person is deleted,
-  disabled or demoted below member, instead of lasting up to 30 days.
-- A personal MCP sign-in now gets through the access gate in front of `/api/mcp`
-  when accounts are on; before, only the shared token did.
-- `/api/mcp` caps the request body as it reads it, so a chunked upload with no
-  size header can no longer be buffered whole.
-- The sign-in store's lock can no longer be taken by two processes at once after
-  a crash, and a stalled writer is refused instead of overwriting a revoke.
-- The device sign-in link (`/device`) now uses your configured public URL
-  (`EMPLOYEE001_PUBLIC_URL` or `APP_URL`) instead of the request's Host header.
-- The local owner's personal MCP sessions work only while the app has no user
-  record at all; one account, even a disabled one, ends them. A disabled
-  person's session never comes back, even when every account is disabled.
-- When too many sign-ins are pending, starting another answers "try again"
-  (429) instead of a server error.
-- `employee001 login` warns when the address is plain `http` on another
-  machine, because the session token would cross the network unencrypted.
-- Importing from Claude Code is limited to the owner. It reads the machine
-  owner's own `~/.claude`, so another admin can no longer copy those files
-  into a twin.
+### Every twin message says it is AI
+- A message a twin sends to people outside the app (chat apps, email) starts
+  with "🤖 AI twin of <name>", and emails carry an `X-AI-Generated` header.
+  Spoken answers are labelled "AI voice" and the audio carries the same
+  header. An approver's edit can't remove it.
 
-### Personal sign-in for MCP clients (groundwork)
+### Personal sign-in for MCP clients (off by default)
+- Each person can sign in their own MCP client instead of sharing one token.
+  It stays off until you set `EMPLOYEE001_MCP_PERSONAL_SIGNIN=1`; see
+  SECURITY.md.
 - The server can now issue a short-lived device code that a signed-in person
   approves, and tie the resulting MCP session to that person so it can be
-  revoked. Nothing is switched on yet.
+  revoked.
 - Once personal sign-in is enabled, the shared `EMPLOYEE001_MCP_TOKEN` and
   `EMPLOYEE001_TOKEN` stop working for `/api/mcp` unless an admin opts in with
   `EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN=1`. See SECURITY.md.
@@ -78,30 +112,30 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The sign-in routes answer 404 while personal sign-in is off, so no code can
   be minted early. Deleting, disabling, demoting or resetting the password of a
   person now ends their MCP sessions too.
+- A personal MCP sign-in stops working immediately when the person is deleted,
+  disabled or demoted below member, instead of lasting up to 30 days.
+- A personal MCP sign-in now gets through the access gate in front of `/api/mcp`
+  when accounts are on; before, only the shared token did.
+- `/api/mcp` caps the request body as it reads it, so a chunked upload with no
+  size header can no longer be buffered whole.
+- The sign-in store's lock can no longer be taken by two processes at once after
+  a crash, and a stalled writer is refused instead of overwriting a revoke.
+- The device sign-in link (`/device`) now uses your configured public URL
+  (`EMPLOYEE001_PUBLIC_URL` or `APP_URL`) instead of the request's Host header.
+- The local owner's personal MCP sessions work only while the app has no user
+  record at all; one account, even a disabled one, ends them. A disabled
+  person's session never comes back, even when every account is disabled.
+- When too many sign-ins are pending, starting another answers "try again"
+  (429) instead of a server error.
+- `employee001 login` warns when the address is plain `http` on another
+  machine, because the session token would cross the network unencrypted.
 
-### Your twin works from your real files, not from a summary someone uploaded
-- Point a twin at a folder on your machine and it answers from your actual
-  files, with nothing uploaded or synced. Add up to five folders on the
-  twin's profile, or one while you build your own twin.
-- The twin reads them; it can't change them. Write and Edit stay inside the
-  twin's own scratch folder, and shell access is off for every twin.
-- `.env` files, keys, `.git` and `node_modules` are never read, a symlink
-  can't lead out of the folder, and `Grep` there works one file at a time.
-  Your home folder itself, `~/.ssh`, `~/.claude` and the app's own data
-  can't be added.
-- Every add and remove is written to the audit log. The files a twin reads
-  go to your model provider to answer, and the add-folder screen says so.
-
-### Twins ask for what they're missing
-- When a question needs a system a twin can't reach, it files a request in
-  the admin's Inbox, with the reason and the access it needs. Nothing is
-  contacted or configured until you act on it.
-- Tasks run on twins with no connected tools: they work from their profile,
-  files and folders.
-
-### Two themes
-- Light (white, stone and dark brown) and dark (black, gray and white). The
-  OS setting picks one until you choose.
+### Import from your Claude Code (owner only, API)
+- The owner can import their own Claude Code skills, MCP servers (http/sse)
+  and CLAUDE.md / rules into a twin. It shows exactly what would be imported
+  first, then imports only what was shown, and audits it. Settings, hooks,
+  credentials and MCP headers are never read; MCP servers arrive disabled.
+  There is no screen for it yet.
 
 ### Security
 - In hardened mode (`EMPLOYEE001_SANDBOX=1`) a twin no longer inherits the
@@ -111,6 +145,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - An approved `Edit` can no longer reach files outside the twin's scratch
   folder.
 - Claude subscription mode still covers one person only.
+- Hidden characters (Unicode tag characters, bidi overrides, zero-width
+  characters) are stripped from emails, uploaded knowledge and other
+  untrusted text before a twin reads it, and each removal is audited.
+  Hebrew and Arabic direction marks are kept.
+- A twin's reply can no longer load a remote image, which could have carried
+  data out without an approval. Only the app's own and inline images load.
+- Twins see only the built-in tools they use. Claude Code subagents,
+  scheduling and messaging tools are gone from twin runs.
+- A tool its MCP server marks as destructive always asks for approval,
+  whatever its name or an employee-level override says.
+- Structured memory is rewritten atomically, so a crash can't truncate it.
+
+### Fixes
+- `doctor` warns when an empty `ANTHROPIC_API_KEY` exported in your shell
+  hides the key in `.env`.
+- A corrected fact replaces the old one in a twin's memory instead of sitting
+  next to it.
+- Retired twins are left out of new meetings.
+- Keyboard and screen-reader fixes on setup, the launchpad, Build my twin and
+  Ask.
+- SECURITY.md now says "the latest minor release" and "the one before it"
+  instead of 0.7.x and 0.6.x, so it stays true with every release. The support
+  commitment itself is unchanged.
 
 ---
 
