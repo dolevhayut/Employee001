@@ -15,6 +15,8 @@ export type HistoryDecision = {
   decision: string;
   actions: RoomateAction[];
   open: string[];
+  /** Absent on meetings summarized before stances were recorded. */
+  stances?: { employeeId: string; stance: "accept" | "object"; turn: number }[];
 };
 
 export type HistorySummary = HistoryDecision & { generatedAt: number; throughTurn: number };
@@ -114,6 +116,7 @@ export function MeetingHistoryDrawer({
   const [summarizing, setSummarizing] = useState<"idle" | "loading" | "error">("idle");
   const [deleteError, setDeleteError] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
+  const [flashTurn, setFlashTurn] = useState<number | null>(null);
 
   const fmt = (ts: number) =>
     new Date(ts).toLocaleString(locale === "he" ? "he-IL" : "en-US", {
@@ -227,6 +230,18 @@ export function MeetingHistoryDrawer({
   }
 
   const nameOf = (id: string, fallback?: string) => empById[id]?.firstName ?? fallback ?? id;
+
+  // Only stances whose turn is still in the transcript can be linked.
+  const stances = (detail?.summary?.stances ?? []).filter((s) => detail?.transcript[s.turn]?.kind === "twin");
+
+  function jumpToTurn(turn: number) {
+    const el = asideRef.current?.querySelector<HTMLElement>(`[data-turn="${turn}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.focus({ preventScroll: true });
+    setFlashTurn(turn);
+    window.setTimeout(() => setFlashTurn((cur) => (cur === turn ? null : cur)), 1800);
+  }
 
   return (
     <>
@@ -407,6 +422,47 @@ export function MeetingHistoryDrawer({
                       </div>
                       <div dir="auto" style={{ marginTop: 6, fontSize: "var(--fs-base)", fontWeight: 600, lineHeight: 1.5 }}>{detail.summary.decision}</div>
                     </div>
+                    {stances.length > 0 && (
+                      <div style={{ padding: "10px 14px 4px" }}>
+                        <div style={sectionLabel}>{t("meeting.stances")}</div>
+                        <ul style={{ listStyle: "none", margin: "6px 0 0", padding: 0, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          {stances.map((s) => {
+                            const accepted = s.stance === "accept";
+                            const color = accepted ? "var(--success)" : "var(--danger)";
+                            const name = nameOf(s.employeeId);
+                            const label = t(accepted ? "meeting.accepted" : "meeting.objected");
+                            return (
+                              <li key={s.employeeId}>
+                                <button
+                                  type="button"
+                                  onClick={() => jumpToTurn(s.turn)}
+                                  aria-label={t("meeting.jumpToTurn", { name, stance: label, n: s.turn + 1 })}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    padding: "3px 10px",
+                                    borderRadius: 999,
+                                    border: `1px solid color-mix(in oklab, ${color} 45%, var(--hairline))`,
+                                    background: `color-mix(in oklab, ${color} 10%, var(--surface))`,
+                                    color: "var(--text)",
+                                    font: "inherit",
+                                    fontSize: "var(--fs-xs)",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <span style={{ color, display: "inline-flex" }}>
+                                    {accepted ? <Icons.Check size={11} /> : <span aria-hidden>✕</span>}
+                                  </span>
+                                  <b><bdi>{name}</bdi></b>
+                                  <span style={{ color: "var(--text-muted)" }}>{label} · #{s.turn + 1}</span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
                     {detail.summary.actions.length > 0 && (
                       <div style={{ padding: "10px 14px 4px" }}>
                         <div style={sectionLabel}>{t("meeting.nextSteps")}</div>
@@ -484,7 +540,19 @@ export function MeetingHistoryDrawer({
                       </div>
                     </div>
                   ) : (
-                    <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div
+                      key={i}
+                      data-turn={i}
+                      tabIndex={-1}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 3,
+                        outline: flashTurn === i ? "2px solid var(--accent)" : "none",
+                        outlineOffset: 4,
+                        borderRadius: 12,
+                      }}
+                    >
                       <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>
                         <b style={{ color: "var(--text)" }}><bdi>{nameOf(turn.employeeId, turn.employeeName)}</bdi></b>
                         {turn.delegatedFromName && (

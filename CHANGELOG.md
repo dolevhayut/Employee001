@@ -8,6 +8,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### A meeting's decision shows who agreed and who objected
+- Open a past meeting and its decision now lists who accepted and who
+  objected. Each name jumps to the message where they said so. Meetings
+  summarized before this show the decision as before.
+
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual
   files, with nothing uploaded or synced. Add up to five folders on the

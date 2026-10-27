@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { directAnthropicAllowed } from "@/lib/model-provider";
 import { TWIN_MODEL_PRIMARY } from "@/lib/sdk-defaults";
 import type { MeetingTurn } from "@/lib/meeting-store";
+import { normalizeStances, type MeetingStance } from "@/lib/meeting-stances";
 
 // "Summarize & decide": turns the latest discussion in a team meeting into a
 // decision the CEO can act on: what was decided, who does what next (each
@@ -17,7 +18,13 @@ export type MeetingAction = {
   /** The Roomate task id the owner's twin reported, when it named one. */
   taskId?: string;
 };
-export type MeetingDecision = { decision: string; actions: MeetingAction[]; open: string[] };
+export type MeetingDecision = {
+  decision: string;
+  actions: MeetingAction[];
+  open: string[];
+  /** Who accepted or objected, and the turn that says so. Absent on meetings summarized before this existed. */
+  stances?: MeetingStance[];
+};
 
 let client: Anthropic | null = null;
 function getClient(): Anthropic | null {
@@ -38,11 +45,13 @@ export function lastDiscussion(transcript: MeetingTurn[]): MeetingTurn[] {
 export async function summarizeMeeting(
   turns: MeetingTurn[],
   people: { id: string; name: string; role: string }[],
+  /** Index of turns[0] in the full transcript, so stances point at real turns. */
+  turnOffset = 0,
 ): Promise<MeetingDecision | null> {
   const c = getClient();
   if (!c || turns.length < 2) return null;
   const text = turns
-    .map((t) => (t.kind === "ceo" ? `CEO: ${t.text}` : `${t.employeeName}: ${t.text}`))
+    .map((t, i) => (t.kind === "ceo" ? `[${turnOffset + i}] CEO: ${t.text}` : `[${turnOffset + i}] ${t.employeeName}: ${t.text}`))
     .join("\n\n")
     .slice(-14_000);
   const hebrew = turns.some((t) => t.kind === "ceo" && /[֐-׿]/.test(t.text));
@@ -55,7 +64,8 @@ export async function summarizeMeeting(
 - "decision": what the team converged on, in at most two short sentences (or the best recommendation if they didn't fully agree).
 - "actions": 2 to 5 concrete next steps, each owned by one team member (use their id from the roster), phrased as a short task they can start now: an imperative of at most 15 words, like a ticket title; add "due" only if a date or timeframe was mentioned (a few words).
 - "open": questions still unresolved (0 to 3).
-Write in ${hebrew ? "Hebrew" : "English"}. Respond with ONLY JSON: {"decision": "...", "actions": [{"employeeId": "...", "action": "...", "due": "..."}], "open": ["..."]}`,
+- "stances": for each team member who clearly accepted or objected to the decision, {"employeeId", "stance": "accept" or "object", "turn"}, where turn is the number in [brackets] of THEIR OWN message that says so. Leave out anyone who never took a position; never guess.
+Write in ${hebrew ? "Hebrew" : "English"}. Respond with ONLY JSON: {"decision": "...", "actions": [{"employeeId": "...", "action": "...", "due": "..."}], "open": ["..."], "stances": [{"employeeId": "...", "stance": "accept", "turn": 3}]}`,
     messages: [{ role: "user", content: `Team:\n${roster}\n\nDiscussion:\n${text}` }],
   }).catch((err: unknown) => {
     console.warn(`[meeting-summary] request failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -70,6 +80,10 @@ Write in ${hebrew ? "Hebrew" : "English"}. Respond with ONLY JSON: {"decision": 
       decision: String(json.decision ?? "").trim(),
       actions: (json.actions ?? []).filter((a): a is MeetingAction => Boolean(a && ids.has(a.employeeId) && a.action)).slice(0, 6),
       open: (json.open ?? []).map(String).slice(0, 3),
+      stances: normalizeStances(
+        json.stances,
+        [...Array.from({ length: turnOffset }, () => ({ kind: "ceo" as const })), ...turns],
+      ),
     };
   } catch {
     console.warn(`[meeting-summary] unparseable reply (${res.stop_reason}): ${raw.slice(0, 300)}`);

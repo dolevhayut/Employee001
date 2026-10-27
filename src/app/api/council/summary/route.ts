@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const spoke = new Set(turns.flatMap((t) => (t.kind === "twin" ? [t.employeeId] : [])));
   const people = roster.filter((e) => spoke.has(e.id)).map((e) => ({ id: e.id, name: e.firstName, role: e.role }));
 
-  const summary = await summarizeMeeting(turns, people);
+  const summary = await summarizeMeeting(turns, people, meeting.transcript.length - turns.length);
   if (!summary) return Response.json({ error: "could not summarize" }, { status: 500 });
   const stored = setMeetingSummary(meeting.id, summary);
   return Response.json(stored ?? summary, { headers: { "Cache-Control": "no-store" } });

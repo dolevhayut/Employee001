@@ -58,6 +58,14 @@ export async function GET(request: NextRequest) {
       for (const a of s.actions) lines.push(`- ${a.employeeId}: ${a.action}${a.due ? ` (due: ${a.due})` : ""}`);
       lines.push("");
     }
+    if (s.stances && s.stances.length > 0) {
+      lines.push("**Accepted / objected**");
+      lines.push("");
+      for (const st of s.stances) {
+        lines.push(`- ${st.employeeId}: ${st.stance === "accept" ? "accepted" : "objected"} (turn ${st.turn + 1})`);
+      }
+      lines.push("");
+    }
     if (s.open.length > 0) {
       lines.push("**Still open**");
       lines.push("");
