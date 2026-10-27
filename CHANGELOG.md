@@ -13,6 +13,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   instead of 0.7.x and 0.6.x, so it stays true with every release. The support
   commitment itself is unchanged.
 
+### Personal sign-in for MCP clients (groundwork)
+- The server can now issue a short-lived device code that a signed-in person
+  approves, and tie the resulting MCP session to that person so it can be
+  revoked. Nothing is switched on yet.
+- Once personal sign-in is enabled, the shared `EMPLOYEE001_MCP_TOKEN` and
+  `EMPLOYEE001_TOKEN` stop working for `/api/mcp` unless an admin opts in with
+  `EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN=1`. See SECURITY.md.
+- Every request to `/api/mcp` made with a personal sign-in is now written to
+  the audit log with who made it, when, and which tool it called. Revoking a
+  person's MCP sessions refuses their very next request.
+
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual
   files, with nothing uploaded or synced. Add up to five folders on the
