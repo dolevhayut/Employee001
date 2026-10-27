@@ -59,6 +59,12 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/email/composio": { POST: webhook },
   "/api/slack/composio": { POST: webhook },
   "/api/mcp": { GET: { kind: "bearer" }, POST: { kind: "bearer" }, DELETE: { kind: "bearer" } },
+  // Device-code sign-in: start and poll are public (the device code is the credential);
+  // approve and revoke need a signed-in person (a shared MCP token is not one).
+  "/api/mcp/device/start": { POST: pub },
+  "/api/mcp/device/poll": { POST: pub },
+  "/api/mcp/device/approve": { POST: employee },
+  "/api/mcp/device/revoke": { POST: employee },
 
   // Employee onboarding: the invite token is the credential
   "/api/invites/[token]": { GET: invite, DELETE: admin },
