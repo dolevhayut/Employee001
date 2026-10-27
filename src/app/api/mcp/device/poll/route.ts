@@ -1,6 +1,6 @@
 import { exchangeDeviceCode } from "@/lib/mcp-server/device-auth";
 import { readJson } from "@/lib/auth/http";
-import { fail, json } from "../respond";
+import { fail, json, takeSlot } from "../respond";
 
 export const runtime = "nodejs";
 
@@ -9,6 +9,7 @@ export const runtime = "nodejs";
  *  authorization_pending, slow_down, expired_token, invalid_grant (unknown or
  *  already collected). The token is handed over exactly once. */
 export async function POST(request: Request) {
+  if (!takeSlot("poll", 300)) return fail(429, "rate_limited", "Too many requests. Try again in a minute.");
   const body = await readJson<{ device_code?: unknown }>(request);
   const deviceCode = typeof body?.device_code === "string" ? body.device_code : "";
   if (!deviceCode || deviceCode.length > 256) return fail(400, "invalid_request", "device_code is required.");

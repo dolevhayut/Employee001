@@ -7,12 +7,14 @@ import { POST as start } from "./start/route";
 import { POST as poll } from "./poll/route";
 import { POST as approve } from "./approve/route";
 import { POST as revoke } from "./revoke/route";
+import { resetSlots } from "./respond";
 
 let home: string;
 let now: number;
 const prevHome = process.env.EMPLOYEE001_HOME;
 
 beforeEach(() => {
+  resetSlots();
   home = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-device-routes-"));
   process.env.EMPLOYEE001_HOME = home;
   now = Date.parse("2026-10-27T09:00:00Z");
@@ -53,6 +55,15 @@ describe("POST /api/mcp/device/start", () => {
     expect(body.verification_uri_complete).toBe(`http://localhost:3000/mcp/device?code=${body.user_code}`);
     expect(body.interval).toBe(POLL_INTERVAL_SECONDS);
     expect(body.expires_in).toBe(DEVICE_CODE_TTL_MS / 1000);
+  });
+});
+
+describe("rate limits on the public routes", () => {
+  it("answers 429 once start or poll is called too often", async () => {
+    for (let i = 0; i < 30; i++) expect((await start(post("start"))).status).toBe(200);
+    expect((await start(post("start"))).status).toBe(429);
+    for (let i = 0; i < 300; i++) await poll(post("poll", { device_code: "x" }));
+    expect((await poll(post("poll", { device_code: "x" }))).status).toBe(429);
   });
 });
 
