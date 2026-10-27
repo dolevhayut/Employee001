@@ -18,14 +18,18 @@ import {
   setDeviceAuthClock,
 } from "./store";
 
-// Everyone signing in below is a member of the app.
-vi.mock("@/lib/auth/store", () => ({ getUser: (id: string) => ({ id, role: "member" }) }));
+// Everyone signing in below is a member unless a test overrides or removes them (null).
+const people = vi.hoisted(() => new Map<string, { id: string; role: string; disabled?: boolean } | null>());
+vi.mock("@/lib/auth/store", () => ({
+  getUser: (id: string) => (people.has(id) ? (people.get(id) ?? undefined) : { id, role: "member" }),
+}));
 
 let home: string;
 let now: number;
 const prevHome = process.env.EMPLOYEE001_HOME;
 
 beforeEach(() => {
+  people.clear();
   home = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-device-auth-"));
   process.env.EMPLOYEE001_HOME = home;
   now = Date.parse("2026-10-27T09:00:00Z");
@@ -370,5 +374,22 @@ describe("revoke (AC3)", () => {
     await revokePersonSessions("ada");
     await issueDeviceCode();
     expect(resolveBearer(bearer)).toBeNull();
+  });
+});
+
+describe("resolve checks the person", () => {
+  it("rejects a disabled person even when every account is disabled", async () => {
+    const { bearer } = await signIn("ada");
+    people.set("ada", { id: "ada", role: "member", disabled: true });
+    expect(resolveBearer(bearer)).toBeNull();
+  });
+
+  it("rejects a deleted person and a local-owner bearer when no user exists", async () => {
+    const ada = await signIn("ada");
+    const owner = await signIn("local-owner");
+    people.set("ada", null);
+    people.set("local-owner", null);
+    expect(resolveBearer(ada.bearer)).toBeNull();
+    expect(resolveBearer(owner.bearer)).toBeNull();
   });
 });
