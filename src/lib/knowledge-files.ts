@@ -8,6 +8,8 @@ import {
   snapshotKnowledgeText,
   sanitizeKnowledgeSegment,
 } from "./knowledge-versions";
+import { stripHiddenChars, type HiddenCharCounts } from "./hidden-chars";
+import { auditHiddenCharsRemoved } from "./hidden-chars-audit";
 
 function employeesDataDir(): string {
   return dataDir("employees");
@@ -215,6 +217,43 @@ export function writeKnowledgeFile(
 }
 
 /**
+ * writeKnowledgeFile for text a person sends through the API (the editor, a
+ * paste from a web page or a document). Invisible characters that could hide
+ * instructions are removed before the twin can read the file, and the
+ * removal is audited (counts only). An unchanged re-save of already-cleaned
+ * text isn't audited again. Twin-written text (knowledge proposals) goes
+ * through writeKnowledgeFile directly and isn't altered.
+ */
+export function writeUntrustedKnowledgeFile(
+  employeeId: string,
+  name: string,
+  body: string
+): { file: KnowledgeFile | null; hiddenCharsRemoved?: HiddenCharCounts } {
+  if (typeof body !== "string") return { file: null };
+  const clean = stripHiddenChars(body);
+  if (clean.total === 0) return { file: writeKnowledgeFile(employeeId, name, body) };
+  const before = readKnowledgeFile(employeeId, name)?.body;
+  const file = writeKnowledgeFile(employeeId, name, clean.text);
+  if (file && before !== clean.text) {
+    auditHiddenCharsRemoved({ source: "knowledge-write", employeeId, removed: clean.removed, ref: { file: file.name } });
+  }
+  return file ? { file, hiddenCharsRemoved: clean.removed } : { file };
+}
+
+/**
+ * Remove invisible characters from an uploaded TEXT file's bytes. Only when
+ * the bytes are valid UTF-8 (they round-trip exactly); any other encoding is
+ * left as it is rather than risk corrupting it.
+ */
+function cleanUploadedText(data: Buffer): { data: Buffer; removed?: HiddenCharCounts } {
+  const decoded = data.toString("utf-8");
+  if (!Buffer.from(decoded, "utf-8").equals(data)) return { data };
+  const clean = stripHiddenChars(decoded);
+  if (clean.total === 0) return { data };
+  return { data: Buffer.from(clean.text, "utf-8"), removed: clean.removed };
+}
+
+/**
  * Persist an uploaded file. Validates size, extension (text OR any non-blocked
  * binary), and the executable blocklist. On a name collision, suffixes the
  * basename with -1, -2, … Returns the saved metadata or a structured error.
@@ -256,9 +295,15 @@ export function saveUploadedKnowledgeFile(
       finalName = `${base}-${i}${parsedExt}`;
     }
 
-    fs.writeFileSync(path.join(dir, finalName), data);
+    // A text upload is read by the twin as-is: clean it first. Binary
+    // uploads are never read directly; PDF/DOCX text is cleaned on extraction.
+    const cleaned = isTextExt(ext) ? cleanUploadedText(data) : { data };
+    fs.writeFileSync(path.join(dir, finalName), cleaned.data);
     const kf = statToKnowledgeFile(dir, finalName);
     if (!kf) return { error: "Could not read back the saved file." };
+    if (cleaned.removed) {
+      auditHiddenCharsRemoved({ source: "knowledge-upload", employeeId, removed: cleaned.removed, ref: { file: finalName } });
+    }
     return kf;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown disk error";
@@ -418,7 +463,10 @@ export async function extractUploadedKnowledgeFile(
     const header =
       `${EXTRACTED_COMPANION_MARKER}\n_Text extracted from \`${savedName}\`._\n\n` +
       (truncated ? "> **Note:** Extracted text was truncated to 2 MB.\n\n" : "");
-    const markdown = header + body;
+    // Hidden text in a PDF/DOCX (tag characters, bidi overrides, zero-width
+    // runs) survives extraction; remove it before the twin can read it.
+    const clean = stripHiddenChars(body);
+    const markdown = header + clean.text;
     const dir = knowledgeDir(employeeId);
     const companionName = `${savedName}.md`;
     fs.writeFileSync(path.join(dir, companionName), markdown, {
@@ -428,6 +476,9 @@ export async function extractUploadedKnowledgeFile(
     const file = statToKnowledgeFile(dir, companionName);
     if (!file) {
       return { warning: "Text was extracted but the Markdown companion could not be read." };
+    }
+    if (clean.total > 0) {
+      auditHiddenCharsRemoved({ source: "knowledge-extract", employeeId, removed: clean.removed, ref: { file: companionName, original: savedName } });
     }
     return { file, truncated };
   } catch (err) {

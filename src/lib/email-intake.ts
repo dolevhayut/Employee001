@@ -2,6 +2,8 @@ import { enqueueWorkItem } from "@/lib/work-items";
 import { isRetiredSync } from "@/lib/twin-lifecycle";
 import { toolkitAllowed } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
+import { stripHiddenCharsFields } from "@/lib/hidden-chars";
+import { auditHiddenCharsRemoved } from "@/lib/hidden-chars-audit";
 
 export type RawEmailMessage = Record<string, unknown>;
 export type IncomingEmail = { messageId: string; threadId?: string; from?: string; subject?: string; date?: string; body?: string };
@@ -39,7 +41,21 @@ export function ingestEmailMessage(
   if (!toolkitAllowed(loadConsentStatus(employeeId), "gmail")) {
     return { deduped: false, workItemId: null, skipped: "consent" };
   }
-  const { item, deduped } = enqueueWorkItem({ type: "email", assigneeEmployeeId: employeeId, title: message.subject ? `Email: ${message.subject}` : "Email (no subject)", payload: message, idempotencyKey: `email:${message.messageId}` });
+  // Invisible characters (Unicode tags, bidi overrides, zero-width) can hide
+  // instructions a reader never sees. Sender and subject reach the prompt too,
+  // outside the untrusted fence, so they are cleaned with the body.
+  const clean = stripHiddenCharsFields(message, ["from", "subject", "body"] as const);
+  const mail = clean.value;
+  const { item, deduped } = enqueueWorkItem({
+    type: "email", assigneeEmployeeId: employeeId,
+    title: mail.subject ? `Email: ${mail.subject}` : "Email (no subject)",
+    payload: mail, idempotencyKey: `email:${message.messageId}`,
+    ...(clean.total > 0 ? { hiddenCharsRemoved: clean.removed } : {}),
+  });
+  // Push and poll deliver the same mail: record the removal once, on intake.
+  if (clean.total > 0 && !deduped) {
+    auditHiddenCharsRemoved({ source: "email", employeeId, removed: clean.removed, ref: { workItemId: item.id, messageId: message.messageId } });
+  }
   return { deduped, workItemId: item.id };
 }
 
