@@ -393,7 +393,9 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
         // Write is deliberately not auto-allowed: allowedTools skip canUseTool,
         // and canUseTool is what limits Write to the 9 profile files.
         // Read/Glob/Grep go through canUseTool too, for the folder rules.
-        allowedTools: ["TodoWrite"],
+        // Only the built-ins a build uses (MCP tools aren't affected by
+        // `tools`); no Cron, RemoteTrigger, SendMessage, Workflow and the like.
+        tools: ["Read", "Glob", "Grep", "Write", "TaskCreate", "TaskUpdate", "ToolSearch"],
         mcpServers,
         // Bumped from 80 → 120: the knowledge-capture prompt requires deeper
         // multi-source cross-referencing (sent emails + Slack + calendar +

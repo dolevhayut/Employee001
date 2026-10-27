@@ -1614,6 +1614,9 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                         <bdi>{(m.confidence * 100).toFixed(0)}%</bdi> {t("chat.confident")}
                       </span>
                     )}
+                    {(playingId === m.id || loadingId === m.id) && (
+                      <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>{t("ask.aiVoice")}</span>
+                    )}
                     <button
                       onClick={() => {
                         if (playingId === m.id) { stop(); }
