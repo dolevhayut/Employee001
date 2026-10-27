@@ -1,4 +1,4 @@
-import { DEVICE_CODE_TTL_MS, issueDeviceCode } from "@/lib/mcp-server/device-auth";
+import { DEVICE_CODE_TTL_MS, issueDeviceCode, publicBaseUrl } from "@/lib/mcp-server/device-auth";
 import { fail, json, signInOff, takeSlot } from "../respond";
 
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   if (off) return off;
   if (!takeSlot("start", 30)) return fail(429, "rate_limited", "Too many sign-in attempts. Try again in a minute.");
   const issued = await issueDeviceCode();
-  const verificationUri = `${new URL(request.url).origin}/device`;
+  const verificationUri = `${publicBaseUrl(request.url)}/device`;
   return json({
     device_code: issued.deviceCode,
     user_code: issued.userCode,

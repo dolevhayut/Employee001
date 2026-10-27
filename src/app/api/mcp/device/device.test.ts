@@ -68,6 +68,24 @@ describe("POST /api/mcp/device/start", () => {
   });
 });
 
+describe("verification_uri", () => {
+  const keys = ["EMPLOYEE001_PUBLIC_URL", "APP_URL"] as const;
+  afterEach(() => {
+    for (const k of keys) delete process.env[k];
+  });
+
+  it("is built from the configured public URL, not the request Host", async () => {
+    process.env.EMPLOYEE001_PUBLIC_URL = "https://brain.acme.io/";
+    const body = await begin();
+    expect(body.verification_uri).toBe("https://brain.acme.io/device");
+    expect(body.verification_uri_complete).toBe(`https://brain.acme.io/device?code=${body.user_code}`);
+  });
+
+  it("points at a page that exists", () => {
+    expect(fs.existsSync(path.join(process.cwd(), "src/app/device/page.tsx"))).toBe(true);
+  });
+});
+
 describe("rate limits on the public routes", () => {
   it("answers 429 once start or poll is called too often", async () => {
     for (let i = 0; i < 30; i++) expect((await start(post("start"))).status).toBe(200);
