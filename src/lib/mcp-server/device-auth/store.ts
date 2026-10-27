@@ -18,6 +18,8 @@ interface DeviceRecord {
   expiresAt: number;
   approvedBy?: string;
   approvedAt?: number;
+  /** Set when a signed-in person refused the code; the poller then gets access_denied. */
+  deniedAt?: number;
   /** Set once the session bearer was handed to the polling client. */
   sessionId?: string;
   lastPolledAt?: number;
@@ -54,11 +56,11 @@ export interface IssuedDeviceCode {
 
 export type ApproveResult =
   | { ok: true; approvedAt: number }
-  | { ok: false; reason: "unknown" | "expired" | "already_approved" | "rate_limited" };
+  | { ok: false; reason: "unknown" | "expired" | "already_approved" | "denied" | "rate_limited" };
 
 export type ExchangeResult =
   | { status: "approved"; bearer: string; expiresAt: number }
-  | { status: "pending" | "expired" | "invalid" | "consumed" | "slow_down" };
+  | { status: "pending" | "expired" | "invalid" | "consumed" | "slow_down" | "denied" };
 
 type Clock = () => number;
 let clock: Clock = Date.now;
@@ -200,6 +202,10 @@ export function issueDeviceCode(): Promise<IssuedDeviceCode> {
 export function approveUserCode(userCode: string, personId: string): Promise<ApproveResult> {
   return withLock(() => approveUnlocked(userCode, personId));
 }
+/** Refuse a user code: it can no longer be approved and the poller gets access_denied. */
+export function denyUserCode(userCode: string, personId: string): Promise<ApproveResult> {
+  return withLock(() => approveUnlocked(userCode, personId, true));
+}
 export function exchangeDeviceCode(deviceCode: string): Promise<ExchangeResult> {
   return withLock(() => exchangeUnlocked(deviceCode));
 }
@@ -230,7 +236,7 @@ function issueUnlocked(): IssuedDeviceCode {
 }
 
 /** Record that a signed-in person approved the user code. Caller authenticates `personId`. */
-function approveUnlocked(userCode: string, personId: string): ApproveResult {
+function approveUnlocked(userCode: string, personId: string, deny = false): ApproveResult {
   const now = clock();
   if (!personId) return { ok: false, reason: "unknown" };
   const store = load();
@@ -253,6 +259,12 @@ function approveUnlocked(userCode: string, personId: string): ApproveResult {
   }
   if (entry.expiresAt <= now) return { ok: false, reason: "expired" };
   if (entry.approvedBy) return { ok: false, reason: "already_approved" };
+  if (entry.deniedAt) return { ok: false, reason: "denied" };
+  if (deny) {
+    entry.deniedAt = now;
+    save(store);
+    return { ok: true, approvedAt: now };
+  }
   entry.approvedBy = personId;
   entry.approvedAt = now;
   save(store);
@@ -274,6 +286,10 @@ function exchangeUnlocked(deviceCode: string): ExchangeResult {
     return { status: "slow_down" }; // keep the window anchored so jitter cannot loop forever
   }
   entry.lastPolledAt = now;
+  if (entry.deniedAt) {
+    save(store);
+    return { status: "denied" };
+  }
   if (!entry.approvedBy) {
     save(store);
     return { status: "pending" };

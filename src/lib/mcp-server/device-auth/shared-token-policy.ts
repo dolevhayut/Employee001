@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "../guard";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 // EMPLOYEE001_MCP_TOKEN / EMPLOYEE001_TOKEN are shared secrets: whoever holds
 // one is nobody in particular. Once personal sign-in is on they are refused
@@ -28,9 +28,13 @@ export function acceptedSharedTokens(env: Env = process.env): string[] {
 
 /** Constant-time check of a presented bearer against the allowed shared tokens. */
 export function matchesSharedToken(bearer: string, env: Env = process.env): boolean {
+  // Compare fixed-length digests so neither the length nor the content of a
+  // token leaks through timing.
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  const presented = digest(bearer);
   let match = false;
   for (const token of acceptedSharedTokens(env)) {
-    if (timingSafeEqual(bearer, token)) match = true;
+    if (timingSafeEqual(presented, digest(token))) match = true;
   }
   return match;
 }

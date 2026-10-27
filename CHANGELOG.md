@@ -23,6 +23,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - New `employee001 login` command: it prints a page address and a code, you
   approve the code in the app as yourself at `/device`, and the command saves
   a personal session that `employee001 mcp` uses when no shared token is set.
+- Pressing Deny on the `/device` page now cancels the code for good, and the
+  waiting `employee001 login` tells you the sign-in was refused. Personal
+  sessions are accepted by `/api/mcp`, sign-in limits are kept per client, and
+  sessions made before you created accounts are revoked when the first owner is
+  created.
 
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual

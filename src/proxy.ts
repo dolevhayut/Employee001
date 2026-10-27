@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { timingSafeEqual } from "@/lib/mcp-server/guard";
+import { matchesSharedToken, resolveBearer } from "@/lib/mcp-server/device-auth";
 import { authorizeApi, authorizePage, type Caller } from "@/lib/auth/rbac";
 import { USER_EMPLOYEE_HEADER, USER_ID_HEADER, USER_ROLE_HEADER } from "@/lib/auth/request-user";
 import {
@@ -62,10 +63,19 @@ function isHttps(request: NextRequest): boolean {
   return request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https";
 }
 
-function bearerMatches(request: NextRequest): boolean {
-  const bearer = request.headers.get("authorization");
-  const expected = [process.env.EMPLOYEE001_MCP_TOKEN, process.env.EMPLOYEE001_TOKEN].filter((t): t is string => Boolean(t));
-  return Boolean(bearer?.startsWith("Bearer ") && expected.some((t) => timingSafeEqual(bearer.slice("Bearer ".length), t)));
+/** Who an MCP bearer belongs to: a shared token (if the policy still allows
+ *  them) or a personal sign-in session. Null when it is neither. */
+function bearerCaller(request: NextRequest): Caller {
+  const header = request.headers.get("authorization");
+  if (!header?.startsWith("Bearer ")) return null;
+  const bearer = header.slice("Bearer ".length);
+  if (matchesSharedToken(bearer)) return { id: "mcp-client", role: "member" };
+  const session = resolveBearer(bearer);
+  // The implicit local owner only exists while there are no accounts.
+  if (session && !(session.personId === "local-owner" && accountsEnabled())) {
+    return { id: session.personId, role: "member" };
+  }
+  return null;
 }
 
 function unauthorizedHtml(pathAndQuery: string): string {
@@ -265,9 +275,11 @@ function gateWithAccounts(request: NextRequest): NextResponse {
         return request.method === "POST" && request.headers.has("webhook-signature")
           ? nextWith(request, null)
           : jsonError(401, "unauthorized", "signed webhook required");
-      case "bearer":
+      case "bearer": {
         if (caller) return finish(nextWith(request, caller));
-        return bearerMatches(request) ? nextWith(request, { id: "mcp-client", role: "member" }) : jsonError(401, "unauthorized", "sign in or MCP bearer token required");
+        const bearer = bearerCaller(request);
+        return bearer ? nextWith(request, bearer) : jsonError(401, "unauthorized", "sign in or MCP bearer token required");
+      }
       default:
         return finish(nextWith(request, caller));
     }
@@ -313,7 +325,10 @@ function gateBootstrap(request: NextRequest): NextResponse {
     );
   }
 
-  if (url.pathname === "/api/mcp" && bearerMatches(request)) return nextWith(request, { id: "mcp-client", role: "member" });
+  if (url.pathname === "/api/mcp") {
+    const bearer = bearerCaller(request);
+    if (bearer) return nextWith(request, bearer);
+  }
 
   // The token is traded for a signed, 30-minute bootstrap cookie that only
   // opens the first-owner setup. The raw token is never stored in a cookie.

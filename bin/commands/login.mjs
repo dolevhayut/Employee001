@@ -104,7 +104,8 @@ export async function runLogin({
       intervalMs += 5000;
       continue;
     }
-    if (error === "expired_token") return { ok: false, message: "That sign-in expired. Run the command again." };
+    if (error === "access_denied") return { ok: false, message: "That sign-in was refused in Employee001. Nothing was signed in." };
+    if (error === "expired_token")return { ok: false, message: "That sign-in expired. Run the command again." };
     return { ok: false, message: polled.data?.message ?? "Sign-in failed. Run the command again." };
   }
   return { ok: false, message: "That sign-in expired. Run the command again." };

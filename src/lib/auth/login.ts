@@ -8,6 +8,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { dataDir } from "../app-home";
 import { appendAuditEntry } from "../audit-log";
+import { revokePersonSessions } from "../mcp-server/device-auth";
 import { hashPassword, passwordProblem, verifyPassword } from "./password";
 import { verifyTotp } from "./totp";
 import { emailVerified, type IdClaims, type OidcConfig } from "./oidc";
@@ -124,6 +125,9 @@ export function createFirstOwner(input: { email: string; name: string; password:
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email." };
   const user = createUser({ email, name: String(input.name ?? "").trim() || email, role: "owner", passwordHash: hashPassword(input.password), createdBy: "bootstrap" });
   auditAuth("userCreated", { userId: user.id, role: "owner", via: "bootstrap" }, user.id);
+  // Sessions minted while the install had no accounts belong to the implicit
+  // local owner; they must not outlive the move to real accounts.
+  void revokePersonSessions("local-owner").catch(() => undefined);
   return { user, cookie: createSession(user.id, "password", true) };
 }
 
