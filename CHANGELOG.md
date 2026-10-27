@@ -33,6 +33,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a crash, and a stalled writer is refused instead of overwriting a revoke.
 - The device sign-in link (`/device`) now uses your configured public URL
   (`EMPLOYEE001_PUBLIC_URL` or `APP_URL`) instead of the request's Host header.
+- When too many sign-ins are pending, starting another answers "try again"
+  (429) instead of a server error.
+- `employee001 login` warns when the address is plain `http` on another
+  machine, because the session token would cross the network unencrypted.
+- Importing from Claude Code is limited to the owner. It reads the machine
+  owner's own `~/.claude`, so another admin can no longer copy those files
+  into a twin.
 
 ### Personal sign-in for MCP clients (groundwork)
 - The server can now issue a short-lived device code that a signed-in person
