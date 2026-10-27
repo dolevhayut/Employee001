@@ -216,6 +216,8 @@ async function askTwin(
   signal?: AbortSignal,
   /** Asked by voice: the server's voice fast lane and a spoken-answer style. */
   voice = false,
+  /** Temporary ask: the server writes no memory and keeps no run text. */
+  temporary = false,
 ): Promise<string> {
   const res = await fetch("/api/twin/chat", {
     method: "POST",
@@ -228,6 +230,7 @@ async function askTwin(
       history,
       question: `${question}\n\n(${voice ? VOICE_ANSWER_STYLE : ANSWER_STYLE} Reply in ${/[\u0590-\u05FF]/.test(question) ? "Hebrew" : "English"}.)`,
       voice,
+      ...(temporary ? { temporary: true } : {}),
       // Ask doesn't show follow-up chips: don't wait on a model call for them.
       followups: false,
     }),
@@ -695,6 +698,18 @@ export default function AskPage() {
     setTurns((prev) => prev.filter((turn) => turn.twinId !== twinId || turn.task));
   };
 
+  // Temporary Ask: a fresh chat that is not saved to history and writes no
+  // memory. Switching either way starts a new conversation, so a saved one is
+  // never mixed with an unsaved one on the same screen.
+  const [temporary, setTemporary] = useState(false);
+  const temporaryRef = useRef(false);
+  const toggleTemporary = () => {
+    if (busy) return;
+    temporaryRef.current = !temporaryRef.current;
+    setTemporary(temporaryRef.current);
+    newConversation();
+  };
+
   useEffect(() => {
     let alive = true;
     fetch("/api/demo", { cache: "no-store" })
@@ -1135,7 +1150,7 @@ export default function AskPage() {
             })),
           thinking: (d) => patchTurn(id, (turn) => ({ ...turn, thinking: turn.thinking + d })),
           text: (d) => sayStreamed(d),
-        }, signal, viaVoice)) || t("ask.empty");
+        }, signal, viaVoice, temporaryRef.current)) || t("ask.empty");
       answer = tidyCites(answer);
       answered = true;
     } catch (err) {
@@ -1146,7 +1161,8 @@ export default function AskPage() {
     }
     if (!signal.aborted) sayStreamed("", true);
     patchTurn(id, (turn) => ({ ...turn, answer }));
-    if (answered && !signal.aborted) {
+    // A temporary ask is never saved: it lives on this screen only.
+    if (answered && !signal.aborted && !temporaryRef.current) {
       const conversationId = (conversationRef.current[twinId] ??= newConversationId());
       saveExchange(twinId, [
         { id: `q${id}-${conversationId}`, role: "user", text: question, conversationId, viaVoice },
@@ -1670,6 +1686,28 @@ export default function AskPage() {
           >
             <Icons.MessageSquare size={12} />
             {t("ask.conversation")}
+            {temporary && (
+              <span
+                role="status"
+                data-testid="ask-temporary-label"
+                title={t("ask.temporaryHint")}
+                style={{ padding: "2px 7px", borderRadius: 6, border: "1px dashed var(--hairline)", color: "var(--text)", fontSize: 10, letterSpacing: "0.06em" }}
+              >
+                {t("ask.temporaryLabel")}
+              </span>
+            )}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={temporary}
+              onClick={toggleTemporary}
+              disabled={busy}
+              title={t("ask.temporaryHint")}
+              {...focusRingHandlers}
+              style={{ marginInlineStart: "auto", padding: "3px 8px", borderRadius: 6, border: "1px solid var(--hairline)", background: temporary ? "var(--surface)" : "transparent", color: temporary ? "var(--text)" : "var(--text-muted)", fontSize: 11, fontWeight: 500, letterSpacing: 0, textTransform: "none", cursor: busy ? "default" : "pointer" }}
+            >
+              {t("ask.temporaryToggle")}
+            </button>
             {twinId && turns.some((turn) => turn.twinId === twinId && !turn.task) && (
               <button
                 type="button"
@@ -1678,7 +1716,7 @@ export default function AskPage() {
                 title={t("ask.newConversationTitle")}
                 aria-label={t("ask.newConversationTitle")}
                 {...focusRingHandlers}
-                style={{ marginInlineStart: "auto", padding: "3px 8px", borderRadius: 6, border: "1px solid var(--hairline)", background: "transparent", color: "var(--text-muted)", fontSize: 11, fontWeight: 500, letterSpacing: 0, textTransform: "none", cursor: busy ? "default" : "pointer" }}
+                style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid var(--hairline)", background: "transparent", color: "var(--text-muted)", fontSize: 11, fontWeight: 500, letterSpacing: 0, textTransform: "none", cursor: busy ? "default" : "pointer" }}
               >
                 {t("ask.newConversation")}
               </button>

@@ -46,7 +46,10 @@ export async function POST(request: NextRequest) {
     voice?: boolean;
     /** False skips the follow-up suggestions (a model call after the answer). */
     followups?: boolean;
+    /** Temporary ask: no memory written, no run text kept. Audit and tool policy are unchanged. */
+    temporary?: boolean;
   };
+  const temporary = body.temporary === true;
 
   const question = body.question?.trim() ?? "";
 
@@ -121,6 +124,9 @@ export async function POST(request: NextRequest) {
       // with /api/employees/[id]/task — twin/chat is its own audit lane.
       const runId = `chat_${employeeId ?? "anon"}_${Date.now()}`;
       const startedAtIso = new Date().toISOString();
+      // The cost record stays (budgets), but a temporary ask keeps no text.
+      const runTask = temporary ? "Temporary ask" : question.slice(0, 500);
+      const runText = () => (temporary ? "" : responseText.slice(0, 2000));
 
       // The whole profile is pre-loaded in the (prompt-cached) system prompt,
       // so the twin never Reads it at runtime. Light only the files this
@@ -264,11 +270,11 @@ export async function POST(request: NextRequest) {
                 id: runId,
                 employeeId: employee.id,
                 employeeName: employee.name,
-                task: question.slice(0, 500),
+                task: runTask,
                 startedAt: startedAtIso,
                 endedAt: new Date().toISOString(),
                 status: "complete",
-                finalText: responseText.slice(0, 2000),
+                finalText: runText(),
                 toolCalls: toolCallsCount,
                 approvalsRequested: approvalsRequestedCount,
                 approvalsApproved: approvalsApprovedCount,
@@ -291,11 +297,11 @@ export async function POST(request: NextRequest) {
                 id: runId,
                 employeeId: employee.id,
                 employeeName: employee.name,
-                task: question.slice(0, 500),
+                task: runTask,
                 startedAt: startedAtIso,
                 endedAt: new Date().toISOString(),
                 status: "error",
-                finalText: responseText.slice(0, 2000),
+                finalText: runText(),
                 toolCalls: toolCallsCount,
                 approvalsRequested: approvalsRequestedCount,
                 approvalsApproved: approvalsApprovedCount,
@@ -319,7 +325,7 @@ export async function POST(request: NextRequest) {
         // session resumption — drop the manual history forwarding so we don't
         // double-feed the model. First turn (no sessionId) falls back to the
         // legacy history path so single-shot callers still work.
-        const useResume = typeof body.sessionId === "string" && body.sessionId.length > 0;
+        const useResume = !temporary && typeof body.sessionId === "string" && body.sessionId.length > 0;
         await runSingleTwin(
           employee,
           question,
@@ -329,6 +335,7 @@ export async function POST(request: NextRequest) {
             resumeSessionId: useResume ? body.sessionId : undefined,
             requesterId: sessionUserFromHeaders(request.headers)?.id,
             voice: body.voice === true,
+            temporary,
           }
         );
 
