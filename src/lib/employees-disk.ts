@@ -4,9 +4,11 @@
 
 import "server-only";
 import fs from "fs/promises";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "path";
-import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin, RetentionConsent, TwinLifecycle } from "./employees";
+import { VOICE_CONSENT_TEXT } from "./employees";
+import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin, RetentionConsent, TwinLifecycle, VoiceConsent } from "./employees";
+import { appendAuditEntry } from "./audit-log";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 import { withSidecarLock } from "./sidecar-lock";
 import { dataDir } from "./app-home";
@@ -62,6 +64,7 @@ type DiskSidecar = {
   handoverStartedAt?: string;
   retiredAt?: string;
   retention?: RetentionConsent;
+  voiceConsent?: VoiceConsent;
   /** Synthetic demo-fixture twin: not a person, consent doesn't apply. */
   synthetic?: boolean;
   /**
@@ -193,6 +196,7 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
       ...(sidecar.lifecycle && sidecar.lifecycle !== "active" ? { lifecycle: sidecar.lifecycle } : {}),
       ...(sidecar.retiredAt ? { retiredAt: sidecar.retiredAt } : {}),
       ...(sidecar.retention ? { retention: sidecar.retention } : {}),
+      ...(sidecar.voiceConsent ? { voiceConsent: sidecar.voiceConsent } : {}),
     });
   }
 
@@ -200,4 +204,78 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
     (b.lastActiveAt ?? "").localeCompare(a.lastActiveAt ?? ""),
   );
   return results;
+}
+
+export const voiceConsentDigest = () => createHash("sha256").update(VOICE_CONSENT_TEXT).digest("hex");
+
+/** The person's recorded voice consent, or null. A record that can't be read
+ *  counts as no consent: a cloned voice is never used on a guess. */
+export async function loadVoiceConsent(employeeId: string): Promise<VoiceConsent | null> {
+  try {
+    const sidecar = JSON.parse(await fs.readFile(dataDir("employees", employeeId, "employee.json"), "utf8")) as DiskSidecar;
+    const c = sidecar.voiceConsent;
+    return c && typeof c.voiceId === "string" && c.voiceId ? c : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Record, or withdraw, a person's consent to use the given voice for their twin.
+ * Granting stores who/when/wording digest/IP/user agent next to the voice id.
+ * Withdrawing deletes the whole record (the voice id with it). Both are audited.
+ */
+export async function recordVoiceConsent(
+  employeeId: string,
+  args: { agree: boolean; voiceId: string; onBehalf: boolean; actor?: { userId?: string }; headers?: Headers },
+): Promise<{ ok: true; voiceConsent: VoiceConsent | null } | { ok: false; error: string; status: number }> {
+  const sidecarPath = dataDir("employees", employeeId, "employee.json");
+  return withSidecarLock(employeeId, async () => {
+    let sidecar: DiskSidecar;
+    try {
+      sidecar = JSON.parse(await fs.readFile(sidecarPath, "utf8")) as DiskSidecar;
+    } catch {
+      return { ok: false as const, error: "Twin not found", status: 404 };
+    }
+    const forwarded = args.headers?.get("x-forwarded-for")?.split(",")[0]?.trim();
+    const ip = (forwarded || args.headers?.get("x-real-ip") || "").slice(0, 64);
+    const userAgent = (args.headers?.get("user-agent") ?? "").slice(0, 300);
+    const textDigest = voiceConsentDigest();
+    const updated: DiskSidecar = { ...sidecar };
+    let voiceConsent: VoiceConsent | null = null;
+    let withdrawnVoiceId: string | undefined;
+    if (args.agree) {
+      voiceConsent = {
+        voiceId: args.voiceId,
+        grantedAt: new Date().toISOString(),
+        textDigest,
+        locale: "en",
+        ...(args.onBehalf ? { onBehalf: true } : {}),
+        ip,
+        userAgent,
+      };
+      updated.voiceConsent = voiceConsent;
+    } else {
+      withdrawnVoiceId = sidecar.voiceConsent?.voiceId;
+      delete updated.voiceConsent;
+    }
+    // Temp file + rename: lifecycle checks read this file without the lock.
+    const tmp = `${sidecarPath}.${randomUUID()}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(updated, null, 2), "utf8");
+    await fs.rename(tmp, sidecarPath);
+
+    const toolName = args.agree ? "voice.consentGranted" : "voice.consentWithdrawn";
+    appendAuditEntry({
+      runId: `voice-${Date.now()}`,
+      employeeId,
+      employeeName: sidecar.name ?? employeeId,
+      toolName,
+      bareName: toolName,
+      input: { voiceId: args.agree ? args.voiceId : (withdrawnVoiceId ?? null), onBehalf: args.onBehalf, consentTextSha256: textDigest, ip, userAgent },
+      verdict: "executed",
+      approvalChannel: "ui",
+      ...(args.actor?.userId ? { requesterId: args.actor.userId } : {}),
+    });
+    return { ok: true as const, voiceConsent };
+  });
 }

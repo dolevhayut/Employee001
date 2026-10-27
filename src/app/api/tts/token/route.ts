@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { liveTokenRefusal, liveVoiceId, mintSingleUseToken, ttsLiveUrl } from "@/lib/voice-live";
+import { liveTokenRefusal, mintSingleUseToken, resolveTtsVoice, ttsLiveUrl } from "@/lib/voice-live";
 
 // POST /api/tts/token — opens live spoken answers on Ask. Returns the Text to
 // Dialogue WebSocket URL (Eleven v4 Turbo, 24 kHz PCM) with a single-use token
@@ -14,7 +14,9 @@ export async function POST(request: NextRequest) {
   const refusal = liveTokenRefusal();
   if (refusal) return Response.json({ error: refusal.error }, { status: refusal.status });
 
-  const body = (await request.json().catch(() => ({}))) as { voiceId?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { voiceId?: unknown; employeeId?: unknown };
+  // A cloned or custom voice needs the person's recorded consent; otherwise the default.
+  const { voiceId, fallback } = await resolveTtsVoice(body?.voiceId, body?.employeeId);
   let token: string | null;
   try {
     token = await mintSingleUseToken("ttd_websocket", request.signal);
@@ -23,5 +25,5 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Text to speech is unreachable" }, { status: 502 });
   }
   if (!token) return Response.json({ error: "Text to speech refused the token request" }, { status: 502 });
-  return Response.json({ url: ttsLiveUrl(token), voiceId: liveVoiceId(body?.voiceId) }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ url: ttsLiveUrl(token), voiceId, ...(fallback ? { voiceFallback: fallback } : {}) }, { headers: { "Cache-Control": "no-store" } });
 }
