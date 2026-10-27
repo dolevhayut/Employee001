@@ -283,3 +283,101 @@ describe("Send to Roomate state on summary actions", () => {
     expect(next.actions[1]).toMatchObject({ sentAt: 99, taskId: "tsk_same0001" });
   });
 });
+
+describe("meeting memory fields", () => {
+  const digest = { decision: "Ship in Q3", points: ["Price stays"], actions: [{ employeeId: "noa", action: "Draft the plan" }], open: [] };
+  const brief = { text: "### Earlier meetings", builtAt: 5, sources: { meetings: ["mtg_1_abcdef"], routines: [], people: ["noa"] } };
+
+  it("keeps digest, brief and forget across a restart", async () => {
+    let store = await boot();
+    const m = store.createMeeting(["noa"]);
+    expect(store.setMeetingBrief(m.id, brief)).toBe(true);
+    store.appendTurn(m.id, { kind: "ceo", text: "Q3?", ts: 1 });
+    store.setMeetingDigest(m.id, digest, 1);
+
+    store = await boot();
+    const back = store.getMeeting(m.id)!;
+    expect(back.brief).toEqual(brief);
+    expect(back.digest).toMatchObject({ ...digest, throughTurn: 1 });
+
+    store.setMeetingForget(m.id, true);
+    store = await boot();
+    expect(store.getMeeting(m.id)!.forget).toBe(true);
+    expect(store.getMeeting(m.id)!.digest).toBeUndefined();
+  });
+
+  it("freezes the brief once, before anyone spoke", async () => {
+    const store = await boot();
+    const m = store.createMeeting(["noa"]);
+    expect(store.setMeetingBrief(m.id, brief)).toBe(true);
+    expect(store.setMeetingBrief(m.id, { ...brief, text: "other" })).toBe(false);
+    const late = store.createMeeting(["noa"]);
+    store.appendTurn(late.id, { kind: "ceo", text: "hi", ts: 1 });
+    expect(store.setMeetingBrief(late.id, brief)).toBe(false);
+  });
+
+  it("stores no digest for a meeting marked Don't remember", async () => {
+    const store = await boot();
+    const m = store.createMeeting(["noa"]);
+    store.setMeetingForget(m.id, true);
+    expect(store.setMeetingDigest(m.id, digest, 0)).toBeUndefined();
+    expect(onDisk(m.id).digest).toBeUndefined();
+  });
+
+  it("ignores a malformed digest or brief on disk", async () => {
+    let store = await boot();
+    const m = store.createMeeting(["noa"]);
+    const file = path.join(meetingsDir(), m.id, "meeting.json");
+    fs.writeFileSync(file, JSON.stringify({ ...onDisk(m.id), digest: { decision: 1 }, brief: { text: "x" }, forget: "yes" }));
+    store = await boot();
+    const back = store.getMeeting(m.id)!;
+    expect(back.digest).toBeUndefined();
+    expect(back.brief).toBeUndefined();
+    expect(back.forget).toBeUndefined();
+  });
+
+  it("drops digest and brief when a person in them is deleted", async () => {
+    const store = await boot();
+    const m = store.createMeeting(["itai"]);
+    store.setMeetingBrief(m.id, brief);
+    store.appendTurn(m.id, { kind: "ceo", text: "Q3?", ts: 1 });
+    store.setMeetingDigest(m.id, digest, 1);
+    store.redactEmployeeFromMeetings("noa");
+    expect(onDisk(m.id).digest).toBeUndefined();
+    expect(onDisk(m.id).brief).toBeUndefined();
+  });
+
+  it("refuses a digest started before a purge, forget or delete changed the meeting", async () => {
+    const store = await boot();
+    const m = store.createMeeting(["noa"]);
+    store.appendTurn(m.id, { kind: "ceo", text: "Q3?", ts: 1 });
+    const epoch = store.memoryEpoch(m.id);
+    store.redactEmployeeFromMeetings("noa");
+    expect(store.setMeetingDigest(m.id, digest, 1, epoch)).toBeUndefined();
+    expect(store.setMeetingDigest(m.id, digest, 1, store.memoryEpoch(m.id))).toBeDefined();
+    expect(store.setMeetingDigest(m.id, digest, 99, store.memoryEpoch(m.id))).toBeUndefined();
+  });
+
+  it("drops later briefs built from a meeting that is forgotten or deleted", async () => {
+    const store = await boot();
+    const source = store.createMeeting(["noa"]);
+    const other = store.createMeeting(["noa"]);
+    const later = store.createMeeting(["noa"]);
+    const unrelated = store.createMeeting(["noa"]);
+    store.setMeetingBrief(later.id, { ...brief, sources: { ...brief.sources, meetings: [source.id] } });
+    store.setMeetingBrief(unrelated.id, { ...brief, sources: { ...brief.sources, meetings: [other.id] } });
+    store.setMeetingForget(source.id, true);
+    expect(onDisk(later.id).brief).toBeUndefined();
+    expect(onDisk(unrelated.id).brief).toBeDefined();
+    store.deleteMeeting(other.id);
+    expect(onDisk(unrelated.id).brief).toBeUndefined();
+  });
+
+  it("drops a brief that names the person only in its sources", async () => {
+    const store = await boot();
+    const m = store.createMeeting(["itai"]);
+    store.setMeetingBrief(m.id, { text: "t", builtAt: 1, sources: { meetings: [], routines: [], people: ["noa"] } });
+    store.redactEmployeeFromMeetings("noa");
+    expect(onDisk(m.id).brief).toBeUndefined();
+  });
+});

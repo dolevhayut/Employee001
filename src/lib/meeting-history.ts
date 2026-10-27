@@ -1,5 +1,5 @@
 import "server-only";
-import { listMeetings, type Meeting, type MeetingSummary, type MeetingTurn, type SharedFile } from "@/lib/meeting-store";
+import { listMeetings, type Meeting, type MeetingBrief, type MeetingDigest, type MeetingSummary, type MeetingTurn, type SharedFile } from "@/lib/meeting-store";
 import { loadEmployeesFromDisk } from "@/lib/employees-disk";
 import { getHiredEmployees } from "@/lib/hired-agents";
 
@@ -27,6 +27,11 @@ export type MeetingDetail = {
   transcript: MeetingTurn[];
   sharedFiles: SharedFile[];
   summary: MeetingSummary | null;
+  /** Meeting memory: the record kept for later meetings, the brief this one
+   *  started from, and whether it is kept out of later briefs. */
+  digest: MeetingDigest | null;
+  brief: MeetingBrief | null;
+  forget: boolean;
 };
 
 type Namer = (m: Meeting, id: string) => string;
@@ -61,7 +66,7 @@ export async function meetingHistory(): Promise<MeetingListItem[]> {
       participants: participantsOf(m, nameOf),
       turnCount: m.transcript.length,
       hasSummary: Boolean(m.summary),
-      ...(m.summary?.decision ? { decision: m.summary.decision } : {}),
+      ...(m.summary?.decision || m.digest?.decision ? { decision: m.summary?.decision || m.digest?.decision } : {}),
     }));
 }
 
@@ -76,5 +81,8 @@ export async function meetingDetail(m: Meeting): Promise<MeetingDetail> {
     transcript: m.transcript,
     sharedFiles: m.sharedFiles,
     summary: m.summary ?? null,
+    digest: m.digest ?? null,
+    brief: m.brief ?? null,
+    forget: m.forget === true,
   };
 }

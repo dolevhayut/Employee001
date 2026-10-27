@@ -70,6 +70,28 @@ export type MeetingSummary = MeetingDecision & {
   throughTurn: number;
 };
 
+/** The whole meeting in a few lines, kept for later meetings' briefs. */
+export type MeetingDigest = {
+  decision: string;
+  points: string[];
+  actions: { employeeId: string; action: string }[];
+  open: string[];
+  generatedAt: number;
+  /** Transcript length when it was generated. */
+  throughTurn: number;
+};
+
+/** "Since the last meeting": what this meeting started from. Frozen when the
+ *  first message is sent, so every turn sees the same text and the CEO can
+ *  see exactly what the twins were given. */
+export type MeetingBrief = {
+  text: string;
+  builtAt: number;
+  /** What the text was built from. `people` lists every employee id it
+   *  names, so deleting a person finds and drops this brief. */
+  sources: { meetings: string[]; routines: string[]; people: string[] };
+};
+
 export type Meeting = {
   id: string;
   /** First CEO question, trimmed. Empty until the CEO has spoken. */
@@ -81,6 +103,10 @@ export type Meeting = {
   /** Files dropped into the meeting scratch by twins, in chronological order. */
   sharedFiles: SharedFile[];
   summary?: MeetingSummary;
+  digest?: MeetingDigest;
+  brief?: MeetingBrief;
+  /** "Don't remember": no digest, and never part of a later brief. */
+  forget?: boolean;
   createdAt: number;
   updatedAt: number;
 };
@@ -167,6 +193,9 @@ function readFromDisk(id: string): Meeting | undefined {
       transcript,
       sharedFiles: Array.isArray(parsed.sharedFiles) ? parsed.sharedFiles : [],
       ...(parsed.summary && typeof parsed.summary === "object" ? { summary: parsed.summary } : {}),
+      ...(isDigest(parsed.digest) ? { digest: parsed.digest } : {}),
+      ...(isBrief(parsed.brief) ? { brief: parsed.brief } : {}),
+      ...(parsed.forget === true ? { forget: true } : {}),
       createdAt: Number(parsed.createdAt) || 0,
       updatedAt: Number(parsed.updatedAt) || Number(parsed.createdAt) || 0,
     };
@@ -174,6 +203,25 @@ function readFromDisk(id: string): Meeting | undefined {
     console.warn(`[meeting-store] unreadable meeting ${id}:`, err);
     return undefined;
   }
+}
+
+const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
+
+function isDigest(v: unknown): v is MeetingDigest {
+  const d = v as MeetingDigest | null;
+  return Boolean(
+    d && typeof d === "object" && typeof d.decision === "string" && strings(d.points) && strings(d.open) &&
+      Array.isArray(d.actions) && d.actions.every((a) => a && typeof a.employeeId === "string" && typeof a.action === "string") &&
+      typeof d.generatedAt === "number" && typeof d.throughTurn === "number",
+  );
+}
+
+function isBrief(v: unknown): v is MeetingBrief {
+  const b = v as MeetingBrief | null;
+  return Boolean(
+    b && typeof b === "object" && typeof b.text === "string" && typeof b.builtAt === "number" &&
+      b.sources && strings(b.sources.meetings) && strings(b.sources.routines) && strings(b.sources.people),
+  );
 }
 
 /**
@@ -257,6 +305,8 @@ export function deleteMeeting(id: string): boolean {
   if (!m) return false;
   meetings.delete(m.id);
   fs.rmSync(meetingDir(m.id), { recursive: true, force: true });
+  bumpMemoryEpoch(m.id);
+  dropBriefsFrom(m.id);
   return true;
 }
 
@@ -283,6 +333,69 @@ export function setMeetingSummary(id: string, decision: MeetingDecision): Meetin
   m.summary = summary;
   persistQuietly(m);
   return summary;
+}
+
+// Meeting memory epoch: bumped whenever a meeting's remembered content must
+// not come back (purge, "Don't remember", delete). A digest started before the
+// bump is dropped instead of writing the old transcript back. In memory only:
+// the race it closes lives inside one process.
+const memoryEpochs = new Map<string, number>();
+export function memoryEpoch(id: string): number {
+  return memoryEpochs.get(id) ?? 0;
+}
+function bumpMemoryEpoch(id: string): void {
+  memoryEpochs.set(id, memoryEpoch(id) + 1);
+}
+
+/** Drop every frozen brief that was built from this meeting. */
+function dropBriefsFrom(sourceId: string): void {
+  for (const m of listMeetings()) {
+    if (!m.brief?.sources.meetings.includes(sourceId)) continue;
+    delete m.brief;
+    persistQuietly(m);
+  }
+}
+
+/** Store the whole-meeting digest. Ignored for a "Don't remember" meeting,
+ *  and when the meeting's memory changed since `epoch` was read. */
+export function setMeetingDigest(
+  id: string,
+  digest: Omit<MeetingDigest, "generatedAt" | "throughTurn">,
+  throughTurn: number,
+  epoch?: number,
+): MeetingDigest | undefined {
+  const m = load(id);
+  if (!m || m.forget || throughTurn > m.transcript.length) return undefined;
+  if (epoch !== undefined && epoch !== memoryEpoch(id)) return undefined;
+  m.digest = { ...digest, generatedAt: Date.now(), throughTurn };
+  persistQuietly(m);
+  return m.digest;
+}
+
+/** Freeze the brief a meeting starts from. Only once, before anyone spoke. */
+export function setMeetingBrief(id: string, brief: MeetingBrief): boolean {
+  const m = load(id);
+  if (!m || m.brief || m.transcript.length > 0) return false;
+  m.brief = brief;
+  persistQuietly(m);
+  return true;
+}
+
+/** Turn "Don't remember" on or off. Turning it on drops the digest and every
+ *  brief already built from this meeting. */
+export function setMeetingForget(id: string, forget: boolean): Meeting | undefined {
+  const m = load(id);
+  if (!m) return undefined;
+  bumpMemoryEpoch(m.id);
+  if (forget) {
+    m.forget = true;
+    delete m.digest;
+    dropBriefsFrom(m.id);
+  } else {
+    delete m.forget;
+  }
+  persistQuietly(m);
+  return m;
 }
 
 export type ActionSendResult =
@@ -670,6 +783,10 @@ export function redactEmployeeFromMeetings(
       .map((f) => ({ ...f, summary: scrub(f.summary) }));
     m.title = scrub(m.title);
     delete m.summary;
+    // Both are model-written text about the people in the room: rebuilt, never scrubbed.
+    delete m.digest;
+    delete m.brief;
+    bumpMemoryEpoch(m.id);
 
     if (JSON.stringify(m) !== before) {
       touched++;

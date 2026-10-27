@@ -25,9 +25,12 @@ import {
   listSharedFiles,
   renderSharedFilesForPrompt,
   renderTranscriptForPrompt,
+  setMeetingBrief,
+  setMeetingForget,
   type Meeting,
   type MeetingTurn,
 } from "@/lib/meeting-store";
+import { auditMeetingBrief, buildMeetingBrief, maybeDigestMeeting, renderBriefForPrompt } from "@/lib/meeting-memory";
 import { classifyTool, describeTool } from "@/lib/tool-policy";
 import { twinLanguageBlock } from "@/lib/twin-language";
 import { approvalActorFields, registerApproval } from "@/lib/approval-bus";
@@ -298,6 +301,8 @@ function buildSystemPromptBlocks(
     calledInBy?: string;
     /** Pre-rendered shared-files index (filenames + summaries + authors). */
     sharedFiles?: string;
+    /** Pre-rendered "Since the last meeting" brief (meeting memory). */
+    brief?: string;
     /** True iff the meeting scratch MCP is registered for this run — controls
      *  whether the prompt mentions the share/read tools at all. */
     scratchEnabled?: boolean;
@@ -318,7 +323,7 @@ function buildSystemPromptBlocks(
     });
     // A meeting still needs the transcript; nothing else applies.
     const meeting = teamMeetingContext
-      ? `# Team meeting\n\nYou are in a live group meeting. Everyone sees every message. Write at most 4 sentences, plain prose, and don't repeat what colleagues already said.\n\n**In the room:** ${teamMeetingContext.colleagues.join(", ")}\n\n## Transcript so far\n\n${teamMeetingContext.transcript ?? "(meeting just started)"}`
+      ? `# Team meeting\n\nYou are in a live group meeting. Everyone sees every message. Write at most 4 sentences, plain prose, and don't repeat what colleagues already said.\n\n**In the room:** ${teamMeetingContext.colleagues.join(", ")}\n\n${teamMeetingContext.brief ? `${teamMeetingContext.brief}\n\n` : ""}## Transcript so far\n\n${teamMeetingContext.transcript ?? "(meeting just started)"}`
       : "";
     return meeting ? [staticBlock, SYSTEM_PROMPT_DYNAMIC_BOUNDARY, meeting] : [staticBlock];
   }
@@ -538,7 +543,7 @@ You are in a live group meeting with the CEO and your colleagues. Treat this lik
 
 **Colleagues in the room:** ${teamMeetingContext.colleagues.join(", ")}
 ${teamMeetingContext.calledInBy ? `\n**You were just called in by ${teamMeetingContext.calledInBy}** — they tagged you because they think your input is needed. Address that directly.\n` : ""}
-## Meeting transcript so far
+${teamMeetingContext.brief ? `${teamMeetingContext.brief}\n\n` : ""}## Meeting transcript so far
 
 ${teamMeetingContext.transcript ?? "(meeting just started — no prior turns)"}
 ${sharedFilesSection ? `\n${sharedFilesSection}\n` : ""}${scratchToolsSection ? `\n${scratchToolsSection}\n` : ""}
@@ -608,6 +613,8 @@ export type RunOptions = {
     calledInBy?: string;
     /** Pre-rendered shared-files index (filenames + summaries + authors). */
     sharedFiles?: string;
+    /** Pre-rendered "Since the last meeting" brief (meeting memory). */
+    brief?: string;
     /**
      * Meeting id. When provided, the runner registers the meeting-scratch MCP
      * server for this turn (share_with_meeting / read_meeting_file) and
@@ -1633,6 +1640,10 @@ export type RunCouncilArgs = {
   onEvent: (event: CouncilEvent) => void;
   /** The signed-in user who asked (audit requesterId). */
   requesterId?: string;
+  /** New meeting only: skip the "Since the last meeting" brief. */
+  fresh?: boolean;
+  /** New meeting only: "Don't remember" this meeting in later briefs. */
+  forget?: boolean;
 };
 
 export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: string }> {
@@ -1661,6 +1672,23 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
     args.meetingId,
     responders.map((e) => e.id)
   );
+
+  // Meeting memory: a new meeting starts from what earlier ones decided and
+  // what happened since, frozen before the first turn ("Start fresh" skips
+  // it). "Don't remember" keeps this meeting out of every later brief.
+  if (meeting.transcript.length === 0) {
+    if (args.forget) setMeetingForget(meeting.id, true);
+    if (!args.fresh && !meeting.brief) {
+      const brief = await buildMeetingBrief({ participantIds: meeting.participantIds, excludeMeetingId: meeting.id }).catch(
+        (err: unknown) => {
+          console.warn("[council] meeting brief failed:", err);
+          return null;
+        },
+      );
+      if (brief && setMeetingBrief(meeting.id, brief)) auditMeetingBrief(meeting.id, brief, args.requesterId);
+    }
+  }
+  const briefText = renderBriefForPrompt(meeting.brief);
 
   // Append the CEO's message to the transcript first — every twin's prompt
   // will render it as the most recent turn.
@@ -1810,6 +1838,7 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
           transcript: transcriptText,
           calledInBy: delegatedFrom?.firstName,
           sharedFiles: sharedFilesText,
+          brief: briefText,
           meetingId: meeting.id,
         },
       }
@@ -1896,9 +1925,13 @@ export async function runCouncil(args: RunCouncilArgs): Promise<{ meetingId: str
 
   onEvent({ type: "council_done" });
 
+  // Meeting memory: refresh this meeting's digest in the background.
+  void maybeDigestMeeting(meeting.id);
+
   // Learnings → knowledge proposals (E-084). Fire-and-forget: the CEO already
   // has the answer; suggestions show up in each twin's Files tab for approval.
-  if (proposalsEnabled()) {
+  // A "Don't remember" meeting teaches the twins nothing either.
+  if (proposalsEnabled() && !meeting.forget) {
     // A retired twin learns nothing new, so it gets no knowledge proposals.
     const spoke = allParticipants
       .filter((e) => spokenThisRun.has(e.id) && e.lifecycle !== "retired")

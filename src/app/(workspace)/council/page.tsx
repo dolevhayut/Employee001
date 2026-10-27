@@ -33,6 +33,7 @@ import { isolate } from "@/lib/i18n/format";
 import type { MessageKey, MessageVars } from "@/lib/i18n/messages";
 import { MeetingHistoryDrawer, fetchMeetingDetail, type HistoryDetail } from "./meeting-history";
 import { SendToRoomate, type RoomateAction, type RoomateSummary } from "./send-to-roomate";
+import { MeetingMemoryCard } from "./meeting-memory-card";
 
 type TFn = (key: MessageKey, vars?: MessageVars) => string;
 
@@ -1961,6 +1962,11 @@ function CouncilPageInner() {
   // reload or from History. Held in state (not a ref) because file chips read
   // it during render to build their download/preview URLs.
   const [meetingId, setMeetingId] = useState<string | null>(null);
+  // Meeting memory: skip the brief / keep this meeting out of later briefs,
+  // and the brief a reopened meeting started from.
+  const [freshStart, setFreshStart] = useState(false);
+  const [forgetMeeting, setForgetMeeting] = useState(false);
+  const [frozenBrief, setFrozenBrief] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyButtonRef = useRef<HTMLButtonElement>(null);
   // The meeting id last asked for via `?meeting=`; stops repeat fetches and
@@ -2101,6 +2107,10 @@ function CouncilPageInner() {
           employeeIds: respondingIds,
           meetingId: meetingId ?? undefined,
           auto,
+          // Applied only to a meeting nobody has spoken in yet, including a new
+          // one the server opens because the old id is gone.
+          fresh: freshStart,
+          forget: forgetMeeting,
         }),
       });
 
@@ -2170,6 +2180,13 @@ function CouncilPageInner() {
             setMeetingId(event.meetingId);
             requestedMeeting.current = event.meetingId;
             setMeetingParam(event.meetingId);
+            // Show the brief the server froze for the twins, not the preview.
+            const id = event.meetingId;
+            void fetchMeetingDetail(id).then((detail) => {
+              if (!detail || requestedMeeting.current !== id) return;
+              setFrozenBrief(detail.brief?.text ?? null);
+              setForgetMeeting(detail.forget === true);
+            });
             continue;
           }
 
@@ -2669,6 +2686,9 @@ function CouncilPageInner() {
     const rebuilt = threadsFromMeeting(detail);
     setThreads(rebuilt);
     setMeetingId(detail.id);
+    setFreshStart(false);
+    setForgetMeeting(detail.forget === true);
+    setFrozenBrief(detail.brief?.text ?? null);
     setReplyTo(null);
     setOpenFile(null);
     setTypingFor([]);
@@ -2698,6 +2718,9 @@ function CouncilPageInner() {
     requestedMeeting.current = null;
     setThreads([]);
     setMeetingId(null);
+    setFreshStart(false);
+    setForgetMeeting(false);
+    setFrozenBrief(null);
     setDecisions({});
     setReplyTo(null);
     setOpenFile(null);
@@ -3088,6 +3111,17 @@ function CouncilPageInner() {
           </div>
         )}
       </div>
+
+      <MeetingMemoryCard
+        meetingId={meetingId}
+        started={threads.length > 0}
+        participantIds={[...activeIds]}
+        frozenBrief={frozenBrief}
+        fresh={freshStart}
+        onFresh={setFreshStart}
+        forget={forgetMeeting}
+        onForget={setForgetMeeting}
+      />
 
       {/* Input row */}
       <div

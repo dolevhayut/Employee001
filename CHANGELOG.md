@@ -8,6 +8,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Team Meetings remember
+- A new Team Meeting starts from a short "Since the last meeting" brief: what
+  the last three meetings with someone from this room decided and left open,
+  the actions people in the room took on (and whether they went to Roomate),
+  and results of their routines that came in since. Every twin in the room
+  gets it, and you see it above the message box before you send.
+- After each round, the meeting keeps a short record of itself for later
+  meetings. "Start fresh" skips the brief for one meeting. "Don't remember
+  this meeting" keeps it out of every later brief, removes it from briefs
+  already built, and stops it from proposing profile knowledge; only an
+  admin can turn memory back on for it.
+- "Summarize & decide" now works in Claude subscription mode and with every
+  model provider. Before, it needed an Anthropic API key.
+- The brief is reference data, never instructions: hidden characters are
+  stripped, it is capped in length, building one writes an audit row, and
+  deleting a person drops every brief and record that names them.
+
 ---
 
 ## [0.11.0] — 2026-10-27

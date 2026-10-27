@@ -68,6 +68,8 @@ export type HistoryDetail = {
   transcript: HistoryTurn[];
   sharedFiles: HistorySharedFile[];
   summary: HistorySummary | null;
+  brief?: { text: string } | null;
+  forget?: boolean;
 };
 
 /** GET one stored meeting; null when it's gone or unreadable. */
