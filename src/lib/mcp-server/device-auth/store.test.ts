@@ -62,7 +62,7 @@ describe("approve", () => {
   it("records who approved and when", () => {
     const issued = issueDeviceCode();
     expect(exchangeDeviceCode(issued.deviceCode).status).toBe("pending");
-    now += 1000;
+    now += 6000;
     expect(approveUserCode(issued.userCode.toLowerCase(), "ada")).toEqual({
       ok: true,
       approvedAt: now,
@@ -84,7 +84,44 @@ describe("approve", () => {
 
   it("hands the bearer over once only", () => {
     const { issued } = signIn();
+    now += 6000;
     expect(exchangeDeviceCode(issued.deviceCode).status).toBe("consumed");
+  });
+});
+
+describe("abuse limits", () => {
+  it("tells a client that polls too fast to slow down", () => {
+    const issued = issueDeviceCode();
+    expect(exchangeDeviceCode(issued.deviceCode).status).toBe("pending");
+    now += 1000;
+    expect(exchangeDeviceCode(issued.deviceCode).status).toBe("slow_down");
+  });
+
+  it("stops approvals after repeated wrong user codes", () => {
+    const issued = issueDeviceCode();
+    for (let i = 0; i < 10; i++) {
+      expect(approveUserCode("ZZZZ-ZZZZ", "eve")).toEqual({ ok: false, reason: "unknown" });
+    }
+    expect(approveUserCode(issued.userCode, "ada")).toEqual({
+      ok: false,
+      reason: "rate_limited",
+    });
+    now += DEVICE_CODE_TTL_MS;
+    const fresh = issueDeviceCode();
+    expect(approveUserCode(fresh.userCode, "ada").ok).toBe(true);
+  });
+});
+
+describe("lock", () => {
+  it("is released after each operation and a stale lock is reclaimed", () => {
+    issueDeviceCode();
+    const lock = path.join(home, "data", "mcp-device-auth.json.lock");
+    expect(fs.existsSync(lock)).toBe(false);
+    fs.mkdirSync(lock);
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(lock, old, old);
+    expect(() => issueDeviceCode()).not.toThrow();
+    expect(fs.existsSync(lock)).toBe(false);
   });
 });
 
