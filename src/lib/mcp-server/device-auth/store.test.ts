@@ -129,6 +129,17 @@ describe("resolve", () => {
   });
 });
 
+describe("corrupt store", () => {
+  it("resolves nothing and refuses to overwrite it", () => {
+    const { bearer } = signIn();
+    const target = path.join(home, "data", "mcp-device-auth.json");
+    fs.writeFileSync(target, "{not json");
+    expect(resolveBearer(bearer)).toBeNull();
+    expect(() => issueDeviceCode()).toThrow();
+    expect(fs.readFileSync(target, "utf8")).toBe("{not json");
+  });
+});
+
 describe("revoke (AC3)", () => {
   it("a revoked person's sessions resolve to nothing; others are untouched", () => {
     const a1 = signIn("ada");

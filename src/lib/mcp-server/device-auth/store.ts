@@ -73,16 +73,25 @@ export function normalizeUserCode(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+// Single-process assumption: every operation is a synchronous read-modify-write,
+// so requests within one Next server never interleave. Running several server
+// processes on one data dir would need a lock.
 function load(): StoreShape {
+  let text: string;
   try {
-    const raw = JSON.parse(fs.readFileSync(file(), "utf8"));
-    if (raw && typeof raw === "object") {
-      return { devices: raw.devices ?? {}, sessions: raw.sessions ?? {} };
-    }
-  } catch {
-    /* missing or unreadable: start empty (nothing resolves) */
+    text = fs.readFileSync(file(), "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { devices: {}, sessions: {} };
+    throw err;
   }
-  return { devices: {}, sessions: {} };
+  // A corrupt file throws instead of reading as empty: the next save must not
+  // wipe sessions and revocation markers. resolveBearer treats a throw as "no session".
+  const raw = JSON.parse(text);
+  const isMap = (v: unknown) => !!v && typeof v === "object" && !Array.isArray(v);
+  if (!isMap(raw) || !isMap(raw.devices ?? {}) || !isMap(raw.sessions ?? {})) {
+    throw new Error("mcp-device-auth store is malformed");
+  }
+  return { devices: raw.devices ?? {}, sessions: raw.sessions ?? {} };
 }
 
 function save(store: StoreShape): void {
@@ -174,7 +183,12 @@ export function exchangeDeviceCode(deviceCode: string): ExchangeResult {
 /** One person's session for a presented bearer, or null (unknown, expired, revoked). */
 export function resolveBearer(bearer: string): McpSession | null {
   if (!bearer) return null;
-  const session = load().sessions[sha(bearer)];
+  let session: SessionRecord | undefined;
+  try {
+    session = load().sessions[sha(bearer)];
+  } catch {
+    return null; // unreadable store: fail closed
+  }
   if (!session || session.revokedAt || session.expiresAt <= clock()) return null;
   return { personId: session.personId, createdAt: session.createdAt, expiresAt: session.expiresAt };
 }
