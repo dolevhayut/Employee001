@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { STARTER_PACKS, type StarterPack } from "@/lib/marketplace";
+import { STARTER_PACKS, type StarterPack } from "@/lib/starter-packs";
 
 const FOCUS_RING = "2px solid var(--accent)";
 const focusRing = {
@@ -16,9 +16,17 @@ const focusRing = {
 
 /** Gallery of labelled example twins. Starting from one hands the pack to the
  *  parent, which fills its normal form; nothing is created here. */
-export function StarterPacks({ disabled, onStart }: { disabled: boolean; onStart: (pack: StarterPack) => void }) {
+export function StarterPacks({
+  disabled,
+  onStart,
+  status,
+}: {
+  disabled: boolean;
+  onStart: (pack: StarterPack) => void;
+  /** Result of the last pick; a new `tick` re-announces even identical text. */
+  status: { text: string; tick: number } | null;
+}) {
   const [open, setOpen] = useState<string | null>(null);
-  const [started, setStarted] = useState<string | null>(null);
 
   return (
     <section aria-labelledby="starter-packs-heading" style={{ display: "grid", gap: "var(--sp-10)" }}>
@@ -71,7 +79,7 @@ export function StarterPacks({ disabled, onStart }: { disabled: boolean; onStart
                   disabled={disabled}
                   aria-label={`Start from the ${p.title} example`}
                   aria-describedby={`${p.id}-summary`}
-                  onClick={() => { setStarted(p.id); onStart(p); }}
+                  onClick={() => onStart(p)}
                   {...focusRing}
                 >
                   Start from this
@@ -82,7 +90,7 @@ export function StarterPacks({ disabled, onStart }: { disabled: boolean; onStart
         })}
       </ul>
       <div role="status" className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
-        {started ? "Example added to the form below. Edit it so it describes you." : ""}
+        {status && <span key={status.tick}>{status.text}</span>}
       </div>
     </section>
   );

@@ -6,7 +6,7 @@ import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
 import { StarterPacks } from "@/components/ex/starter-packs";
-import type { StarterPack } from "@/lib/marketplace";
+import { isUnchangedExample, planStarterPack, type AppliedPack, type StarterPack } from "@/lib/starter-packs";
 import { useT } from "@/components/ex/i18n-context";
 import { KNOWLEDGE_FOLDER_DISCLOSURE } from "@/lib/knowledge-folder-shared";
 
@@ -218,6 +218,10 @@ export default function BuildMyTwinPage() {
   // continues with the same twin instead of creating a second one.
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState<Set<File>>(() => new Set());
+  const [appliedPack, setAppliedPack] = useState<AppliedPack | null>(null);
+  const [packStatus, setPackStatus] = useState<{ text: string; tick: number } | null>(null);
+  const [focusNotes, setFocusNotes] = useState(0);
+  const notesRef = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const writeTabRef = useRef<HTMLButtonElement>(null);
   const interviewTabRef = useRef<HTMLButtonElement>(null);
@@ -246,15 +250,29 @@ export default function BuildMyTwinPage() {
     }
   }
 
-  // An example fills the role (only if empty) and the notes; text already
-  // written is kept and the example goes below it.
+  // Starting from an example: see planStarterPack for how it merges with what
+  // is already in the form.
   function startFromPack(pack: StarterPack) {
-    setRole((cur) => cur.trim() || pack.role);
-    setWritten((cur) => (cur.includes(pack.notes) ? cur : cur.trim() ? `${cur.trim()}\n\n${pack.notes}` : pack.notes));
+    const plan = planStarterPack({ written, role, applied: appliedPack }, pack);
+    if (plan.action === "noop") {
+      setPackStatus((s) => ({ text: `${pack.title} example is already in the form. Your edits are kept.`, tick: (s?.tick ?? 0) + 1 }));
+      return;
+    }
+    if (plan.action === "confirm" && !window.confirm(`Replace your edited example with the ${pack.title} example? Your edits to it will be lost.`)) {
+      return;
+    }
+    setWritten(plan.written);
+    setRole(plan.role);
+    setAppliedPack(plan.applied);
     setMode("write");
-    // The write panel is hidden until React commits the mode change.
-    setTimeout(() => document.getElementById("notes")?.focus(), 0);
+    setPackStatus((s) => ({ text: `${pack.title} example added to the form below. Edit it so it describes you.`, tick: (s?.tick ?? 0) + 1 }));
+    setFocusNotes((n) => n + 1);
   }
+
+  // The write panel is hidden until the mode change commits; focus after it.
+  useEffect(() => {
+    if (focusNotes > 0) notesRef.current?.focus();
+  }, [focusNotes]);
 
   // Prefill the name from the signed-in account (not the loopback stand-in).
   useEffect(() => {
@@ -267,11 +285,14 @@ export default function BuildMyTwinPage() {
       .catch(() => {});
   }, []);
 
+  // An invented brief must not become a twin untouched.
+  const unchangedExample = isUnchangedExample(written, appliedPack) && interviewAnswerChars === 0 && !folderPath.trim();
   const notesShort = material < MIN_NOTES && !folderPath.trim();
   const missing = [
     !name.trim() && "your name",
     !role.trim() && "your role",
     notesShort && `${MIN_NOTES - material} more characters about your work`,
+    unchangedExample && "your own edits to the example",
     !consent && "your agreement below",
   ].filter(Boolean) as string[];
   const ready = missing.length === 0 && stage === "idle";
@@ -371,7 +392,7 @@ export default function BuildMyTwinPage() {
               Your twin is created; edit its profile after the build.
             </p>
           )}
-          <StarterPacks disabled={profileLocked} onStart={startFromPack} />
+          <StarterPacks disabled={profileLocked} onStart={startFromPack} status={packStatus} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--sp-12)" }}>
             <label htmlFor="self-name">
               <span style={labelStyle}>Your name</span>
@@ -451,9 +472,10 @@ export default function BuildMyTwinPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "var(--sp-12)", alignItems: "start" }}>
                   <textarea
                     id="notes"
+                    ref={notesRef}
                     aria-labelledby="about-work-label"
                     style={{ ...fieldStyle, minHeight: 320, resize: "vertical", lineHeight: 1.55 }}
-                    value={notes}
+                    value={written}
                     onChange={(e) => setWritten(e.target.value)}
                     placeholder="Write freely, in any language. Bullet points are fine."
                     readOnly={profileLocked}
