@@ -16,7 +16,7 @@ const home = await vi.hoisted(async () => {
 import { applyClaudeCodeImport, ImportChangedError, previewClaudeCodeImport, previewForClient } from "./claude-code-import";
 import { sdkChildEnv } from "./sdk-env";
 
-const SECRETS = ["HOOK_SECRET_CMD", "PERMISSION_SECRET_RULE", "ENV_SECRET_VALUE", "CRED_SECRET_TOKEN", "HEADER_SECRET_BEARER", "URLUSER_SECRET", "QUERY_SECRET_KEY"];
+const SECRETS = ["HOOK_SECRET_CMD", "PERMISSION_SECRET_RULE", "ENV_SECRET_VALUE", "CRED_SECRET_TOKEN", "HEADER_SECRET_BEARER", "URLUSER_SECRET", "QUERY_SECRET_KEY", "PATH_SECRET_Zk3j9Qw8Lm2Xv7Rt4Yb6"];
 const FORBIDDEN_FILES = ["settings.json", "settings.local.json", ".credentials.json"];
 
 const fixtureRoot = path.join(home, "fixture");
@@ -46,6 +46,7 @@ beforeAll(() => {
     mcpServers: {
       docs: { type: "http", url: "https://docs.example.com/mcp", headers: { Authorization: "HEADER_SECRET_BEARER" }, env: { K: "ENV_SECRET_VALUE" } },
       withtoken: { type: "http", url: "https://user:URLUSER_SECRET@t.example.com/mcp?key=QUERY_SECRET_KEY" },
+      pathtoken: { type: "http", url: "https://mcp.example.com/api/mcp/s/PATH_SECRET_Zk3j9Qw8Lm2Xv7Rt4Yb6/mcp" },
       events: { type: "sse", url: "https://events.example.com/sse" },
       local: { type: "stdio", command: "node", args: ["x.js"], env: { K: "ENV_SECRET_VALUE" } },
     },
@@ -126,6 +127,8 @@ describe("import from Claude Code", () => {
   it("skips MCP urls that carry credentials and never lists their secrets", async () => {
     const p = await previewClaudeCodeImport(EMP, claudeDir);
     expect(p.skipped.some((s) => s.what === "mcp withtoken")).toBe(true);
+    expect(p.skipped.some((s) => s.what === "mcp pathtoken")).toBe(true);
+    expect(JSON.stringify(p)).not.toContain("PATH_SECRET");
     expect(JSON.stringify(p)).not.toContain("QUERY_SECRET_KEY");
   });
 
@@ -142,11 +145,17 @@ describe("import from Claude Code", () => {
     put(path.join(dir, "skills", "b", "SKILL.md"), "---\nname: Same\n---\nbody");
     put(path.join(dir, "rules", "a", "b.md"), "1");
     put(path.join(dir, "rules", "a-b.md"), "2");
-    fs.symlinkSync(real, path.join(dir, "rules2"));
+    fs.symlinkSync(real, path.join(dir, "rules", "linked"));
     fs.symlinkSync(path.join(real, "CLAUDE.md"), path.join(dir, "skills", "c"));
     const p = await previewClaudeCodeImport(EMP, dir);
     expect(p.counts).toEqual({ skills: 1, mcpServers: 0, knowledge: 1 });
-    expect(p.skipped.length).toBeGreaterThanOrEqual(2);
+    expect(p.skipped.some((s) => s.what === "rules/linked")).toBe(true);
+    expect(p.skipped.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("assigns the previewed skills to the target twin", () => {
+    const a = JSON.parse(fs.readFileSync(path.join(home, "data", "org", "skill-assignments.json"), "utf8")) as Record<string, string[]>;
+    expect(a[EMP]).toContain("pr-review");
   });
 
   it("only accepts a .claude directory", async () => {

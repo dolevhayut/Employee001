@@ -21,7 +21,12 @@ import { createHash } from "node:crypto";
 import { appendAuditEntry } from "./audit-log";
 import { createCustomMcp, listCustomMcp, previewKey } from "./custom-mcp";
 import { listKnowledgeFiles, writeKnowledgeFile } from "./knowledge-files";
-import { importOrgSkillMarkdown, readOrgSkill } from "./org-skills";
+import {
+  getAssignedOrgSkillIdsForEmployee,
+  importOrgSkillMarkdown,
+  readOrgSkill,
+  setAssignedOrgSkillIds,
+} from "./org-skills";
 
 const MAX_FILE_BYTES = 256 * 1024;
 const MAX_CLAUDE_JSON_BYTES = 16 * 1024 * 1024; // ~/.claude.json carries project history
@@ -37,6 +42,8 @@ export type ImportItem = SkillItem | McpItem | KnowledgeItem;
 
 export type ImportPreview = {
   sourcePath: string;
+  /** Plain-words warning shown with the preview. */
+  notice: string;
   items: ImportItem[];
   counts: { skills: number; mcpServers: number; knowledge: number };
   /** Things found but not imported, with the reason (never their content). */
@@ -109,7 +116,12 @@ function cleanUrl(raw: string): { url: string; stripped: boolean } | null {
     u.password = "";
     u.search = "";
     u.hash = "";
-    return { url: u.toString(), stripped };
+    // A token can also sit in the path (e.g. /s/<secret>/mcp): treat long or
+    // mixed letter+digit segments as secrets and refuse the URL.
+    const tokenLike = u.pathname.split("/").some(
+      (seg) => /^[A-Za-z0-9_~-]{24,}$/.test(seg) || (seg.length >= 12 && /^[A-Za-z0-9_-]+$/.test(seg) && /\d/.test(seg) && /[A-Za-z]/.test(seg)),
+    );
+    return { url: u.toString(), stripped: stripped || tokenLike };
   } catch {
     return null;
   }
@@ -148,13 +160,16 @@ export async function previewClaudeCodeImport(
   const seenSkills = new Set<string>();
   for (const entry of listDir(path.join(root, "skills"))) {
     if (!entry.isDirectory()) continue;
-    if (items.filter((i) => i.kind === "skill").length >= MAX_ITEMS_PER_KIND) break;
+    if (items.filter((i) => i.kind === "skill").length >= MAX_ITEMS_PER_KIND) {
+      skipped.push({ what: `skills/${entry.name}`, reason: "over the item limit" });
+      continue;
+    }
     const content = readText(path.join(root, "skills", entry.name, "SKILL.md"));
     if (content === null) {
       skipped.push({ what: `skills/${entry.name}`, reason: "no readable SKILL.md" });
       continue;
     }
-    const id = slug(frontmatterValue(content, "name") || entry.name);
+    const id = slug(frontmatterValue(content, "name")) || slug(entry.name);
     if (!id || seenSkills.has(id)) {
       skipped.push({ what: `skills/${entry.name}`, reason: id ? "same name as another skill" : "no usable name" });
       continue;
@@ -185,7 +200,7 @@ export async function previewClaudeCodeImport(
     }
     if (cleaned.stripped) {
       // The token would be lost and the server would not work; don't import a broken copy.
-      skipped.push({ what: `mcp ${name}`, reason: "url carries credentials (userinfo or query); add it by hand" });
+      skipped.push({ what: `mcp ${name}`, reason: "url carries credentials (userinfo, query or a token-like path); add it by hand" });
       continue;
     }
     if (seenMcp.has(previewKey(name))) {
@@ -221,15 +236,25 @@ export async function previewClaudeCodeImport(
   };
   const claudeMd = readText(path.join(root, "CLAUDE.md"));
   if (claudeMd !== null) addKnowledge("CLAUDE.md", "claude-code-CLAUDE.md", claudeMd);
+  else if (fs.existsSync(path.join(root, "CLAUDE.md"))) skipped.push({ what: "CLAUDE.md", reason: "too large or not a regular file" });
   const walkRules = (dir: string, rel: string, depth: number) => {
     for (const entry of listDir(dir)) {
-      if (entry.isSymbolicLink()) continue;
       const childRel = rel ? `${rel}/${entry.name}` : entry.name;
-      if (entry.isDirectory() && depth < MAX_RULE_DEPTH) walkRules(path.join(dir, entry.name), childRel, depth + 1);
+      if (entry.isSymbolicLink()) {
+        skipped.push({ what: `rules/${childRel}`, reason: "symlinks are not followed" });
+        continue;
+      }
+      if (entry.isDirectory() && depth >= MAX_RULE_DEPTH) skipped.push({ what: `rules/${childRel}`, reason: "nested too deep" });
+      else if (entry.isDirectory()) walkRules(path.join(dir, entry.name), childRel, depth + 1);
       else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
         const content = readText(path.join(dir, entry.name));
-        if (content === null) continue;
-        addKnowledge(`rules/${childRel}`, `claude-code-rule-${slug(childRel.replace(/\.md$/i, ""))}.md`, content);
+        if (content === null) {
+          skipped.push({ what: `rules/${childRel}`, reason: "too large or not a regular file" });
+          continue;
+        }
+        const base = childRel.replace(/\.md$/i, "");
+        const key = slug(base) || createHash("sha256").update(base).digest("hex").slice(0, 8);
+        addKnowledge(`rules/${childRel}`, `claude-code-rule-${key}.md`, content);
       }
     }
   };
@@ -247,7 +272,15 @@ export async function previewClaudeCodeImport(
   const digest = createHash("sha256")
     .update(JSON.stringify({ employeeId, root, items }))
     .digest("hex");
-  return { sourcePath: root, items, counts, skipped, digest };
+  return {
+    sourcePath: root,
+    notice:
+      "This reads the Claude Code folder of the user running Employee001 on this machine, and adds it to this twin. Skills are assigned to this twin; MCP servers are added disabled.",
+    items,
+    counts,
+    skipped,
+    digest,
+  };
 }
 
 export async function applyClaudeCodeImport(opts: {
@@ -264,14 +297,16 @@ export async function applyClaudeCodeImport(opts: {
   const imported = { skills: 0, mcpServers: 0, knowledge: 0 };
   let skippedExisting = 0;
   let failure: unknown = null;
+  const assignable: string[] = [];
   try {
     for (const item of preview.items) {
     if (item.kind === "skill") {
+      assignable.push(item.id);
       if (item.status === "exists") { skippedExisting++; continue; }
       // Pin the id so the folder written matches the id the preview showed.
-      const fm = item.content.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
+      const fm = item.content.match(/^---\s*\n([\s\S]*?)\n---\s*(?:\n([\s\S]*))?$/);
       const content = fm
-        ? `---\nid: ${item.id}\n${fm[1].split("\n").filter((l) => !l.startsWith("id:")).join("\n")}\n---\n${fm[2]}`
+        ? `---\nid: ${item.id}\n${fm[1].split("\n").filter((l) => !l.startsWith("id:")).join("\n")}\n---\n${fm[2] ?? ""}`
         : `---\nid: ${item.id}\n---\n${item.content}`;
       importOrgSkillMarkdown({ filename: `${item.id}.md`, content });
       imported.skills++;
@@ -283,6 +318,11 @@ export async function applyClaudeCodeImport(opts: {
     } else {
       if (writeKnowledgeFile(opts.employeeId, item.name, item.content)) imported.knowledge++;
     }
+    }
+    // The twin only uses org skills assigned to it, so assign what was previewed.
+    if (assignable.length > 0) {
+      const current = getAssignedOrgSkillIdsForEmployee(opts.employeeId, []);
+      setAssignedOrgSkillIds(opts.employeeId, [...current, ...assignable]);
     }
   } catch (err) {
     failure = err;

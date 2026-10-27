@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 import { employeeExists } from "@/lib/employees-files";
+import { getEmployee } from "@/lib/employees";
+import { isRetiredSync } from "@/lib/twin-lifecycle";
 import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 import {
   applyClaudeCodeImport,
@@ -21,6 +23,9 @@ export async function POST(
 ) {
   const { id } = await params;
   if (!employeeExists(id)) return Response.json({ error: "employee not found" }, { status: 404 });
+  if (isRetiredSync(id)) {
+    return Response.json({ error: "This twin is retired and read-only." }, { status: 409 });
+  }
 
   let body: { previewDigest?: unknown };
   try {
@@ -38,7 +43,7 @@ export async function POST(
     const user = sessionUserFromHeaders(request.headers);
     const result = await applyClaudeCodeImport({
       employeeId: id,
-      employeeName: id,
+      employeeName: getEmployee(id)?.name ?? id,
       sourceDir,
       previewDigest: body.previewDigest,
       actorId: user?.id ?? "local",
