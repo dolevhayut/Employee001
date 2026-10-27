@@ -27,6 +27,8 @@ export async function POST(request: Request) {
         return fail(400, "expired_token", "That code expired. Start sign-in again from the client.");
       case "already_approved":
         return fail(409, "already_approved", "That code was already approved.");
+      case "denied":
+        return fail(409, "access_denied", "That code was already refused.");
       default:
         return fail(404, "unknown_code", "No pending sign-in matches that code.");
     }

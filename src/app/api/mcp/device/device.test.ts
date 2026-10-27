@@ -7,15 +7,13 @@ import { dataDir } from "@/lib/app-home";
 import { POST as start } from "./start/route";
 import { POST as poll } from "./poll/route";
 import { POST as approve } from "./approve/route";
+import { POST as deny } from "./deny/route";
 import { POST as revoke } from "./revoke/route";
 import { resetSlots } from "./respond";
 
 // People known to the app: anyone not listed here does not exist.
 const users = new Map<string, { id: string; role: string; disabled?: boolean }>();
-vi.mock("@/lib/auth/store", () => ({
-  getUser: (id: string) => users.get(id),
-  accountsEnabled: () => [...users.values()].some((u) => !u.disabled),
-}));
+vi.mock("@/lib/auth/store", () => ({ accountsEnabled: () => true, getUser: (id: string) => users.get(id) }));
 
 let home: string;
 let now: number;
@@ -59,13 +57,6 @@ async function begin() {
 }
 
 describe("POST /api/mcp/device/start", () => {
-  it("refuses with accounts_required when there are no accounts to approve it", async () => {
-    users.clear();
-    const res = await start(post("start"));
-    expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe("accounts_required");
-  });
-
   it("answers 429, not 500, once the store holds the most pending codes it allows", async () => {
     const devices = Object.fromEntries(
       Array.from({ length: MAX_OUTSTANDING_CODES }, (_, i) => [`d${i}`, { userCodeHash: `u${i}`, expiresAt: now + DEVICE_CODE_TTL_MS }]),
@@ -113,8 +104,60 @@ describe("rate limits on the public routes", () => {
   it("answers 429 once start or poll is called too often", async () => {
     for (let i = 0; i < 30; i++) expect((await start(post("start"))).status).toBe(200);
     expect((await start(post("start"))).status).toBe(429);
-    for (let i = 0; i < 300; i++) await poll(post("poll", { device_code: "x" }));
-    expect((await poll(post("poll", { device_code: "x" }))).status).toBe(429);
+    const code = "A".repeat(43);
+    for (let i = 0; i < 300; i++) await poll(post("poll", { device_code: code }));
+    expect((await poll(post("poll", { device_code: code }))).status).toBe(429);
+  });
+
+  it("keeps a separate bucket per client, so one caller cannot lock out another", async () => {
+    const from = (ip: string) => post("start", undefined, { "x-forwarded-for": ip });
+    for (let i = 0; i < 30; i++) expect((await start(from("203.0.113.1"))).status).toBe(200);
+    expect((await start(from("203.0.113.1"))).status).toBe(429);
+    expect((await start(from("203.0.113.2"))).status).toBe(200);
+    const code = "B".repeat(43);
+    const pollFrom = (ip: string) => poll(post("poll", { device_code: code }, { "x-forwarded-for": ip }));
+    for (let i = 0; i < 300; i++) await pollFrom("198.51.100.1");
+    expect((await pollFrom("198.51.100.1")).status).toBe(429);
+    expect((await pollFrom("198.51.100.2")).status).toBe(400);
+  });
+
+  it("does not spend rate-limit slots on malformed device codes", async () => {
+    for (let i = 0; i < 400; i++) expect((await poll(post("poll", { device_code: `junk${i}` }))).status).toBe(400);
+    const { device_code } = await begin();
+    const res = await poll(post("poll", { device_code }));
+    expect((await res.json()).error).toBe("authorization_pending");
+  });
+});
+
+describe("POST /api/mcp/device/deny", () => {
+  it("needs a signed-in person", async () => {
+    const { user_code } = await begin();
+    expect((await deny(post("deny", { user_code }))).status).toBe(401);
+  });
+
+  it("invalidates the code: the poller gets access_denied and nobody can approve it", async () => {
+    const { device_code, user_code } = await begin();
+    const res = await deny(post("deny", { user_code }, as("ada", "member")));
+    expect(res.status).toBe(200);
+    expect((await res.json()).denied).toBe(true);
+
+    const polled = await poll(post("poll", { device_code }));
+    const body = await polled.json();
+    expect(polled.status).toBe(400);
+    expect(body.error).toBe("access_denied");
+    expect(body.access_token).toBeUndefined();
+
+    const late = await approve(post("approve", { user_code }, as("bob", "member")));
+    expect(late.status).toBe(409);
+    now += POLL_INTERVAL_SECONDS * 1000;
+    expect((await (await poll(post("poll", { device_code }))).json()).error).toBe("access_denied");
+  });
+
+  it("will not refuse a code that was already approved, and 404s an unknown one", async () => {
+    const { user_code } = await begin();
+    await approve(post("approve", { user_code }, as("ada", "member")));
+    expect((await deny(post("deny", { user_code }, as("ada", "member")))).status).toBe(409);
+    expect((await deny(post("deny", { user_code: "ZZZZ-ZZZZ" }, as("ada", "member")))).status).toBe(404);
   });
 });
 
@@ -153,7 +196,7 @@ describe("POST /api/mcp/device/poll", () => {
   });
 
   it("rejects an unknown device code and malformed bodies", async () => {
-    const unknown = await poll(post("poll", { device_code: "nope" }));
+    const unknown = await poll(post("poll", { device_code: "n".repeat(43) }));
     expect((await unknown.json()).error).toBe("invalid_grant");
     expect((await poll(post("poll", {}))).status).toBe(400);
     expect((await poll(post("poll", { device_code: 42 }))).status).toBe(400);
@@ -162,7 +205,7 @@ describe("POST /api/mcp/device/poll", () => {
 
   it("does not accept the user code in place of the device code", async () => {
     const { user_code } = await begin();
-    expect((await (await poll(post("poll", { device_code: user_code }))).json()).error).toBe("invalid_grant");
+    expect((await (await poll(post("poll", { device_code: user_code }))).json()).error).toBe("invalid_request");
   });
 
   it("tells a client that polls too fast to slow down", async () => {

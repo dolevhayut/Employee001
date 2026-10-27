@@ -65,7 +65,8 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/mcp/device/start": { POST: pub },
   "/api/mcp/device/poll": { POST: pub },
   "/api/mcp/device/approve": { POST: member },
-  "/api/mcp/device/revoke": { POST: employee },
+  "/api/mcp/device/deny": { POST: member },
+  "/api/mcp/device/revoke":{ POST: employee },
 
   // Employee onboarding: the invite token is the credential
   "/api/invites/[token]": { GET: invite, DELETE: admin },

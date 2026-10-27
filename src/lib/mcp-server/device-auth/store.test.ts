@@ -20,8 +20,9 @@ import {
 
 // Everyone signing in below is a member of the app, unless a test swaps in its own accounts.
 type Person = { id: string; role: string; disabled?: boolean };
-const people = vi.hoisted(() => ({ lookup: null as null | ((id: string) => Person | undefined) }));
+const people = vi.hoisted(() => ({ lookup: null as null | ((id: string) => Person | undefined), accounts: true }));
 vi.mock("@/lib/auth/store", () => ({
+  accountsEnabled: () => people.accounts,
   getUser: (id: string) => (people.lookup ? people.lookup(id) : { id, role: "member" }),
 }));
 
@@ -390,6 +391,21 @@ describe("resolve checks the person on every request", () => {
     accounts.set("o", { id: "o", role: "owner" });
     const ghost = await signIn("local-owner");
     expect(resolveBearer(ghost.bearer)).toBeNull();
+  });
+
+  it("with no enabled account, honours only the implicit local owner's sessions", async () => {
+    accounts.set("ana", { id: "ana", role: "member" });
+    const a = await signIn("ana");
+    const owner = await signIn("local-owner");
+    // Every account disabled: the install reads as having none. Ana's session must
+    // not come back to life just because nobody is left to check her against.
+    people.accounts = false;
+    try {
+      expect(resolveBearer(a.bearer)).toBeNull();
+      expect(resolveBearer(owner.bearer)?.personId).toBe("local-owner");
+    } finally {
+      people.accounts = true;
+    }
   });
 
   it("fails closed when the user store can't be read", async () => {

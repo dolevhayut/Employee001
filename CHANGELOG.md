@@ -24,8 +24,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a crash, and a stalled writer is refused instead of overwriting a revoke.
 - The device sign-in link (`/device`) now uses your configured public URL
   (`EMPLOYEE001_PUBLIC_URL` or `APP_URL`) instead of the request's Host header.
-- With no accounts set up, `employee001 login` now says that personal sign-in
-  needs accounts, instead of waiting for an approval nobody can give.
 - When too many sign-ins are pending, starting another answers "try again"
   (429) instead of a server error.
 - `employee001 login` warns when the address is plain `http` on another
@@ -47,6 +45,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - New `employee001 login` command: it prints a page address and a code, you
   approve the code in the app as yourself at `/device`, and the command saves
   a personal session that `employee001 mcp` uses when no shared token is set.
+- Pressing Deny on the `/device` page now cancels the code for good, and the
+  waiting `employee001 login` tells you the sign-in was refused. Personal
+  sessions are accepted by `/api/mcp`, sign-in limits are kept per client, and
+  sessions made before you created accounts are revoked when the first owner is
+  created.
 - The sign-in routes answer 404 while personal sign-in is off, so no code can
   be minted early. Deleting, disabling, demoting or resetting the password of a
   person now ends their MCP sessions too.

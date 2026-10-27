@@ -65,6 +65,24 @@ function DeviceInner() {
     }
   }
 
+  async function deny() {
+    setBusy(true);
+    setError(null);
+    try {
+      // Tell the server so the code stops being approvable and the terminal learns it was refused.
+      await fetch("/api/mcp/device/deny", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ user_code: code }),
+      });
+    } catch {
+      /* the code still expires on its own */
+    } finally {
+      setBusy(false);
+      setStage("denied");
+    }
+  }
+
   return (
     <div style={cardStyle}>
       {stage === "enter" && (
@@ -112,7 +130,7 @@ function DeviceInner() {
             </button>
             <button
               type="button"
-              onClick={() => setStage("denied")}
+              onClick={deny}
               disabled={busy}
               style={{ ...buttonStyle, flex: 1, background: "transparent", color: "var(--text)", border: "1px solid var(--hairline-strong)" }}
             >
@@ -132,7 +150,7 @@ function DeviceInner() {
       {stage === "denied" && (
         <Heading
           title="Not approved"
-          sub="Nothing was signed in. The code expires on its own in a few minutes. You can close this tab."
+          sub="Nothing was signed in and the code can no longer be used. You can close this tab."
         />
       )}
     </div>
