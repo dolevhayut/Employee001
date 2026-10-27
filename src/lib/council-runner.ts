@@ -55,7 +55,7 @@ import {
   formatResponseIntentBlock,
   planEmployeeResponseIntent,
 } from "@/lib/employee-intent-planner";
-import { buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
+import { TWIN_CHAT_TOOLS, buildBaseOptions, buildTwinHooks, twinDisallowedTools } from "@/lib/sdk-defaults";
 import { getToolPolicyOverrides } from "@/lib/tool-policy-overrides";
 import { applyConsent } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
@@ -693,34 +693,44 @@ export type RunOptions = {
   consultContext?: ConsultContext;
 };
 
+/** `tools` is the run's built-in allowlist (MCP tools are not affected by it);
+ *  `disallowedTools` replaces the base list, so it always carries the hard
+ *  list and the Claude Code subagent denies (twinDisallowedTools). */
 export function buildToolConfig(options: RunOptions): {
+  tools: string[];
   allowedTools: string[];
-  disallowedTools?: string[];
+  disallowedTools: string[];
   agents?: ReturnType<typeof buildTwinAgentDefinitions>;
 } {
   if (options.publicReply || options.retired) {
+    // No built-in tools at all, not just denied ones.
     return {
+      tools: [],
       allowedTools: [],
-      disallowedTools: ["AskUserQuestion", "Read", "Glob", "Grep", "Write", "WebSearch", "WebFetch", "Task", "TodoWrite"],
+      disallowedTools: twinDisallowedTools(["AskUserQuestion", "Read", "Glob", "Grep", "Write", "Edit", "WebSearch", "WebFetch", "Task", "TodoWrite"]),
     };
   }
   if (options.readOnly) {
     return {
+      tools: ["Read", "Glob", "Grep", "WebSearch", "ToolSearch"],
       allowedTools: ["Read", "Glob", "Grep", "mcp__org_brain__search_org_brain"],
-      disallowedTools: ["AskUserQuestion", "Write", "WebFetch", "Task", "TodoWrite"],
+      disallowedTools: twinDisallowedTools(["AskUserQuestion", "Write", "Edit", "WebFetch", "Task", "TodoWrite"]),
     };
   }
   if (options.answerOnly) {
     return {
+      tools: ["Read", "Glob", "Grep", "ToolSearch"],
       allowedTools: ["Read", "Glob", "Grep", "mcp__org_brain__search_org_brain"],
-      disallowedTools: ["AskUserQuestion", "Write", "WebSearch", "WebFetch", "Task", "TodoWrite"],
+      disallowedTools: twinDisallowedTools(["AskUserQuestion", "Write", "Edit", "WebSearch", "WebFetch", "Task", "TodoWrite"]),
     };
   }
   return {
+    tools: [...TWIN_CHAT_TOOLS],
     // allowedTools are auto-approved and skip canUseTool. WebFetch and
     // WebSearch stay available but are left out so every query goes through
     // the tool policy and the admin's read allowlist (it carries data out).
     allowedTools: ["TodoWrite", "AskUserQuestion", "Read", "Glob", "Grep", "Write", "Task"],
+    disallowedTools: twinDisallowedTools(),
     agents: buildTwinAgentDefinitions(),
   };
 }
@@ -1352,8 +1362,10 @@ export async function runSingleTwin(
               }
             : undefined,
         ),
-        // Allowed built-ins:
-        //   - TodoWrite / AskUserQuestion: surface twin reasoning + clarifications.
+        // Built-ins (TWIN_CHAT_TOOLS in sdk-defaults.ts):
+        //   - TaskCreate / TaskUpdate / AskUserQuestion: surface twin reasoning + clarifications.
+        //   - Task: Employee001's subagents only (twin-subagents.ts); Claude
+        //     Code's own are denied (CLAUDE_BUILTIN_SUBAGENTS_DENY).
         //   - Read / Glob / Grep: browse the workspace (own profile, peers,
         //     org-brain, org-skills) — see prompt for paths.
         //   - Write: jot notes / draft memos to scratch/<employeeId>/ ONLY.
@@ -1362,10 +1374,10 @@ export async function runSingleTwin(
         //   - WebSearch / WebFetch: live research — competitor pricing, API
         //     docs, case studies. Replaces "I think" with "per Stripe's docs
         //     as of today, …".
+        // The only built-ins the twin sees (retired / auto-reply: none).
+        tools: toolConfig.tools,
         allowedTools: toolConfig.allowedTools,
-        // A retired twin gets no built-in tools at all, not just denied ones.
-        ...(retired ? { tools: [] } : {}),
-        ...(toolConfig.disallowedTools ? { disallowedTools: toolConfig.disallowedTools } : {}),
+        disallowedTools: toolConfig.disallowedTools,
         ...(toolConfig.agents ? { agents: toolConfig.agents } : {}),
         toolConfig: { askUserQuestion: { previewFormat: "html" } },
         ...(hasMcp ? { mcpServers } : {}),

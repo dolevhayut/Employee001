@@ -1,5 +1,7 @@
 "use client";
 
+import { ApprovalArgs } from "@/components/ex/approval-args";
+
 import { Suspense, useState, useRef, useEffect, useMemo, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -628,26 +630,7 @@ function ApprovalCard({
 
       <div>
         {!editing ? (
-          <pre
-            style={{
-              margin: 0,
-              padding: "8px 10px",
-              background: "var(--bg-sunken)",
-              border: "1px solid var(--hairline)",
-              borderRadius: 6,
-              fontSize: "var(--fs-meta)",
-              lineHeight: 1.5,
-              fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-              maxHeight: 160,
-              overflow: "auto",
-              color: "var(--text-muted)",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
-            {JSON.stringify(approval.input, null, 2)}
-          </pre>
+          <ApprovalArgs input={(approval.input ?? {}) as Record<string, unknown>} />
         ) : (
           <textarea
             value={edited}

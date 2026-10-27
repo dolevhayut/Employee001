@@ -1,5 +1,7 @@
 "use client";
 
+import { ApprovalArgs } from "@/components/ex/approval-args";
+
 import { useState, useEffect, useCallback } from "react";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
@@ -174,23 +176,7 @@ function ArgsCell({ input }: { input: Record<string, unknown> }) {
         )}
       </button>
       {open && (
-        <pre
-          style={{
-            marginTop: "var(--sp-6)",
-            padding: "8px 10px",
-            background: "var(--bg-sunken)",
-            borderRadius: 6,
-            fontSize: 10.5,
-            lineHeight: 1.6,
-            fontFamily: "var(--font-mono, monospace)",
-            color: "var(--text)",
-            overflowX: "auto",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-          }}
-        >
-          {JSON.stringify(input, null, 2)}
-        </pre>
+        <ApprovalArgs input={(input ?? {}) as Record<string, unknown>} />
       )}
     </div>
   );

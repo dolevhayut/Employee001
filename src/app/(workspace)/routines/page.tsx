@@ -1,5 +1,7 @@
 "use client";
 
+import { ApprovalArgs } from "@/components/ex/approval-args";
+
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1103,9 +1105,7 @@ function LogRow({ e }: { e: ArchiveEvent }) {
         <div style={wrap}>
           {meta(<>🔧 {t("routines.log.tool")} · <bdi>{e.tool}</bdi></>, "var(--accent)")}
           {e.input && Object.keys(e.input).length > 0 && (
-            <pre style={{ margin: 0, fontSize: "var(--fs-2xs)", color: "var(--text-muted)", background: "var(--bg-sunken)", padding: "6px 8px", borderRadius: 5, overflow: "auto", maxHeight: 120 }}>
-              {JSON.stringify(e.input, null, 2)}
-            </pre>
+            <ApprovalArgs input={(e.input ?? {}) as Record<string, unknown>} />
           )}
         </div>
       );

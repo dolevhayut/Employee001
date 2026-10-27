@@ -4,9 +4,10 @@ import {
   extractUploadedKnowledgeFile,
   listKnowledgeFiles,
   saveUploadedKnowledgeFile,
-  writeKnowledgeFile,
+  writeUntrustedKnowledgeFile,
   type KnowledgeFile,
 } from "@/lib/knowledge-files";
+import type { HiddenCharCounts } from "@/lib/hidden-chars";
 import { listRecentlyDeletedKnowledge } from "@/lib/knowledge-versions";
 
 export const runtime = "nodejs";
@@ -114,8 +115,11 @@ export async function POST(
   }
 
   let kf: KnowledgeFile | null;
+  let hiddenCharsRemoved: HiddenCharCounts | undefined;
   try {
-    kf = writeKnowledgeFile(id, body.name, body.body);
+    // Hidden characters (tag, bidi, zero-width) are removed before the twin
+    // can read the file; the response says how many went.
+    ({ file: kf, hiddenCharsRemoved } = writeUntrustedKnowledgeFile(id, body.name, body.body));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown disk error";
     return diskErrorResponse(`create ${id}/${body.name}`, message);
@@ -126,5 +130,5 @@ export async function POST(
       400
     );
   }
-  return jsonResponse({ file: kf });
+  return jsonResponse({ file: kf, ...(hiddenCharsRemoved ? { hiddenCharsRemoved } : {}) });
 }
