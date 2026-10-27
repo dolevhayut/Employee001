@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.12.0] — 2026-10-28
+
 ### Team Meetings remember
 - A new Team Meeting starts from a short "Since the last meeting" brief: what
   the last three meetings with someone from this room decided and left open,
