@@ -44,7 +44,8 @@ beforeAll(() => {
   put(path.join(fixtureRoot, ".claude.json"), JSON.stringify({
     oauthAccount: { token: "CRED_SECRET_TOKEN" },
     mcpServers: {
-      docs: { type: "http", url: "https://user:URLUSER_SECRET@docs.example.com/mcp?key=QUERY_SECRET_KEY", headers: { Authorization: "HEADER_SECRET_BEARER" }, env: { K: "ENV_SECRET_VALUE" } },
+      docs: { type: "http", url: "https://docs.example.com/mcp", headers: { Authorization: "HEADER_SECRET_BEARER" }, env: { K: "ENV_SECRET_VALUE" } },
+      withtoken: { type: "http", url: "https://user:URLUSER_SECRET@t.example.com/mcp?key=QUERY_SECRET_KEY" },
       events: { type: "sse", url: "https://events.example.com/sse" },
       local: { type: "stdio", command: "node", args: ["x.js"], env: { K: "ENV_SECRET_VALUE" } },
     },
@@ -120,6 +121,32 @@ describe("import from Claude Code", () => {
     await expect(applyClaudeCodeImport({ employeeId: EMP, employeeName: "T", sourceDir: claudeDir, previewDigest: "nope", actorId: "u" })).rejects.toBeInstanceOf(ImportChangedError);
     fs.appendFileSync(path.join(claudeDir, "CLAUDE.md"), "more\n");
     await expect(applyClaudeCodeImport({ employeeId: EMP, employeeName: "T", sourceDir: claudeDir, previewDigest: p.digest, actorId: "u" })).rejects.toBeInstanceOf(ImportChangedError);
+  });
+
+  it("skips MCP urls that carry credentials and never lists their secrets", async () => {
+    const p = await previewClaudeCodeImport(EMP, claudeDir);
+    expect(p.skipped.some((s) => s.what === "mcp withtoken")).toBe(true);
+    expect(JSON.stringify(p)).not.toContain("QUERY_SECRET_KEY");
+  });
+
+  it("does not follow a symlinked .claude folder or symlinked subfolders, and skips duplicate names", async () => {
+    const real = path.join(home, "real-elsewhere");
+    put(path.join(real, "CLAUDE.md"), "x");
+    const link = path.join(home, "linked", ".claude");
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.symlinkSync(real, link);
+    await expect(previewClaudeCodeImport(EMP, link)).rejects.toThrow(/symlink/);
+
+    const dir = path.join(home, "dup", ".claude");
+    put(path.join(dir, "skills", "a", "SKILL.md"), "---\nname: Same\n---\nbody");
+    put(path.join(dir, "skills", "b", "SKILL.md"), "---\nname: Same\n---\nbody");
+    put(path.join(dir, "rules", "a", "b.md"), "1");
+    put(path.join(dir, "rules", "a-b.md"), "2");
+    fs.symlinkSync(real, path.join(dir, "rules2"));
+    fs.symlinkSync(path.join(real, "CLAUDE.md"), path.join(dir, "skills", "c"));
+    const p = await previewClaudeCodeImport(EMP, dir);
+    expect(p.counts).toEqual({ skills: 1, mcpServers: 0, knowledge: 1 });
+    expect(p.skipped.length).toBeGreaterThanOrEqual(2);
   });
 
   it("only accepts a .claude directory", async () => {

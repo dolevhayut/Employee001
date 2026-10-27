@@ -22,13 +22,14 @@ export async function POST(
   const { id } = await params;
   if (!employeeExists(id)) return Response.json({ error: "employee not found" }, { status: 404 });
 
-  let body: { sourceDir?: unknown; previewDigest?: unknown; employeeName?: unknown };
+  let body: { previewDigest?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     body = {};
   }
-  const sourceDir = typeof body.sourceDir === "string" ? body.sourceDir : undefined;
+  // The source is always the server user's own ~/.claude; the client can't choose a path.
+  const sourceDir = undefined;
 
   try {
     if (typeof body.previewDigest !== "string") {
