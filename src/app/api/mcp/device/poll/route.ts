@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const deviceCode = typeof body?.device_code === "string" ? body.device_code : "";
   // Malformed codes are refused before they cost a rate-limit slot or touch the store.
   if (!DEVICE_CODE_SHAPE.test(deviceCode)) return fail(400, "invalid_request", "device_code is required.");
-  if (!takeSlot(`poll:${clientKey(request)}`, 300)) return fail(429, "rate_limited", "Too many requests. Try again in a minute.");
+  if (!takeSlot(`poll:${clientKey(request)}`, 300) || !takeSlot("poll:all", 6000)) return fail(429, "rate_limited", "Too many requests. Try again in a minute.");
 
   const result = await exchangeDeviceCode(deviceCode);
   switch (result.status) {

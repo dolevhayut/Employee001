@@ -6,6 +6,7 @@ import { authorizeApi, authorizePage, type Caller } from "@/lib/auth/rbac";
 import { USER_EMPLOYEE_HEADER, USER_ID_HEADER, USER_ROLE_HEADER } from "@/lib/auth/request-user";
 import {
   accountsEnabled,
+  getUser,
   bootstrapCookie,
   bootstrapValid,
   BOOTSTRAP_COOKIE,
@@ -72,10 +73,12 @@ function bearerCaller(request: NextRequest): Caller {
   if (matchesSharedToken(bearer)) return { id: "mcp-client", role: "member" };
   const session = resolveBearer(bearer);
   // The implicit local owner only exists while there are no accounts.
-  if (session && !(session.personId === "local-owner" && accountsEnabled())) {
-    return { id: session.personId, role: "member" };
-  }
-  return null;
+  if (!session) return null;
+  if (session.personId === "local-owner") return accountsEnabled() ? null : { id: session.personId, role: "member" };
+  // Once accounts exist the person must still have an enabled account.
+  const user = accountsEnabled() ? getUser(session.personId) : undefined;
+  if (accountsEnabled() && (!user || user.disabled)) return null;
+  return { id: session.personId, role: "member" };
 }
 
 function unauthorizedHtml(pathAndQuery: string): string {

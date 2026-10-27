@@ -132,11 +132,14 @@ describe("proxy: personal MCP sign-in bearers", () => {
 
   it("accepts a personal session as that person on /api/mcp when accounts exist", async () => {
     const { proxy, store } = await load();
-    store.createUser({ email: "o@x.io", name: "o", role: "owner" });
+    store.createUser({ id: "usr_ada", email: "o@x.io", name: "o", role: "owner" });
     const bearer = await mint("usr_ada");
     const res = proxy(mcp("http://127.0.0.1:3000/api/mcp", bearer));
     expect(res.headers.get("x-middleware-next")).toBe("1");
     expect(forwarded(res, "x-e001-user-id")).toBe("usr_ada");
+    store.updateUser("usr_ada", { disabled: true });
+    store.createUser({ email: "p@x.io", name: "p", role: "owner" });
+    expect(proxy(mcp("http://127.0.0.1:3000/api/mcp", bearer)).status).toBe(401);
     expect(proxy(mcp("http://127.0.0.1:3000/api/mcp", "not-a-session")).status).toBe(401);
   });
 
