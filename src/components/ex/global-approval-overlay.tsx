@@ -1,5 +1,6 @@
 "use client";
 
+import { ApprovalArgs } from "@/components/ex/approval-args";
 import { useState, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -370,24 +371,7 @@ export function GlobalApprovalOverlay() {
                       }}
                     />
                   ) : (
-                    <pre
-                      style={{
-                        margin: 0,
-                        padding: "10px 12px",
-                        background: "var(--bg-sunken)",
-                        borderRadius: 6,
-                        fontSize: "var(--fs-meta)",
-                        fontFamily: "var(--font-mono, monospace)",
-                        color: "var(--text-muted)",
-                        overflow: "auto",
-                        maxHeight: 200,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-all",
-                        lineHeight: 1.55,
-                      }}
-                    >
-                      {JSON.stringify((current as LiveApproval).input, null, 2)}
-                    </pre>
+                    <ApprovalArgs input={(current as LiveApproval).input} />
                   )}
                 </div>
               )}
