@@ -36,6 +36,27 @@ export const PEER_PROFILE_FILES = new Set([
 
 const SHARED_ROOTS = ["org-brain", "org-skills"];
 
+/** Data-root paths no twin reads, whatever else the rules say: every twin's
+ *  memory, sign-in state, invite tokens and stored secrets. A trailing "/"
+ *  marks a directory. The hook below already refuses them (they are outside
+ *  the allowlist); sdk-defaults.ts also passes them to Claude Code as native
+ *  deny rules, so they stay refused if this hook regresses. */
+export const TWIN_DENIED_DATA_PATHS: readonly string[] = [
+  "memory/",
+  "auth/",
+  "invites.json",
+  "org/custom-mcp.json",
+  "telegram-approval-secret",
+  ".audit-pseudonym-key",
+];
+
+/** Is this data-relative path one of TWIN_DENIED_DATA_PATHS or inside one? */
+export function isDeniedDataPath(rel: string): boolean {
+  return TWIN_DENIED_DATA_PATHS.some((entry) =>
+    entry.endsWith("/") ? underRoot(rel, entry.slice(0, -1)) : rel === entry,
+  );
+}
+
 /** ok may carry a rewritten tool input (a Grep over a folder runs with the
  *  secret-excluding glob). */
 export type ReadScopeDecision = { ok: true; updatedInput?: Record<string, unknown> } | { ok: false; reason: string };
@@ -98,6 +119,7 @@ function configuredFolderDecision(rawPath: string, employeeId: string, cwd: stri
 
 /** May the twin read file contents at this data-relative path? */
 export function canReadPath(rel: string, employeeId: string): boolean {
+  if (isDeniedDataPath(rel)) return false;
   if (SHARED_ROOTS.some((root) => underRoot(rel, root))) return true;
   if (underRoot(rel, `employees/${employeeId}`)) return true;
   if (underRoot(rel, `scratch/${employeeId}`)) return true;

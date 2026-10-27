@@ -142,20 +142,23 @@ describe("guard and runner policy", () => {
       )?.json(),
     ).toMatchObject({ error: { code: -32003 } });
     expect(buildToolConfig({ answerOnly: true })).toMatchObject({
+      tools: ["Read", "Glob", "Grep", "ToolSearch"],
       allowedTools: [
         "Read",
         "Glob",
         "Grep",
         "mcp__org_brain__search_org_brain",
       ],
-      disallowedTools: [
+      disallowedTools: expect.arrayContaining([
+        "Bash",
+        "Agent(general-purpose)",
         "AskUserQuestion",
         "Write",
         "WebSearch",
         "WebFetch",
         "Task",
         "TodoWrite",
-      ],
+      ]),
     });
   });
 });

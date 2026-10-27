@@ -10,7 +10,7 @@ import { routeWithModel } from "@/lib/org-router-model";
 import { runSingleTwin } from "@/lib/council-runner";
 import { directAnthropicAllowed, modelErrorMessage } from "@/lib/model-provider";
 import { relayTurn } from "@/lib/relay/model";
-import { TWIN_HARD_DISALLOWED, TWIN_MODEL_PRIMARY, buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
+import { TWIN_MODEL_PRIMARY, buildBaseOptions, buildTwinHooks, twinDisallowedTools } from "@/lib/sdk-defaults";
 import { listCustomMcp, loadOrgCustomMcpServers } from "@/lib/custom-mcp";
 import { selectOrgBrainNodesForRun } from "@/lib/org-brain";
 import { classifyTool } from "@/lib/tool-policy";
@@ -145,7 +145,10 @@ If the systems hold nothing relevant, reply with exactly: ${NOTHING}
 Write the brief in English.`,
       options: {
         ...buildBaseOptions({ surface: "chat", abortController: abort, runId, employeeId: "org-systems" }),
-        disallowedTools: [...TWIN_HARD_DISALLOWED, "Read", "Glob", "Grep", "Write", "Edit", "Bash", "WebFetch", "WebSearch", "Task", "TodoWrite", "AskUserQuestion"],
+        // Only ToolSearch among the built-ins (MCP tools are unaffected by
+        // `tools`): connected systems' tools may be deferred behind it.
+        tools: ["ToolSearch"],
+        disallowedTools: twinDisallowedTools(["Read", "Glob", "Grep", "Write", "Edit", "WebFetch", "WebSearch", "Task", "TodoWrite", "AskUserQuestion"]),
         systemPrompt: "You are the company's records desk. You answer only from the company's connected systems, through the MCP tools you have, and you never change anything.",
         mcpServers,
         allowedTools: [],
