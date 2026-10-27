@@ -1,13 +1,16 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveBearer } from "@/lib/mcp-server/device-auth";
 import { readStoredSession, runLogin } from "../../../../../bin/commands/login.mjs";
 import { POST as start } from "./start/route";
 import { POST as poll } from "./poll/route";
 import { POST as approve } from "./approve/route";
 import { resetSlots } from "./respond";
+
+// People known to the app: sessions only resolve for people who still exist.
+vi.mock("@/lib/auth/store", () => ({ getUser: (id: string) => (id === "ada" ? { id, role: "member" } : undefined) }));
 
 let home: string;
 const prevHome = process.env.EMPLOYEE001_HOME;
