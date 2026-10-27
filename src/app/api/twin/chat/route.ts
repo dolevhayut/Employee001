@@ -307,7 +307,7 @@ export async function POST(request: NextRequest) {
                 approvalsApproved: approvalsApprovedCount,
                 approvalsDenied: approvalsDeniedCount,
                 blockedTools: blockedToolsCount,
-                errorMessage: evt.message,
+                errorMessage: temporary ? "error" : evt.message,
                 costUsd: 0,
               });
             }

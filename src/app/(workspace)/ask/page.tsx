@@ -655,8 +655,12 @@ export default function AskPage() {
   // person sees only what they asked. "New conversation" starts a fresh one.
   const conversationRef = useRef<Record<string, string>>({});
   const loadedRef = useRef<Set<string>>(new Set());
+  // Temporary Ask: a chat that is not saved to history and writes no memory.
+  // While it is on, no saved conversation is loaded onto the screen.
+  const [temporary, setTemporary] = useState(false);
+  const temporaryRef = useRef(false);
   useEffect(() => {
-    if (!twin || loadedRef.current.has(twin.id)) return;
+    if (!twin || temporary || loadedRef.current.has(twin.id)) return;
     let alive = true;
     fetch(`/api/employees/${encodeURIComponent(twin.id)}/chat-history?surface=ask`, { cache: "no-store" })
       .then((r) => (r.ok ? (r.json() as Promise<SavedMessage[]>) : []))
@@ -688,7 +692,7 @@ export default function AskPage() {
     return () => {
       alive = false;
     };
-  }, [twin]);
+  }, [twin, temporary]);
 
   const newConversation = () => {
     if (!twinId || busy) return;
@@ -698,16 +702,15 @@ export default function AskPage() {
     setTurns((prev) => prev.filter((turn) => turn.twinId !== twinId || turn.task));
   };
 
-  // Temporary Ask: a fresh chat that is not saved to history and writes no
-  // memory. Switching either way starts a new conversation, so a saved one is
-  // never mixed with an unsaved one on the same screen.
-  const [temporary, setTemporary] = useState(false);
-  const temporaryRef = useRef(false);
+  // Switching either way starts a new conversation on screen, so a saved one is
+  // never mixed with an unsaved one. Saved history is left alone (no markFresh).
   const toggleTemporary = () => {
     if (busy) return;
+    stopAudio();
     temporaryRef.current = !temporaryRef.current;
     setTemporary(temporaryRef.current);
-    newConversation();
+    if (twinId) conversationRef.current[twinId] = newConversationId();
+    setTurns((prev) => prev.filter((turn) => turn.twinId !== twinId || turn.task));
   };
 
   useEffect(() => {
@@ -1059,6 +1062,8 @@ export default function AskPage() {
     const viaVoice = viaVoiceRef.current;
     viaVoiceRef.current = false;
     if (mode === "task") return assign(question, viaVoice);
+    // Fixed for this question: the request flag and the save decision agree.
+    const temp = temporaryRef.current;
     if (!twinId || !twin) return t("ask.noTwin");
     setBusy(true);
     stopAudio();
@@ -1150,7 +1155,7 @@ export default function AskPage() {
             })),
           thinking: (d) => patchTurn(id, (turn) => ({ ...turn, thinking: turn.thinking + d })),
           text: (d) => sayStreamed(d),
-        }, signal, viaVoice, temporaryRef.current)) || t("ask.empty");
+        }, signal, viaVoice, temp)) || t("ask.empty");
       answer = tidyCites(answer);
       answered = true;
     } catch (err) {
@@ -1162,7 +1167,7 @@ export default function AskPage() {
     if (!signal.aborted) sayStreamed("", true);
     patchTurn(id, (turn) => ({ ...turn, answer }));
     // A temporary ask is never saved: it lives on this screen only.
-    if (answered && !signal.aborted && !temporaryRef.current) {
+    if (answered && !signal.aborted && !temp) {
       const conversationId = (conversationRef.current[twinId] ??= newConversationId());
       saveExchange(twinId, [
         { id: `q${id}-${conversationId}`, role: "user", text: question, conversationId, viaVoice },
@@ -1686,7 +1691,7 @@ export default function AskPage() {
           >
             <Icons.MessageSquare size={12} />
             {t("ask.conversation")}
-            {temporary && (
+            {mode === "ask" && temporary && (
               <span
                 role="status"
                 data-testid="ask-temporary-label"
@@ -1696,7 +1701,7 @@ export default function AskPage() {
                 {t("ask.temporaryLabel")}
               </span>
             )}
-            <button
+            {mode === "ask" && <button
               type="button"
               role="switch"
               aria-checked={temporary}
@@ -1707,7 +1712,7 @@ export default function AskPage() {
               style={{ marginInlineStart: "auto", padding: "3px 8px", borderRadius: 6, border: "1px solid var(--hairline)", background: temporary ? "var(--surface)" : "transparent", color: temporary ? "var(--text)" : "var(--text-muted)", fontSize: 11, fontWeight: 500, letterSpacing: 0, textTransform: "none", cursor: busy ? "default" : "pointer" }}
             >
               {t("ask.temporaryToggle")}
-            </button>
+            </button>}
             {twinId && turns.some((turn) => turn.twinId === twinId && !turn.task) && (
               <button
                 type="button"

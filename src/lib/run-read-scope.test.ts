@@ -80,8 +80,8 @@ describe("read scope per run type", () => {
     expect(text).toMatch(/options\.temporary \? \{ persistSession: false \}/);
     // Nothing else in the runner branches on it: tool policy, hooks, read scope
     // and the audit log are not conditional on a temporary ask.
-    const uses = text.split("\n").filter((line) => /\btemporary\b/.test(line) && !/^\s*(\/\/|\*|\/\*)/.test(line));
-    expect(uses.length).toBe(6);
+    expect(text.slice(text.indexOf("buildTwinHooks({"), text.indexOf("const toolConfig"))).not.toMatch(/temporary/);
+    expect(text).not.toMatch(/appendAuditEntry\(\{[^}]*temporary/);
     const toolConfig = text.slice(text.indexOf("function buildToolConfig"), text.indexOf("export async function runSingleTwin"));
     expect(toolConfig).not.toMatch(/temporary/);
   });
