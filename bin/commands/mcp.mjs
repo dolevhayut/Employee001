@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { resolve } from "node:path";
 import { createBridge, resolveBridgeConfig } from "../lib/mcp-bridge.mjs";
+import { readStoredSession } from "./login.mjs";
 
 function parseEnv(text) {
   const out = {};
@@ -39,12 +40,21 @@ export default async function mcp(argv) {
     return;
   }
 
-  const { url, token } = resolveBridgeConfig({
+  let { url, token } = resolveBridgeConfig({
     url: urlIndex >= 0 ? argv[urlIndex + 1] : undefined,
     token: tokenIndex >= 0 ? argv[tokenIndex + 1] : undefined,
     processEnv: process.env,
     fileEnv: localEnv(),
   });
+  // No shared token anywhere: use the personal session from `employee001 login`.
+  // It goes only to the URL it was issued for.
+  if (!token) {
+    const stored = readStoredSession();
+    if (stored && (urlIndex < 0 || argv[urlIndex + 1] === stored.url)) {
+      url = stored.url;
+      token = stored.token;
+    }
+  }
   const bridge = createBridge({
     url,
     token,

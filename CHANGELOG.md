@@ -23,6 +23,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Every request to `/api/mcp` made with a personal sign-in is now written to
   the audit log with who made it, when, and which tool it called. Revoking a
   person's MCP sessions refuses their very next request.
+- New `employee001 login` command: it prints a page address and a code, you
+  approve the code in the app as yourself at `/device`, and the command saves
+  a personal session that `employee001 mcp` uses when no shared token is set.
 - The sign-in routes answer 404 while personal sign-in is off, so no code can
   be minted early. Deleting, disabling, demoting or resetting the password of a
   person now ends their MCP sessions too.

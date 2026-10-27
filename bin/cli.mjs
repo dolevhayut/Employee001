@@ -22,6 +22,7 @@ More commands:
   export    Snapshot data/ to a tar.gz archive (excludes .env)
   import    Restore data/ from a tar.gz archive
   mcp       Connect Claude Code, Cursor and other MCP clients (stdio bridge to the running app)
+  login     Sign in to the running app as yourself for MCP clients (approve a code in the browser)
   audit     Verify the audit log's hash chain (audit verify [exported-file])
   help      Show this message
 
@@ -51,9 +52,9 @@ Examples:
 Docs: https://github.com/dolevhayut/Employee001
 `;
 
-const HOME_COMMANDS = new Set(["setup", "start", "doctor", "secure", "mcp"]);
+const HOME_COMMANDS = new Set(["setup", "start", "doctor", "secure", "mcp", "login"]);
 
-const KNOWN = new Set(["setup", "start", "update", "doctor", "secure", "export", "import", "mcp", "audit", "demo", "help"]);
+const KNOWN = new Set(["setup", "start", "update", "doctor", "secure", "export", "import", "mcp", "login", "audit", "demo", "help"]);
 
 async function main() {
   // No command (or only flags, like `--port 4000`) starts the app, running

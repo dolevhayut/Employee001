@@ -61,8 +61,8 @@ describe("POST /api/mcp/device/start", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(body.device_code).toMatch(/^[\w-]{40,}$/);
     expect(body.user_code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
-    expect(body.verification_uri).toBe("http://localhost:3000/mcp/device");
-    expect(body.verification_uri_complete).toBe(`http://localhost:3000/mcp/device?code=${body.user_code}`);
+    expect(body.verification_uri).toBe("http://localhost:3000/device");
+    expect(body.verification_uri_complete).toBe(`http://localhost:3000/device?code=${body.user_code}`);
     expect(body.interval).toBe(POLL_INTERVAL_SECONDS);
     expect(body.expires_in).toBe(DEVICE_CODE_TTL_MS / 1000);
   });
