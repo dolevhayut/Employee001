@@ -11,16 +11,20 @@ import { resetSlots } from "./respond";
 
 let home: string;
 const prevHome = process.env.EMPLOYEE001_HOME;
+const prevSignIn = process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN;
 
 beforeEach(() => {
   resetSlots();
   home = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-login-flow-"));
   process.env.EMPLOYEE001_HOME = home;
+  process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "1"; // the routes 404 while sign-in is off
 });
 
 afterEach(() => {
   if (prevHome === undefined) delete process.env.EMPLOYEE001_HOME;
   else process.env.EMPLOYEE001_HOME = prevHome;
+  if (prevSignIn === undefined) delete process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN;
+  else process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = prevSignIn;
   fs.rmSync(home, { recursive: true, force: true });
 });
 
