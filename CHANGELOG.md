@@ -8,6 +8,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### A cloned voice needs the person's recorded consent
+- A cloned or custom voice is only used for a twin if the person it belongs to
+  has agreed, and the agreement (who, when, the wording's SHA-256, IP and
+  browser) is recorded. Without it, speech uses the default voice and says why.
+- Withdrawing consent removes the voice id and is written to the audit log.
+  Consent recorded by an admin is marked "on behalf".
+- The screens to give or withdraw consent come in a follow-up; until then
+  custom voices use the default voice.
+
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual
   files, with nothing uploaded or synced. Add up to five folders on the
