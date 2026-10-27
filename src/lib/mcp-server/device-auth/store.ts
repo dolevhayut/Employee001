@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "@/lib/app-home";
 import { ROLE_RANK } from "@/lib/auth/rbac";
-import { getUser } from "@/lib/auth/store";
+import { accountsEnabled, getUser } from "@/lib/auth/store";
 
 // Personal MCP sign-in (device-code flow), server-side model only. Raw device
 // codes, user codes and bearers are never stored: only their SHA-256 hashes.
@@ -408,10 +408,14 @@ export function resolveBearer(bearer: string): McpSession | null {
     return null; // unreadable store: fail closed
   }
   if (!session || session.revokedAt || session.expiresAt <= clock()) return null;
-  // A session belongs to a person who can still approve one: deleted, disabled or
-  // demoted below member means no session, even if revocation never ran.
-  const person = getUser(session.personId);
-  if (!person || person.disabled || ROLE_RANK[person.role] < ROLE_RANK.member) return null;
+  // Before any account exists there is nobody to check against: sessions made then
+  // stay valid until the first owner is created (which revokes them).
+  if (accountsEnabled()) {
+    // A session belongs to a person who can still approve one: deleted, disabled or
+    // demoted below member means no session, even if revocation never ran.
+    const person = getUser(session.personId);
+    if (!person || person.disabled || ROLE_RANK[person.role] < ROLE_RANK.member) return null;
+  }
   return { personId: session.personId, createdAt: session.createdAt, expiresAt: session.expiresAt };
 }
 

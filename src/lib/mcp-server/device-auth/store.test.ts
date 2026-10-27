@@ -19,7 +19,7 @@ import {
 } from "./store";
 
 // Everyone signing in below is a member of the app.
-vi.mock("@/lib/auth/store", () => ({ getUser: (id: string) => ({ id, role: "member" }) }));
+vi.mock("@/lib/auth/store", () => ({ accountsEnabled: () => true, getUser: (id: string) => ({ id, role: "member" }) }));
 
 let home: string;
 let now: number;

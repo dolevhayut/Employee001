@@ -12,7 +12,7 @@ import { resetSlots } from "./respond";
 
 // People known to the app: anyone not listed here does not exist.
 const users = new Map<string, { id: string; role: string; disabled?: boolean }>();
-vi.mock("@/lib/auth/store", () => ({ getUser: (id: string) => users.get(id) }));
+vi.mock("@/lib/auth/store", () => ({ accountsEnabled: () => true, getUser: (id: string) => users.get(id) }));
 
 let home: string;
 let now: number;
