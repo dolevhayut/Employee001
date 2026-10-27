@@ -1,6 +1,6 @@
 import { exchangeDeviceCode } from "@/lib/mcp-server/device-auth";
 import { readJson } from "@/lib/auth/http";
-import { clientKey, fail, json, takeSlot } from "../respond";
+import { clientKey, fail, json, signInOff, takeSlot } from "../respond";
 
 export const runtime = "nodejs";
 
@@ -12,6 +12,8 @@ const DEVICE_CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
  *  authorization_pending, slow_down, expired_token, invalid_grant (unknown or
  *  already collected). The token is handed over exactly once. */
 export async function POST(request: Request) {
+  const off = signInOff();
+  if (off) return off;
   const body = await readJson<{ device_code?: unknown }>(request);
   const deviceCode = typeof body?.device_code === "string" ? body.device_code : "";
   // Malformed codes are refused before they cost a rate-limit slot or touch the store.

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveBearer } from "@/lib/mcp-server/device-auth";
 import { readStoredSession, runLogin } from "../../../../../bin/commands/login.mjs";
 import { POST as start } from "./start/route";
@@ -9,18 +9,25 @@ import { POST as poll } from "./poll/route";
 import { POST as approve } from "./approve/route";
 import { resetSlots } from "./respond";
 
+// People known to the app: sessions only resolve for people who still exist.
+vi.mock("@/lib/auth/store", () => ({ getUser: (id: string) => (id === "ada" ? { id, role: "member" } : undefined) }));
+
 let home: string;
 const prevHome = process.env.EMPLOYEE001_HOME;
+const prevSignIn = process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN;
 
 beforeEach(() => {
   resetSlots();
   home = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-login-flow-"));
   process.env.EMPLOYEE001_HOME = home;
+  process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "1"; // the routes 404 while sign-in is off
 });
 
 afterEach(() => {
   if (prevHome === undefined) delete process.env.EMPLOYEE001_HOME;
   else process.env.EMPLOYEE001_HOME = prevHome;
+  if (prevSignIn === undefined) delete process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN;
+  else process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = prevSignIn;
   fs.rmSync(home, { recursive: true, force: true });
 });
 

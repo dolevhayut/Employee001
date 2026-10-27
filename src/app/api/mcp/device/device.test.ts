@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEVICE_CODE_TTL_MS, POLL_INTERVAL_SECONDS, resolveBearer, setDeviceAuthClock } from "@/lib/mcp-server/device-auth";
 import { POST as start } from "./start/route";
 import { POST as poll } from "./poll/route";
@@ -10,12 +10,20 @@ import { POST as deny } from "./deny/route";
 import { POST as revoke } from "./revoke/route";
 import { resetSlots } from "./respond";
 
+// People known to the app: anyone not listed here does not exist.
+const users = new Map<string, { id: string; role: string; disabled?: boolean }>();
+vi.mock("@/lib/auth/store", () => ({ getUser: (id: string) => users.get(id) }));
+
 let home: string;
 let now: number;
 const prevHome = process.env.EMPLOYEE001_HOME;
+const prevSignIn = process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN;
 
 beforeEach(() => {
   resetSlots();
+  process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "1";
+  users.clear();
+  for (const id of ["ada", "bob", "root"]) users.set(id, { id, role: "admin" });
   home = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-device-routes-"));
   process.env.EMPLOYEE001_HOME = home;
   now = Date.parse("2026-10-27T09:00:00Z");
@@ -24,6 +32,8 @@ beforeEach(() => {
 
 afterEach(() => {
   setDeviceAuthClock();
+  if (prevSignIn === undefined) delete process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN;
+  else process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = prevSignIn;
   if (prevHome === undefined) delete process.env.EMPLOYEE001_HOME;
   else process.env.EMPLOYEE001_HOME = prevHome;
   fs.rmSync(home, { recursive: true, force: true });
@@ -250,5 +260,36 @@ describe("POST /api/mcp/device/revoke", () => {
 
   it("rejects a malformed person_id", async () => {
     expect((await revoke(post("revoke", { person_id: 7 }, as("root", "admin")))).status).toBe(400);
+  });
+
+  it("stops honouring a session when its person is deleted, disabled or demoted", async () => {
+    const a = await signIn("ada");
+    const b = await signIn("bob");
+    const c = await signIn("root");
+    users.delete("ada");
+    users.set("bob", { id: "bob", role: "admin", disabled: true });
+    users.set("root", { id: "root", role: "employee" });
+    expect(resolveBearer(a)).toBeNull();
+    expect(resolveBearer(b)).toBeNull();
+    expect(resolveBearer(c)).toBeNull();
+    users.set("bob", { id: "bob", role: "member" });
+    expect(resolveBearer(b)?.personId).toBe("bob");
+  });
+});
+
+describe("personal sign-in switched off", () => {
+  it("start, poll and approve answer 404 and mint nothing", async () => {
+    delete process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN;
+    expect((await start(post("start"))).status).toBe(404);
+    expect((await poll(post("poll", { device_code: "x".repeat(43) }))).status).toBe(404);
+    expect((await approve(post("approve", { user_code: "ABCD-EFGH" }, as("ada", "member")))).status).toBe(404);
+    expect(fs.existsSync(path.join(home, "data", "mcp-device-auth.json"))).toBe(false);
+  });
+
+  it("a code started while on is not usable once the flag is turned off", async () => {
+    const { device_code, user_code } = await begin();
+    delete process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN;
+    expect((await approve(post("approve", { user_code }, as("ada", "member")))).status).toBe(404);
+    expect((await poll(post("poll", { device_code }))).status).toBe(404);
   });
 });
