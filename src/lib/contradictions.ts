@@ -92,11 +92,20 @@ function normalizeWords(text: string): string[] {
     .filter(Boolean);
 }
 
+/** One-word labels that describe a document or a person, not an org-wide
+ *  question ("Status: active", "Owner: Dana" differ per project). */
+const GENERIC_SUBJECTS = new Set([
+  "status", "owner", "role", "name", "title", "team", "department", "goal", "goals", "notes", "summary", "focus",
+  "location", "email", "phone", "date", "priority", "stage", "type", "version", "description", "context", "purpose",
+  "manager", "lead", "contact", "deadline", "timezone", "language", "company", "project", "stack", "tools",
+]);
+
 function subjectKeyOf(subject: string): string | null {
   const tokens = normalizeWords(subject);
   if (tokens.some((t) => FIRST_PERSON.has(t))) return null;
   const kept = tokens.filter((t) => !STOPWORDS.has(t));
   if (kept.length === 0 || kept.length > 5) return null;
+  if (kept.length === 1 && GENERIC_SUBJECTS.has(kept[0])) return null;
   return [...kept].sort().join(" ");
 }
 
@@ -177,8 +186,10 @@ export function findConflicts(claims: Claim[]): Conflict[] {
         const pair = pickPair(left, right);
         if (!pair) continue;
         const [a, b] = pair;
+        // Twin pair + subject only: editing or reordering a line must not turn
+        // the same dispute into a new Inbox item.
         const fingerprint = createHash("sha256")
-          .update([twinIds[i], twinIds[j], subjectKey, normalizeValue(a.value), normalizeValue(b.value)].join("|"))
+          .update([twinIds[i], twinIds[j], subjectKey].join("|"))
           .digest("hex")
           .slice(0, 16);
         out.push({

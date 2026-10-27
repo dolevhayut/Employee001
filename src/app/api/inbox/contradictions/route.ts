@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
     claimsCompared: result.claimsCompared,
     created: result.created,
     alreadyFiled: result.alreadyFiled,
-    conflicts: result.conflicts,
+    // Counts only: the claims themselves are shown in the Inbox items, redacted.
+    conflicts: result.conflicts.length,
   });
 }

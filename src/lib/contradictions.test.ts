@@ -105,6 +105,18 @@ describe("contradiction scan", () => {
     expect((await mod.scanContradictions(null)).conflicts).toHaveLength(0);
   });
 
+  it("ignores generic labels and keeps one item per twin pair and subject when a value is edited", async () => {
+    writeTwin("dana", "Dana", { "CONTEXT.md": "- Status: active\n- The release approver is Dana\n" });
+    writeTwin("omer", "Omer", { "CONTEXT.md": "- Status: blocked\n- The release approver is Omer\n" });
+    expect((await mod.scanContradictions(null)).created).toBe(1);
+    fs.writeFileSync(
+      path.join(tempDir, "data", "employees", "omer", "CONTEXT.md"),
+      "- The release approver is Sam\n"
+    );
+    expect((await mod.scanContradictions(null)).created).toBe(0);
+    expect(feed.listFeed({ type: "alert" })).toHaveLength(1);
+  });
+
   it("refuses viewers below the member role and runs for members", async () => {
     expect(mod.canRunContradictionScan({ id: "u1", role: "employee" })).toBe(false);
     await expect(mod.scanContradictions({ id: "u1", role: "employee" })).rejects.toThrow("forbidden");
