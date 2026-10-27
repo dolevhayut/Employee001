@@ -129,6 +129,7 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/approvals/pending": { GET: member },
   "/api/feed": { GET: member },
   "/api/feed/[id]/resolve": { POST: approver },
+  "/api/inbox/contradictions": { POST: member },
   "/api/stt": { POST: member },
   "/api/stt/token": { POST: member },
   "/api/tts": { POST: member },

@@ -1306,6 +1306,13 @@ export function searchStructuredMemory(
   return [...matched, ...backfill];
 }
 
+/** Every durable fact currently in force for a twin (superseded history is
+ *  left out). Used by the cross-twin contradiction scan. */
+export function listCurrentStructuredFacts(employeeId: string): TwinStructuredFact[] {
+  if (!isEnabled() || !structuredEnabled()) return [];
+  return readJsonl<TwinStructuredFact>(structuredPath(employeeId)).filter((fact) => !fact.supersededBy);
+}
+
 function cmpRecent(a: TwinStructuredFact, b: TwinStructuredFact): number {
   return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 }
