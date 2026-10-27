@@ -21,7 +21,7 @@ export function StarterPacks({ disabled, onStart }: { disabled: boolean; onStart
   const [started, setStarted] = useState<string | null>(null);
 
   return (
-    <section aria-labelledby="starter-packs-heading" aria-describedby="starter-packs-hint" style={{ display: "grid", gap: "var(--sp-10)" }}>
+    <section aria-labelledby="starter-packs-heading" style={{ display: "grid", gap: "var(--sp-10)" }}>
       <div>
         <h2 id="starter-packs-heading" style={{ margin: 0, fontSize: "var(--fs-ui)", fontWeight: 600, color: "var(--text)" }}>
           Not sure where to start? Try an example
@@ -45,6 +45,9 @@ export function StarterPacks({ disabled, onStart }: { disabled: boolean; onStart
               {expanded && (
                 <pre
                   id={`${p.id}-preview`}
+                  tabIndex={0}
+                  role="region"
+                  aria-labelledby={`${p.id}-title`}
                   style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: "var(--fs-sm)", lineHeight: 1.55, color: "var(--text-muted)", maxHeight: 260, overflow: "auto" }}
                 >
                   {p.notes}
@@ -56,7 +59,7 @@ export function StarterPacks({ disabled, onStart }: { disabled: boolean; onStart
                   className="btn ghost sm"
                   aria-expanded={expanded}
                   aria-controls={expanded ? `${p.id}-preview` : undefined}
-                  aria-describedby={`${p.id}-title`}
+                  aria-label={`${expanded ? "Hide preview of" : "Preview"} ${p.title} example`}
                   onClick={() => setOpen(expanded ? null : p.id)}
                   {...focusRing}
                 >
@@ -66,7 +69,8 @@ export function StarterPacks({ disabled, onStart }: { disabled: boolean; onStart
                   type="button"
                   className="btn sm"
                   disabled={disabled}
-                  aria-describedby={`${p.id}-title ${p.id}-summary`}
+                  aria-label={`Start from the ${p.title} example`}
+                  aria-describedby={`${p.id}-summary`}
                   onClick={() => { setStarted(p.id); onStart(p); }}
                   {...focusRing}
                 >

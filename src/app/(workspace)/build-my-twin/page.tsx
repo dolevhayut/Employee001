@@ -250,9 +250,10 @@ export default function BuildMyTwinPage() {
   // written is kept and the example goes below it.
   function startFromPack(pack: StarterPack) {
     setRole((cur) => cur.trim() || pack.role);
-    setWritten((cur) => (cur.trim() ? `${cur.trim()}\n\n${pack.notes}` : pack.notes));
+    setWritten((cur) => (cur.includes(pack.notes) ? cur : cur.trim() ? `${cur.trim()}\n\n${pack.notes}` : pack.notes));
     setMode("write");
-    requestAnimationFrame(() => document.getElementById("notes")?.focus());
+    // The write panel is hidden until React commits the mode change.
+    setTimeout(() => document.getElementById("notes")?.focus(), 0);
   }
 
   // Prefill the name from the signed-in account (not the loopback stand-in).
