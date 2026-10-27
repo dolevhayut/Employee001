@@ -32,7 +32,8 @@ describe("normalizeStances", () => {
           { employeeId: "a", stance: "accept", turn: 0 },
           { employeeId: "a", stance: "accept", turn: 9 },
           { employeeId: "a", stance: "maybe", turn: 1 },
-          { employeeId: "a", stance: "accept", turn: "1" },
+          { employeeId: "a", stance: "accept", turn: "1.5" },
+          { employeeId: "a", stance: "accept", turn: 1.5 },
           null,
         ],
         transcript,
@@ -71,6 +72,12 @@ describe("normalizeStances", () => {
         new Set(["a"]),
       ),
     ).toEqual([{ employeeId: "a", stance: "accept", turn: 1 }]);
+  });
+
+  it("accepts a whole-number turn quoted as a string", () => {
+    expect(normalizeStances([{ employeeId: "a", stance: "accept", turn: "1" }], transcript)).toEqual([
+      { employeeId: "a", stance: "accept", turn: 1 },
+    ]);
   });
 
   it("returns [] for missing data (old meetings)", () => {

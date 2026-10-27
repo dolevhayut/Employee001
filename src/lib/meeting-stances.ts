@@ -30,9 +30,11 @@ export function normalizeStances(
   const byTwin = new Map<string, MeetingStance>();
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
-    const { employeeId, stance, turn } = item as Record<string, unknown>;
+    const { employeeId, stance, turn: rawTurn } = item as Record<string, unknown>;
     if (typeof employeeId !== "string" || (stance !== "accept" && stance !== "object")) continue;
     if (roster && !roster.has(employeeId)) continue;
+    // Models sometimes quote the number ("7"); accept that, but nothing fuzzier.
+    const turn = typeof rawTurn === "string" && /^\d+$/.test(rawTurn) ? Number(rawTurn) : rawTurn;
     if (typeof turn !== "number" || !Number.isInteger(turn)) continue;
     const spoken = turns[turn - offset];
     if (!spoken || spoken.kind !== "twin" || spoken.employeeId !== employeeId) continue;

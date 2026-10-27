@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { useT } from "@/components/ex/i18n-context";
@@ -119,6 +119,7 @@ export function MeetingHistoryDrawer({
   const [canDelete, setCanDelete] = useState(false);
   const [flashTurn, setFlashTurn] = useState<number | null>(null);
   const flashTimer = useRef<number | null>(null);
+  const reduceMotion = useReducedMotion();
   useEffect(() => () => {
     if (flashTimer.current) window.clearTimeout(flashTimer.current);
   }, []);
@@ -175,12 +176,22 @@ export function MeetingHistoryDrawer({
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     const active = document.activeElement as HTMLElement | null;
-    // Focus can sit on a non-tabbable element (heading, a jumped-to turn); treat it as outside the tab order.
-    const outside = !active || !nodes.includes(active);
-    if (e.shiftKey && (active === first || active === headingRef.current || outside)) {
+    const inside = !!active && asideRef.current.contains(active);
+    if (inside && active && !nodes.includes(active) && active !== headingRef.current) {
+      // Focus sits on a non-tabbable element (a jumped-to turn): step to the
+      // neighbouring control by document position instead of wrapping.
+      const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
+      const target = e.shiftKey
+        ? [...nodes].reverse().find((n) => active.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_PRECEDING)
+        : nodes.find((n) => active.compareDocumentPosition(n) & FOLLOWING);
+      e.preventDefault();
+      (target ?? (e.shiftKey ? last : first)).focus();
+      return;
+    }
+    if (e.shiftKey && (active === first || active === headingRef.current || !inside)) {
       e.preventDefault();
       last.focus();
-    } else if (!e.shiftKey && (active === last || outside)) {
+    } else if (!e.shiftKey && (active === last || !inside)) {
       e.preventDefault();
       first.focus();
     }
@@ -242,7 +253,10 @@ export function MeetingHistoryDrawer({
   const nameOf = (id: string, fallback?: string) => empById[id]?.firstName ?? fallback ?? id;
 
   // Only stances whose turn is still in the transcript can be linked.
-  const stances = normalizeStances(detail?.summary?.stances, detail?.transcript ?? []);
+  const stances = useMemo(
+    () => normalizeStances(detail?.summary?.stances, detail?.transcript ?? []),
+    [detail?.summary?.stances, detail?.transcript],
+  );
   const speakerName = (s: MeetingStance) => {
     const spoke = detail?.transcript[s.turn];
     return nameOf(s.employeeId, spoke?.kind === "twin" ? spoke.employeeName : undefined);
@@ -251,8 +265,7 @@ export function MeetingHistoryDrawer({
   function jumpToTurn(turn: number) {
     const el = asideRef.current?.querySelector<HTMLElement>(`[data-turn="${turn}"]`);
     if (!el) return;
-    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
+    el.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
     el.focus({ preventScroll: true });
     setFlashTurn(turn);
     if (flashTimer.current) window.clearTimeout(flashTimer.current);

@@ -55,12 +55,24 @@ export async function summarizeMeeting(
 ): Promise<MeetingDecision | null> {
   const c = getClient();
   if (!c || turns.length < 2) return null;
-  // Keep the newest turns that fit, cutting at turn boundaries so a "[n]" label is never split.
-  const labelled = turns.map((t, i) => (t.kind === "ceo" ? `[${turnOffset + i}] CEO: ${t.text}` : `[${turnOffset + i}] ${t.employeeName}: ${t.text}`));
-  let size = 0;
-  let from = labelled.length;
-  while (from > 0 && size + labelled[from - 1].length + 2 <= 14_000) size += labelled[--from].length + 2;
-  const text = (from === labelled.length ? [labelled[labelled.length - 1].slice(-14_000)] : labelled.slice(from)).join("\n\n");
+  // Keep the CEO's question and the newest turns that fit, cutting at turn
+  // boundaries so a "[turn n]" label is never split; a single over-long turn
+  // keeps its label and loses the start of its body.
+  const BUDGET = 14_000;
+  const labelled = turns.map((t, i) => {
+    const label = `[turn ${turnOffset + i}] ${t.kind === "ceo" ? "CEO" : t.employeeName}: `;
+    return label + t.text.slice(-(BUDGET - label.length));
+  });
+  const seen = new Set<number>();
+  let size = labelled[0].length + 2;
+  seen.add(0);
+  for (let i = labelled.length - 1; i > 0 && size + labelled[i].length + 2 <= BUDGET; i--) {
+    size += labelled[i].length + 2;
+    seen.add(i);
+  }
+  const text = labelled.filter((_, i) => seen.has(i)).join("\n\n");
+  // Only turns the model actually saw can back a stance.
+  const visibleTurns = turns.map((t, i): MeetingTurn => (seen.has(i) ? t : { kind: "ceo", text: "", ts: 0 }));
   const hebrew = turns.some((t) => t.kind === "ceo" && /[֐-׿]/.test(t.text));
   const roster = people.map((p) => `- ${p.id}: ${p.name}, ${p.role}`).join("\n");
 
@@ -71,7 +83,7 @@ export async function summarizeMeeting(
 - "decision": what the team converged on, in at most two short sentences (or the best recommendation if they didn't fully agree).
 - "actions": 2 to 5 concrete next steps, each owned by one team member (use their id from the roster), phrased as a short task they can start now: an imperative of at most 15 words, like a ticket title; add "due" only if a date or timeframe was mentioned (a few words).
 - "open": questions still unresolved (0 to 3).
-- "stances": for each team member who clearly accepted or objected to the decision, {"employeeId", "stance": "accept" or "object", "turn"}, where turn is the number in [brackets] of THEIR OWN message that says so. Leave out anyone who never took a position; never guess.
+- "stances": for each team member who clearly accepted or objected to the decision, {"employeeId", "stance": "accept" or "object", "turn"}, where turn is the number in the "[turn N]" label of THEIR OWN message that says so. Leave out anyone who never took a position; never guess.
 Write in ${hebrew ? "Hebrew" : "English"}. Respond with ONLY JSON: {"decision": "...", "actions": [{"employeeId": "...", "action": "...", "due": "..."}], "open": ["..."], "stances": [{"employeeId": "...", "stance": "accept", "turn": 3}]}`,
     messages: [{ role: "user", content: `Team:\n${roster}\n\nDiscussion:\n${text}` }],
   }).catch((err: unknown) => {
@@ -87,7 +99,7 @@ Write in ${hebrew ? "Hebrew" : "English"}. Respond with ONLY JSON: {"decision": 
       decision: String(json.decision ?? "").trim(),
       actions: (json.actions ?? []).filter((a): a is MeetingAction => Boolean(a && ids.has(a.employeeId) && a.action)).slice(0, 6),
       open: (json.open ?? []).map(String).slice(0, 3),
-      stances: normalizeStances(json.stances, turns, turnOffset, ids),
+      stances: normalizeStances(json.stances, visibleTurns, turnOffset, ids),
     };
   } catch {
     console.warn(`[meeting-summary] unparseable reply (${res.stop_reason}): ${raw.slice(0, 300)}`);

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getMeeting } from "@/lib/meeting-store";
+import { normalizeStances } from "@/lib/meeting-stances";
 
 /**
  * Export a council meeting transcript as a Markdown file.
@@ -48,6 +49,11 @@ export async function GET(request: NextRequest) {
 
   if (meeting.summary) {
     const s = meeting.summary;
+    // Names come from the transcript; a twin who never spoke keeps its id.
+    const names = new Map<string, string>();
+    for (const t of meeting.transcript) if (t.kind === "twin") names.set(t.employeeId, t.employeeName);
+    const nameOf = (id: string) => names.get(id) ?? id;
+    const stances = normalizeStances(s.stances, meeting.transcript);
     lines.push("## Decision");
     lines.push("");
     lines.push(s.decision);
@@ -55,16 +61,14 @@ export async function GET(request: NextRequest) {
     if (s.actions.length > 0) {
       lines.push("**Next steps**");
       lines.push("");
-      for (const a of s.actions) lines.push(`- ${a.employeeId}: ${a.action}${a.due ? ` (due: ${a.due})` : ""}`);
+      for (const a of s.actions) lines.push(`- ${nameOf(a.employeeId)}: ${a.action}${a.due ? ` (due: ${a.due})` : ""}`);
       lines.push("");
     }
-    if (s.stances && s.stances.length > 0) {
+    if (stances.length > 0) {
       lines.push("**Accepted / objected**");
       lines.push("");
-      for (const st of s.stances) {
-        const spoke = meeting.transcript[st.turn];
-        const who = spoke?.kind === "twin" ? spoke.employeeName : st.employeeId;
-        lines.push(`- ${who}: ${st.stance === "accept" ? "accepted" : "objected"} (message ${st.turn + 1})`);
+      for (const st of stances) {
+        lines.push(`- ${nameOf(st.employeeId)}: ${st.stance === "accept" ? "accepted" : "objected"} (message ${st.turn + 1})`);
       }
       lines.push("");
     }
