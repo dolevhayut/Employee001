@@ -46,9 +46,9 @@ export async function PATCH(request: Request, { params }: Params) {
   }
   const updated = updateUser(id, patch);
   if (body.role || body.disabled || body.password !== undefined) revokeUserSessions(id);
-  // A disable or role change also ends their personal MCP sessions.
-  if (body.role || body.disabled) await revokePersonSessions(id);
+  // Audit first: if the MCP store is busy the request fails, but the change is on record.
   audit("userUpdated", { userId: id, ...(body.role ? { role: body.role } : {}), ...(typeof body.disabled === "boolean" ? { disabled: body.disabled } : {}), ...(body.password !== undefined ? { passwordReset: true } : {}) }, me.id);
+  if (body.role || body.disabled || body.password !== undefined) await revokePersonSessions(id);
   return NextResponse.json({ user: publicUser(updated) });
 }
 

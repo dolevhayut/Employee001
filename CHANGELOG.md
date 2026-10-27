@@ -22,8 +22,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   size header can no longer be buffered whole.
 - The sign-in store's lock can no longer be taken by two processes at once after
   a crash, and a stalled writer is refused instead of overwriting a revoke.
-- The device sign-in link now opens a real approval page at `/mcp/device` and uses
-  your configured public URL (`EMPLOYEE001_PUBLIC_URL` or `APP_URL`).
+- The device sign-in link (`/device`) now uses your configured public URL
+  (`EMPLOYEE001_PUBLIC_URL` or `APP_URL`) instead of the request's Host header.
 
 ### Personal sign-in for MCP clients (groundwork)
 - The server can now issue a short-lived device code that a signed-in person
@@ -35,6 +35,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Every request to `/api/mcp` made with a personal sign-in is now written to
   the audit log with who made it, when, and which tool it called. Revoking a
   person's MCP sessions refuses their very next request.
+- New `employee001 login` command: it prints a page address and a code, you
+  approve the code in the app as yourself at `/device`, and the command saves
+  a personal session that `employee001 mcp` uses when no shared token is set.
+- The sign-in routes answer 404 while personal sign-in is off, so no code can
+  be minted early. Deleting, disabling, demoting or resetting the password of a
+  person now ends their MCP sessions too.
 
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual

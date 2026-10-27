@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { personalSignInEnabled } from "@/lib/mcp-server/device-auth/shared-token-policy";
 
 // Shared by the device-code routes: every response is uncacheable because it
 // can carry a session token or reveal whether a code exists.
@@ -28,4 +29,11 @@ export function resetSlots(): void {
 
 export function fail(status: number, error: string, message: string): NextResponse {
   return json({ error, message }, status);
+}
+
+/** A 404 while personal sign-in is off, so no device code or session can be minted
+ *  that would start working the moment the flag is turned on; null when it is on. */
+export function signInOff(): NextResponse | null {
+  if (personalSignInEnabled()) return null;
+  return fail(404, "not_found", "Personal MCP sign-in is not enabled.");
 }

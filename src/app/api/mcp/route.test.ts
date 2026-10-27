@@ -12,6 +12,9 @@ vi.mock("@/lib/audit-log", () => ({
   },
 }));
 
+// Sessions only resolve for a person who still exists and can approve one.
+vi.mock("@/lib/auth/store", () => ({ getUser: (id: string) => ({ id, role: "member" }) }));
+
 import {
   approveUserCode,
   exchangeDeviceCode,
