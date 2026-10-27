@@ -4,6 +4,7 @@ import { deleteUser, getUser, listUsers, publicUser, revokeUserSessions, updateU
 import { ROLES, sessionUserFromHeaders, type Role } from "@/lib/auth/request-user";
 import { hashPassword, passwordProblem } from "@/lib/auth/password";
 import { readJson } from "@/lib/auth/http";
+import { revokePersonSessions } from "@/lib/mcp-server/device-auth";
 import { addPersonProblem } from "@/lib/model-provider";
 
 export const runtime = "nodejs";
@@ -45,7 +46,9 @@ export async function PATCH(request: Request, { params }: Params) {
   }
   const updated = updateUser(id, patch);
   if (body.role || body.disabled || body.password !== undefined) revokeUserSessions(id);
+  // Audit first: if the MCP store is busy the request fails, but the change is on record.
   audit("userUpdated", { userId: id, ...(body.role ? { role: body.role } : {}), ...(typeof body.disabled === "boolean" ? { disabled: body.disabled } : {}), ...(body.password !== undefined ? { passwordReset: true } : {}) }, me.id);
+  if (body.role || body.disabled || body.password !== undefined) await revokePersonSessions(id);
   return NextResponse.json({ user: publicUser(updated) });
 }
 
@@ -57,6 +60,7 @@ export async function DELETE(request: Request, { params }: Params) {
   if (target.role === "owner" && me.role !== "owner") return NextResponse.json({ error: "Only an owner can remove an owner." }, { status: 403 });
   if (target.role === "owner" && otherActiveOwners(id) === 0) return NextResponse.json({ error: "Keep at least one active owner." }, { status: 400 });
   deleteUser(id);
+  await revokePersonSessions(id);
   audit("userDeleted", { userId: id }, me.id);
   return NextResponse.json({ ok: true });
 }

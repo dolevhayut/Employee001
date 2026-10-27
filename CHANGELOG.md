@@ -23,6 +23,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Every request to `/api/mcp` made with a personal sign-in is now written to
   the audit log with who made it, when, and which tool it called. Revoking a
   person's MCP sessions refuses their very next request.
+- The sign-in routes answer 404 while personal sign-in is off, so no code can
+  be minted early. Deleting, disabling, demoting or resetting the password of a
+  person now ends their MCP sessions too.
+
+### The security policy no longer names out-of-date versions
+- SECURITY.md now says "the latest minor release" and "the one before it"
+  instead of 0.7.x and 0.6.x, so it stays true with every release. The support
+  commitment itself is unchanged.
 
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual
