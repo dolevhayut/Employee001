@@ -48,6 +48,7 @@ found": the stream and data checks ran, the tool-result check did not.
 | Date | Mode | Result |
 | --- | --- | --- |
 | 2026-10-27 (7220c41) | sandbox off | Passed: Write and 5/5 folder reads `hard_blocked`, folder Grep filtered, no leak. WebFetch recorded as failed/unclear (allowed by design without the sandbox) |
-| 2026-10-27 | `--sandbox` | Not recorded yet: the run on 7220c41 lost the network mid-way. Re-run before tagging 0.11.0 |
+| 2026-10-27 (b4e2c0c, `--require-model`) | sandbox off | Passed: Write and 5/5 folder reads `hard_blocked`, folder Grep filtered, no leak, audit chain intact (26 rows). WebFetch recorded as failed/unclear (allowed by design without the sandbox) |
+| 2026-10-27 (b4e2c0c, `--require-model`) | `--sandbox` | Passed: WebFetch failed as required, Write and 5/5 folder reads `hard_blocked`, folder Grep filtered, no leak, audit chain intact (41 rows) |
 
 Add a line here after each release run.
