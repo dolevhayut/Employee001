@@ -52,7 +52,7 @@ Claude subscription covers one person. For a team, use an Anthropic API key, a c
 
 ## Get started in five minutes
 
-1. **Run it.** `npx employee001`. Setup finds your signed-in Claude Code and offers your Claude subscription, with no API key. Otherwise it asks for an Anthropic API key, your cloud provider (Bedrock, Vertex AI, Foundry) or a local model.
+1. **Run it.** `npx employee001`. Setup finds your signed-in Claude Code and offers your Claude subscription, with no API key; it covers one person. Otherwise it asks for an Anthropic API key, your cloud provider (Bedrock, Vertex AI, Foundry) or a local model.
 2. **Build your own twin.** Open **Build my twin**, first on the Launchpad. Write about your work or answer a short interview, add documents if you like, and agree. The builder writes the nine profile files while you watch.
 3. **Ask it.** Open **Ask**, pick your twin, and ask it what people usually ask you.
 
