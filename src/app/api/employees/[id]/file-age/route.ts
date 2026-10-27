@@ -1,0 +1,19 @@
+import { NextRequest, NextResponse } from "next/server";
+import { sessionUserFromHeaders } from "@/lib/auth/request-user";
+import { confirmProfileFile, profileFileAges } from "@/lib/employees-disk";
+
+/** Age of each profile file: GET lists them. */
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return NextResponse.json({ ages: await profileFileAges(id) }, { headers: { "Cache-Control": "no-store" } });
+}
+
+/** "Still true": POST { file } resets one file's age without touching its content. */
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const body = (await req.json().catch(() => ({}))) as { file?: unknown };
+  if (typeof body.file !== "string") return NextResponse.json({ error: "file is required" }, { status: 400 });
+  const age = await confirmProfileFile(id, body.file, sessionUserFromHeaders(req.headers) ?? undefined);
+  if (!age) return NextResponse.json({ error: "unknown employee or profile file" }, { status: 404 });
+  return NextResponse.json({ age });
+}

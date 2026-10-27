@@ -30,6 +30,7 @@ import { FlowCanvas } from "@/components/ex/morph-orb/flow-canvas";
 import { CitedAnswer, type CitedSource } from "@/components/ex/cited-answer";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { parseCitedAnswer } from "@/lib/org-answer";
+import { describeAge } from "@/lib/profile-age";
 
 const FOCUS_RING = "2px solid var(--accent)";
 const focusRingHandlers = {
@@ -112,6 +113,8 @@ type Turn = {
   steps: Step[];
   thinking: string;
   answer: string | null;
+  /** Age of the profile files the answer relied on. */
+  profileAges?: { file: string; days: number }[];
   /** Set when the CEO handed this as a task instead of asking. */
   task?: {
     itemId?: string;
@@ -172,6 +175,7 @@ type TraceEvent = {
   reason?: string;
   approvalId?: string;
   message?: string;
+  files?: { file: string; days: number }[];
 };
 
 /** A failure the server explained (a bad key, Claude Code signed out, a
@@ -212,6 +216,8 @@ async function askTwin(
     thinking: (d: string) => void;
     /** The answer's text as it streams (spoken sentence by sentence in live voice). */
     text?: (d: string) => void;
+    /** How old the profile files behind this answer are. */
+    profileAges?: (files: { file: string; days: number }[]) => void;
   },
   signal?: AbortSignal,
   /** Asked by voice: the server's voice fast lane and a spoken-answer style. */
@@ -278,6 +284,9 @@ async function askTwin(
           break;
         case "tool_result":
           on.stepDone();
+          break;
+        case "profile_age":
+          if (evt.files?.length) on.profileAges?.(evt.files);
           break;
         case "brain_recall":
           if (evt.nodes?.length) {
@@ -1135,6 +1144,7 @@ export default function AskPage() {
             })),
           thinking: (d) => patchTurn(id, (turn) => ({ ...turn, thinking: turn.thinking + d })),
           text: (d) => sayStreamed(d),
+          profileAges: (files) => patchTurn(id, (turn) => ({ ...turn, profileAges: files })),
         }, signal, viaVoice)) || t("ask.empty");
       answer = tidyCites(answer);
       answered = true;
@@ -1752,6 +1762,11 @@ export default function AskPage() {
                         />
                       );
                     })()}
+                    {turn.profileAges?.length ? (
+                      <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--text-muted)" }}>
+                        Based on {turn.profileAges.map((a) => `${a.file}, ${describeAge(a.days)}`).join(" · ")}
+                      </div>
+                    ) : null}
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
                       <SpeakButton
                         size={24}

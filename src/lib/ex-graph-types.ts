@@ -137,6 +137,12 @@ export type TwinTraceEvent =
       ts: number;
     }
   | {
+      /** Age of the profile files this answer drew on (see profileFileAges). */
+      type: "profile_age";
+      files: Array<{ file: string; days: number; basis: "confirmed" | "written" }>;
+      ts: number;
+    }
+  | {
       /** Emitted when the restrictWriteToScratch hook denies a Write call.
        *  Gives the CEO visibility into why the twin's memo wasn't saved. */
       type: "scratch_write_denied";
