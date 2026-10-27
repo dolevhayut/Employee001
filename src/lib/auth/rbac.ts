@@ -63,7 +63,7 @@ export const API_ROUTES: Record<string, Methods> = {
   // approve and revoke need a signed-in person (a shared MCP token is not one).
   "/api/mcp/device/start": { POST: pub },
   "/api/mcp/device/poll": { POST: pub },
-  "/api/mcp/device/approve": { POST: employee },
+  "/api/mcp/device/approve": { POST: member },
   "/api/mcp/device/revoke": { POST: employee },
 
   // Employee onboarding: the invite token is the credential
