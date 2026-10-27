@@ -20,6 +20,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Once personal sign-in is enabled, the shared `EMPLOYEE001_MCP_TOKEN` and
   `EMPLOYEE001_TOKEN` stop working for `/api/mcp` unless an admin opts in with
   `EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN=1`. See SECURITY.md.
+- New `employee001 login` command: it prints a page address and a code, you
+  approve the code in the app as yourself at `/device`, and the command saves
+  a personal session that `employee001 mcp` uses when no shared token is set.
 
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual
