@@ -126,6 +126,21 @@ describe("POST /api/mcp per-person identity and audit", () => {
     expect((await call("wrong-secret-token!")).status).toBe(401);
   });
 
+  it("refuses a batch too big to audit in full instead of running unaudited calls", async () => {
+    const ana = await signIn("person_ana");
+    const batch = Array.from({ length: 51 }, () => toolCall("list_twins"));
+    const before = rows.length;
+    expect((await call(ana, batch)).status).toBe(413);
+    expect(rows).toHaveLength(before);
+  });
+
+  it("does not honour a personal session while personal sign-in is off on an exposed bind", async () => {
+    const ana = await signIn("person_ana");
+    process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "0";
+    process.env.EMPLOYEE001_BIND = "0.0.0.0";
+    expect((await call(ana)).status).toBe(401);
+  });
+
   it("refuses a request with no bearer when personal sign-in is on", async () => {
     expect((await call(null)).status).toBe(401);
   });

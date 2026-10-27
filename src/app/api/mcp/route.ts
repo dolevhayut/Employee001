@@ -11,6 +11,8 @@ import { buildPublicMcpServer, isLoopbackBind } from "@/lib/mcp-server/server";
 
 export const dynamic = "force-dynamic";
 
+const MAX_BODY_BYTES = 1_000_000;
+
 function rpcError(code: number, message: string, status = 403): Response {
   return new Response(
     JSON.stringify({ jsonrpc: "2.0", error: { code, message }, id: null }),
@@ -31,7 +33,7 @@ export async function POST(request: Request): Promise<Response> {
   const personal = personalSignInEnabled();
   // A personal session is looked up on every request, so a revoke takes effect
   // on the very next one.
-  const session = bearer ? resolveBearer(bearer) : null;
+  const session = personal && bearer ? resolveBearer(bearer) : null;
 
   let identity: string | null = null;
   if (session) {
@@ -52,9 +54,12 @@ export async function POST(request: Request): Promise<Response> {
     return rpcError(-32004, "missing or invalid token", 401);
   }
 
-  const written = auditMcpRequest(identity, toolsInBody(await request.clone().text()), {
-    verdict: "executed",
-  });
+  if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) {
+    return rpcError(-32600, "request too large", 413);
+  }
+  const tools = toolsInBody(await request.clone().text());
+  if (!tools) return rpcError(-32600, "request too large or too many calls in one batch", 413);
+  const written = auditMcpRequest(identity, tools, { verdict: "executed" });
   // With personal sign-in on, a request that cannot be attributed is not served.
   if (!written && personal) return rpcError(-32005, "audit log unavailable", 503);
 

@@ -10,9 +10,13 @@ export const UNAUTHENTICATED_IDENTITY = "unauthenticated";
 const MAX_BODY_CHARS = 1_000_000;
 const MAX_CALLS = 50;
 
-/** Tool (or protocol method) named by each JSON-RPC message in a request body. */
-export function toolsInBody(body: string): string[] {
-  if (body.length > MAX_BODY_CHARS) return ["(oversized request)"];
+/**
+ * Tool (or protocol method) named by each JSON-RPC message in a request body.
+ * Returns null when the request is too big to audit in full; the caller must
+ * refuse it rather than run calls that have no audit row.
+ */
+export function toolsInBody(body: string): string[] | null {
+  if (body.length > MAX_BODY_CHARS) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(body);
@@ -20,8 +24,9 @@ export function toolsInBody(body: string): string[] {
     return ["(unparseable request)"];
   }
   const messages = Array.isArray(parsed) ? parsed : [parsed];
+  if (messages.length > MAX_CALLS) return null;
   const names: string[] = [];
-  for (const message of messages.slice(0, MAX_CALLS)) {
+  for (const message of messages) {
     if (!message || typeof message !== "object") continue;
     const { method, params } = message as { method?: unknown; params?: { name?: unknown } };
     if (typeof method !== "string") continue;
