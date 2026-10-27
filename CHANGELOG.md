@@ -24,6 +24,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a crash, and a stalled writer is refused instead of overwriting a revoke.
 - The device sign-in link (`/device`) now uses your configured public URL
   (`EMPLOYEE001_PUBLIC_URL` or `APP_URL`) instead of the request's Host header.
+- The local owner's personal MCP sessions work only while the app has no user
+  record at all; one account, even a disabled one, ends them. A disabled
+  person's session never comes back, even when every account is disabled.
 - When too many sign-ins are pending, starting another answers "try again"
   (429) instead of a server error.
 - `employee001 login` warns when the address is plain `http` on another

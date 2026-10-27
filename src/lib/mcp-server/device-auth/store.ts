@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "@/lib/app-home";
 import { ROLE_RANK } from "@/lib/auth/rbac";
-import { accountsEnabled, getUser } from "@/lib/auth/store";
+import { getUser, listUsers } from "@/lib/auth/store";
 
 // Personal MCP sign-in (device-code flow), server-side model only. Raw device
 // codes, user codes and bearers are never stored: only their SHA-256 hashes.
@@ -424,19 +424,18 @@ export function resolveBearer(bearer: string): McpSession | null {
     return null; // unreadable store: fail closed
   }
   if (!session || session.revokedAt || session.expiresAt <= clock()) return null;
-  // Before any account exists there is nobody to check against: sessions made then
-  // stay valid until the first owner is created (which revokes them). Otherwise a
-  // session belongs to a person who can still approve one: deleted, disabled or
-  // demoted below member means no session, even if revocation never ran. Checked
-  // on every request, so the cut-off is immediate.
+  // The implicit local owner exists only while the app has no user record at all
+  // (disabled ones count): its sessions die with the first account, even if the
+  // revoke at owner creation never ran. Everyone else must be a person who can
+  // still approve one: deleted, disabled or demoted below member means no session,
+  // and that holds even when every account is disabled. Checked on every request,
+  // so the cut-off is immediate.
   try {
-    if (accountsEnabled()) {
+    if (session.personId === LOCAL_OWNER) {
+      if (listUsers().length > 0) return null;
+    } else {
       const person = getUser(session.personId);
       if (!person || person.disabled || ROLE_RANK[person.role] < ROLE_RANK.member) return null;
-    } else if (session.personId !== LOCAL_OWNER) {
-      // No enabled account: only the implicit local owner's sessions count. A real
-      // person's session must not come back to life because every account was disabled.
-      return null;
     }
   } catch {
     return null; // unreadable user store: fail closed

@@ -20,9 +20,10 @@ import {
 
 // Everyone signing in below is a member of the app, unless a test swaps in its own accounts.
 type Person = { id: string; role: string; disabled?: boolean };
-const people = vi.hoisted(() => ({ lookup: null as null | ((id: string) => Person | undefined), accounts: true }));
+const people = vi.hoisted(() => ({ lookup: null as null | ((id: string) => Person | undefined), records: 1 }));
 vi.mock("@/lib/auth/store", () => ({
-  accountsEnabled: () => people.accounts,
+  accountsEnabled: () => people.records > 0,
+  listUsers: () => Array.from({ length: people.records }, (_, i) => ({ id: `u${i}`, role: "member" })),
   getUser: (id: string) => (people.lookup ? people.lookup(id) : { id, role: "member" }),
 }));
 
@@ -393,19 +394,22 @@ describe("resolve checks the person on every request", () => {
     expect(resolveBearer(ghost.bearer)).toBeNull();
   });
 
-  it("with no enabled account, honours only the implicit local owner's sessions", async () => {
-    accounts.set("ana", { id: "ana", role: "member" });
+  it("never revives a disabled person's session, even when every account is disabled", async () => {
+    accounts.set("ana", { id: "ana", role: "member", disabled: true });
     const a = await signIn("ana");
+    expect(resolveBearer(a.bearer)).toBeNull();
+  });
+
+  it("honours the local owner only while there is no user record at all", async () => {
     const owner = await signIn("local-owner");
-    // Every account disabled: the install reads as having none. Ana's session must
-    // not come back to life just because nobody is left to check her against.
-    people.accounts = false;
+    people.records = 0;
     try {
-      expect(resolveBearer(a.bearer)).toBeNull();
       expect(resolveBearer(owner.bearer)?.personId).toBe("local-owner");
     } finally {
-      people.accounts = true;
+      people.records = 1;
     }
+    // One record, even a disabled one, ends the local owner's sessions.
+    expect(resolveBearer(owner.bearer)).toBeNull();
   });
 
   it("fails closed when the user store can't be read", async () => {
