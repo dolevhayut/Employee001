@@ -71,7 +71,10 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** "acceptanceCriteria" → "Acceptance criteria", "file_path" → "File path". */
+const ACRONYMS: Record<string, string> = { url: "URL", uri: "URI", id: "ID", ids: "IDs", api: "API", mcp: "MCP", html: "HTML", json: "JSON", cc: "CC", bcc: "BCC" };
+
 function humanize(key: string): string {
+  if (ACRONYMS[key.toLowerCase()]) return ACRONYMS[key.toLowerCase()];
   const spaced = key.replace(/_/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
