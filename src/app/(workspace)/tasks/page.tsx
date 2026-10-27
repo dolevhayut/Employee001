@@ -1,5 +1,7 @@
 "use client";
 
+import { ApprovalArgs } from "@/components/ex/approval-args";
+
 import { useState, useRef, useEffect, useCallback, type CSSProperties } from "react";
 import { Icons } from "@/components/ex/icons";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
@@ -1997,20 +1999,7 @@ function ToolUseRow({
         )}
       </button>
       {hasArgs && open && (
-        <pre
-          style={{
-            margin: "8px 0 0",
-            fontSize: "var(--fs-meta)",
-            lineHeight: 1.5,
-            color: "var(--text-muted)",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-            maxHeight: 200,
-            overflow: "auto",
-          }}
-        >
-          {JSON.stringify(entry.input, null, 2)}
-        </pre>
+        <ApprovalArgs input={(entry.input ?? {}) as Record<string, unknown>} />
       )}
     </div>
   );
@@ -2096,23 +2085,7 @@ function TaskLogRow({
             {entry.reason}
           </div>
           {entry.input && Object.keys(entry.input).length > 0 && (
-            <pre
-              style={{
-                margin: "0 0 12px",
-                fontSize: "var(--fs-meta)",
-                lineHeight: 1.5,
-                color: "var(--text-muted)",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-all",
-                maxHeight: 100,
-                overflow: "auto",
-                padding: "8px 10px",
-                background: "var(--bg-elevated)",
-                borderRadius: 6,
-              }}
-            >
-              {JSON.stringify(entry.input, null, 2)}
-            </pre>
+            <ApprovalArgs input={(entry.input ?? {}) as Record<string, unknown>} />
           )}
           {!resolved ? (
             <div className="row" style={{ gap: "var(--sp-8)" }}>

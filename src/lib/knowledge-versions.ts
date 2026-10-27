@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { safeIso } from "./twin-versions";
 import { dataDir } from "./app-home";
+import { stripHiddenCharsAudited } from "./hidden-chars-audit";
 
 // Snapshots of text files in a twin's knowledge/ directory.
 //
@@ -258,7 +259,14 @@ export function restoreKnowledgeVersion(
     snapshotKnowledgeText(employeeId, clean, fs.readFileSync(full, "utf-8"), "restore");
   }
   fs.mkdirSync(path.dirname(full), { recursive: true });
-  fs.writeFileSync(full, body, "utf-8");
+  // A snapshot taken before hidden-character cleaning existed may still
+  // carry them: clean it on the way back in.
+  const restored = stripHiddenCharsAudited(body, {
+    source: "knowledge-restore",
+    employeeId,
+    ref: { file: clean, version: ts },
+  });
+  fs.writeFileSync(full, restored.text, "utf-8");
   return { ok: true };
 }
 

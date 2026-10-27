@@ -61,14 +61,21 @@ export function resolveActionOwner(
 
 const TASK_ID_RE = /(?<![A-Za-z0-9_])tsk_[A-Za-z0-9]{4,64}(?![A-Za-z0-9_])/;
 
-/** The first Roomate task id (tsk_…) a twin's reply mentions, or null. */
+const FILED_LINE_RE = /Roomate task[*`]*:[*`\s]*(tsk_[A-Za-z0-9]{4,64})(?![A-Za-z0-9_])/gi;
+
+/** The task the twin says it created, from its closing "Roomate task: tsk_…"
+ * line (the last one wins). A reply often also names related or duplicate
+ * tasks, so a bare tsk_ id anywhere else is not taken as the new one. */
 export function extractTaskId(text: string | undefined | null): string | null {
-  return text ? (TASK_ID_RE.exec(text)?.[0] ?? null) : null;
+  if (!text) return null;
+  let found: string | null = null;
+  for (const m of text.matchAll(FILED_LINE_RE)) found = m[1];
+  return found;
 }
 
 /** True for a value that looks like a Roomate task id, nothing else around it. */
 export function isTaskId(value: unknown): value is string {
-  return typeof value === "string" && extractTaskId(value) === value;
+  return typeof value === "string" && new RegExp(`^${TASK_ID_RE.source}$`).test(value);
 }
 
 const flat = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -81,6 +88,6 @@ export function buildFilingPrompt(args: { meetingId: string; title: string; acti
     `From Team Meeting '${title}' (${args.meetingId}), file this action to the dev team following your ` +
     `'Filing work to the dev team (Roomate)' skill: ${flat(args.action).replace(/[.\s]+$/, "")}.` +
     (decision ? ` Context: ${decision}` : "") +
-    `\n\nWhen it's filed, end your reply with the Roomate task id (tsk_…).`
+    `\n\nEnd your reply with one line exactly like "Roomate task: tsk_…" naming the task you created now (not a related or duplicate one). If you filed nothing, end with "Roomate task: none".`
   );
 }

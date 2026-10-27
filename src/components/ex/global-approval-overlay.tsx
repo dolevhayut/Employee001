@@ -1,8 +1,9 @@
 "use client";
 
+import { ApprovalArgs } from "@/components/ex/approval-args";
 import { useState, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Icons } from "@/components/ex/icons";
 import { useRoster } from "@/components/ex/roster-context";
 import { useT } from "@/components/ex/i18n-context";
@@ -105,6 +106,7 @@ function pendingItemsSnapshot(): PendingItem[] {
 // ─── Overlay ─────────────────────────────────────────────────────────────────
 
 export function GlobalApprovalOverlay() {
+  const reducedMotion = useReducedMotion() ?? false;
   const { t } = useT();
   const roster = useRoster();
   const pending = useSyncExternalStore(subscribePendingReviewPoll, pendingItemsSnapshot, noPending);
@@ -240,13 +242,12 @@ export function GlobalApprovalOverlay() {
           transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
           style={{
             width: "100%",
-            maxWidth: 520,
+            maxWidth: 560,
             background: "var(--bg-elevated)",
-            border: "1.5px solid var(--warn)",
-            borderRadius: 14,
-            padding: "var(--sp-22)",
-            boxShadow:
-              "var(--shadow-dialog), 0 0 0 6px color-mix(in srgb, var(--warn) 14%, transparent)",
+            border: "1px solid var(--hairline-strong)",
+            borderRadius: 18,
+            padding: "var(--sp-20)",
+            boxShadow: "var(--shadow-dialog)",
           }}
         >
           {pending.length > 1 && (
@@ -275,11 +276,45 @@ export function GlobalApprovalOverlay() {
             </div>
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-10)", marginBottom: "var(--sp-4)" }}>
-            <Icons.Lock size={16} style={{ color: "var(--warn)", flexShrink: 0 }} />
-            <h2 style={{ margin: 0, fontSize: "var(--fs-lg)", fontWeight: 700, color: "var(--text)" }}>
-              {title}
-            </h2>
+          {/* Header after 21st.dev's "Tool Approval" (starc007): an icon tile,
+              the title, and a status pill. */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--sp-12)", marginBottom: "var(--sp-8)" }}>
+            <span
+              aria-hidden
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 11,
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+                border: "1px solid var(--hairline)",
+                background: "var(--surface)",
+                color: "var(--warn)",
+              }}
+            >
+              <Icons.Lock size={15} />
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{ margin: 0, fontSize: "var(--fs-lg)", fontWeight: 650, color: "var(--text)", lineHeight: 1.3 }}>
+                {title}
+              </h2>
+            </div>
+            <span
+              style={{
+                flexShrink: 0,
+                padding: "2px 9px",
+                borderRadius: 999,
+                fontSize: "var(--fs-2xs)",
+                fontWeight: 600,
+                color: "var(--warn)",
+                border: "1px solid color-mix(in oklch, var(--warn) 35%, transparent)",
+                background: "color-mix(in oklch, var(--warn) 10%, transparent)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Approval required
+            </span>
           </div>
 
           {(empLabel || subContext) && (
@@ -331,11 +366,27 @@ export function GlobalApprovalOverlay() {
                   fontSize: "var(--fs-ui)",
                   fontWeight: 600,
                   color: "var(--text)",
-                  marginBottom: "var(--sp-6)",
+                  marginBottom: "var(--sp-2)",
                 }}
               >
                 <bdi>{describeTool((current as LiveApproval).toolName)}</bdi>
               </div>
+              {describeTool((current as LiveApproval).toolName) !== (current as LiveApproval).toolName && (
+              <div
+                style={{
+                  fontFamily: "var(--font-mono, monospace)",
+                  fontSize: "var(--fs-2xs)",
+                  color: "var(--text-subtle)",
+                  marginBottom: "var(--sp-8)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={(current as LiveApproval).toolName}
+              >
+                {(current as LiveApproval).toolName}
+              </div>
+              )}
               <p
                 style={{
                   fontSize: "var(--fs-sm)",
@@ -370,30 +421,23 @@ export function GlobalApprovalOverlay() {
                       }}
                     />
                   ) : (
-                    <pre
-                      style={{
-                        margin: 0,
-                        padding: "10px 12px",
-                        background: "var(--bg-sunken)",
-                        borderRadius: 6,
-                        fontSize: "var(--fs-meta)",
-                        fontFamily: "var(--font-mono, monospace)",
-                        color: "var(--text-muted)",
-                        overflow: "auto",
-                        maxHeight: 200,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-all",
-                        lineHeight: 1.55,
-                      }}
-                    >
-                      {JSON.stringify((current as LiveApproval).input, null, 2)}
-                    </pre>
+                    <ApprovalArgs input={(current as LiveApproval).input} />
                   )}
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: "var(--sp-8)" }}>
-                <button
+              <div
+                style={{
+                  display: "flex",
+                  gap: "var(--sp-8)",
+                  borderTop: "1px solid var(--hairline)",
+                  margin: "var(--sp-4) calc(-1 * var(--sp-20)) 0",
+                  padding: "var(--sp-14) var(--sp-20) 0",
+                }}
+              >
+                <motion.button
+                  whileTap={reducedMotion ? undefined : { scale: 0.97 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={() => {
                     if (isEditing) {
                       try {
@@ -413,7 +457,7 @@ export function GlobalApprovalOverlay() {
                     background: "var(--text)",
                     color: "var(--bg)",
                     border: "none",
-                    borderRadius: 6,
+                    borderRadius: 10,
                     fontSize: "var(--fs-ui)",
                     fontWeight: 600,
                     cursor: busy ? "not-allowed" : "pointer",
@@ -426,7 +470,7 @@ export function GlobalApprovalOverlay() {
                 >
                   <Icons.Check size={13} />
                   {t("inbox.approve")}
-                </button>
+                </motion.button>
                 <button
                   onClick={() => setEditing((m) => ({ ...m, [key]: !m[key] }))}
                   disabled={busy}
@@ -435,7 +479,7 @@ export function GlobalApprovalOverlay() {
                     background: "var(--surface)",
                     color: "var(--text-muted)",
                     border: "1px solid var(--hairline)",
-                    borderRadius: 6,
+                    borderRadius: 10,
                     fontSize: "var(--fs-ui)",
                     fontWeight: 500,
                     cursor: "pointer",
@@ -451,7 +495,7 @@ export function GlobalApprovalOverlay() {
                     background: "var(--surface)",
                     color: "var(--text-muted)",
                     border: "1px solid var(--hairline)",
-                    borderRadius: 6,
+                    borderRadius: 10,
                     fontSize: "var(--fs-ui)",
                     fontWeight: 500,
                     cursor: busy ? "not-allowed" : "pointer",

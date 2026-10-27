@@ -1,5 +1,7 @@
 "use client";
 
+import { ApprovalArgs } from "@/components/ex/approval-args";
+
 import {
   useCallback,
   useEffect,
@@ -275,24 +277,7 @@ function ApprovalCard({
               )}
             </>
           ) : (
-            <pre
-              style={{
-                margin: 0,
-                padding: "6px 8px",
-                background: "var(--bg-sunken)",
-                borderRadius: 5,
-                fontSize: 10.5,
-                fontFamily: "var(--font-mono, monospace)",
-                color: "var(--text-muted)",
-                overflowX: "auto",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-all",
-                maxHeight: 120,
-                overflow: "auto",
-              }}
-            >
-              {JSON.stringify(approval.input, null, 2)}
-            </pre>
+            <ApprovalArgs input={(approval.input ?? {}) as Record<string, unknown>} />
           )}
         </div>
       )}

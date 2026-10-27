@@ -9,6 +9,7 @@ import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import type { McpSdkServerConfigWithInstance } from "@anthropic-ai/claude-agent-sdk";
 import { dataDir } from "./app-home";
 import { cacheMcpToolAnnotations } from "./tool-policy";
+import { withHiddenCharCleaning } from "./hidden-chars-tools";
 import { toolkitAllowed } from "./consent-policy";
 import { loadConsentStatus } from "./consent-status";
 import { disableEmailTrigger, ensureEmailTrigger } from "@/lib/email-intake-trigger";
@@ -398,9 +399,12 @@ export async function buildEmployeeMcpServer(
     annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };
   }>);
 
+  // Tool results (mail bodies, Slack messages, tickets) are outside text:
+  // each handler's result is cleaned of invisible characters, and audited.
+  type SdkTools = NonNullable<Parameters<typeof createSdkMcpServer>[0]["tools"]>;
   return createSdkMcpServer({
     name: "composio",
     version: "1.0.0",
-    tools: tools as Parameters<typeof createSdkMcpServer>[0]["tools"],
+    tools: withHiddenCharCleaning(tools as SdkTools, employeeId),
   });
 }

@@ -2,10 +2,11 @@ import { NextRequest } from "next/server";
 import { hasEmployeeFiles } from "@/lib/employees-files";
 import {
   readKnowledgeFile,
-  writeKnowledgeFile,
+  writeUntrustedKnowledgeFile,
   deleteKnowledgeFile,
   type KnowledgeFile,
 } from "@/lib/knowledge-files";
+import type { HiddenCharCounts } from "@/lib/hidden-chars";
 
 function jsonResponse(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -64,8 +65,11 @@ export async function PUT(
   }
 
   let meta: KnowledgeFile | null;
+  let hiddenCharsRemoved: HiddenCharCounts | undefined;
   try {
-    meta = writeKnowledgeFile(id, name, body.body);
+    // Hidden characters (tag, bidi, zero-width) are removed before the twin
+    // can read the file; the response says how many went.
+    ({ file: meta, hiddenCharsRemoved } = writeUntrustedKnowledgeFile(id, name, body.body));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown disk error";
     return diskErrorResponse(`save ${id}/${name}`, message);
@@ -76,7 +80,7 @@ export async function PUT(
       400
     );
   }
-  return jsonResponse({ meta });
+  return jsonResponse({ meta, ...(hiddenCharsRemoved ? { hiddenCharsRemoved } : {}) });
 }
 
 export async function DELETE(

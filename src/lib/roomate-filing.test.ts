@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFilingPrompt, extractTaskId, isTaskId, meetingPeople, resolveActionOwner, roomateAvailable } from "./roomate-filing";
+import { buildFilingPrompt, extractTaskId, meetingPeople, resolveActionOwner, roomateAvailable } from "./roomate-filing";
 
 describe("roomateAvailable", () => {
   const server = (name: string, enabled = true, url = "https://mcp.roomate.example/mcp") => ({ name, enabled, url });
@@ -52,28 +52,28 @@ describe("meetingPeople + resolveActionOwner", () => {
 });
 
 describe("extractTaskId", () => {
-  it("finds the first tsk_ id in a reply", () => {
-    expect(extractTaskId("Filed it as tsk_9fk2m1x0 in Roomate.")).toBe("tsk_9fk2m1x0");
-    expect(extractTaskId("Created `tsk_abc123`, linked to tsk_zzz999.")).toBe("tsk_abc123");
-    expect(extractTaskId("**Task:** tsk_AbC123def")).toBe("tsk_AbC123def");
+  it("takes the id from the closing 'Roomate task:' line only", () => {
+    expect(extractTaskId("Filed it.\nRoomate task: tsk_9fk2m1x0")).toBe("tsk_9fk2m1x0");
+    expect(extractTaskId("Roomate task: `tsk_abc123`")).toBe("tsk_abc123");
+    expect(extractTaskId("**Roomate task:** tsk_AbC123def")).toBe("tsk_AbC123def");
   });
 
-  it("returns null without a task id", () => {
-    expect(extractTaskId("The approval was declined, nothing was filed.")).toBeNull();
+  it("ignores related or duplicate ids mentioned elsewhere (the #1216 case)", () => {
+    const reply = "I filed #1216. Nothing public merges until the attack run in tsk_hv8dyqhfmh passes.\nRoomate task: tsk_new1216x";
+    expect(extractTaskId(reply)).toBe("tsk_new1216x");
+    expect(extractTaskId("Related to tsk_hv8dyqhfmh, see there.")).toBeNull();
+  });
+
+  it("returns null without a filed line", () => {
+    expect(extractTaskId("The approval was declined.\nRoomate task: none")).toBeNull();
     expect(extractTaskId("I called list_tasks and create_tasks.")).toBeNull();
-    expect(extractTaskId("tsk_")).toBeNull();
+    expect(extractTaskId("Roomate task: tsk_")).toBeNull();
     expect(extractTaskId("")).toBeNull();
     expect(extractTaskId(undefined)).toBeNull();
   });
 
   it("does not match inside a longer identifier", () => {
-    expect(extractTaskId("see mytsk_abc123 or prj_xx4z9ak3nt")).toBeNull();
-  });
-
-  it("isTaskId accepts a bare id only", () => {
-    expect(isTaskId("tsk_abc123")).toBe(true);
-    expect(isTaskId("id tsk_abc123")).toBe(false);
-    expect(isTaskId(42)).toBe(false);
+    expect(extractTaskId("Roomate task: tsk_abc123_more")).toBeNull();
   });
 });
 
