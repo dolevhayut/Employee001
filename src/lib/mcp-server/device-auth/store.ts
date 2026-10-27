@@ -180,7 +180,11 @@ function pidAlive(pid: number): boolean {
   }
 }
 
-/** Stale when the owner process (the "pid:" prefix) is gone, or, for an unknown format, when old. */
+/**
+ * Stale when the owner process (the "pid:" prefix) is gone, or when the file is
+ * older than maxAgeMs (a backstop for unknown formats and reused pids; the store
+ * is single-host and its critical sections last milliseconds).
+ */
 function isStale(p: string, content: string, maxAgeMs: number): boolean {
   const pid = /^(\d+):/.exec(content)?.[1];
   if (pid !== undefined && !pidAlive(Number(pid))) return true;
@@ -224,8 +228,8 @@ async function withGuard<T>(lock: string, fn: () => T): Promise<T> {
 
 /**
  * Cross-process mutex: an exclusively created lock file holding "pid:token".
- * A lock is reclaimed only when its owner process is dead (or, for a foreign
- * format, older than LOCK_STALE_MS). Every removal, release and reclaim alike,
+ * A lock is reclaimed only when its owner process is dead or it is older than
+ * LOCK_STALE_MS. Every removal, release and reclaim alike,
  * runs inside withGuard and re-checks the owner token first, so a fresh lock
  * created by someone else is never deleted. Waiting is async.
  */
@@ -254,9 +258,14 @@ async function withLock<T>(fn: () => T): Promise<T> {
   try {
     return fn();
   } finally {
-    await withGuard(lock, () => {
+    // Release must never turn a committed write into a failure.
+    try {
+      await withGuard(lock, () => {
+        if (readOwner(lock) === mine) fs.rmSync(lock, { force: true });
+      });
+    } catch {
       if (readOwner(lock) === mine) fs.rmSync(lock, { force: true });
-    });
+    }
   }
 }
 
