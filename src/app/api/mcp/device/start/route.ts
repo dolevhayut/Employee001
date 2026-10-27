@@ -1,4 +1,5 @@
 import { DEVICE_CODE_TTL_MS, DeviceCodeLimitError, issueDeviceCode, publicBaseUrl } from "@/lib/mcp-server/device-auth";
+import { accountsEnabled } from "@/lib/auth/store";
 import { fail, json, signInOff, takeSlot } from "../respond";
 
 export const runtime = "nodejs";
@@ -9,6 +10,11 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const off = signInOff();
   if (off) return off;
+  // A session belongs to a person, so with no accounts nobody could approve it
+  // and resolveBearer would refuse it anyway. Say so up front.
+  if (!accountsEnabled()) {
+    return fail(409, "accounts_required", "Personal sign-in needs accounts. Create the owner account in Employee001 first, then run login again.");
+  }
   if (!takeSlot("start", 30)) return fail(429, "rate_limited", "Too many sign-in attempts. Try again in a minute.");
   let issued;
   try {

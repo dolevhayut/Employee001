@@ -12,7 +12,10 @@ import { resetSlots } from "./respond";
 
 // People known to the app: anyone not listed here does not exist.
 const users = new Map<string, { id: string; role: string; disabled?: boolean }>();
-vi.mock("@/lib/auth/store", () => ({ getUser: (id: string) => users.get(id) }));
+vi.mock("@/lib/auth/store", () => ({
+  getUser: (id: string) => users.get(id),
+  accountsEnabled: () => [...users.values()].some((u) => !u.disabled),
+}));
 
 let home: string;
 let now: number;
@@ -56,6 +59,13 @@ async function begin() {
 }
 
 describe("POST /api/mcp/device/start", () => {
+  it("refuses with accounts_required when there are no accounts to approve it", async () => {
+    users.clear();
+    const res = await start(post("start"));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("accounts_required");
+  });
+
   it("answers 429, not 500, once the store holds the most pending codes it allows", async () => {
     const devices = Object.fromEntries(
       Array.from({ length: MAX_OUTSTANDING_CODES }, (_, i) => [`d${i}`, { userCodeHash: `u${i}`, expiresAt: now + DEVICE_CODE_TTL_MS }]),
