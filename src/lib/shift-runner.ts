@@ -11,7 +11,7 @@ import { appendAuditEntry } from "@/lib/audit-log";
 import { readShiftLog } from "@/lib/shift-log";
 import { ShiftReport, SHIFT_REPORT_JSON_SCHEMA } from "@/lib/shift-schema";
 import type { ShiftReportType } from "@/lib/shift-schema";
-import { buildBaseOptions, buildTwinHooks } from "@/lib/sdk-defaults";
+import { TWIN_SHIFT_TOOLS, buildBaseOptions, buildTwinHooks, twinDisallowedTools } from "@/lib/sdk-defaults";
 import { getToolPolicyOverrides } from "@/lib/tool-policy-overrides";
 import { applyConsent } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
@@ -417,7 +417,12 @@ export async function runShift(args: {
         ...baseOptions,
         cwd: employeeDir,
         systemPrompt: buildSystemPromptBlocks(employee, employeeDir, trigger, focusBlock),
+        // Built-in allowlist (MCP tools unaffected). No Task: a shift has no
+        // agents of its own, so only Claude Code's would be reachable. No
+        // AskUserQuestion: nobody is there to answer.
+        tools: [...TWIN_SHIFT_TOOLS],
         allowedTools: ["TodoWrite"],
+        disallowedTools: twinDisallowedTools(),
         mcpServers: mcpServersWithConsult,
         maxTurns: 12,
         includePartialMessages: true,

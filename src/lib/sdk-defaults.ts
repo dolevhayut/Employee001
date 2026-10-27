@@ -16,8 +16,9 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import { appendAuditEntry } from "@/lib/audit-log";
 import { claudeCodeExecutable, modelForProvider, providerEnvForAgentSdk } from "@/lib/model-provider";
-import { dataDir } from "@/lib/app-home";
-import { checkTwinRead } from "@/lib/twin-read-scope";
+import os from "os";
+import { appHome, dataDir } from "@/lib/app-home";
+import { TWIN_DENIED_DATA_PATHS, checkTwinRead } from "@/lib/twin-read-scope";
 import { sdkChildEnv } from "@/lib/sdk-env";
 import { discloseOutbound, isOutboundMessageTool } from "@/lib/ai-disclosure";
 import { spawnClaudeCodeProcess, twinSandboxEnabled } from "@/lib/twin-sandbox";
@@ -44,6 +45,76 @@ export const TWIN_HARD_DISALLOWED: string[] = [
   "EnterWorktree",
   "ExitWorktree",
 ];
+
+/** Claude Code's own subagents. A twin delegates only to Employee001's
+ *  (twin-subagents.ts). Init still lists them; a call is refused with
+ *  "denied by permission rule". The CLI reports the tool as "Task", but the
+ *  rule name is "Agent(...)" ("Task(...)" is normalized to it). */
+export const CLAUDE_BUILTIN_SUBAGENTS_DENY: readonly string[] = [
+  "Agent(general-purpose)",
+  "Agent(statusline-setup)",
+  "Agent(claude)",
+  "Agent(Plan)",
+  "Agent(Explore)",
+];
+
+/** disallowedTools for a twin run: the hard list, Claude Code's subagents,
+ *  then the run's own extras. A run's disallowedTools replaces the base one
+ *  (it is not merged), so every twin run builds its list here. */
+export function twinDisallowedTools(extra: readonly string[] = []): string[] {
+  return [...new Set([...TWIN_HARD_DISALLOWED, ...CLAUDE_BUILTIN_SUBAGENTS_DENY, ...extra])];
+}
+
+/** Built-in tools an unattended twin run (a shift) may see. `tools` is an
+ *  allowlist of built-ins only; MCP tools are not affected by it. Leaves out
+ *  Claude Code's session tools (Cron*, RemoteTrigger, Workflow, SendMessage,
+ *  PushNotification, ScheduleWakeup, Monitor, DesignSync...).
+ *  - Glob/Grep must be named: the native CLI leaves them out of its default
+ *    set (it searches with Bash, which twins never get).
+ *  - TaskCreate/TaskUpdate are the planning list (TodoWrite no longer exists).
+ *  - ToolSearch: large MCP tool sets (Composio) are deferred behind it.
+ *  - No Skill: runs pass skills: [] (org skills are ours). Add it with native
+ *    skills. */
+export const TWIN_SHIFT_TOOLS: readonly string[] = [
+  "Read", "Glob", "Grep", "Write", "Edit", "WebSearch", "WebFetch",
+  "TaskCreate", "TaskUpdate", "ToolSearch",
+];
+
+/** Built-in tools a chat or meeting twin may see: the shift set, plus Task
+ *  for Employee001's subagents and AskUserQuestion for clarification cards
+ *  (Claude Code offers it only when canUseTool is set). */
+export const TWIN_CHAT_TOOLS: readonly string[] = [...TWIN_SHIFT_TOOLS, "Task", "AskUserQuestion"];
+
+/** Rule path for an absolute local path: "//abs/path" (Windows "C:\x" is
+ *  "//c/x"). Null when the path holds a character the rule or its glob would
+ *  read as syntax; the PreToolUse hook still covers that path. */
+function rulePath(abs: string): string | null {
+  const posix = abs.replace(/\\/g, "/").replace(/^([A-Za-z]):/, (_m, d: string) => `/${d.toLowerCase()}`);
+  if (!posix.startsWith("/") || /[()[\]{}*?!]/.test(posix)) return null;
+  return `/${posix.replace(/\/+$/, "")}`;
+}
+
+/** Native permission deny rules for every twin run, under the read-scope and
+ *  scratch hooks: they hold even if a hook regresses. Read rules also cover
+ *  Glob and Grep; Edit rules cover Write. Each entry is refused on its own
+ *  (an allowedTools entry doesn't override a deny). Twins' legitimate reads
+ *  (own folder, peers' profile files, org-brain/, org-skills/, configured
+ *  folders outside the data dir) are not matched; see sdk-defaults.test.ts. */
+export function twinPermissionDenyRules(home: string = os.homedir()): string[] {
+  const targets: string[] = [];
+  for (const entry of TWIN_DENIED_DATA_PATHS) {
+    const p = rulePath(dataDir(entry.replace(/\/$/, "")));
+    if (p) targets.push(entry.endsWith("/") ? `${p}/**` : p);
+  }
+  const app = rulePath(appHome());
+  if (app) targets.push(`${app}/.env*`);
+  // "~" is the child's HOME; the absolute form covers a sandbox that moves it.
+  targets.push("~/.claude/**", "~/.ssh/**");
+  const absHome = home ? rulePath(home) : null;
+  if (absHome) targets.push(`${absHome}/.claude/**`, `${absHome}/.ssh/**`);
+  const unique = [...new Set(targets)];
+  return [...unique.map((t) => `Read(${t})`), ...unique.map((t) => `Edit(${t})`)];
+}
 
 export type TwinSurfaceKind = "builder" | "chat" | "meeting" | "routine" | "relay";
 
@@ -88,6 +159,7 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
   | "strictMcpConfig"
   | "verbatimPrompts"
   | "skills"
+  | "settings"
 > {
   const runtimeOptions = providerRuntimeOptions();
   const effort: EffortLevel =
@@ -127,6 +199,8 @@ export function buildBaseOptions(args: BaseOptionsArgs): Pick<
     // No effect until programmatic subagents land, but harmless to keep on.
     agentProgressSummaries: false,
     strictMcpConfig: true,
+    // Flag-layer settings (--settings): applies with settingSources [] too.
+    settings: { permissions: { deny: twinPermissionDenyRules() } },
   };
 }
 
