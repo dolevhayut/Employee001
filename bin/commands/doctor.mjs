@@ -281,6 +281,13 @@ function portFree(port) {
   });
 }
 
+// An exported-but-empty ANTHROPIC_API_KEY in the shell wins over the .env value
+// (dotenv never overrides existing vars), so the twin gets no key at all.
+/** @param {Record<string, string | undefined>} [procEnv] */
+export function hasEmptyShellApiKey(procEnv = process.env) {
+  return Object.prototype.hasOwnProperty.call(procEnv, "ANTHROPIC_API_KEY") && String(procEnv.ANTHROPIC_API_KEY).trim() === "";
+}
+
 export default async function doctor(argv = []) {
   let issues = 0;
 
@@ -320,6 +327,12 @@ export default async function doctor(argv = []) {
 
   // Anthropic key is only required and checked for direct Anthropic API mode.
   const aKey = env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+  if (provider === "anthropic" && hasEmptyShellApiKey()) {
+    warn(
+      "ANTHROPIC_API_KEY",
+      "is exported but empty in your shell, and it overrides the key in .env — run `unset ANTHROPIC_API_KEY` or restart the shell",
+    );
+  }
   if (provider === "claude-code") {
     const claude = claudeCliStatus();
     if (!claude.installed) { fail("Claude Code", "not installed — npm install -g @anthropic-ai/claude-code, then run `claude` and sign in"); issues++; }
