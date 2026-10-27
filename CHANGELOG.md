@@ -8,6 +8,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Start your twin from an example
+- "Build my twin" now shows a few example briefs, each labelled "Example".
+  Preview one, then start from it: it fills the form and you rewrite it so it
+  describes you. Build stays off while any example text is still there
+  unchanged, so an invented brief never becomes your profile.
+- Editing your notes after an interview no longer copies the interview
+  answers into the notes.
+
 ### See how old a twin's profile is
 - Ask shows how old the profile files related to an answer are. The profile's
   Files tab nudges you once a month about files older than 30 days, and
