@@ -2,6 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "@/lib/app-home";
+import { ROLE_RANK } from "@/lib/auth/rbac";
+import { getUser } from "@/lib/auth/store";
 
 // Personal MCP sign-in (device-code flow), server-side model only. Raw device
 // codes, user codes and bearers are never stored: only their SHA-256 hashes.
@@ -147,50 +149,77 @@ function readLockOwner(lock: string): string | null {
   }
 }
 
+/** True when `target` exists and was last written more than LOCK_STALE_MS ago. */
+function isStale(target: string): boolean {
+  try {
+    return Date.now() - fs.statSync(target).mtimeMs > LOCK_STALE_MS;
+  } catch {
+    return false;
+  }
+}
+
+/** Remove `target` only while it still holds `token`. */
+function releaseIfOwned(target: string, token: string): void {
+  if (readLockOwner(target) === token) fs.rmSync(target, { force: true });
+}
+
 /**
  * Cross-process mutex: an exclusively created lock file holding an owner token.
- * Release removes the lock only if we still own it. A stale lock is reclaimed by
- * an atomic rename, and put back if what we moved turns out to be someone's fresh
- * lock. Waiting is async, so the event loop is never blocked.
+ * Release removes the lock only if we still own it. POSIX has no compare-and-swap
+ * delete, so a stale lock is reclaimed behind a reclaim guard instead of a blind
+ * rename: while the guard exists nobody keeps the lock (a process that got in just
+ * before the guard backs off once it sees it), and the reclaimer removes the lock
+ * only after re-reading that it still holds the owner it judged stale. A lock it
+ * cannot verify is left alone. Waiting is async, so the event loop is never blocked.
  */
 async function withLock<T>(fn: () => T): Promise<T> {
   const lock = `${file()}.lock`;
+  const guard = `${lock}.reclaim`;
   fs.mkdirSync(path.dirname(lock), { recursive: true });
   const token = randomBytes(16).toString("hex");
   const started = Date.now();
   for (;;) {
-    try {
-      fs.writeFileSync(lock, token, { flag: "wx", mode: 0o600 });
-      break;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-      try {
-        const seen = readLockOwner(lock);
-        if (seen !== null && Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS) {
-          const moved = `${lock}.stale.${token}`;
-          fs.renameSync(lock, moved);
-          if (readLockOwner(moved) === seen) fs.rmSync(moved, { force: true });
-          else {
-            // We moved a lock that was replaced meanwhile: give it back if the slot is free.
-            try {
-              fs.linkSync(moved, lock);
-            } catch {
-              /* slot already retaken */
-            }
-            fs.rmSync(moved, { force: true });
-          }
-        }
-      } catch {
-        /* released or reclaimed by someone else */
+    if (fs.existsSync(guard)) {
+      // A reclaim is running. A guard left by a crashed reclaimer ages out.
+      if (isStale(guard)) {
+        const owner = readLockOwner(guard);
+        if (owner !== null && isStale(guard)) releaseIfOwned(guard, owner);
       }
-      if (Date.now() - started > LOCK_WAIT_MS) throw new Error("mcp-device-auth store is busy");
-      await sleep(10);
+    } else {
+      try {
+        fs.writeFileSync(lock, token, { flag: "wx", mode: 0o600 });
+        // A reclaim may have started between our guard check and the create:
+        // give the slot back rather than risk two holders.
+        if (!fs.existsSync(guard)) break;
+        releaseIfOwned(lock, token);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+        reclaimIfStale(lock, guard, token);
+      }
     }
+    if (Date.now() - started > LOCK_WAIT_MS) throw new Error("mcp-device-auth store is busy");
+    await sleep(10);
   }
   try {
     return fn();
   } finally {
-    if (readLockOwner(lock) === token) fs.rmSync(lock, { force: true });
+    releaseIfOwned(lock, token);
+  }
+}
+
+function reclaimIfStale(lock: string, guard: string, token: string): void {
+  if (!isStale(lock)) return;
+  try {
+    fs.writeFileSync(guard, token, { flag: "wx", mode: 0o600 });
+  } catch {
+    return; // someone else is reclaiming
+  }
+  try {
+    const seen = readLockOwner(lock);
+    // Re-verify under the guard: only the exact lock we judged stale is removed.
+    if (seen !== null && isStale(lock) && readLockOwner(lock) === seen) fs.rmSync(lock, { force: true });
+  } finally {
+    releaseIfOwned(guard, token);
   }
 }
 
@@ -301,6 +330,10 @@ export function resolveBearer(bearer: string): McpSession | null {
     return null; // unreadable store: fail closed
   }
   if (!session || session.revokedAt || session.expiresAt <= clock()) return null;
+  // A session belongs to a person who can still approve one: deleted, disabled or
+  // demoted below member means no session, even if revocation never ran.
+  const person = getUser(session.personId);
+  if (!person || person.disabled || ROLE_RANK[person.role] < ROLE_RANK.member) return null;
   return { personId: session.personId, createdAt: session.createdAt, expiresAt: session.expiresAt };
 }
 

@@ -20,6 +20,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Once personal sign-in is enabled, the shared `EMPLOYEE001_MCP_TOKEN` and
   `EMPLOYEE001_TOKEN` stop working for `/api/mcp` unless an admin opts in with
   `EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN=1`. See SECURITY.md.
+- The sign-in routes answer 404 while personal sign-in is off, so no code can
+  be minted early. Deleting, disabling, demoting or resetting the password of a
+  person now ends their MCP sessions too.
 
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual
