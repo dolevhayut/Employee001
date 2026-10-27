@@ -153,6 +153,20 @@ describe("import from Claude Code", () => {
     expect(p.skipped.length).toBeGreaterThanOrEqual(3);
   });
 
+  it("keeps a twin's default org skills when it has no assignment entry yet", async () => {
+    const { writeOrgSkill } = await import("./org-skills");
+    for (const id of ["role-a", "role-b"]) writeOrgSkill({ id, label: id, description: "", triggers: [], body: "x" });
+    const mod = await import("./employees-disk");
+    const spy = vi.spyOn(mod, "loadEmployeesFromDisk").mockResolvedValue([{ id: "emp-role", name: "R", orgSkillIds: ["role-a", "role-b"] }] as never);
+    const dir = path.join(home, "defaults", ".claude");
+    put(path.join(dir, "skills", "extra", "SKILL.md"), "---\nname: Extra\n---\nbody");
+    const p = await previewClaudeCodeImport("emp-role", dir);
+    await applyClaudeCodeImport({ employeeId: "emp-role", employeeName: "R", sourceDir: dir, previewDigest: p.digest, actorId: "u" });
+    spy.mockRestore();
+    const a = JSON.parse(fs.readFileSync(path.join(home, "data", "org", "skill-assignments.json"), "utf8")) as Record<string, string[]>;
+    expect(a["emp-role"]).toEqual(["role-a", "role-b", "extra"]);
+  });
+
   it("assigns the previewed skills to the target twin", () => {
     const a = JSON.parse(fs.readFileSync(path.join(home, "data", "org", "skill-assignments.json"), "utf8")) as Record<string, string[]>;
     expect(a[EMP]).toContain("pr-review");

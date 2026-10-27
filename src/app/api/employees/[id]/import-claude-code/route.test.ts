@@ -5,7 +5,7 @@ vi.mock("@/lib/employees-files", () => ({ employeeExists: (id: string) => id !==
 vi.mock("@/lib/employees", () => ({ getEmployee: () => ({ name: "Ada" }) }));
 vi.mock("@/lib/twin-lifecycle", () => ({ isRetiredSync: (id: string) => id === "gone" }));
 const { previewMock, applyMock } = vi.hoisted(() => ({
-  previewMock: vi.fn(async (..._a: unknown[]) => ({ sourcePath: "/x/.claude", items: [], skipped: [], counts: {}, digest: "d", notice: "n" })),
+  previewMock: vi.fn().mockResolvedValue({ sourcePath: "/x/.claude", items: [], skipped: [], counts: {}, digest: "d", notice: "n" }),
   applyMock: vi.fn(),
 }));
 vi.mock("@/lib/claude-code-import", async (orig) => {

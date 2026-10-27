@@ -5,6 +5,7 @@ import { isRetiredSync } from "@/lib/twin-lifecycle";
 import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 import {
   applyClaudeCodeImport,
+  findTwin,
   ImportChangedError,
   previewClaudeCodeImport,
   previewForClient,
@@ -29,7 +30,7 @@ export async function POST(
 
   let body: { previewDigest?: unknown };
   try {
-    body = (await request.json()) as typeof body;
+    body = ((await request.json()) as typeof body) ?? {};
   } catch {
     body = {};
   }
@@ -43,7 +44,7 @@ export async function POST(
     const user = sessionUserFromHeaders(request.headers);
     const result = await applyClaudeCodeImport({
       employeeId: id,
-      employeeName: getEmployee(id)?.name ?? id,
+      employeeName: (await findTwin(id))?.name ?? getEmployee(id)?.name ?? id,
       sourceDir,
       previewDigest: body.previewDigest,
       actorId: user?.id ?? "local",
@@ -51,6 +52,10 @@ export async function POST(
     return Response.json({ result });
   } catch (err) {
     if (err instanceof ImportChangedError) return Response.json({ error: err.message }, { status: 409 });
-    return Response.json({ error: err instanceof Error ? err.message : "import failed" }, { status: 400 });
+    if (err instanceof Error && err.message.startsWith("That .claude folder")) {
+      return Response.json({ error: err.message }, { status: 400 });
+    }
+    console.warn("[import-claude-code]", err instanceof Error ? err.message : err);
+    return Response.json({ error: "The import failed. Check the server log." }, { status: 500 });
   }
 }

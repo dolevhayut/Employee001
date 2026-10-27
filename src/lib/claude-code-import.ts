@@ -21,6 +21,8 @@ import { createHash } from "node:crypto";
 import { appendAuditEntry } from "./audit-log";
 import { createCustomMcp, listCustomMcp, previewKey } from "./custom-mcp";
 import { listKnowledgeFiles, writeKnowledgeFile } from "./knowledge-files";
+import { loadEmployeesFromDisk } from "./employees-disk";
+import { getHiredEmployees } from "./hired-agents";
 import {
   getAssignedOrgSkillIdsForEmployee,
   importOrgSkillMarkdown,
@@ -57,6 +59,12 @@ export type ImportResult = {
   skippedExisting: number;
   auditRecorded: boolean;
 };
+
+/** A twin from disk or a hired one, as the skills route resolves it. */
+export async function findTwin(id: string) {
+  const fromDisk = await loadEmployeesFromDisk();
+  return [...fromDisk, ...getHiredEmployees().filter((h) => !fromDisk.some((e) => e.id === h.id))].find((e) => e.id === id);
+}
 
 export function defaultClaudeDir(): string {
   return path.join(os.homedir(), ".claude");
@@ -304,7 +312,7 @@ export async function applyClaudeCodeImport(opts: {
       assignable.push(item.id);
       if (item.status === "exists") { skippedExisting++; continue; }
       // Pin the id so the folder written matches the id the preview showed.
-      const fm = item.content.match(/^---\s*\n([\s\S]*?)\n---\s*(?:\n([\s\S]*))?$/);
+      const fm = item.content.replace(/\r\n/g, "\n").match(/^---\s*\n([\s\S]*?)\n---\s*(?:\n([\s\S]*))?$/);
       const content = fm
         ? `---\nid: ${item.id}\n${fm[1].split("\n").filter((l) => !l.startsWith("id:")).join("\n")}\n---\n${fm[2] ?? ""}`
         : `---\nid: ${item.id}\n---\n${item.content}`;
@@ -321,7 +329,9 @@ export async function applyClaudeCodeImport(opts: {
     }
     // The twin only uses org skills assigned to it, so assign what was previewed.
     if (assignable.length > 0) {
-      const current = getAssignedOrgSkillIdsForEmployee(opts.employeeId, []);
+      // Same fallback as the skills route, so a twin's default role skills survive.
+      const employee = await findTwin(opts.employeeId);
+      const current = getAssignedOrgSkillIdsForEmployee(opts.employeeId, employee?.orgSkillIds ?? []);
       setAssignedOrgSkillIds(opts.employeeId, [...current, ...assignable]);
     }
   } catch (err) {
