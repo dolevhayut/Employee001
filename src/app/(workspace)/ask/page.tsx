@@ -31,6 +31,7 @@ import { CitedAnswer, type CitedSource } from "@/components/ex/cited-answer";
 import { AnswerFeedback } from "@/components/ex/answer-feedback";
 import { ToolkitIcon } from "@/components/ex/toolkit-icon";
 import { parseCitedAnswer } from "@/lib/org-answer";
+import { describeAge } from "@/lib/profile-age";
 
 const FOCUS_RING = "2px solid var(--accent)";
 const focusRingHandlers = {
@@ -113,6 +114,8 @@ type Turn = {
   steps: Step[];
   thinking: string;
   answer: string | null;
+  /** Age of the profile files the answer relied on. */
+  profileAges?: { file: string; days: number; basis?: "confirmed" | "written" }[];
   /** The answer is an error or "stopped" notice, not something the twin said. */
   failed?: boolean;
   /** Set when the CEO handed this as a task instead of asking. */
@@ -175,6 +178,7 @@ type TraceEvent = {
   reason?: string;
   approvalId?: string;
   message?: string;
+  files?: { file: string; days: number; basis?: "confirmed" | "written" }[];
 };
 
 /** A failure the server explained (a bad key, Claude Code signed out, a
@@ -215,6 +219,8 @@ async function askTwin(
     thinking: (d: string) => void;
     /** The answer's text as it streams (spoken sentence by sentence in live voice). */
     text?: (d: string) => void;
+    /** How old the profile files behind this answer are. */
+    profileAges?: (files: { file: string; days: number; basis?: "confirmed" | "written" }[]) => void;
   },
   signal?: AbortSignal,
   /** Asked by voice: the server's voice fast lane and a spoken-answer style. */
@@ -284,6 +290,9 @@ async function askTwin(
           break;
         case "tool_result":
           on.stepDone();
+          break;
+        case "profile_age":
+          if (evt.files?.length) on.profileAges?.(evt.files);
           break;
         case "brain_recall":
           if (evt.nodes?.length) {
@@ -1183,6 +1192,7 @@ export default function AskPage() {
             })),
           thinking: (d) => patchTurn(id, (turn) => ({ ...turn, thinking: turn.thinking + d })),
           text: (d) => sayStreamed(d),
+          profileAges: (files) => patchTurn(id, (turn) => ({ ...turn, profileAges: files })),
         }, signal, viaVoice, temp)) || t("ask.empty");
       answer = tidyCites(answer);
       answered = true;
@@ -1830,6 +1840,11 @@ export default function AskPage() {
                         />
                       );
                     })()}
+                    {turn.profileAges?.length ? (
+                      <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--text-muted)" }}>
+                        Related profile files: {turn.profileAges.map((a) => `${a.file}, ${describeAge(a.days, a.basis)}`).join(" · ")}
+                      </div>
+                    ) : null}
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
                       <SpeakButton
                         size={24}

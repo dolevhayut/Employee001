@@ -13,6 +13,8 @@ import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 import { withSidecarLock } from "./sidecar-lock";
 import { dataDir } from "./app-home";
 import { pendingInviteTokens } from "./invites";
+import { appendAuditEntry } from "./audit-log";
+import { daysBetween, type ProfileFileAge } from "./profile-age";
 
 const AVATAR_PALETTE = [
   "#A8B4C4", "#C4A8B8", "#B8C4A8", "#A8C4B8", "#C4B8A8",
@@ -76,6 +78,8 @@ type DiskSidecar = {
    */
   pendingProfile?: boolean;
   via?: { invite?: string };
+  /** When the owner last clicked "Still true" on each profile file (ISO). */
+  profileConfirmedAt?: Record<string, string>;
 };
 
 /** Returns the ISO week string for a given date, e.g. "2026-W20". */
@@ -118,6 +122,100 @@ export async function bumpActivityOnDisk(employeeId: string): Promise<void> {
   } catch {
     // Non-critical — never crash the chat for a stats write failure.
   }
+}
+
+function validEmployeeId(id: string): boolean {
+  return /^[a-z0-9][a-z0-9_-]*$/i.test(id);
+}
+
+/**
+ * Age of each profile file that exists. The age counts from the later of the
+ * file's last write and the owner's last "Still true", so a file that was
+ * never confirmed shows its last-written age rather than a blank.
+ */
+export async function profileFileAges(employeeId: string, nowMs: number = Date.now()): Promise<ProfileFileAge[]> {
+  if (!validEmployeeId(employeeId)) return [];
+  const dir = dataDir("employees", employeeId);
+  let confirmed: Record<string, string> = {};
+  try {
+    const sidecar = JSON.parse(await fs.readFile(path.join(dir, "employee.json"), "utf8")) as DiskSidecar;
+    confirmed = sidecar.profileConfirmedAt ?? {};
+  } catch {
+    // no sidecar: every file shows its written age
+  }
+  const ages: ProfileFileAge[] = [];
+  for (const base of PROFILE_BASES) {
+    const file = `${base}.md`;
+    let writtenMs: number;
+    try {
+      writtenMs = (await fs.stat(path.join(dir, file))).mtimeMs;
+    } catch {
+      continue; // missing file: nothing to age
+    }
+    const confirmedMs = Date.parse(confirmed[file] ?? "");
+    const useConfirmed = Number.isFinite(confirmedMs) && confirmedMs > writtenMs;
+    const atMs = useConfirmed ? confirmedMs : writtenMs;
+    ages.push({
+      file,
+      days: daysBetween(atMs, nowMs),
+      basis: useConfirmed ? "confirmed" : "written",
+      at: new Date(atMs).toISOString(),
+    });
+  }
+  return ages;
+}
+
+/**
+ * "Still true": record that the owner re-confirmed a profile file. The file's
+ * content and modified time are left alone; the confirmation lives in the
+ * sidecar and is appended to the audit log. Returns the new age, or null for
+ * an unknown employee or file; throws when the record can't be saved.
+ */
+export async function confirmProfileFile(
+  employeeId: string,
+  file: string,
+  actor?: { id?: string },
+  nowMs: number = Date.now(),
+): Promise<ProfileFileAge | null> {
+  if (!validEmployeeId(employeeId)) return null;
+  if (!PROFILE_BASES.some((b) => `${b}.md` === file)) return null;
+  const dir = dataDir("employees", employeeId);
+  const sidecarPath = path.join(dir, "employee.json");
+  try {
+    await fs.stat(path.join(dir, file));
+  } catch {
+    return null;
+  }
+  const at = new Date(nowMs).toISOString();
+  // Throws if the sidecar can't be read or written, or the audit entry can't
+  // be appended. The row is written after the rename, so it never records a
+  // confirmation that didn't land; a failed row is reported as a failure.
+  const confirmed = await withSidecarLock(employeeId, async () => {
+    const sidecar: DiskSidecar = JSON.parse(await fs.readFile(sidecarPath, "utf8"));
+    // Retired twins are read-only (checked under the lock retirement also takes).
+    if (sidecar.lifecycle === "retired") return false;
+    const tmp = `${sidecarPath}.${randomUUID()}.tmp`;
+    await fs.writeFile(
+      tmp,
+      JSON.stringify({ ...sidecar, profileConfirmedAt: { ...sidecar.profileConfirmedAt, [file]: at } }, null, 2),
+      "utf8",
+    );
+    await fs.rename(tmp, sidecarPath);
+    const audited = appendAuditEntry({
+      runId: `profile-confirm-${nowMs}-${randomUUID().slice(0, 8)}`,
+      employeeId,
+      employeeName: sidecar.name || employeeId,
+      toolName: "confirmProfileFile",
+      bareName: "confirmProfileFile",
+      input: { file },
+      verdict: "executed",
+      ...(actor?.id ? { approvedBy: actor.id, approvalChannel: "ui" as const } : {}),
+    });
+    if (!audited) throw new Error("the confirmation was saved but could not be written to the audit log");
+    return true;
+  });
+  if (!confirmed) return null;
+  return { file, days: 0, basis: "confirmed", at };
 }
 
 export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {

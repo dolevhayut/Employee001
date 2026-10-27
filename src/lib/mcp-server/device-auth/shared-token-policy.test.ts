@@ -49,4 +49,11 @@ describe("shared-token policy (AC4)", () => {
     expect(acceptedSharedTokens({ EMPLOYEE001_TOKEN: "x" })).toEqual(["x"]);
     expect(matchesSharedToken("", {})).toBe(false);
   });
+
+  it("rejects different-length and prefix bearers without throwing", () => {
+    expect(matchesSharedToken("", tokens)).toBe(false);
+    expect(matchesSharedToken("mcp", tokens)).toBe(false);
+    expect(matchesSharedToken("mcp-tok-and-more", tokens)).toBe(false);
+    expect(matchesSharedToken("mcp-tok", tokens)).toBe(true);
+  });
 });

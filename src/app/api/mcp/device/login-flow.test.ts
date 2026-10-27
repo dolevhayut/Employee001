@@ -10,7 +10,7 @@ import { POST as approve } from "./approve/route";
 import { resetSlots } from "./respond";
 
 // People known to the app: sessions only resolve for people who still exist.
-vi.mock("@/lib/auth/store", () => ({ getUser: (id: string) => (id === "ada" ? { id, role: "member" } : undefined) }));
+vi.mock("@/lib/auth/store", () => ({ accountsEnabled: () => true, listUsers: () => [{ id: "ada", role: "member" }], getUser: (id: string) => (id === "ada" ? { id, role: "member" } : undefined) }));
 
 let home: string;
 const prevHome = process.env.EMPLOYEE001_HOME;

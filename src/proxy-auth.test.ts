@@ -172,3 +172,75 @@ describe("proxy: accounts exist", () => {
     expect(proxy(req("http://127.0.0.1:3000/api/invites/inv_abc123")).headers.get("x-middleware-next")).toBe("1");
   });
 });
+
+describe("proxy: personal MCP sign-in bearers", () => {
+  async function mint(personId: string) {
+    const auth = await import("./lib/mcp-server/device-auth");
+    const issued = await auth.issueDeviceCode();
+    expect((await auth.approveUserCode(issued.userCode, personId)).ok).toBe(true);
+    const exchanged = await auth.exchangeDeviceCode(issued.deviceCode);
+    if (exchanged.status !== "approved") throw new Error("not approved");
+    return exchanged.bearer;
+  }
+  const mcp = (url: string, bearer: string) => req(url, { method: "POST", headers: { authorization: `Bearer ${bearer}` } });
+  afterEach(() => {
+    for (const k of ["EMPLOYEE001_MCP_PERSONAL_SIGNIN", "EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN", "EMPLOYEE001_MCP_TOKEN"]) delete process.env[k];
+  });
+
+  it("accepts a personal session as that person on /api/mcp when accounts exist", async () => {
+    process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "1";
+    const { proxy, store } = await load();
+    store.createUser({ id: "usr_ada", email: "o@x.io", name: "o", role: "owner" });
+    const bearer = await mint("usr_ada");
+    const res = proxy(mcp("http://127.0.0.1:3000/api/mcp", bearer));
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+    expect(forwarded(res, "x-e001-user-id")).toBe("usr_ada");
+    store.updateUser("usr_ada", { disabled: true });
+    store.createUser({ email: "p@x.io", name: "p", role: "owner" });
+    expect(proxy(mcp("http://127.0.0.1:3000/api/mcp", bearer)).status).toBe(401);
+    expect(proxy(mcp("http://127.0.0.1:3000/api/mcp", "not-a-session")).status).toBe(401);
+  });
+
+  it("accepts the local owner's session on an exposed bind before accounts exist, and no one else's", async () => {
+    process.env.EMPLOYEE001_BIND = "0.0.0.0";
+    process.env.EMPLOYEE001_TOKEN = "boot-token-123";
+    process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "1";
+    const { proxy } = await load();
+    const owner = await mint("local-owner");
+    expect(proxy(mcp(`${LAN}/api/mcp`, owner)).headers.get("x-middleware-next")).toBe("1");
+    // With no enabled account there is nobody to check a person against.
+    const person = await mint("usr_ada");
+    expect(proxy(mcp(`${LAN}/api/mcp`, person)).headers.get("x-middleware-next")).not.toBe("1");
+  });
+
+  it("refuses shared tokens once personal sign-in is on, unless an admin opts in", async () => {
+    process.env.EMPLOYEE001_MCP_TOKEN = "shared-mcp";
+    const { proxy, store } = await load();
+    store.createUser({ email: "o@x.io", name: "o", role: "owner" });
+    expect(proxy(mcp("http://127.0.0.1:3000/api/mcp", "shared-mcp")).headers.get("x-middleware-next")).toBe("1");
+    process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "1";
+    expect(proxy(mcp("http://127.0.0.1:3000/api/mcp", "shared-mcp")).status).toBe(401);
+    process.env.EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN = "1";
+    expect(proxy(mcp("http://127.0.0.1:3000/api/mcp", "shared-mcp")).headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("stops honouring a local-owner session once accounts exist", async () => {
+    process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "1";
+    const { proxy, store } = await load();
+    const bearer = await mint("local-owner");
+    expect(proxy(mcp("http://127.0.0.1:3000/api/mcp", bearer)).headers.get("x-middleware-next")).toBe("1");
+    store.createUser({ email: "o@x.io", name: "o", role: "owner" });
+    expect(proxy(mcp("http://127.0.0.1:3000/api/mcp", bearer)).status).toBe(401);
+  });
+
+  it("revokes local-owner sessions when the first owner is created", async () => {
+    await load();
+    const bearer = await mint("local-owner");
+    const { createFirstOwner } = await import("./lib/auth/login");
+    const { resolveBearer } = await import("./lib/mcp-server/device-auth");
+    expect(resolveBearer(bearer)).not.toBeNull();
+    const created = createFirstOwner({ email: "o@x.io", name: "Owner", password: "correct horse battery staple 9!" });
+    expect("user" in created).toBe(true);
+    await vi.waitFor(() => expect(resolveBearer(bearer)).toBeNull());
+  });
+});

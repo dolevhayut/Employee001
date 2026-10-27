@@ -38,8 +38,8 @@ describe("POST /api/employees/[id]/import-claude-code", () => {
     expect((await call("emp", { previewDigest: "d" })).status).toBe(200);
   });
 
-  it("is admin-only", () => {
-    expect(API_ROUTES["/api/employees/[id]/import-claude-code"]?.POST).toEqual({ kind: "role", min: "admin" });
-    expect(authorizeApi("/api/employees/e1/import-claude-code", "POST", { id: "u", role: "member" }).allow).toBe(false);
+  it("is owner-only: it reads the server user's own ~/.claude", () => {
+    expect(API_ROUTES["/api/employees/[id]/import-claude-code"]?.POST).toEqual({ kind: "role", min: "owner" });
+    expect(authorizeApi("/api/employees/e1/import-claude-code", "POST", { id: "u", role: "admin" }).allow).toBe(false);
   });
 });

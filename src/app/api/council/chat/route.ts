@@ -24,6 +24,10 @@ export async function POST(request: NextRequest) {
     meetingId?: string;
     /** Let the relevant twins answer: the org router picks 1–3 of employeeIds. */
     auto?: boolean;
+    /** New meeting only: skip the "Since the last meeting" brief. */
+    fresh?: boolean;
+    /** New meeting only: keep this meeting out of later briefs. */
+    forget?: boolean;
   };
 
   const question = body.question?.trim();
@@ -98,6 +102,8 @@ export async function POST(request: NextRequest) {
           allParticipants,
           onEvent: (event) => send(event.type === "employee_error" ? { ...event, message: modelErrorMessage(event.message) } : event),
           requesterId: sessionUserFromHeaders(request.headers)?.id,
+          fresh: body.fresh === true,
+          forget: body.forget === true,
         });
         // Echo the resolved meeting id so the client can persist it across
         // CEO messages — same id on a new meeting, unchanged on followups.

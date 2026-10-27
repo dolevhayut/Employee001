@@ -17,46 +17,30 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The screens to give or withdraw consent come in a follow-up; until then
   custom voices use the default voice.
 
-### The security policy no longer names out-of-date versions
-- SECURITY.md now says "the latest minor release" and "the one before it"
-  instead of 0.7.x and 0.6.x, so it stays true with every release. The support
-  commitment itself is unchanged.
+---
 
-### Personal sign-in for MCP clients: follow-ups
-- A personal MCP sign-in stops working immediately when the person is deleted,
-  disabled or demoted below member, instead of lasting up to 30 days.
-- A personal MCP sign-in now gets through the access gate in front of `/api/mcp`
-  when accounts are on; before, only the shared token did.
-- `/api/mcp` caps the request body as it reads it, so a chunked upload with no
-  size header can no longer be buffered whole.
-- The sign-in store's lock can no longer be taken by two processes at once after
-  a crash, and a stalled writer is refused instead of overwriting a revoke.
-- The device sign-in link (`/device`) now uses your configured public URL
-  (`EMPLOYEE001_PUBLIC_URL` or `APP_URL`) instead of the request's Host header.
-- When too many sign-ins are pending, starting another answers "try again"
-  (429) instead of a server error.
-- `employee001 login` warns when the address is plain `http` on another
-  machine, because the session token would cross the network unencrypted.
-- Importing from Claude Code is limited to the owner. It reads the machine
-  owner's own `~/.claude`, so another admin can no longer copy those files
-  into a twin.
+## [0.12.0] — 2026-10-28
 
-### Personal sign-in for MCP clients (groundwork)
-- The server can now issue a short-lived device code that a signed-in person
-  approves, and tie the resulting MCP session to that person so it can be
-  revoked. Nothing is switched on yet.
-- Once personal sign-in is enabled, the shared `EMPLOYEE001_MCP_TOKEN` and
-  `EMPLOYEE001_TOKEN` stop working for `/api/mcp` unless an admin opts in with
-  `EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN=1`. See SECURITY.md.
-- Every request to `/api/mcp` made with a personal sign-in is now written to
-  the audit log with who made it, when, and which tool it called. Revoking a
-  person's MCP sessions refuses their very next request.
-- New `employee001 login` command: it prints a page address and a code, you
-  approve the code in the app as yourself at `/device`, and the command saves
-  a personal session that `employee001 mcp` uses when no shared token is set.
-- The sign-in routes answer 404 while personal sign-in is off, so no code can
-  be minted early. Deleting, disabling, demoting or resetting the password of a
-  person now ends their MCP sessions too.
+### Team Meetings remember
+- A new Team Meeting starts from a short "Since the last meeting" brief: what
+  the last three meetings with someone from this room decided and left open,
+  the actions people in the room took on (and whether they went to Roomate),
+  and results of their routines that came in since. Every twin in the room
+  gets it, and you see it above the message box before you send.
+- After each round, the meeting keeps a short record of itself for later
+  meetings. "Start fresh" skips the brief for one meeting. "Don't remember
+  this meeting" keeps it out of every later brief, removes it from briefs
+  already built, and stops it from proposing profile knowledge; only an
+  admin can turn memory back on for it.
+- "Summarize & decide" now works in Claude subscription mode and with every
+  model provider. Before, it needed an Anthropic API key.
+- The brief is reference data, never instructions: hidden characters are
+  stripped, it is capped in length, building one writes an audit row, and
+  deleting a person drops every brief and record that names them.
+
+---
+
+## [0.11.0] — 2026-10-27
 
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual
@@ -71,16 +55,117 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Every add and remove is written to the audit log. The files a twin reads
   go to your model provider to answer, and the add-folder screen says so.
 
-### Twins ask for what they're missing
+### Ask without leaving a trace, and flag a wrong answer
+- **Temporary ask.** Turn it on in Ask and the chat isn't saved to history and
+  the twin remembers nothing from it. Tool calls and approvals are still
+  written to the audit log.
+- **"Wrong or outdated?"** under every answer files a correction proposal
+  on the twin's profile. Nothing changes until someone accepts it. Members
+  can file one; pending proposals are capped.
+
+### Start your twin from an example
+- "Build my twin" now shows a few example briefs, each labelled "Example".
+  Preview one, then start from it: it fills the form and you rewrite it so it
+  describes you. Build stays off while any example text is still there
+  unchanged, so an invented brief never becomes your profile.
+- Editing your notes after an interview no longer copies the interview
+  answers into the notes.
+
+### Team Meetings are kept
+- Meetings are saved to disk, so they survive a restart. Reopen one from
+  History, read it again, or continue it with the twins that can still
+  answer. Each meeting is titled by its first question and keeps its latest
+  decision.
+- Open a past meeting and its decision now lists who accepted and who
+  objected. Each name jumps to the message where they said so. Meetings
+  summarized before this show the decision as before. The exported
+  meeting file now numbers each message and lists who accepted or
+  objected, with the message number.
+- If you connected a Roomate MCP server, each action item in a decision gets
+  "Send to Roomate": the owner's twin files it as a task, through the normal
+  approval.
+
+### Twins ask for what they're missing, and find where they disagree
 - When a question needs a system a twin can't reach, it files a request in
   the admin's Inbox, with the reason and the access it needs. Nothing is
   contacted or configured until you act on it.
 - Tasks run on twins with no connected tools: they work from their profile,
   files and folders.
+- "Scan for conflicts" in the Inbox compares what twins say about the same
+  thing and raises an item when two disagree, with a link to start a meeting
+  about it. Claims from memory are cited, not quoted.
+
+### See how old a twin's profile is
+- Ask shows how old the profile files related to an answer are. The profile's
+  Files tab nudges you once a month about files older than 30 days, and
+  "Still true" marks one as checked without changing it. Only the twin's own
+  person or an admin can confirm, it is audited, and a retired twin stays
+  read-only.
+
+### Easier to read
+- Approvals show what you are approving as a card, with every field readable
+  and the raw JSON one click away. The approval dialog is calmer.
+- Cockpit shows a run as a conversation, not a terminal log.
+- Tasks has a board view of task history.
 
 ### Two themes
 - Light (white, stone and dark brown) and dark (black, gray and white). The
   OS setting picks one until you choose.
+
+### Every twin message says it is AI
+- A message a twin sends to people outside the app (chat apps, email) starts
+  with "🤖 AI twin of <name>", and emails carry an `X-AI-Generated` header.
+  Spoken answers are labelled "AI voice" and the audio carries the same
+  header. An approver's edit can't remove it.
+
+### Personal sign-in for MCP clients (off by default)
+- Each person can sign in their own MCP client instead of sharing one token.
+  It stays off until you set `EMPLOYEE001_MCP_PERSONAL_SIGNIN=1`; see
+  SECURITY.md.
+- The server can now issue a short-lived device code that a signed-in person
+  approves, and tie the resulting MCP session to that person so it can be
+  revoked.
+- Once personal sign-in is enabled, the shared `EMPLOYEE001_MCP_TOKEN` and
+  `EMPLOYEE001_TOKEN` stop working for `/api/mcp` unless an admin opts in with
+  `EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN=1`. See SECURITY.md.
+- Every request to `/api/mcp` made with a personal sign-in is now written to
+  the audit log with who made it, when, and which tool it called. Revoking a
+  person's MCP sessions refuses their very next request.
+- New `employee001 login` command: it prints a page address and a code, you
+  approve the code in the app as yourself at `/device`, and the command saves
+  a personal session that `employee001 mcp` uses when no shared token is set.
+- Pressing Deny on the `/device` page now cancels the code for good, and the
+  waiting `employee001 login` tells you the sign-in was refused. Personal
+  sessions are accepted by `/api/mcp`, sign-in limits are kept per client, and
+  sessions made before you created accounts are revoked when the first owner is
+  created.
+- The sign-in routes answer 404 while personal sign-in is off, so no code can
+  be minted early. Deleting, disabling, demoting or resetting the password of a
+  person now ends their MCP sessions too.
+- A personal MCP sign-in stops working immediately when the person is deleted,
+  disabled or demoted below member, instead of lasting up to 30 days.
+- A personal MCP sign-in now gets through the access gate in front of `/api/mcp`
+  when accounts are on; before, only the shared token did.
+- `/api/mcp` caps the request body as it reads it, so a chunked upload with no
+  size header can no longer be buffered whole.
+- The sign-in store's lock can no longer be taken by two processes at once after
+  a crash, and a stalled writer is refused instead of overwriting a revoke.
+- The device sign-in link (`/device`) now uses your configured public URL
+  (`EMPLOYEE001_PUBLIC_URL` or `APP_URL`) instead of the request's Host header.
+- The local owner's personal MCP sessions work only while the app has no user
+  record at all; one account, even a disabled one, ends them. A disabled
+  person's session never comes back, even when every account is disabled.
+- When too many sign-ins are pending, starting another answers "try again"
+  (429) instead of a server error.
+- `employee001 login` warns when the address is plain `http` on another
+  machine, because the session token would cross the network unencrypted.
+
+### Import from your Claude Code (owner only, API)
+- The owner can import their own Claude Code skills, MCP servers (http/sse)
+  and CLAUDE.md / rules into a twin. It shows exactly what would be imported
+  first, then imports only what was shown, and audits it. Settings, hooks,
+  credentials and MCP headers are never read; MCP servers arrive disabled.
+  There is no screen for it yet.
 
 ### Security
 - In hardened mode (`EMPLOYEE001_SANDBOX=1`) a twin no longer inherits the
@@ -90,6 +175,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - An approved `Edit` can no longer reach files outside the twin's scratch
   folder.
 - Claude subscription mode still covers one person only.
+- Hidden characters (Unicode tag characters, bidi overrides, zero-width
+  characters) are stripped from emails, uploaded knowledge and other
+  untrusted text before a twin reads it, and each removal is audited.
+  Hebrew and Arabic direction marks are kept.
+- A twin's reply can no longer load a remote image, which could have carried
+  data out without an approval. Only the app's own and inline images load.
+- Twins see only the built-in tools they use. Claude Code subagents,
+  scheduling and messaging tools are gone from twin runs.
+- A tool its MCP server marks as destructive always asks for approval,
+  whatever its name or an employee-level override says.
+- Structured memory is rewritten atomically, so a crash can't truncate it.
+
+### Fixes
+- `doctor` warns when an empty `ANTHROPIC_API_KEY` exported in your shell
+  hides the key in `.env`.
+- A corrected fact replaces the old one in a twin's memory instead of sitting
+  next to it.
+- Retired twins are left out of new meetings.
+- Keyboard and screen-reader fixes on setup, the launchpad, Build my twin and
+  Ask.
+- SECURITY.md now says "the latest minor release" and "the one before it"
+  instead of 0.7.x and 0.6.x, so it stays true with every release. The support
+  commitment itself is unchanged.
 
 ---
 

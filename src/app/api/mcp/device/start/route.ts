@@ -1,5 +1,5 @@
 import { DEVICE_CODE_TTL_MS, DeviceCodeLimitError, issueDeviceCode, publicBaseUrl } from "@/lib/mcp-server/device-auth";
-import { fail, json, signInOff, takeSlot } from "../respond";
+import { clientKey, fail, json, signInOff, takeSlot } from "../respond";
 
 export const runtime = "nodejs";
 
@@ -9,7 +9,8 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const off = signInOff();
   if (off) return off;
-  if (!takeSlot("start", 30)) return fail(429, "rate_limited", "Too many sign-in attempts. Try again in a minute.");
+  // The global ceiling backstops a spoofed forwarded-for header minting fresh per-client buckets.
+  if (!takeSlot(`start:${clientKey(request)}`, 30) || !takeSlot("start:all", 600)) return fail(429, "rate_limited", "Too many sign-in attempts. Try again in a minute.");
   let issued;
   try {
     issued = await issueDeviceCode();

@@ -89,6 +89,15 @@ describe("authorizeApi", () => {
     expect(authorizeApi("/api/mcp", "POST", null)).toMatchObject({ allow: true, access: { kind: "bearer" } });
   });
 
+  it("lets only the twin's own person or an admin mark its profile files 'Still true'", () => {
+    const route = "/api/employees/noa/file-age";
+    expect(authorizeApi(route, "GET", member).allow).toBe(true);
+    expect(authorizeApi(route, "POST", member).allow).toBe(false);
+    expect(authorizeApi(route, "POST", employee).allow).toBe(true); // noa's own person
+    expect(authorizeApi("/api/employees/dana/file-age", "POST", employee).allow).toBe(false);
+    expect(authorizeApi(route, "POST", admin).allow).toBe(true);
+  });
+
   it("keeps the Claude Code import to the owner: it reads the server user's own folder", () => {
     const route = "/api/employees/noa/import-claude-code";
     expect(authorizeApi(route, "POST", owner).allow).toBe(true);

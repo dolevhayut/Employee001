@@ -60,6 +60,13 @@ describe("employee001 login", () => {
     expect(readStoredSession(env)).toBeNull();
   });
 
+  it("stops with a clear message when the person refuses the code, and stores nothing", async () => {
+    const fetchFn = vi.fn(async (url: string) => (String(url).endsWith("/start") ? reply(started) : reply({ error: "access_denied", message: "x" }, 400)));
+    const result = await runLogin({ base: "http://app", env, fetchFn: fetchFn as unknown as typeof fetch, sleep: async () => {}, write: () => {} });
+    expect(result).toEqual({ ok: false, message: "That sign-in was refused in Employee001. Nothing was signed in." });
+    expect(readStoredSession(env)).toBeNull();
+  });
+
   it("reports an app that is not running", async () => {
     const fetchFn = vi.fn(async () => {
       throw new TypeError("fetch failed");

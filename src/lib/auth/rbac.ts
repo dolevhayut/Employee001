@@ -65,7 +65,8 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/mcp/device/start": { POST: pub },
   "/api/mcp/device/poll": { POST: pub },
   "/api/mcp/device/approve": { POST: member },
-  "/api/mcp/device/revoke": { POST: employee },
+  "/api/mcp/device/deny": { POST: member },
+  "/api/mcp/device/revoke":{ POST: employee },
 
   // Employee onboarding: the invite token is the credential
   "/api/invites/[token]": { GET: invite, DELETE: admin },
@@ -81,6 +82,8 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/employees/[id]": { PATCH: admin, DELETE: role("admin", "id") }, // employee: revoke own consent
   "/api/employees/[id]/chat-history": { GET: member, POST: member, DELETE: admin },
   "/api/employees/[id]/file/[name]": { GET: role("member", "id"), PUT: admin },
+  // "Still true" changes a twin's profile metadata: its own person or an admin, like editing the file.
+  "/api/employees/[id]/file-age": { GET: role("member", "id"), POST: ownOrRole("admin", "id") },
   "/api/employees/[id]/graph": { GET: role("member", "id") },
   "/api/employees/[id]/knowledge": { GET: role("member", "id"), POST: admin },
   "/api/employees/[id]/knowledge-folders": { GET: admin, POST: admin, DELETE: admin },
@@ -131,7 +134,8 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/council/export": { GET: member },
   "/api/council/file": { GET: member },
   "/api/council/meetings": { GET: member },
-  "/api/council/meetings/[id]": { GET: member, DELETE: admin },
+  "/api/council/meetings/[id]": { GET: member, PATCH: member, DELETE: admin },
+  "/api/council/brief": { POST: member },
   "/api/council/meetings/[id]/roomate": { POST: member },
   "/api/council/roomate": { GET: member },
   "/api/council/approve": { POST: approver },

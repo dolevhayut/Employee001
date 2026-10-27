@@ -9,6 +9,7 @@ vi.mock("@/lib/audit-log", () => ({ appendAuditEntry: vi.fn() }));
 vi.mock("@/lib/model-provider", () => ({ addPersonProblem: () => null }));
 vi.mock("@/lib/auth/password", () => ({ hashPassword: (p: string) => p, passwordProblem: () => null }));
 vi.mock("@/lib/auth/store", () => ({
+  accountsEnabled: () => true,
   getUser: (id: string) => users.get(id),
   listUsers: () => [...users.values()],
   publicUser: (u: unknown) => u,

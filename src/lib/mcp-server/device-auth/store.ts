@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "@/lib/app-home";
 import { ROLE_RANK } from "@/lib/auth/rbac";
-import { getUser } from "@/lib/auth/store";
+import { getUser, listUsers } from "@/lib/auth/store";
 
 // Personal MCP sign-in (device-code flow), server-side model only. Raw device
 // codes, user codes and bearers are never stored: only their SHA-256 hashes.
@@ -11,6 +11,8 @@ import { getUser } from "@/lib/auth/store";
 export const DEVICE_CODE_TTL_MS = 10 * 60 * 1000;
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const POLL_INTERVAL_SECONDS = 5;
+/** Who approves a code on an install with no accounts (the proxy's implicit owner). */
+export const LOCAL_OWNER = "local-owner";
 
 // No 0/O/1/I/L/U so a code read aloud or typed from a screen is unambiguous.
 const USER_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
@@ -20,6 +22,8 @@ interface DeviceRecord {
   expiresAt: number;
   approvedBy?: string;
   approvedAt?: number;
+  /** Set when a signed-in person refused the code; the poller then gets access_denied. */
+  deniedAt?: number;
   /** Set once the session bearer was handed to the polling client. */
   sessionId?: string;
   lastPolledAt?: number;
@@ -69,11 +73,11 @@ export interface IssuedDeviceCode {
 
 export type ApproveResult =
   | { ok: true; approvedAt: number }
-  | { ok: false; reason: "unknown" | "expired" | "already_approved" | "rate_limited" };
+  | { ok: false; reason: "unknown" | "expired" | "already_approved" | "denied" | "rate_limited" };
 
 export type ExchangeResult =
   | { status: "approved"; bearer: string; expiresAt: number }
-  | { status: "pending" | "expired" | "invalid" | "consumed" | "slow_down" };
+  | { status: "pending" | "expired" | "invalid" | "consumed" | "slow_down" | "denied" };
 
 type Clock = () => number;
 let clock: Clock = Date.now;
@@ -292,6 +296,10 @@ export function issueDeviceCode(opts: { ip?: string } = {}): Promise<IssuedDevic
 export function approveUserCode(userCode: string, personId: string): Promise<ApproveResult> {
   return withLock(() => approveUnlocked(userCode, personId));
 }
+/** Refuse a user code: it can no longer be approved and the poller gets access_denied. */
+export function denyUserCode(userCode: string, personId: string): Promise<ApproveResult> {
+  return withLock(() => approveUnlocked(userCode, personId, true));
+}
 export function exchangeDeviceCode(deviceCode: string): Promise<ExchangeResult> {
   return withLock(() => exchangeUnlocked(deviceCode));
 }
@@ -334,7 +342,7 @@ function issueUnlocked(issuerHash?: string): IssuedDeviceCode {
 }
 
 /** Record that a signed-in person approved the user code. Caller authenticates `personId`. */
-function approveUnlocked(userCode: string, personId: string): ApproveResult {
+function approveUnlocked(userCode: string, personId: string, deny = false): ApproveResult {
   const now = clock();
   if (!personId) return { ok: false, reason: "unknown" };
   const store = load();
@@ -358,6 +366,12 @@ function approveUnlocked(userCode: string, personId: string): ApproveResult {
   }
   if (entry.expiresAt <= now) return { ok: false, reason: "expired" };
   if (entry.approvedBy) return { ok: false, reason: "already_approved" };
+  if (entry.deniedAt) return { ok: false, reason: "denied" };
+  if (deny) {
+    entry.deniedAt = now;
+    save(store);
+    return { ok: true, approvedAt: now };
+  }
   entry.approvedBy = personId;
   entry.approvedAt = now;
   save(store);
@@ -379,6 +393,10 @@ function exchangeUnlocked(deviceCode: string): ExchangeResult {
     return { status: "slow_down" }; // keep the window anchored so jitter cannot loop forever
   }
   entry.lastPolledAt = now;
+  if (entry.deniedAt) {
+    save(store);
+    return { status: "denied" };
+  }
   if (!entry.approvedBy) {
     save(store);
     return { status: "pending" };
@@ -406,12 +424,19 @@ export function resolveBearer(bearer: string): McpSession | null {
     return null; // unreadable store: fail closed
   }
   if (!session || session.revokedAt || session.expiresAt <= clock()) return null;
-  // A session belongs to a person who can still approve one: deleted, disabled or
-  // demoted below member means no session, even if revocation never ran. Checked
-  // on every request, so the cut-off is immediate.
+  // The implicit local owner exists only while the app has no user record at all
+  // (disabled ones count): its sessions die with the first account, even if the
+  // revoke at owner creation never ran. Everyone else must be a person who can
+  // still approve one: deleted, disabled or demoted below member means no session,
+  // and that holds even when every account is disabled. Checked on every request,
+  // so the cut-off is immediate.
   try {
-    const person = getUser(session.personId);
-    if (!person || person.disabled || ROLE_RANK[person.role] < ROLE_RANK.member) return null;
+    if (session.personId === LOCAL_OWNER) {
+      if (listUsers().length > 0) return null;
+    } else {
+      const person = getUser(session.personId);
+      if (!person || person.disabled || ROLE_RANK[person.role] < ROLE_RANK.member) return null;
+    }
   } catch {
     return null; // unreadable user store: fail closed
   }

@@ -6,7 +6,7 @@ import { getHiredEmployees } from "@/lib/hired-agents";
 import { hasEmployeeFiles } from "@/lib/employees-files";
 import { runSingleTwin } from "@/lib/council-runner";
 import type { CouncilEvent, ConversationTurn } from "@/lib/council-runner";
-import { bumpActivityOnDisk } from "@/lib/employees-disk";
+import { bumpActivityOnDisk, profileFileAges } from "@/lib/employees-disk";
 import { generateFollowups } from "@/lib/followup-suggestions";
 import { appendTaskRun } from "@/lib/task-history";
 import { canRunModel, modelErrorMessage } from "@/lib/model-provider";
@@ -141,6 +141,12 @@ export async function POST(request: NextRequest) {
       // are in its prompt: show them read like the profile.
       if (employee.lifecycle === "retired" && (await loadPackage(employee.id))?.review) {
         send({ type: "tool_call", name: "Read", args: { file_path: "/handover/notes.md" }, ts: 0 });
+      }
+      if (recalled.length) {
+        const ages = (await profileFileAges(employee.id)).filter((a) => recalled.includes(a.file as (typeof recalled)[number]));
+        if (ages.length) {
+          send({ type: "profile_age", files: ages.map(({ file, days, basis }) => ({ file, days, basis })), ts: Date.now() - start });
+        }
       }
       recalled.forEach((file, i) => {
         setTimeout(() => {
