@@ -19,6 +19,7 @@ import type { MeetingTurn } from "@/lib/meeting-store";
 import { dataDir } from "./app-home";
 import { isUnderBudget } from "@/lib/twin-budget";
 import { directAnthropicAllowed } from "@/lib/model-provider";
+import { loadChatHistory } from "@/lib/chat-history";
 
 export type KnowledgeProposalStatus = "pending" | "accepted" | "dismissed";
 
@@ -26,7 +27,7 @@ export type KnowledgeProposal = {
   id: string;
   employeeId: string;
   createdAt: string;
-  source: { kind: "council"; meetingId: string };
+  source: { kind: "council"; meetingId: string } | { kind: "answer"; question: string; answer: string };
   /** Target file inside knowledge/; always a .md name. */
   file: string;
   /** Markdown appended to the target file on accept. */
@@ -150,6 +151,48 @@ export async function addProposals(
     writeAll(employeeId, [...all, ...created]);
     return created;
   });
+}
+
+export const CORRECTION_MAX = 1000;
+export const CORRECTION_FILE = "corrections.md";
+
+/**
+ * A reader flags a twin's Ask answer as wrong or outdated. Creates a pending
+ * proposal (source kind "answer"); nothing is written to the knowledge files
+ * until the twin's owner accepts it through decideProposal.
+ */
+export async function addAnswerCorrection(
+  employeeId: string,
+  input: { question?: unknown; answer?: unknown; correction?: unknown },
+): Promise<{ ok: true; proposal: KnowledgeProposal } | { ok: false; error: "empty_correction" }> {
+  const correction = typeof input.correction === "string" ? input.correction.trim().slice(0, CORRECTION_MAX) : "";
+  if (!correction) return { ok: false, error: "empty_correction" };
+  const question = typeof input.question === "string" ? input.question.trim().slice(0, 500) : "";
+  const answer = typeof input.answer === "string" ? input.answer.trim().slice(0, 2000) : "";
+  const date = new Date().toISOString().slice(0, 10);
+  const topic = question.replace(/\s+/g, " ").slice(0, 120);
+  const markdown = `### ${date} — Correction${topic ? `: ${topic}` : ""}\n\n${correction}`;
+  const proposal: KnowledgeProposal = {
+    id: `kp_${randomUUID()}`,
+    employeeId,
+    createdAt: new Date().toISOString(),
+    source: { kind: "answer", question, answer },
+    file: CORRECTION_FILE,
+    markdown: markdown.slice(0, PROPOSAL_MARKDOWN_MAX),
+    reason: "Reported as wrong or outdated in Ask",
+    status: "pending",
+  };
+  await withSidecarLock(lockKey(employeeId), async () => {
+    writeAll(employeeId, [...readAll(employeeId), proposal]);
+  });
+  return { ok: true, proposal };
+}
+
+/** Answers the twin gave in Ask, and how many were reported wrong or outdated. */
+export function answerStats(employeeId: string): { answered: number; corrected: number } {
+  const answered = loadChatHistory(employeeId).filter((m) => m.role === "twin" && m.surface === "ask").length;
+  const corrected = readAll(employeeId).filter((p) => p.source?.kind === "answer").length;
+  return { answered, corrected };
 }
 
 /**
