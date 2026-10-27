@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { timingSafeEqual } from "@/lib/mcp-server/guard";
-import { matchesSharedToken, resolveBearer } from "@/lib/mcp-server/device-auth";
+import { matchesSharedToken, personalSignInEnabled, resolveBearer } from "@/lib/mcp-server/device-auth";
 import { authorizeApi, authorizePage, type Caller } from "@/lib/auth/rbac";
 import { USER_EMPLOYEE_HEADER, USER_ID_HEADER, USER_ROLE_HEADER } from "@/lib/auth/request-user";
 import {
@@ -65,12 +65,14 @@ function isHttps(request: NextRequest): boolean {
 }
 
 /** Who an MCP bearer belongs to: a shared token (if the policy still allows
- *  them) or a personal sign-in session. Null when it is neither. */
+ *  them) or a personal sign-in session while personal sign-in is on. Null when
+ *  it is neither. /api/mcp re-checks either way and attributes the request. */
 function bearerCaller(request: NextRequest): Caller {
   const header = request.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return null;
   const bearer = header.slice("Bearer ".length);
   if (matchesSharedToken(bearer)) return { id: "mcp-client", role: "member" };
+  if (!personalSignInEnabled()) return null;
   const session = resolveBearer(bearer);
   // The implicit local owner only exists while there are no accounts.
   if (!session) return null;

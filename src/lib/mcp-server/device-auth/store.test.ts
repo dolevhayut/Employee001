@@ -18,8 +18,13 @@ import {
   setDeviceAuthClock,
 } from "./store";
 
-// Everyone signing in below is a member of the app.
-vi.mock("@/lib/auth/store", () => ({ accountsEnabled: () => true, getUser: (id: string) => ({ id, role: "member" }) }));
+// Everyone signing in below is a member of the app, unless a test swaps in its own accounts.
+type Person = { id: string; role: string; disabled?: boolean };
+const people = vi.hoisted(() => ({ lookup: null as null | ((id: string) => Person | undefined) }));
+vi.mock("@/lib/auth/store", () => ({
+  accountsEnabled: () => true,
+  getUser: (id: string) => (people.lookup ? people.lookup(id) : { id, role: "member" }),
+}));
 
 let home: string;
 let now: number;
@@ -209,6 +214,27 @@ describe("lock", () => {
     await expect(pending).resolves.toBeTruthy();
   });
 
+  it("refuses to save when the lock was taken over mid-operation, so a revoke is never overwritten", async () => {
+    const { bearer } = await signIn();
+    const dataFile = path.join(home, "data", "mcp-device-auth.json");
+    const realRead = fs.readFileSync;
+    let intruded = false;
+    const spy = vi.spyOn(fs, "readFileSync").mockImplementation(((p: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
+      if (!intruded && p === dataFile) {
+        intruded = true;
+        fs.writeFileSync(lockPath(), "intruder"); // someone reclaimed our lock while we worked
+      }
+      return (realRead as (...a: unknown[]) => unknown)(p, ...rest);
+    }) as typeof fs.readFileSync);
+    try {
+      await expect(revokePersonSessions("ada")).rejects.toThrow(/lock was lost/);
+    } finally {
+      spy.mockRestore();
+      fs.rmSync(lockPath(), { force: true });
+    }
+    expect(resolveBearer(bearer)).not.toBeNull(); // nothing half-written; the caller sees the error and can retry
+  });
+
   it("keeps every write when many callers race to reclaim the same stale lock", async () => {
     await issueDeviceCode();
     fs.writeFileSync(lockPath(), "dead-owner");
@@ -326,6 +352,54 @@ describe("resolve", () => {
     const b = await signIn("bob");
     expect(resolveBearer(a.bearer)?.personId).toBe("ada");
     expect(resolveBearer(b.bearer)?.personId).toBe("bob");
+  });
+});
+
+describe("resolve checks the person on every request", () => {
+  let accounts: Map<string, Person>;
+  beforeEach(() => {
+    accounts = new Map();
+    people.lookup = (id) => accounts.get(id);
+  });
+  afterEach(() => {
+    people.lookup = null;
+  });
+
+  it("cuts off a person who was deleted, disabled or demoted below member", async () => {
+    accounts.set("ana", { id: "ana", role: "member" });
+    accounts.set("ben", { id: "ben", role: "member" });
+    accounts.set("cy", { id: "cy", role: "admin" });
+    const a = await signIn("ana");
+    const b = await signIn("ben");
+    const c = await signIn("cy");
+    expect(resolveBearer(a.bearer)?.personId).toBe("ana");
+
+    accounts.delete("ana");
+    expect(resolveBearer(a.bearer)).toBeNull();
+
+    accounts.set("ben", { id: "ben", role: "member", disabled: true });
+    expect(resolveBearer(b.bearer)).toBeNull();
+    accounts.set("ben", { id: "ben", role: "member" });
+    expect(resolveBearer(b.bearer)).not.toBeNull();
+    accounts.set("ben", { id: "ben", role: "employee" });
+    expect(resolveBearer(b.bearer)).toBeNull();
+
+    expect(resolveBearer(c.bearer)?.personId).toBe("cy"); // others unaffected
+  });
+
+  it("refuses a person id that matches no account", async () => {
+    accounts.set("o", { id: "o", role: "owner" });
+    const ghost = await signIn("local-owner");
+    expect(resolveBearer(ghost.bearer)).toBeNull();
+  });
+
+  it("fails closed when the user store can't be read", async () => {
+    accounts.set("ana", { id: "ana", role: "member" });
+    const { bearer } = await signIn("ana");
+    people.lookup = () => {
+      throw new Error("corrupt users file");
+    };
+    expect(resolveBearer(bearer)).toBeNull();
   });
 });
 

@@ -118,6 +118,13 @@ function load(): StoreShape {
   };
 }
 
+/**
+ * Token of the lock this process holds while a mutation runs. Module-global, so
+ * `fn` passed to withLock must stay synchronous. The fence narrows the window in
+ * which a reclaimed holder can write; it is not a hard guarantee without OS locks.
+ */
+let heldToken: string | null = null;
+
 /** Own, array-valued entries only, in a prototype-less object so "constructor" is just a key. */
 function sanitizeFailures(value: unknown): Record<string, number[]> {
   const out: Record<string, number[]> = Object.create(null);
@@ -130,6 +137,11 @@ function sanitizeFailures(value: unknown): Record<string, number[]> {
 
 function save(store: StoreShape): void {
   const target = file();
+  // Fence: a holder that stalled past the stale timeout may have been reclaimed.
+  // Writing then could drop a revokedAt or a new session another process saved.
+  if (heldToken !== null && readOwner(`${target}.lock`) !== heldToken) {
+    throw new Error("mcp-device-auth store lock was lost");
+  }
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const tmp = `${target}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(store, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
@@ -259,9 +271,11 @@ async function withLock<T>(fn: () => T): Promise<T> {
     if (Date.now() - started > LOCK_WAIT_MS) throw new Error("mcp-device-auth store is busy");
     await sleep(10);
   }
+  heldToken = mine;
   try {
     return fn();
   } finally {
+    heldToken = null;
     // Release must never turn a committed write into a failure.
     try {
       await withGuard(lock, () => {
@@ -409,12 +423,17 @@ export function resolveBearer(bearer: string): McpSession | null {
   }
   if (!session || session.revokedAt || session.expiresAt <= clock()) return null;
   // Before any account exists there is nobody to check against: sessions made then
-  // stay valid until the first owner is created (which revokes them).
-  if (accountsEnabled()) {
-    // A session belongs to a person who can still approve one: deleted, disabled or
-    // demoted below member means no session, even if revocation never ran.
-    const person = getUser(session.personId);
-    if (!person || person.disabled || ROLE_RANK[person.role] < ROLE_RANK.member) return null;
+  // stay valid until the first owner is created (which revokes them). Otherwise a
+  // session belongs to a person who can still approve one: deleted, disabled or
+  // demoted below member means no session, even if revocation never ran. Checked
+  // on every request, so the cut-off is immediate.
+  try {
+    if (accountsEnabled()) {
+      const person = getUser(session.personId);
+      if (!person || person.disabled || ROLE_RANK[person.role] < ROLE_RANK.member) return null;
+    }
+  } catch {
+    return null; // unreadable user store: fail closed
   }
   return { personId: session.personId, createdAt: session.createdAt, expiresAt: session.expiresAt };
 }

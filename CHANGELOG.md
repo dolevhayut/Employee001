@@ -13,6 +13,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   instead of 0.7.x and 0.6.x, so it stays true with every release. The support
   commitment itself is unchanged.
 
+### Personal sign-in for MCP clients: follow-ups
+- A personal MCP sign-in stops working immediately when the person is deleted,
+  disabled or demoted below member, instead of lasting up to 30 days.
+- A personal MCP sign-in now gets through the access gate in front of `/api/mcp`
+  when accounts are on; before, only the shared token did.
+- `/api/mcp` caps the request body as it reads it, so a chunked upload with no
+  size header can no longer be buffered whole.
+- The sign-in store's lock can no longer be taken by two processes at once after
+  a crash, and a stalled writer is refused instead of overwriting a revoke.
+- The device sign-in link (`/device`) now uses your configured public URL
+  (`EMPLOYEE001_PUBLIC_URL` or `APP_URL`) instead of the request's Host header.
+
 ### Personal sign-in for MCP clients (groundwork)
 - The server can now issue a short-lived device code that a signed-in person
   approves, and tie the resulting MCP session to that person so it can be
