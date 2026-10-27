@@ -22,7 +22,12 @@ export function clientKey(request: Request): string {
 export function takeSlot(bucket: string, limit: number, now = Date.now()): boolean {
   if (hits.size >= MAX_BUCKETS && !hits.has(bucket)) {
     for (const [key, times] of hits) if (!times.some((t) => t > now - 60_000)) hits.delete(key);
-    if (hits.size >= MAX_BUCKETS) return false; // refuse rather than grow without bound
+    // Still full: drop the oldest buckets so the map stays bounded without locking new clients out.
+    // The global ceiling in the routes is what limits a flood of rotating keys.
+    for (const key of hits.keys()) {
+      if (hits.size < MAX_BUCKETS) break;
+      hits.delete(key);
+    }
   }
   const recent = (hits.get(bucket) ?? []).filter((t) => t > now - 60_000);
   if (recent.length >= limit) {
