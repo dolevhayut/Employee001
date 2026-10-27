@@ -8,6 +8,15 @@ import type { CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 
 const MARK = "🤖 AI twin of";
 
+/** Machine-readable twin of the text line, for email headers and HTTP responses. */
+export const AI_HEADER = "X-AI-Generated";
+export const AI_HEADER_VALUE = "true";
+
+/** The label shown wherever a twin's answer is spoken (synthetic audio). */
+export const AI_VOICE_LABEL = "AI voice";
+/** Response headers marking synthesized audio so clients can detect it. */
+export const AI_AUDIO_HEADERS: Record<string, string> = { [AI_HEADER]: AI_HEADER_VALUE, "X-AI-Voice": "synthetic" };
+
 export function disclosureLine(employeeName: string): string {
   return `${MARK} ${employeeName.trim() || "an employee"}`;
 }
@@ -85,7 +94,33 @@ export function discloseOutbound(
     }
   }
   if (!touched) out[/(?:^|_)(?:MICROSOFT_)?TEAMS_/i.test(bare) ? "content" : textFields[0]] = withAiDisclosure("", employeeName);
+  if (EMAIL_SEND.test(bare)) markEmailHeader(bare, out);
   return out;
+}
+
+/** Input fields an email tool exposes for custom headers. Header support is
+ *  read from the input itself: the model sees the tool's schema, so a tool
+ *  that takes headers gets the field filled; one that doesn't is a logged gap
+ *  and keeps the text line alone. */
+const HEADER_FIELDS = ["headers", "custom_headers", "internet_message_headers"];
+const warnedGaps = new Set<string>();
+
+function markEmailHeader(tool: string, out: Record<string, unknown>): void {
+  const field = HEADER_FIELDS.find((f) => f in out);
+  if (!field) {
+    if (!warnedGaps.has(tool)) {
+      warnedGaps.add(tool);
+      console.warn(`[ai-disclosure] ${tool} has no custom-header field; ${AI_HEADER} not sent, text disclosure only`);
+    }
+    return;
+  }
+  const current = out[field];
+  if (Array.isArray(current)) {
+    const has = current.some((h) => h && typeof h === "object" && String((h as { name?: unknown }).name).toLowerCase() === AI_HEADER.toLowerCase());
+    out[field] = has ? current : [...current, { name: AI_HEADER, value: AI_HEADER_VALUE }];
+  } else {
+    out[field] = { ...(current && typeof current === "object" ? (current as Record<string, unknown>) : {}), [AI_HEADER]: AI_HEADER_VALUE };
+  }
 }
 
 /** Wrap a canUseTool callback so every allowed send carries the disclosure,

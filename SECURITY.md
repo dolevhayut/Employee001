@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---|---|
-| The latest minor release (currently 0.7.x) | ✅ |
-| The minor release before it (currently 0.6.x) | ✅ Security fixes only |
+| The latest minor release | ✅ |
+| The minor release before it | ✅ Security fixes only |
 | Older releases | ❌ |
 
 We support the latest minor release and the one before it as weekly releases continue.
@@ -67,6 +67,12 @@ Composio-managed apps are covered by ZDR only on Composio Enterprise.
 - **Two-factor sign-in**: TOTP (any authenticator app), turned on from your account page. Codes can't be reused.
 - **Single sign-on**: OpenID Connect with PKCE (`EMPLOYEE001_OIDC_ISSUER`, `EMPLOYEE001_OIDC_CLIENT_ID`, `EMPLOYEE001_OIDC_CLIENT_SECRET`, `EMPLOYEE001_OIDC_REDIRECT_URI` or `APP_URL`). People are matched by verified email; `EMPLOYEE001_OIDC_ALLOWED_DOMAINS` lets unknown people from those domains in as members. **SAML isn't supported yet.**
 - **Roles**: owner (everything), admin (settings, connections, allowlists, deletion, audit export), approver (approves twin actions), member (uses twins), employee (sees only their own twin and can withdraw consent). Every API route is in one table (`src/lib/auth/rbac.ts`); a test fails when a route is missing, and unknown routes are denied.
+- **Personal MCP sign-in (opt-in)**: set `EMPLOYEE001_MCP_PERSONAL_SIGNIN=1` and `/api/mcp` clients sign in as themselves instead of sharing a token. A client starts a device code (`POST /api/mcp/device/start`) and polls for it (`/api/mcp/device/poll`); a signed-in person approves it at `/device` (`/api/mcp/device/approve`), and the client gets a bearer that belongs to that person. The approval link is built from `EMPLOYEE001_PUBLIC_URL` or `APP_URL` when set, not from the request's Host header. Device codes expire after 10 minutes, sessions after 30 days, and only hashes of codes and bearers are stored. With it off (the default), nothing changes.
+  - **Attributed in the audit log**: once it is on, every `/api/mcp` request is written to the audit log with who made it (the person's id), when, and which tool it called; a batch writes one row per call. Refused requests are logged too. If a request can't be written to the log it isn't served (503), and a batch of more than 50 calls or 1 MB is refused (413).
+  - **Revocation**: `POST /api/mcp/device/revoke` ends a person's MCP sessions (your own, or anyone's if you are an admin). The very next request with that bearer is refused with 401, because sessions are looked up on every request. Revocations are audited.
+  - **Tied to the person**: a session stops working at once if its person is deleted, disabled or demoted below member (checked on every request), and those changes, plus a password reset, also revoke their sessions.
+  - **The shared token is off by default once personal sign-in is on**: `EMPLOYEE001_MCP_TOKEN` and `EMPLOYEE001_TOKEN` are then **refused for `/api/mcp`**, and loopback requests need a personal bearer too. An admin opts back in on purpose with `EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN=1`. Those requests are logged as `shared-token`, not as a person, and the token is compared in constant time. Remove the setting to turn the shared token off again.
+  - **Exposed bind**: on `EMPLOYEE001_BIND`, the access gate in `src/proxy.ts` accepts a personal bearer in front of `/api/mcp` while personal sign-in is on, as well as the shared tokens the policy allows.
 - Failed sign-ins are rate limited per account and per IP. Sign-ins, account changes and MFA changes are audited.
 
 ## What a twin can reach
@@ -170,7 +176,7 @@ You host Employee001, so it runs inside your environment and within your complia
 
 Download the release tarball, then verify its build provenance with the GitHub CLI:
 
-`gh attestation verify employee001-0.7.0.tgz -R dolevhayut/Employee001`
+`gh attestation verify employee001-<version>.tgz -R dolevhayut/Employee001`
 
 ## Reporting a Vulnerability
 

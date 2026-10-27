@@ -59,6 +59,12 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/email/composio": { POST: webhook },
   "/api/slack/composio": { POST: webhook },
   "/api/mcp": { GET: { kind: "bearer" }, POST: { kind: "bearer" }, DELETE: { kind: "bearer" } },
+  // Device-code sign-in: start and poll are public (the device code is the credential);
+  // approve and revoke need a signed-in person (a shared MCP token is not one).
+  "/api/mcp/device/start": { POST: pub },
+  "/api/mcp/device/poll": { POST: pub },
+  "/api/mcp/device/approve": { POST: member },
+  "/api/mcp/device/revoke": { POST: employee },
 
   // Employee onboarding: the invite token is the credential
   "/api/invites/[token]": { GET: invite, DELETE: admin },
@@ -81,9 +87,10 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/employees/[id]/knowledge/[name]/versions": { GET: role("member", "id") },
   "/api/employees/[id]/knowledge/[name]/versions/[ts]": { GET: role("member", "id") },
   "/api/employees/[id]/knowledge/[name]/versions/[ts]/restore": { POST: admin },
-  "/api/employees/[id]/knowledge/proposals": { GET: member },
+  "/api/employees/[id]/knowledge/proposals": { GET: member, POST: member },
   "/api/employees/[id]/knowledge/proposals/[pid]": { POST: admin },
   "/api/employees/[id]/skills": { GET: member, PATCH: admin },
+  "/api/employees/[id]/import-claude-code": { POST: admin },
   "/api/employees/[id]/task": { POST: member },
   "/api/employees/[id]/versions/builds": { GET: role("member", "id") },
   "/api/employees/[id]/versions/file/[name]": { GET: role("member", "id") },
@@ -129,6 +136,7 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/approvals/pending": { GET: member },
   "/api/feed": { GET: member },
   "/api/feed/[id]/resolve": { POST: approver },
+  "/api/inbox/contradictions": { POST: member },
   "/api/stt": { POST: member },
   "/api/stt/token": { POST: member },
   "/api/tts": { POST: member },

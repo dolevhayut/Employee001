@@ -90,4 +90,25 @@ describe("twin memory redaction", () => {
       value: "25-minute decision meetings with notes and a weekly summary",
     });
   });
+
+  it("recall for a temporary ask reads memory without reinforcing cards on disk", async () => {
+    const { rememberTwinRun, searchTwinMemory } = await import("./twin-memory");
+    await rememberTwinRun({
+      employeeId: "noa",
+      runId: "r1",
+      surface: "chat",
+      question: "Who owns the Acme renewal?",
+      answer: "Dana owns the Acme renewal and signs off on discounts.",
+    });
+    const dir = path.join(home, "data", "memory", "noa");
+    const accessFiles = () => fs.readdirSync(dir).filter((f) => f.includes("access"));
+    expect(accessFiles()).toEqual([]);
+
+    const quiet = await searchTwinMemory("noa", "Acme renewal owner", undefined, false);
+    expect(quiet.length).toBeGreaterThan(0);
+    expect(accessFiles()).toEqual([]);
+
+    await searchTwinMemory("noa", "Acme renewal owner");
+    expect(accessFiles().length).toBe(1);
+  });
 });

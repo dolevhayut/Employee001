@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { AI_AUDIO_HEADERS } from "@/lib/ai-disclosure";
 import { elevenLabsBase, voiceEnabled } from "@/lib/data-residency";
 import { fetchSpeech } from "@/lib/tts-model";
 import { resolveTtsVoice } from "@/lib/voice-live";
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
       "Cache-Control": "no-cache",
       "X-Content-Type-Options": "nosniff",
       ...(fallback ? { "X-Voice-Fallback": fallback.error, "X-Voice-Fallback-Message": fallback.message } : {}),
+      ...AI_AUDIO_HEADERS,
     },
   });
 }

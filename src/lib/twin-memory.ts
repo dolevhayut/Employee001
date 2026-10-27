@@ -672,7 +672,9 @@ async function agenticRerank(
 export async function searchTwinMemory(
   employeeId: string,
   query: string,
-  limit = searchLimit()
+  limit = searchLimit(),
+  /** False for a temporary ask: recall may read, but must not bump access counts on disk. */
+  reinforceHits = true
 ): Promise<TwinMemoryHit[]> {
   if (!isEnabled()) return [];
 
@@ -753,7 +755,7 @@ export async function searchTwinMemory(
   if (hits.length === 0) return [];
 
   // Reinforce what we surfaced — recall is itself a signal of usefulness.
-  reinforce(employeeId, hits.map((hit) => hit.card.id));
+  if (reinforceHits) reinforce(employeeId, hits.map((hit) => hit.card.id));
 
   return hits;
 }
@@ -1304,6 +1306,13 @@ export function searchStructuredMemory(
     .slice(0, limit - matched.length);
 
   return [...matched, ...backfill];
+}
+
+/** Every durable fact currently in force for a twin (superseded history is
+ *  left out). Used by the cross-twin contradiction scan. */
+export function listCurrentStructuredFacts(employeeId: string): TwinStructuredFact[] {
+  if (!isEnabled() || !structuredEnabled()) return [];
+  return readJsonl<TwinStructuredFact>(structuredPath(employeeId)).filter((fact) => !fact.supersededBy);
 }
 
 function cmpRecent(a: TwinStructuredFact, b: TwinStructuredFact): number {
