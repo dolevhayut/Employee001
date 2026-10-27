@@ -8,11 +8,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### The security policy no longer names out-of-date versions
-- SECURITY.md now says "the latest minor release" and "the one before it"
-  instead of 0.7.x and 0.6.x, so it stays true with every release. The support
-  commitment itself is unchanged.
-
 ### Personal sign-in for MCP clients (groundwork)
 - The server can now issue a short-lived device code that a signed-in person
   approves, and tie the resulting MCP session to that person so it can be
@@ -23,6 +18,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The sign-in routes answer 404 while personal sign-in is off, so no code can
   be minted early. Deleting, disabling, demoting or resetting the password of a
   person now ends their MCP sessions too.
+
+### The security policy no longer names out-of-date versions
+- SECURITY.md now says "the latest minor release" and "the one before it"
+  instead of 0.7.x and 0.6.x, so it stays true with every release. The support
+  commitment itself is unchanged.
 
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual
