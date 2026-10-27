@@ -15,6 +15,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Once personal sign-in is enabled, the shared `EMPLOYEE001_MCP_TOKEN` and
   `EMPLOYEE001_TOKEN` stop working for `/api/mcp` unless an admin opts in with
   `EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN=1`. See SECURITY.md.
+- The sign-in routes answer 404 while personal sign-in is off, so no code can
+  be minted early. Deleting, disabling, demoting or resetting the password of a
+  person now ends their MCP sessions too.
 
 ### The security policy no longer names out-of-date versions
 - SECURITY.md now says "the latest minor release" and "the one before it"
