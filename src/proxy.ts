@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { timingSafeEqual } from "@/lib/mcp-server/guard";
+import { matchesSharedToken, personalSignInEnabled, resolveBearer } from "@/lib/mcp-server/device-auth";
 import { authorizeApi, authorizePage, type Caller } from "@/lib/auth/rbac";
 import { USER_EMPLOYEE_HEADER, USER_ID_HEADER, USER_ROLE_HEADER } from "@/lib/auth/request-user";
 import {
@@ -63,9 +64,14 @@ function isHttps(request: NextRequest): boolean {
 }
 
 function bearerMatches(request: NextRequest): boolean {
-  const bearer = request.headers.get("authorization");
-  const expected = [process.env.EMPLOYEE001_MCP_TOKEN, process.env.EMPLOYEE001_TOKEN].filter((t): t is string => Boolean(t));
-  return Boolean(bearer?.startsWith("Bearer ") && expected.some((t) => timingSafeEqual(bearer.slice("Bearer ".length), t)));
+  const header = request.headers.get("authorization");
+  if (!header?.startsWith("Bearer ")) return false;
+  const bearer = header.slice("Bearer ".length);
+  // The shared-token policy decides whether shared tokens still count; a personal
+  // device bearer counts only while personal sign-in is on. /api/mcp re-checks
+  // either way and attributes the request to a person.
+  if (matchesSharedToken(bearer)) return true;
+  return personalSignInEnabled() && resolveBearer(bearer) !== null;
 }
 
 function unauthorizedHtml(pathAndQuery: string): string {

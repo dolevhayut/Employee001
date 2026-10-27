@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEVICE_CODE_TTL_MS,
   SESSION_TTL_MS,
@@ -148,6 +148,49 @@ describe("lock", () => {
     expect(fs.readFileSync(lockPath(), "utf8")).toBe("someone-else");
     fs.rmSync(lockPath());
     await expect(pending).resolves.toBeTruthy();
+  });
+
+  it("clears a reclaim guard left by a crashed reclaimer, then reclaims the stale lock", async () => {
+    await issueDeviceCode();
+    const old = new Date(Date.now() - 60_000);
+    for (const p of [lockPath(), `${lockPath()}.reclaim`]) {
+      fs.writeFileSync(p, "dead-owner");
+      fs.utimesSync(p, old, old);
+    }
+    await expect(issueDeviceCode()).resolves.toBeTruthy();
+    expect(fs.existsSync(lockPath())).toBe(false);
+    expect(fs.existsSync(`${lockPath()}.reclaim`)).toBe(false);
+  });
+
+  it("never lets two stale-lock reclaimers both proceed: concurrent waiters keep every write", async () => {
+    await issueDeviceCode();
+    fs.writeFileSync(lockPath(), "dead-owner");
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(lockPath(), old, old);
+    const issued = await Promise.all(Array.from({ length: 6 }, () => issueDeviceCode()));
+    const results = await Promise.all(issued.map((i) => approveUserCode(i.userCode, "ada")));
+    expect(results.every((r) => r.ok)).toBe(true);
+  });
+
+  it("refuses to save when the lock was taken over mid-operation, so a revoke is never overwritten", async () => {
+    const { bearer } = await signIn();
+    const dataFile = path.join(home, "data", "mcp-device-auth.json");
+    const realRead = fs.readFileSync;
+    let intruded = false;
+    const spy = vi.spyOn(fs, "readFileSync").mockImplementation(((p: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
+      if (!intruded && p === dataFile) {
+        intruded = true;
+        fs.writeFileSync(lockPath(), "intruder"); // someone reclaimed our lock while we worked
+      }
+      return (realRead as (...a: unknown[]) => unknown)(p, ...rest);
+    }) as typeof fs.readFileSync);
+    try {
+      await expect(revokePersonSessions("ada")).rejects.toThrow(/lock was lost/);
+    } finally {
+      spy.mockRestore();
+      fs.rmSync(lockPath(), { force: true });
+    }
+    expect(resolveBearer(bearer)).not.toBeNull(); // nothing half-written; the caller sees the error and can retry
   });
 
   it("serialises concurrent operations without losing writes", async () => {

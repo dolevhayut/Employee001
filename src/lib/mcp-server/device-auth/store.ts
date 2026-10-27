@@ -101,8 +101,16 @@ function load(): StoreShape {
   };
 }
 
+/** Token of the lock this process holds while a mutation runs (mutations are synchronous). */
+let heldToken: string | null = null;
+
 function save(store: StoreShape): void {
   const target = file();
+  // Fence: a holder that stalled past the stale timeout may have been reclaimed.
+  // Writing then could drop a revokedAt or a new session another process saved.
+  if (heldToken !== null && readLockOwner(`${target}.lock`) !== heldToken) {
+    throw new Error("mcp-device-auth store lock was lost");
+  }
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const tmp = `${target}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(store, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
@@ -164,33 +172,48 @@ async function withLock<T>(fn: () => T): Promise<T> {
       break;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-      try {
-        const seen = readLockOwner(lock);
-        if (seen !== null && Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS) {
-          const moved = `${lock}.stale.${token}`;
-          fs.renameSync(lock, moved);
-          if (readLockOwner(moved) === seen) fs.rmSync(moved, { force: true });
-          else {
-            // We moved a lock that was replaced meanwhile: give it back if the slot is free.
-            try {
-              fs.linkSync(moved, lock);
-            } catch {
-              /* slot already retaken */
-            }
-            fs.rmSync(moved, { force: true });
-          }
-        }
-      } catch {
-        /* released or reclaimed by someone else */
-      }
+      reclaimIfStale(lock, token);
       if (Date.now() - started > LOCK_WAIT_MS) throw new Error("mcp-device-auth store is busy");
       await sleep(10);
     }
   }
+  heldToken = token;
   try {
     return fn();
   } finally {
+    heldToken = null;
     if (readLockOwner(lock) === token) fs.rmSync(lock, { force: true });
+  }
+}
+
+/**
+ * Remove a lock whose holder stalled past LOCK_STALE_MS. Reclaiming is itself
+ * serialized by an exclusive `.reclaim` file, so two waiters never both remove a
+ * lock (the old rename-then-link-back could hand the slot to two processes).
+ * Under that guard the lock is re-read, and only the exact stale owner is removed.
+ */
+function reclaimIfStale(lock: string, token: string): void {
+  const guard = `${lock}.reclaim`;
+  try {
+    fs.writeFileSync(guard, token, { flag: "wx", mode: 0o600 });
+  } catch {
+    // Someone else is reclaiming; clear a guard its crashed owner left behind.
+    try {
+      if (Date.now() - fs.statSync(guard).mtimeMs > LOCK_STALE_MS) fs.rmSync(guard, { force: true });
+    } catch {
+      /* gone already */
+    }
+    return;
+  }
+  try {
+    const seen = readLockOwner(lock);
+    if (seen !== null && Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS && readLockOwner(lock) === seen) {
+      fs.rmSync(lock, { force: true });
+    }
+  } catch {
+    /* released or reclaimed by someone else */
+  } finally {
+    if (readLockOwner(guard) === token) fs.rmSync(guard, { force: true });
   }
 }
 

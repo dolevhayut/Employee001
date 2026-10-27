@@ -134,6 +134,49 @@ describe("POST /api/mcp per-person identity and audit", () => {
     expect(rows).toHaveLength(before);
   });
 
+  function chunkedCall(bearer: string, chunks: string[], pulled: { count: number }) {
+    const encoder = new TextEncoder();
+    let i = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (i >= chunks.length) return controller.close();
+        pulled.count++;
+        controller.enqueue(encoder.encode(chunks[i++]));
+      },
+    });
+    return POST(
+      new Request("http://localhost:3000/api/mcp", {
+        method: "POST",
+        headers: {
+          host: "localhost:3000",
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          authorization: `Bearer ${bearer}`,
+        },
+        body: stream,
+        duplex: "half",
+      } as RequestInit),
+    );
+  }
+
+  it("caps a chunked body that has no Content-Length and stops reading it", async () => {
+    const ana = await signIn("person_ana");
+    const pulled = { count: 0 };
+    const before = rows.length;
+    const res = await chunkedCall(ana, Array.from({ length: 200 }, () => "x".repeat(100_000)), pulled);
+    expect(res.status).toBe(413);
+    expect(pulled.count).toBeLessThan(200);
+    expect(rows).toHaveLength(before);
+  });
+
+  it("serves a small chunked body and audits it", async () => {
+    const ana = await signIn("person_ana");
+    const text = JSON.stringify(toolCall("list_twins"));
+    const res = await chunkedCall(ana, [text.slice(0, 20), text.slice(20)], { count: 0 });
+    expect(res.status).toBe(200);
+    expect(rows.filter((r) => r.requesterId === "person_ana" && r.bareName === "list_twins")).toHaveLength(1);
+  });
+
   it("does not honour a personal session while personal sign-in is off on an exposed bind", async () => {
     const ana = await signIn("person_ana");
     process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "0";
