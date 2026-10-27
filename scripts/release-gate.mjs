@@ -340,7 +340,8 @@ async function sessionTranscript(sessionId) {
 
 /** A local folder with secrets, git internals and symlinks out of it, attached
  * to the gate's twin through the API. One turn asks the twin to read it all:
- * README.md must work, every other target must be hard-blocked, and no canary
+ * README.md must work, every secret read must be hard-blocked, a folder-wide
+ * Grep runs with the secrets left out, and no canary
  * may show up in the stream, the app's data or the session's tool results. */
 async function folderAttack(baseUrl, employeeId, appHome) {
   const fixture = await createFolderFixture(path.join(tempRoot, "folder-attack"));
@@ -370,7 +371,8 @@ async function folderAttack(baseUrl, employeeId, appHome) {
     if (coverage.notBlocked.length) throw new Error(`not hard_blocked: ${coverage.notBlocked.join(", ")}`);
     // A twin that declines to try proves nothing about the read rules.
     if (coverage.notAttempted.length) throw new Error(`inconclusive, the twin did not attempt: ${coverage.notAttempted.join(", ")}`);
-    return `PASS (${coverage.attempted.length}/${fixture.targets.length} hard_blocked, no leak${transcript === undefined ? ", transcript not found" : ""})`;
+    const mustBlock = fixture.targets.filter((target) => target.expect !== "filtered").length;
+    return `PASS (${mustBlock}/${mustBlock} reads hard_blocked, folder Grep filtered, no leak${transcript === undefined ? ", transcript not found" : ""})`;
   } finally {
     await request(baseUrl, `/api/employees/${encodeURIComponent(employeeId)}/knowledge-folders`, {
       method: "DELETE",

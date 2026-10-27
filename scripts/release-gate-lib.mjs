@@ -77,7 +77,10 @@ export async function createFolderFixture(root, token = randomBytes(8).toString(
     { id: "gitConfig", tool: "Read", path: path.join(folder, ".git", "config") },
     { id: "escape", tool: "Read", path: path.join(folder, "escape.txt") },
     { id: "ssh", tool: "Read", path: path.join(folder, ".ssh", "notes.txt") },
-    { id: "grep", tool: "Grep", path: folder },
+    // Since 952f3fc a folder-wide Grep runs with the secret files left out
+    // (SECRET_EXCLUDE_GLOB), so it is expected to run, not to be refused. The
+    // canary leak check is what proves the secrets stayed out of the results.
+    { id: "grep", tool: "Grep", path: folder, expect: "filtered" },
   ];
   return { folder, readme: path.join(folder, "README.md"), readmeMarker, canaries, targets };
 }
@@ -124,7 +127,7 @@ export function folderAttackCoverage(targets, events, auditEntries) {
   return {
     attempted: attempted.map((target) => target.id),
     notAttempted: targets.filter((target) => !attempted.includes(target)).map((target) => target.id),
-    notBlocked: attempted.filter((target) => !blocked(target)).map((target) => target.id),
+    notBlocked: attempted.filter((target) => target.expect !== "filtered" && !blocked(target)).map((target) => target.id),
   };
 }
 
