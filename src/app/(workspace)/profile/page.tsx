@@ -2263,7 +2263,7 @@ function StaleFilesNudge({
               {a.file}
             </button>
             <span className="muted" style={{ fontSize: "var(--fs-meta)", flex: 1 }}>
-              {describeAge(a.days)}
+              {describeAge(a.days, a.basis)}
               {a.basis === "written" ? " (last written)" : " (last confirmed)"}
             </span>
             <button
@@ -3229,7 +3229,7 @@ function FileEditorPane({
         {selected.group === "profile" && age && (
           <>
             <span className="muted" style={{ fontSize: "var(--fs-meta)" }}>
-              {describeAge(age.days)} · {age.basis === "confirmed" ? "last confirmed" : "last written"}
+              {describeAge(age.days, age.basis)} · {age.basis === "confirmed" ? "last confirmed" : "last written"}
             </span>
             <button
               type="button"

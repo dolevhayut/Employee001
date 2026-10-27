@@ -17,9 +17,9 @@ export function daysBetween(fromMs: number, nowMs: number): number {
   return Math.max(0, Math.floor((nowMs - fromMs) / 86_400_000));
 }
 
-/** "41 days old", "1 day old", "updated today". */
-export function describeAge(days: number): string {
-  if (days <= 0) return "updated today";
+/** "41 days old", "1 day old", "updated today" (or "confirmed today" after a Still true). */
+export function describeAge(days: number, basis: "confirmed" | "written" = "written"): string {
+  if (days <= 0) return basis === "confirmed" ? "confirmed today" : "updated today";
   return `${days} ${days === 1 ? "day" : "days"} old`;
 }
 

@@ -35,6 +35,7 @@ describe("age helpers", () => {
     expect(describeAge(41)).toBe("41 days old");
     expect(describeAge(1)).toBe("1 day old");
     expect(describeAge(0)).toBe("updated today");
+    expect(describeAge(0, "confirmed")).toBe("confirmed today");
   });
 
   it("lists only files older than 30 days, oldest first", () => {

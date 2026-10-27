@@ -114,7 +114,7 @@ type Turn = {
   thinking: string;
   answer: string | null;
   /** Age of the profile files the answer relied on. */
-  profileAges?: { file: string; days: number }[];
+  profileAges?: { file: string; days: number; basis?: "confirmed" | "written" }[];
   /** Set when the CEO handed this as a task instead of asking. */
   task?: {
     itemId?: string;
@@ -175,7 +175,7 @@ type TraceEvent = {
   reason?: string;
   approvalId?: string;
   message?: string;
-  files?: { file: string; days: number }[];
+  files?: { file: string; days: number; basis?: "confirmed" | "written" }[];
 };
 
 /** A failure the server explained (a bad key, Claude Code signed out, a
@@ -217,7 +217,7 @@ async function askTwin(
     /** The answer's text as it streams (spoken sentence by sentence in live voice). */
     text?: (d: string) => void;
     /** How old the profile files behind this answer are. */
-    profileAges?: (files: { file: string; days: number }[]) => void;
+    profileAges?: (files: { file: string; days: number; basis?: "confirmed" | "written" }[]) => void;
   },
   signal?: AbortSignal,
   /** Asked by voice: the server's voice fast lane and a spoken-answer style. */
@@ -1764,7 +1764,7 @@ export default function AskPage() {
                     })()}
                     {turn.profileAges?.length ? (
                       <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--text-muted)" }}>
-                        Based on {turn.profileAges.map((a) => `${a.file}, ${describeAge(a.days)}`).join(" · ")}
+                        Based on {turn.profileAges.map((a) => `${a.file}, ${describeAge(a.days, a.basis)}`).join(" · ")}
                       </div>
                     ) : null}
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
