@@ -52,7 +52,7 @@ export async function POST(
     return Response.json({ result });
   } catch (err) {
     if (err instanceof ImportChangedError) return Response.json({ error: err.message }, { status: 409 });
-    if (err instanceof Error && err.message.startsWith("That .claude folder")) {
+    if (err instanceof Error && /^(That \.claude folder|The \.claude folder|The source folder)/.test(err.message)) {
       return Response.json({ error: err.message }, { status: 400 });
     }
     console.warn("[import-claude-code]", err instanceof Error ? err.message : err);

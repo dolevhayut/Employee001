@@ -126,9 +126,18 @@ function cleanUrl(raw: string): { url: string; stripped: boolean } | null {
     u.hash = "";
     // A token can also sit in the path (e.g. /s/<secret>/mcp): treat long or
     // mixed letter+digit segments as secrets and refuse the URL.
-    const tokenLike = u.pathname.split("/").some(
-      (seg) => /^[A-Za-z0-9_~-]{24,}$/.test(seg) || (seg.length >= 12 && /^[A-Za-z0-9_-]+$/.test(seg) && /\d/.test(seg) && /[A-Za-z]/.test(seg)),
-    );
+    // Checked on the raw and the percent-decoded segment, whatever characters
+    // it uses (JWTs carry dots, base64 carries + / =), and on host labels.
+    const segTokenLike = (raw: string) => {
+      let decoded = raw;
+      try { decoded = decodeURIComponent(raw); } catch { /* keep raw */ }
+      return [raw, decoded].some(
+        (s) => s.length >= 24 || /^eyJ/.test(s) || (s.length >= 12 && /[A-Za-z]/.test(s) && /\d/.test(s)),
+      );
+    };
+    const labelTokenLike = (l: string) => l.length >= 20 || (/^[a-z0-9]+$/i.test(l) && l.length >= 6 && /[a-z]/i.test(l) && /\d/.test(l));
+    const tokenLike =
+      u.pathname.split("/").some(segTokenLike) || u.hostname.split(".").some(labelTokenLike);
     return { url: u.toString(), stripped: stripped || tokenLike };
   } catch {
     return null;
@@ -283,7 +292,7 @@ export async function previewClaudeCodeImport(
   return {
     sourcePath: root,
     notice:
-      "This reads the Claude Code folder of the user running Employee001 on this machine, and adds it to this twin. Skills are assigned to this twin; MCP servers are added disabled.",
+      "This reads the Claude Code folder of the user running Employee001 on this machine, and adds it to this twin. Skills are assigned to this twin; MCP servers are added to the whole organisation, disabled, with any headers, env and authentication left out.",
     items,
     counts,
     skipped,

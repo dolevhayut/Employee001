@@ -16,7 +16,7 @@ const home = await vi.hoisted(async () => {
 import { applyClaudeCodeImport, ImportChangedError, previewClaudeCodeImport, previewForClient } from "./claude-code-import";
 import { sdkChildEnv } from "./sdk-env";
 
-const SECRETS = ["HOOK_SECRET_CMD", "PERMISSION_SECRET_RULE", "ENV_SECRET_VALUE", "CRED_SECRET_TOKEN", "HEADER_SECRET_BEARER", "URLUSER_SECRET", "QUERY_SECRET_KEY", "PATH_SECRET_Zk3j9Qw8Lm2Xv7Rt4Yb6"];
+const SECRETS = ["HOOK_SECRET_CMD", "PERMISSION_SECRET_RULE", "ENV_SECRET_VALUE", "CRED_SECRET_TOKEN", "HEADER_SECRET_BEARER", "URLUSER_SECRET", "QUERY_SECRET_KEY", "PATH_SECRET_Zk3j9Qw8Lm2Xv7Rt4Yb6", "JWT_SECRET", "B64_SECRET", "k8f2abc"];
 const FORBIDDEN_FILES = ["settings.json", "settings.local.json", ".credentials.json"];
 
 const fixtureRoot = path.join(home, "fixture");
@@ -47,6 +47,9 @@ beforeAll(() => {
       docs: { type: "http", url: "https://docs.example.com/mcp", headers: { Authorization: "HEADER_SECRET_BEARER" }, env: { K: "ENV_SECRET_VALUE" } },
       withtoken: { type: "http", url: "https://user:URLUSER_SECRET@t.example.com/mcp?key=QUERY_SECRET_KEY" },
       pathtoken: { type: "http", url: "https://mcp.example.com/api/mcp/s/PATH_SECRET_Zk3j9Qw8Lm2Xv7Rt4Yb6/mcp" },
+      jwtpath: { type: "http", url: "https://mcp.example.com/mcp/eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.JWT_SECRET_sig" },
+      b64path: { type: "http", url: "https://mcp.example.com/m/B64_SECRET%2Bab%2Fcd%3D%3D" },
+      subdomain: { type: "sse", url: "https://k8f2abc.mcp.example.com/sse" },
       events: { type: "sse", url: "https://events.example.com/sse" },
       local: { type: "stdio", command: "node", args: ["x.js"], env: { K: "ENV_SECRET_VALUE" } },
     },
@@ -129,6 +132,8 @@ describe("import from Claude Code", () => {
     expect(p.skipped.some((s) => s.what === "mcp withtoken")).toBe(true);
     expect(p.skipped.some((s) => s.what === "mcp pathtoken")).toBe(true);
     expect(JSON.stringify(p)).not.toContain("PATH_SECRET");
+    for (const n of ["jwtpath", "b64path", "subdomain"]) expect(p.skipped.some((s) => s.what === `mcp ${n}`)).toBe(true);
+    for (const s of ["JWT_SECRET", "B64_SECRET", "k8f2abc"]) expect(JSON.stringify(p)).not.toContain(s);
     expect(JSON.stringify(p)).not.toContain("QUERY_SECRET_KEY");
   });
 
