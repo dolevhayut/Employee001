@@ -12,7 +12,8 @@ export type HiddenCharSource =
   | "knowledge-extract"
   | "knowledge-write"
   | "mcp-ask_twin"
-  | "mcp";
+  | "mcp"
+  | "focus-preload";
 
 export const HIDDEN_CHARS_AUDIT_TOOL = "inboundHiddenCharsRemoved";
 

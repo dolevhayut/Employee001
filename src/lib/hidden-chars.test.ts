@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeHiddenChars, stripHiddenChars, stripHiddenCharsFields } from "./hidden-chars";
+import { describeHiddenChars, stripHiddenChars, stripHiddenCharsDeep, stripHiddenCharsFields } from "./hidden-chars";
 
 /** The invisible Unicode-tag spelling of an ASCII string ("ASCII smuggling"). */
 const tags = (ascii: string) => [...ascii].map((ch) => String.fromCodePoint(0xe0000 + ch.charCodeAt(0))).join("");
@@ -83,6 +83,12 @@ describe("stripHiddenChars", () => {
     const once = stripHiddenChars(`x‮y${tags("hi")}`).text;
     expect(stripHiddenChars(once)).toMatchObject({ text: once, total: 0 });
     expect(stripHiddenChars("")).toMatchObject({ text: "", total: 0 });
+  });
+
+  it("cleans every string in a nested provider payload, keys included", () => {
+    const result = stripHiddenCharsDeep({ items: [{ subject: `Hi${tags("x")}`, n: 3, ok: true, none: null }], [`k​`]: ["a‮"] });
+    expect(result.value).toEqual({ items: [{ subject: "Hi", n: 3, ok: true, none: null }], k: ["a"] });
+    expect(result.removed).toEqual({ tag: 1, bidi: 1, zeroWidth: 1, other: 0 });
   });
 
   it("cleans several fields at once and describes the counts without the payload", () => {

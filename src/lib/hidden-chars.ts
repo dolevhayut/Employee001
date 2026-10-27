@@ -147,6 +147,32 @@ export function stripHiddenCharsFields<T extends Record<string, unknown>, K exte
   return { value: out, removed, total: hiddenCharTotal(removed) };
 }
 
+/**
+ * Clean every string (values and keys) inside a JSON-like value, e.g. a
+ * provider response that will be rendered into a prompt. Returns a copy.
+ */
+export function stripHiddenCharsDeep(value: unknown): { value: unknown; removed: HiddenCharCounts; total: number } {
+  const removed = emptyHiddenCharCounts();
+  const walk = (node: unknown, depth: number): unknown => {
+    if (typeof node === "string") {
+      const result = stripHiddenChars(node);
+      addHiddenCharCounts(removed, result.removed);
+      return result.text;
+    }
+    // Deeper than any real provider payload: leave it (the rendered block is
+    // cleaned again as a whole before it reaches a prompt).
+    if (depth > 64 || node === null || typeof node !== "object") return node;
+    if (Array.isArray(node)) return node.map((item) => walk(item, depth + 1));
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(node as Record<string, unknown>)) {
+      out[walk(key, depth + 1) as string] = walk(item, depth + 1);
+    }
+    return out;
+  };
+  const cleaned = walk(value, 0);
+  return { value: cleaned, removed, total: hiddenCharTotal(removed) };
+}
+
 /** "3 tag, 1 zero-width": a short, payload-free description for logs. */
 export function describeHiddenChars(counts: HiddenCharCounts): string {
   const parts: string[] = [];

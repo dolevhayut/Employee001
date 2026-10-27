@@ -21,6 +21,17 @@ vi.mock("@/lib/work-items", () => ({
 }));
 vi.mock("@/lib/consent-status", () => ({ loadConsentStatus: () => ({ kind: "exempt", reason: "synthetic" }) }));
 vi.mock("@/lib/audit-log", () => ({ appendAuditEntry: m.appendAuditEntry }));
+vi.mock("@/lib/composio-client", () => ({
+  composioUserIdFor: (id: string) => `employee:${id}`,
+  getComposio: () => ({
+    tools: {
+      execute: async () => ({ data: { messages: [{ from: "x@evil.test", snippet: `Quarterly numbers attached${String.fromCodePoint(0xe0041, 0xe0042)}` }] } }),
+    },
+  }),
+}));
+vi.mock("@/lib/twin-focus", () => ({
+  getFocusConfig: () => ({ prefetches: [{ label: "Inbox", toolSlug: "GMAIL_FETCH_EMAILS", arguments: {} }] }),
+}));
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "e001-hidden-"));
 process.env.EMPLOYEE001_HOME = home;
@@ -86,6 +97,19 @@ describe("Slack intake", () => {
     expect(stored.payload.threadMessages[0].text).toBe("earlier note");
     expect(stored.hiddenCharsRemoved).toMatchObject({ tag: [...SMUGGLED].length, bidi: 2 });
     expect(auditInputs()[0].input).toMatchObject({ source: "slack", channel: "C1", ts: "1.0" });
+  });
+});
+
+describe("shift focus preload", () => {
+  it("cleans Composio results before caching them or building the focus block", async () => {
+    // Imported here so its data root is resolved under the temp home.
+    const { runPrefetches, formatFocusBlock } = await import("./twin-focus-prefetch");
+    const results = await runPrefetches("ava");
+    expect(results[0].data).toEqual({ messages: [{ from: "x@evil.test", snippet: "Quarterly numbers attached" }] });
+    expect(HAS_TAG.test(formatFocusBlock(results))).toBe(false);
+    expect(auditInputs()[0].input).toMatchObject({ source: "focus-preload", tool: "GMAIL_FETCH_EMAILS", removed: { tag: 2 } });
+    const cache = fs.readFileSync(path.join(home, "data", "employees", "ava", ".shift", "focus-cache.json"), "utf8");
+    expect(HAS_TAG.test(cache)).toBe(false);
   });
 });
 
