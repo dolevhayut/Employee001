@@ -8,7 +8,15 @@ import type { MeetingTurn } from "@/lib/meeting-store";
 // decision the CEO can act on: what was decided, who does what next (each
 // action assignable to that twin as a task), and what is still open.
 
-export type MeetingAction = { employeeId: string; action: string; due?: string };
+export type MeetingAction = {
+  employeeId: string;
+  action: string;
+  due?: string;
+  /** Set when "Send to Roomate" started filing this action (ms). */
+  sentAt?: number;
+  /** The Roomate task id the owner's twin reported, when it named one. */
+  taskId?: string;
+};
 export type MeetingDecision = { decision: string; actions: MeetingAction[]; open: string[] };
 
 let client: Anthropic | null = null;

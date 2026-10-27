@@ -30,6 +30,7 @@ import { useT } from "@/components/ex/i18n-context";
 import { isolate } from "@/lib/i18n/format";
 import type { MessageKey, MessageVars } from "@/lib/i18n/messages";
 import { MeetingHistoryDrawer, fetchMeetingDetail, type HistoryDetail } from "./meeting-history";
+import { SendToRoomate, type RoomateAction, type RoomateSummary } from "./send-to-roomate";
 
 type TFn = (key: MessageKey, vars?: MessageVars) => string;
 
@@ -133,7 +134,7 @@ type MessageThread = {
 
 type MeetingDecision = {
   decision: string;
-  actions: { employeeId: string; action: string; due?: string }[];
+  actions: RoomateAction[];
   open: string[];
 };
 
@@ -1765,14 +1766,19 @@ function DecisionPanel({
   state,
   empById,
   question,
+  meetingId,
   onSummarize,
   onAssign,
+  onSummary,
 }: {
   state?: { status: "loading" | "ready" | "error"; data?: MeetingDecision; assigned?: Record<number, boolean> };
   empById: Record<string, EmployeeWithTwin>;
   question: string;
+  meetingId: string;
   onSummarize: () => void;
   onAssign: (idx: number) => void;
+  /** The stored summary changed (an action was sent to Roomate). */
+  onSummary: (summary: RoomateSummary) => void;
 }) {
   const { t } = useT();
   if (!state || state.status === "error") {
@@ -1847,6 +1853,14 @@ function DecisionPanel({
                     <bdi>{emp?.firstName ?? a.employeeId}</bdi>
                     {a.due && <> · {a.due}</>}
                   </div>
+                  <SendToRoomate
+                    meetingId={meetingId}
+                    index={i}
+                    action={a}
+                    ownerName={emp?.firstName ?? a.employeeId}
+                    ownerLeft={emp?.lifecycle === "retired"}
+                    onSummary={onSummary}
+                  />
                 </div>
                 <button
                   onClick={() => !done && onAssign(i)}
@@ -3037,6 +3051,10 @@ function CouncilPageInner() {
                     state={decisions[thread.id]}
                     empById={empById}
                     question={thread.userText}
+                    meetingId={meetingId}
+                    onSummary={(summary) =>
+                      setDecisions((d) => ({ ...d, [thread.id]: { ...d[thread.id], status: "ready", data: summary } }))
+                    }
                     onSummarize={async () => {
                       setDecisions((d) => ({ ...d, [thread.id]: { status: "loading" } }));
                       try {

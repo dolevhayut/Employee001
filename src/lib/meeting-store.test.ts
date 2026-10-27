@@ -205,3 +205,81 @@ describe("redactEmployeeFromMeetings", () => {
     expect(JSON.stringify(store.getMeeting(m.id))).not.toContain("my private view");
   });
 });
+
+describe("Send to Roomate state on summary actions", () => {
+  async function meetingWithSummary() {
+    const store = await boot();
+    const m = store.createMeeting(["noa", "itai"]);
+    store.appendTurn(m.id, { kind: "ceo", text: "Fix checkout?", ts: 1 });
+    store.setMeetingSummary(m.id, {
+      decision: "Fix the checkout bug first",
+      actions: [
+        { employeeId: "noa", action: "Fix the coupon rounding bug" },
+        { employeeId: "itai", action: "Add a checkout e2e test" },
+      ],
+      open: [],
+    });
+    return { store, id: m.id };
+  }
+
+  it("persists sentAt and taskId across a restart", async () => {
+    const first = await meetingWithSummary();
+    const { id } = first;
+    let store = first.store;
+    expect(store.markActionSent(id, 0, "Fix the coupon rounding bug", { now: 1234 })).toMatchObject({ ok: true });
+    expect(onDisk(id).summary.actions[0]).toMatchObject({ sentAt: 1234 });
+    expect(onDisk(id).summary.actions[0].taskId).toBeUndefined();
+
+    expect(store.recordActionTaskId(id, 0, "Fix the coupon rounding bug", "tsk_ab12cd34")).toMatchObject({ ok: true });
+
+    store = await boot();
+    const actions = store.getMeeting(id)!.summary!.actions;
+    expect(actions[0]).toEqual({ employeeId: "noa", action: "Fix the coupon rounding bug", sentAt: 1234, taskId: "tsk_ab12cd34" });
+    expect(actions[1].sentAt).toBeUndefined();
+  });
+
+  it("refuses a second send unless forced, and a forced send clears the old task id", async () => {
+    const { store, id } = await meetingWithSummary();
+    store.markActionSent(id, 1, "Add a checkout e2e test", { now: 1 });
+    store.recordActionTaskId(id, 1, "Add a checkout e2e test", "tsk_first001");
+
+    expect(store.markActionSent(id, 1, "Add a checkout e2e test")).toMatchObject({ ok: false, error: "already_sent" });
+    const again = store.markActionSent(id, 1, "Add a checkout e2e test", { force: true, now: 2 });
+    expect(again.ok && again.summary.actions[1]).toEqual({ employeeId: "itai", action: "Add a checkout e2e test", sentAt: 2 });
+    expect(onDisk(id).summary.actions[1]).toEqual({ employeeId: "itai", action: "Add a checkout e2e test", sentAt: 2 });
+  });
+
+  it("refuses when the action at that index changed or doesn't exist", async () => {
+    const { store, id } = await meetingWithSummary();
+    expect(store.markActionSent(id, 0, "Something else")).toMatchObject({ ok: false, error: "changed" });
+    expect(store.markActionSent(id, 5, "Fix the coupon rounding bug")).toMatchObject({ ok: false, error: "not_found" });
+    expect(store.markActionSent("mtg_missing", 0, "x")).toMatchObject({ ok: false, error: "not_found" });
+  });
+
+  it("releases a claim whose run never started, but keeps a filed one", async () => {
+    const { store, id } = await meetingWithSummary();
+    store.markActionSent(id, 0, "Fix the coupon rounding bug");
+    store.releaseActionSent(id, 0, "Fix the coupon rounding bug");
+    expect(onDisk(id).summary.actions[0].sentAt).toBeUndefined();
+
+    store.recordActionTaskId(id, 1, "Add a checkout e2e test", "tsk_kept0001");
+    store.releaseActionSent(id, 1, "Add a checkout e2e test");
+    expect(onDisk(id).summary.actions[1]).toMatchObject({ taskId: "tsk_kept0001" });
+  });
+
+  it("keeps sent state when the meeting is summarized again with the same action", async () => {
+    const { store, id } = await meetingWithSummary();
+    store.markActionSent(id, 0, "Fix the coupon rounding bug", { now: 99 });
+    store.recordActionTaskId(id, 0, "Fix the coupon rounding bug", "tsk_same0001");
+    const next = store.setMeetingSummary(id, {
+      decision: "Still fix checkout",
+      actions: [
+        { employeeId: "itai", action: "Write the postmortem" },
+        { employeeId: "noa", action: "Fix the coupon rounding bug" },
+      ],
+      open: [],
+    })!;
+    expect(next.actions[0].sentAt).toBeUndefined();
+    expect(next.actions[1]).toMatchObject({ sentAt: 99, taskId: "tsk_same0001" });
+  });
+});

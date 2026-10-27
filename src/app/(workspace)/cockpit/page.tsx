@@ -10,6 +10,7 @@ import { useWorkspaceMode } from "@/components/ex/workspace-mode-context";
 import { AutonomyEmptyState } from "@/components/ex/autonomy-empty-state";
 import { LoadErrorPanel, RefreshMiss } from "@/components/ex/load-error";
 import { useT } from "@/components/ex/i18n-context";
+import { Markdown } from "@/components/ex/markdown";
 import type { MessageKey } from "@/lib/i18n/messages";
 
 type RunSurface = "shift" | "routine" | "task" | "council" | "builder";
@@ -341,6 +342,7 @@ function LogTail({
   status: RunStatus;
   initialText?: string;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const { t } = useT();
   const [lines, setLines] = useState<RunLogEvent[]>(() =>
     initialText
@@ -414,31 +416,67 @@ function LogTail({
     el.scrollTop = el.scrollHeight;
   }, [lines]);
 
+  // Read like a conversation, not a terminal: the twin's words as Markdown,
+  // tools and approvals as small chips, consecutive text merged.
+  const blocks = useMemo(() => {
+    const out: ({ kind: "text"; text: string } | { kind: "event"; ev: RunLogEvent })[] = [];
+    for (const ev of lines) {
+      const last = out[out.length - 1];
+      if (ev.type === "text" && last?.kind === "text") last.text += ev.text ?? "";
+      else if (ev.type === "text") out.push({ kind: "text", text: ev.text ?? "" });
+      else out.push({ kind: "event", ev });
+    }
+    return out;
+  }, [lines]);
+
   return (
-    <div
-      ref={containerRef}
-      className="scrollbar"
-      style={{
-        background: "var(--bg-sunken)",
-        border: "1px solid var(--hairline)",
-        borderRadius: 6,
-        padding: "8px 10px",
-        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-        fontSize: "var(--fs-meta)",
-        lineHeight: 1.45,
-        color: "var(--text-muted)",
-        maxHeight: 160,
-        minHeight: 88,
-        overflowY: "auto",
-        flex: 1,
-      }}
-    >
-      {lines.length === 0 ? (
-        <div style={{ color: "var(--text-subtle)", fontStyle: "italic" }}>
-          {t("cockpit.waiting")}
-        </div>
-      ) : (
-        lines.map((ev, i) => <LogLine key={i} ev={ev} />)
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-6)", flex: 1 }}>
+      <div
+        ref={containerRef}
+        className="scrollbar"
+        style={{
+          background: "var(--bg-sunken)",
+          border: "1px solid var(--hairline)",
+          borderRadius: 8,
+          padding: "10px 12px",
+          fontSize: "var(--fs-sm)",
+          lineHeight: 1.6,
+          color: "var(--text)",
+          maxHeight: expanded ? "none" : 260,
+          minHeight: 88,
+          overflowY: expanded ? "visible" : "auto",
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--sp-8)",
+        }}
+      >
+        {blocks.length === 0 ? (
+          <div style={{ color: "var(--text-subtle)", fontStyle: "italic" }}>
+            {t("cockpit.waiting")}
+          </div>
+        ) : (
+          blocks.map((b, i) =>
+            b.kind === "text" ? (
+              <div key={i} style={{ fontSize: "var(--fs-sm)" }}>
+                <Markdown>{b.text}</Markdown>
+              </div>
+            ) : (
+              <LogLine key={i} ev={b.ev} />
+            )
+          )
+        )}
+      </div>
+      {blocks.length > 0 && (
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          style={{ alignSelf: "flex-start", height: 24, fontSize: "var(--fs-meta)" }}
+        >
+          {expanded ? "Collapse" : "Show the whole conversation"}
+        </button>
       )}
     </div>
   );
@@ -508,6 +546,17 @@ function LogLine({ ev }: { ev: RunLogEvent }) {
         fontStyle: italic ? "italic" : "normal",
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
+        fontSize: "var(--fs-meta)",
+        ...(toolLine
+          ? {
+              alignSelf: "flex-start",
+              padding: "1px 8px",
+              borderRadius: 999,
+              border: "1px solid var(--hairline)",
+              background: "var(--surface)",
+              fontFamily: "var(--font-mono, ui-monospace, monospace)",
+            }
+          : {}),
       }}
     >
       {toolLine ? (
