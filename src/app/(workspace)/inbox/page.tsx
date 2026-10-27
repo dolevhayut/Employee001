@@ -21,7 +21,16 @@ type FeedSource =
   | { kind: "twin-task"; taskId: string; fromId: string; toId: string }
   | { kind: "approval"; employeeId: string; runId: string; toolName: string; input: Record<string, unknown> }
   | { kind: "connection_request"; employeeId: string; employeeName: string; service: string; reason: string; scope?: string; count: number; lastAskedAt: string }
+  | { kind: "contradiction"; fingerprint: string; subject: string; a: ContradictionSide; b: ContradictionSide }
   | { kind: "off-track"; departmentId: string; metric: string };
+
+type ContradictionSide = { employeeId: string; employeeName: string; value: string; source: string };
+
+/** Team Meeting with both twins; the disagreement is prefilled, not sent. */
+function meetingHref(c: { subject: string; a: ContradictionSide; b: ContradictionSide }): string {
+  const q = `${c.a.employeeName} says "${c.a.value}" but ${c.b.employeeName} says "${c.b.value}" about ${c.subject}. Which is right?`.slice(0, 500);
+  return `/council?${new URLSearchParams({ with: `${c.a.employeeId},${c.b.employeeId}`, q })}`;
+}
 
 type FeedType = "update" | "alert" | "needs-review" | "task-handoff" | "connection_request";
 type FeedStatus = "open" | "resolved" | "dismissed";
@@ -202,6 +211,17 @@ function SourceLine({ source }: { source: FeedSource }) {
       </div>
     );
   }
+  if (source.kind === "contradiction") {
+    return (
+      <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-6)", fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>
+        <EmpAvatar employeeId={source.a.employeeId} size={18} />
+        <span style={{ fontWeight: 500 }}><bdi>{source.a.employeeName}</bdi></span>
+        <span style={{ color: "var(--text-subtle)" }}>vs</span>
+        <EmpAvatar employeeId={source.b.employeeId} size={18} />
+        <span style={{ fontWeight: 500 }}><bdi>{source.b.employeeName}</bdi></span>
+      </div>
+    );
+  }
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-5)", fontSize: "var(--fs-meta)", color: "var(--text-muted)" }}>
       <span style={{ fontWeight: 500 }}><bdi>{source.departmentId}</bdi></span>
@@ -256,6 +276,8 @@ export default function InboxPage() {
   const [hideResolved, setHideResolved] = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [rerunningId, setRerunningId] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<string | null>(null);
   const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
@@ -306,6 +328,31 @@ export default function InboxPage() {
       await load();
     } finally {
       setResolvingId(null);
+    }
+  }
+
+  async function scanContradictions() {
+    setScanning(true);
+    setScanNote(null);
+    try {
+      const res = await fetch("/api/inbox/contradictions", { method: "POST" });
+      if (!res.ok) {
+        setScanNote("Couldn't scan twins for conflicts.");
+        return;
+      }
+      const data = (await res.json()) as { created: number; alreadyFiled: number };
+      setScanNote(
+        data.created > 0
+          ? `Found ${data.created} new conflict${data.created === 1 ? "" : "s"}.`
+          : data.alreadyFiled > 0
+            ? "No new conflicts; the ones found are already in your Inbox."
+            : "No conflicts found between twins."
+      );
+      await load();
+    } catch {
+      setScanNote("Couldn't scan twins for conflicts.");
+    } finally {
+      setScanning(false);
     }
   }
 
@@ -384,6 +431,13 @@ export default function InboxPage() {
         })}
 
         <div style={{ flex: 1 }} />
+
+        {scanNote && (
+          <span role="status" style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>{scanNote}</span>
+        )}
+        <button onClick={() => void scanContradictions()} disabled={scanning} className="btn ghost sm" style={{ height: 26 }}>
+          {scanning ? "Scanning…" : "Scan for conflicts"}
+        </button>
 
         <button
           onClick={() => {
@@ -534,9 +588,23 @@ export default function InboxPage() {
                     )}
 
                     {/* Source line */}
-                    <div style={{ marginBottom: isOpenReview || isOpenConnectionRequest || isResolved ? 10 : 0 }}>
+                    <div style={{ marginBottom: isOpenReview || isOpenConnectionRequest || isResolved || item.source.kind === "contradiction" ? 10 : 0 }}>
                       <SourceLine source={item.source} />
                     </div>
+
+                    {item.source.kind === "contradiction" && !isResolved && (
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--sp-6)", paddingTop: "var(--sp-8)", borderTop: "1px solid var(--hairline)" }}>
+                        <Link href={meetingHref(item.source)} className="btn sm" style={{ height: 26 }}>
+                          Open a meeting with both
+                        </Link>
+                        <button onClick={() => resolve(item.id, "approved")} disabled={resolvingId === item.id} className="btn ghost sm" style={{ height: 26 }}>
+                          <Icons.Check size={11} /> Mark settled
+                        </button>
+                        <button onClick={() => resolve(item.id, "dismissed")} disabled={resolvingId === item.id} className="btn ghost sm" style={{ height: 26 }}>
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
 
                     {isOpenConnectionRequest && connectionRequest && (
                       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--sp-6)", paddingTop: "var(--sp-8)", borderTop: "1px solid var(--hairline)" }}>

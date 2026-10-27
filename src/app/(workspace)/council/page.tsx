@@ -1944,12 +1944,16 @@ function CouncilPageInner() {
   // The override is narrowed to twins that can answer now: a meeting continued
   // from History may list twins since retired or not ready. If none are left,
   // fall back to every ready twin so the CEO can still ask.
+  // `?with=a,b` opens the room with just those twins (an Inbox conflict item
+  // links here); a toggle by the CEO replaces it.
+  const withParam = searchParams.get("with");
   const activeIds = useMemo(() => {
     const ready = roster.filter((e) => e.twinStatus === "ready" && e.lifecycle !== "retired").map((e) => e.id);
-    if (!activeIdsOverride) return new Set(ready);
-    const kept = ready.filter((id) => activeIdsOverride.has(id));
+    const requested = activeIdsOverride ?? (withParam ? new Set(withParam.split(",")) : null);
+    if (!requested) return new Set(ready);
+    const kept = ready.filter((id) => requested.has(id));
     return new Set(kept.length > 0 ? kept : ready);
-  }, [activeIdsOverride, roster]);
+  }, [activeIdsOverride, roster, withParam]);
   const [threads, setThreads] = useState<MessageThread[]>([]);
   // Stable across CEO messages — server uses it to load the meeting transcript
   // so every twin sees prior CEO asks and prior twin turns. Meetings are stored
