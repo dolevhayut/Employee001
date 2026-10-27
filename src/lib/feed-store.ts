@@ -41,7 +41,24 @@ export type FeedSource =
       count: number;
       lastAskedAt: string;
     }
+  | {
+      kind: "contradiction";
+      /** Stable id of the conflict, so a re-scan does not file it twice. */
+      fingerprint: string;
+      subject: string;
+      a: ContradictionSide;
+      b: ContradictionSide;
+    }
   | { kind: "off-track"; departmentId: string; metric: string };
+
+/** One twin's side of a conflict, with where the claim was found. */
+export type ContradictionSide = {
+  employeeId: string;
+  employeeName: string;
+  value: string;
+  /** "memory: durable fact <id>" or "profile: CONTEXT.md". */
+  source: string;
+};
 
 export type FeedItem = {
   id: string;
@@ -149,6 +166,8 @@ function sourceMatchesEmployee(source: FeedSource, employeeId: string): boolean 
       return source.employeeId === employeeId;
     case "connection_request":
       return source.employeeId === employeeId;
+    case "contradiction":
+      return source.a.employeeId === employeeId || source.b.employeeId === employeeId;
     case "off-track":
       return false;
   }

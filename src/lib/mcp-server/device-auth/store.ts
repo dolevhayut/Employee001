@@ -21,10 +21,23 @@ interface DeviceRecord {
   /** Set once the session bearer was handed to the polling client. */
   sessionId?: string;
   lastPolledAt?: number;
+  /** SHA-256 of the requesting IP, for the per-IP cap. The raw IP is never stored. */
+  issuerHash?: string;
 }
 
 /** Wrong user-code guesses tolerated per code lifetime before approvals are refused. */
 const MAX_FAILED_APPROVALS = 10;
+
+/** Outstanding (unexpired) device codes tolerated store-wide and per requesting IP. */
+export const MAX_OUTSTANDING_CODES = 500;
+export const MAX_OUTSTANDING_CODES_PER_IP = 10;
+
+export class DeviceCodeLimitError extends Error {
+  constructor(readonly scope: "global" | "ip") {
+    super(`too many outstanding device codes (${scope})`);
+    this.name = "DeviceCodeLimitError";
+  }
+}
 
 interface SessionRecord {
   personId: string;
@@ -97,8 +110,18 @@ function load(): StoreShape {
   return {
     devices: raw.devices ?? {},
     sessions: raw.sessions ?? {},
-    failedApprovals: isMap(raw.failedApprovals) ? raw.failedApprovals : {},
+    failedApprovals: sanitizeFailures(raw.failedApprovals),
   };
+}
+
+/** Own, array-valued entries only, in a prototype-less object so "constructor" is just a key. */
+function sanitizeFailures(value: unknown): Record<string, number[]> {
+  const out: Record<string, number[]> = Object.create(null);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return out;
+  for (const [id, times] of Object.entries(value)) {
+    if (Array.isArray(times)) out[id] = times.filter((t): t is number => typeof t === "number");
+  }
+  return out;
 }
 
 function save(store: StoreShape): void {
@@ -134,68 +157,121 @@ function prune(store: StoreShape, now: number): void {
   }
 }
 
-const LOCK_STALE_MS = 5_000;
-const LOCK_WAIT_MS = 6_000; // longer than the stale timeout, so a crashed holder never makes waiters fail
+const LOCK_STALE_MS = 30_000; // a live holder is never stolen from sooner than this
+const GUARD_STALE_MS = 2_000; // the guard is held for microseconds
+const LOCK_WAIT_MS = 6_000; // a busy store fails the caller instead of stealing a live lock
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-function readLockOwner(lock: string): string | null {
+function readOwner(p: string): string | null {
   try {
-    return fs.readFileSync(lock, "utf8");
+    return fs.readFileSync(p, "utf8");
   } catch {
     return null;
   }
 }
 
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 /**
- * Cross-process mutex: an exclusively created lock file holding an owner token.
- * Release removes the lock only if we still own it. A stale lock is reclaimed by
- * an atomic rename, and put back if what we moved turns out to be someone's fresh
- * lock. Waiting is async, so the event loop is never blocked.
+ * Stale when the owner process (the "pid:" prefix) is gone, or when the file is
+ * older than maxAgeMs (a backstop for unknown formats and reused pids; the store
+ * is single-host and its critical sections last milliseconds).
  */
-async function withLock<T>(fn: () => T): Promise<T> {
-  const lock = `${file()}.lock`;
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  const token = randomBytes(16).toString("hex");
+function isStale(p: string, content: string, maxAgeMs: number): boolean {
+  const pid = /^(\d+):/.exec(content)?.[1];
+  if (pid !== undefined && !pidAlive(Number(pid))) return true;
+  try {
+    return Date.now() - fs.statSync(p).mtimeMs > maxAgeMs;
+  } catch {
+    return false; // already gone
+  }
+}
+
+/**
+ * Short critical section that serialises every removal of the lock file, so the
+ * "is it still the lock I looked at?" check and the unlink cannot interleave with
+ * another process's release or reclaim. Creating the lock stays a plain exclusive
+ * create. Only a guard whose holder crashed is reclaimed (dead pid or age).
+ */
+async function withGuard<T>(lock: string, fn: () => T): Promise<T> {
+  const guard = `${lock}.guard`;
+  const mine = `${process.pid}:${randomBytes(16).toString("hex")}`;
   const started = Date.now();
   for (;;) {
     try {
-      fs.writeFileSync(lock, token, { flag: "wx", mode: 0o600 });
+      fs.writeFileSync(guard, mine, { flag: "wx", mode: 0o600 });
       break;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-      try {
-        const seen = readLockOwner(lock);
-        if (seen !== null && Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS) {
-          const moved = `${lock}.stale.${token}`;
-          fs.renameSync(lock, moved);
-          if (readLockOwner(moved) === seen) fs.rmSync(moved, { force: true });
-          else {
-            // We moved a lock that was replaced meanwhile: give it back if the slot is free.
-            try {
-              fs.linkSync(moved, lock);
-            } catch {
-              /* slot already retaken */
-            }
-            fs.rmSync(moved, { force: true });
-          }
-        }
-      } catch {
-        /* released or reclaimed by someone else */
-      }
-      if (Date.now() - started > LOCK_WAIT_MS) throw new Error("mcp-device-auth store is busy");
-      await sleep(10);
     }
+    const seen = readOwner(guard);
+    if (seen !== null && isStale(guard, seen, GUARD_STALE_MS) && readOwner(guard) === seen) {
+      fs.rmSync(guard, { force: true });
+    }
+    if (Date.now() - started > LOCK_WAIT_MS) throw new Error("mcp-device-auth store is busy");
+    await sleep(2);
   }
   try {
     return fn();
   } finally {
-    if (readLockOwner(lock) === token) fs.rmSync(lock, { force: true });
+    if (readOwner(guard) === mine) fs.rmSync(guard, { force: true });
   }
 }
 
-export function issueDeviceCode(): Promise<IssuedDeviceCode> {
-  return withLock(issueUnlocked);
+/**
+ * Cross-process mutex: an exclusively created lock file holding "pid:token".
+ * A lock is reclaimed only when its owner process is dead or it is older than
+ * LOCK_STALE_MS. Every removal, release and reclaim alike,
+ * runs inside withGuard and re-checks the owner token first, so a fresh lock
+ * created by someone else is never deleted. Waiting is async.
+ */
+async function withLock<T>(fn: () => T): Promise<T> {
+  const lock = `${file()}.lock`;
+  fs.mkdirSync(path.dirname(lock), { recursive: true });
+  const mine = `${process.pid}:${randomBytes(16).toString("hex")}`;
+  const started = Date.now();
+  for (;;) {
+    try {
+      fs.writeFileSync(lock, mine, { flag: "wx", mode: 0o600 });
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    }
+    const seen = readOwner(lock);
+    if (seen !== null && isStale(lock, seen, LOCK_STALE_MS)) {
+      await withGuard(lock, () => {
+        if (readOwner(lock) === seen) fs.rmSync(lock, { force: true });
+      });
+      continue;
+    }
+    if (Date.now() - started > LOCK_WAIT_MS) throw new Error("mcp-device-auth store is busy");
+    await sleep(10);
+  }
+  try {
+    return fn();
+  } finally {
+    // Release must never turn a committed write into a failure.
+    try {
+      await withGuard(lock, () => {
+        if (readOwner(lock) === mine) fs.rmSync(lock, { force: true });
+      });
+    } catch {
+      if (readOwner(lock) === mine) fs.rmSync(lock, { force: true });
+    }
+  }
+}
+
+/** Rejects with DeviceCodeLimitError when the global or per-IP cap is reached. */
+export function issueDeviceCode(opts: { ip?: string } = {}): Promise<IssuedDeviceCode> {
+  return withLock(() => issueUnlocked(opts.ip ? sha(opts.ip) : undefined));
 }
 export function approveUserCode(userCode: string, personId: string): Promise<ApproveResult> {
   return withLock(() => approveUnlocked(userCode, personId));
@@ -210,16 +286,28 @@ export function revokeBearer(bearer: string): Promise<boolean> {
   return withLock(() => revokeBearerUnlocked(bearer));
 }
 
-function issueUnlocked(): IssuedDeviceCode {
+function issueUnlocked(issuerHash?: string): IssuedDeviceCode {
   const now = clock();
   const store = load();
   prune(store, now);
+  const outstanding = Object.values(store.devices);
+  if (outstanding.length >= MAX_OUTSTANDING_CODES) throw new DeviceCodeLimitError("global");
+  if (
+    issuerHash &&
+    outstanding.filter((d) => d.issuerHash === issuerHash).length >= MAX_OUTSTANDING_CODES_PER_IP
+  ) {
+    throw new DeviceCodeLimitError("ip");
+  }
   const deviceCode = randomBytes(32).toString("base64url");
   let normalized = randomUserCode();
   const taken = new Set(Object.values(store.devices).map((d) => d.userCodeHash));
   while (taken.has(sha(normalized))) normalized = randomUserCode();
   const expiresAt = now + DEVICE_CODE_TTL_MS;
-  store.devices[sha(deviceCode)] = { userCodeHash: sha(normalized), expiresAt };
+  store.devices[sha(deviceCode)] = {
+    userCodeHash: sha(normalized),
+    expiresAt,
+    ...(issuerHash ? { issuerHash } : {}),
+  };
   save(store);
   return {
     deviceCode,
@@ -237,8 +325,9 @@ function approveUnlocked(userCode: string, personId: string): ApproveResult {
   // The cap is per approving person, so one member's typos never block another's
   // valid approval. It is checked before the lookup so a locked-out person cannot
   // keep guessing.
-  const failures = store.failedApprovals ?? {};
-  const recent = (failures[personId] ?? []).filter((t) => t > now - DEVICE_CODE_TTL_MS);
+  const failures = store.failedApprovals ?? sanitizeFailures(undefined);
+  const prior = failures[personId];
+  const recent = (Array.isArray(prior) ? prior : []).filter((t) => t > now - DEVICE_CODE_TTL_MS);
   if (recent.length >= MAX_FAILED_APPROVALS) return { ok: false, reason: "rate_limited" };
   const hash = sha(normalizeUserCode(userCode));
   const entry = Object.values(store.devices).find((d) => d.userCodeHash === hash);

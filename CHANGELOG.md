@@ -16,6 +16,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `EMPLOYEE001_TOKEN` stop working for `/api/mcp` unless an admin opts in with
   `EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN=1`. See SECURITY.md.
 
+### The security policy no longer names out-of-date versions
+- SECURITY.md now says "the latest minor release" and "the one before it"
+  instead of 0.7.x and 0.6.x, so it stays true with every release. The support
+  commitment itself is unchanged.
+
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual
   files, with nothing uploaded or synced. Add up to five folders on the
