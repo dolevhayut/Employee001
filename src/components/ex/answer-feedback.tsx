@@ -60,6 +60,10 @@ export function AnswerFeedback({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question, answer, correction: text }),
       });
+      if (r.status === 429) {
+        setError(t("ask.fix.full", { name: twinName }));
+        return;
+      }
       if (!r.ok) throw new Error(String(r.status));
       setDone(true);
       onSent?.();

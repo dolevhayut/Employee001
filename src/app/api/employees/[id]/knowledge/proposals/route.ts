@@ -35,6 +35,6 @@ export async function POST(
     return Response.json({ error: "invalid_body" }, { status: 400 });
   }
   const result = await addAnswerCorrection(id, body ?? {});
-  if (!result.ok) return Response.json({ error: result.error }, { status: 400 });
+  if (!result.ok) return Response.json({ error: result.error }, { status: result.error === "too_many_pending" ? 429 : 400 });
   return Response.json({ proposal: result.proposal, stats: answerStats(id) }, { status: 201 });
 }

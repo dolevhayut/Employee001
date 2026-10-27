@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { appendChatMessage } from "./chat-history";
 import { readKnowledgeFile } from "./knowledge-files";
-import { addAnswerCorrection, answerStats, decideProposal, listPendingProposals } from "./knowledge-proposals";
+import { MAX_PENDING_CORRECTIONS, addAnswerCorrection, answerStats, decideProposal, listPendingProposals } from "./knowledge-proposals";
 
 let previousCwd: string;
 let tempDir: string;
@@ -35,6 +35,12 @@ describe("addAnswerCorrection", () => {
   it("rejects an empty correction", async () => {
     expect(await addAnswerCorrection("noa", { correction: "   " })).toEqual({ ok: false, error: "empty_correction" });
     expect(listPendingProposals("noa")).toHaveLength(0);
+  });
+
+  it("refuses more than the pending cap", async () => {
+    for (let i = 0; i < MAX_PENDING_CORRECTIONS; i++) await addAnswerCorrection("noa", { correction: `fix ${i}` });
+    expect(await addAnswerCorrection("noa", { correction: "one more" })).toEqual({ ok: false, error: "too_many_pending" });
+    expect(listPendingProposals("noa")).toHaveLength(MAX_PENDING_CORRECTIONS);
   });
 
   it("writes to the knowledge file only after the owner accepts", async () => {

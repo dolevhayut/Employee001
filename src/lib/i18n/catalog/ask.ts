@@ -29,6 +29,7 @@ export const askEn = {
   "ask.fix.sending": "Sending…",
   "ask.fix.empty": "Write what is wrong or what changed, then send.",
   "ask.fix.error": "Couldn't send the correction. Check your connection and try again.",
+  "ask.fix.full": "{name}'s owner already has many corrections waiting. Ask them to review the suggested updates, then try again.",
   "ask.fix.done": "Thanks. {name}'s owner will review this before anything changes.",
   "ask.stats": "{answered} answered · {corrected} corrected",
   "ask.stats.empty": "No answers yet. Ask {name} something to get started.",

@@ -81,7 +81,7 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/employees/[id]/knowledge/[name]/versions": { GET: role("member", "id") },
   "/api/employees/[id]/knowledge/[name]/versions/[ts]": { GET: role("member", "id") },
   "/api/employees/[id]/knowledge/[name]/versions/[ts]/restore": { POST: admin },
-  "/api/employees/[id]/knowledge/proposals": { GET: member },
+  "/api/employees/[id]/knowledge/proposals": { GET: member, POST: member },
   "/api/employees/[id]/knowledge/proposals/[pid]": { POST: admin },
   "/api/employees/[id]/skills": { GET: member, PATCH: admin },
   "/api/employees/[id]/task": { POST: member },

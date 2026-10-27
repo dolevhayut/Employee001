@@ -155,6 +155,8 @@ export async function addProposals(
 
 export const CORRECTION_MAX = 1000;
 export const CORRECTION_FILE = "corrections.md";
+/** Unreviewed corrections one twin's owner is asked to look at before more are refused. */
+export const MAX_PENDING_CORRECTIONS = 50;
 
 /**
  * A reader flags a twin's Ask answer as wrong or outdated. Creates a pending
@@ -164,7 +166,7 @@ export const CORRECTION_FILE = "corrections.md";
 export async function addAnswerCorrection(
   employeeId: string,
   input: { question?: unknown; answer?: unknown; correction?: unknown },
-): Promise<{ ok: true; proposal: KnowledgeProposal } | { ok: false; error: "empty_correction" }> {
+): Promise<{ ok: true; proposal: KnowledgeProposal } | { ok: false; error: "empty_correction" | "too_many_pending" }> {
   const correction = typeof input.correction === "string" ? input.correction.trim().slice(0, CORRECTION_MAX) : "";
   if (!correction) return { ok: false, error: "empty_correction" };
   const question = typeof input.question === "string" ? input.question.trim().slice(0, 500) : "";
@@ -182,9 +184,13 @@ export async function addAnswerCorrection(
     reason: "Reported as wrong or outdated in Ask",
     status: "pending",
   };
-  await withSidecarLock(lockKey(employeeId), async () => {
-    writeAll(employeeId, [...readAll(employeeId), proposal]);
+  const full = await withSidecarLock(lockKey(employeeId), async () => {
+    const all = readAll(employeeId);
+    if (all.filter((p) => p.status === "pending" && p.source?.kind === "answer").length >= MAX_PENDING_CORRECTIONS) return true;
+    writeAll(employeeId, [...all, proposal]);
+    return false;
   });
+  if (full) return { ok: false, error: "too_many_pending" };
   return { ok: true, proposal };
 }
 
