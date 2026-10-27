@@ -147,7 +147,7 @@ describe("knowledge files", () => {
     expect(upload("nul.txt", Buffer.from(`a\u0000b${SMUGGLED}`, "utf-8")).bytes.toString("utf-8")).toBe("a\u0000b");
     const invalid = Buffer.concat([Buffer.from("caf"), Buffer.from([0xe9]), Buffer.from(` menu${SMUGGLED}`, "utf-8")]);
     const { bytes } = upload("menu.txt", invalid);
-    expect(bytes.toString("utf-8")).toBe("caf� menu");
+    expect(bytes.toString("utf-8")).toBe("caf\uFFFD menu");
   });
 
   it("cleans UTF-16 and UTF-32 uploads (with a BOM) in their own encoding", () => {

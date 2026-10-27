@@ -76,7 +76,7 @@ function decodeUtf32(data: Buffer, littleEndian: boolean): string {
   const parts: string[] = [];
   for (let i = 4; i + 4 <= data.length; i += 4) {
     const cp = littleEndian ? data.readUInt32LE(i) : data.readUInt32BE(i);
-    parts.push(cp <= 0x10ffff && (cp < 0xd800 || cp > 0xdfff) ? String.fromCodePoint(cp) : "�");
+    parts.push(cp <= 0x10ffff && (cp < 0xd800 || cp > 0xdfff) ? String.fromCodePoint(cp) : "\uFFFD");
   }
   return parts.join("");
 }
