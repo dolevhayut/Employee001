@@ -13,6 +13,7 @@ import {
   findLeaksInDir,
   folderAttackCoverage,
   folderAttackPrompt,
+  requireModelProblem,
   signInErrorProblem,
   signedOutEnv,
   streamedErrorMessage,
@@ -20,6 +21,7 @@ import {
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const SANDBOX = process.argv.includes("--sandbox");
+const REQUIRE_MODEL = process.argv.includes("--require-model");
 const RESULTS = [];
 const SIGNED_OUT_TIMEOUT_MS = 90_000;
 const FOLDER_ATTACK_TIMEOUT_MS = 5 * 60_000;
@@ -442,6 +444,11 @@ async function main() {
     // Needs no sign-in or key, so it runs even when the model steps can't.
     await step("signed out: clear error", () => signedOutCheck(cli));
 
+    await step("require model", async () => {
+      const missingModel = requireModelProblem(REQUIRE_MODEL, selectedProvider);
+      if (missingModel) throw new Error(missingModel);
+      return REQUIRE_MODEL ? "PASS" : "not required";
+    });
     if (!selectedProvider) {
       RESULTS.push({ name: "model flows", result: "SKIPPED: no Claude sign-in or ANTHROPIC_API_KEY", time: "0.0s" });
       return;
@@ -493,6 +500,13 @@ async function main() {
     // Last: the builder reads configured folders, so attaching one before the
     // self-twin build would put its contents into the profile files.
     await step("attack: folder reads", () => folderAttack(baseUrl, employeeId, homeDir));
+
+    // The blocked attacks are in the audit log; the chain over them must be intact.
+    await step("audit verify", async () => {
+      const out = await run(process.execPath, [cli, "audit", "verify"], { cwd: homeDir, env: { ...process.env, EMPLOYEE001_HOME: homeDir } });
+      if (/No audit rows found/.test(out)) throw new Error("no audit rows after the attacks");
+      return `PASS (${out.trim().slice(0, 100)})`;
+    });
   } finally {
     await Promise.all(servers.map(stopServer));
     // Report first: a cleanup error must not hide the results.

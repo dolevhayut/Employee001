@@ -158,3 +158,10 @@ export async function findLeaksInDir(dir, canaries) {
   await walk(dir);
   return [...found];
 }
+
+/** With --require-model, a gate that could not run the model attacks must
+ * fail instead of passing with them SKIPPED. Null when fine. */
+export function requireModelProblem(requireModel, provider) {
+  if (!requireModel || provider) return null;
+  return "--require-model: no Claude sign-in or ANTHROPIC_API_KEY, so the attack steps cannot run";
+}

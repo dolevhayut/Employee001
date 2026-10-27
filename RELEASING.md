@@ -66,9 +66,10 @@ and creates the GitHub Release. Watch progress under the Actions tab.
 Run locally before tagging:
 
 ```bash
-node scripts/release-gate.mjs
+node scripts/release-gate.mjs --require-model
 # On macOS/Linux, also exercise the OS sandbox boundary:
-node scripts/release-gate.mjs --sandbox
+node scripts/release-gate.mjs --sandbox --require-model
+# Record each run in docs/SECURITY-ATTACK-RUNS.md
 npm run lint
 npm run build
 node bin/cli.mjs doctor
