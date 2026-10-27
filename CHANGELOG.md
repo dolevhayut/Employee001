@@ -8,6 +8,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Personal sign-in for MCP clients (groundwork)
+- The server can now issue a short-lived device code that a signed-in person
+  approves, and tie the resulting MCP session to that person so it can be
+  revoked. Nothing is switched on yet.
+- Once personal sign-in is enabled, the shared `EMPLOYEE001_MCP_TOKEN` and
+  `EMPLOYEE001_TOKEN` stop working for `/api/mcp` unless an admin opts in with
+  `EMPLOYEE001_MCP_ALLOW_SHARED_TOKEN=1`. See SECURITY.md.
+
 ### The security policy no longer names out-of-date versions
 - SECURITY.md now says "the latest minor release" and "the one before it"
   instead of 0.7.x and 0.6.x, so it stays true with every release. The support
