@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
+import { StarterPacks } from "@/components/ex/starter-packs";
+import type { StarterPack } from "@/lib/marketplace";
 import { useT } from "@/components/ex/i18n-context";
 import { KNOWLEDGE_FOLDER_DISCLOSURE } from "@/lib/knowledge-folder-shared";
 
@@ -244,6 +246,15 @@ export default function BuildMyTwinPage() {
     }
   }
 
+  // An example fills the role (only if empty) and the notes; text already
+  // written is kept and the example goes below it.
+  function startFromPack(pack: StarterPack) {
+    setRole((cur) => cur.trim() || pack.role);
+    setWritten((cur) => (cur.trim() ? `${cur.trim()}\n\n${pack.notes}` : pack.notes));
+    setMode("write");
+    requestAnimationFrame(() => document.getElementById("notes")?.focus());
+  }
+
   // Prefill the name from the signed-in account (not the loopback stand-in).
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
@@ -359,6 +370,7 @@ export default function BuildMyTwinPage() {
               Your twin is created; edit its profile after the build.
             </p>
           )}
+          <StarterPacks disabled={profileLocked} onStart={startFromPack} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--sp-12)" }}>
             <label htmlFor="self-name">
               <span style={labelStyle}>Your name</span>

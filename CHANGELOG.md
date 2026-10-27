@@ -8,6 +8,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Start your twin from an example
+- "Build my twin" now shows a few example briefs, each labelled "Example".
+  Preview one, then start from it: it fills the form and you rewrite it so it
+  describes you.
+
 ### Your twin works from your real files, not from a summary someone uploaded
 - Point a twin at a folder on your machine and it answers from your actual
   files, with nothing uploaded or synced. Add up to five folders on the
