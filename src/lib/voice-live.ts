@@ -13,7 +13,7 @@
 
 import { elevenLabsBase, euRegion, voiceEnabled } from "@/lib/data-residency";
 import { STT_SAMPLE_RATE, TTS_SAMPLE_RATE } from "@/lib/pcm";
-import { isStockVoice } from "@/lib/employees";
+import { EMPLOYEE_ID, isStockVoice } from "@/lib/employees";
 import { loadVoiceConsent } from "@/lib/employees-disk";
 
 type Env = Record<string, string | undefined>;
@@ -56,9 +56,6 @@ export function liveVoiceId(requested: unknown, env: Env = process.env): string 
 
 export const VOICE_CONSENT_REQUIRED_MESSAGE =
   "This voice isn't cleared for use: no recorded consent from the person it belongs to. Using the default voice instead.";
-
-/** Employee ids come from the request; keep them to a safe directory name. */
-export const EMPLOYEE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 export type ResolvedVoice =
   | { voiceId: string; fallback?: undefined }

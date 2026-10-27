@@ -86,6 +86,13 @@ describe("voice consent", () => {
     expect(auditRows().at(-1).input).toMatchObject({ voiceId: CLONE });
   });
 
+  it("rejects unsafe ids before touching disk", async () => {
+    const { recordVoiceConsent } = await import("./employees-disk");
+    expect(await recordVoiceConsent("../noa", { agree: true, voiceId: CLONE, onBehalf: true })).toMatchObject({ ok: false, status: 404 });
+    expect(await recordVoiceConsent("noa", { agree: true, voiceId: "a/b", onBehalf: true })).toMatchObject({ ok: false, status: 400 });
+    expect(read("noa").voiceConsent).toBeUndefined();
+  });
+
   it("answers 404 for an unknown twin", async () => {
     const { recordVoiceConsent } = await import("./employees-disk");
     expect(await recordVoiceConsent("ghost", { agree: true, voiceId: CLONE, onBehalf: true })).toMatchObject({ ok: false, status: 404 });

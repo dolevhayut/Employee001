@@ -6,7 +6,7 @@ import "server-only";
 import fs from "fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import path from "path";
-import { VOICE_CONSENT_TEXT } from "./employees";
+import { EMPLOYEE_ID, VOICE_CONSENT_TEXT } from "./employees";
 import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin, RetentionConsent, TwinLifecycle, VoiceConsent } from "./employees";
 import { appendAuditEntry } from "./audit-log";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
@@ -229,6 +229,8 @@ export async function recordVoiceConsent(
   employeeId: string,
   args: { agree: boolean; voiceId: string; onBehalf: boolean; actor?: { userId?: string }; headers?: Headers },
 ): Promise<{ ok: true; voiceConsent: VoiceConsent | null } | { ok: false; error: string; status: number }> {
+  if (!EMPLOYEE_ID.test(employeeId)) return { ok: false, error: "Twin not found", status: 404 };
+  if (args.agree && !/^[A-Za-z0-9]{1,64}$/.test(args.voiceId)) return { ok: false, error: "voiceId is required to give consent", status: 400 };
   const sidecarPath = dataDir("employees", employeeId, "employee.json");
   return withSidecarLock(employeeId, async () => {
     let sidecar: DiskSidecar;
@@ -265,7 +267,7 @@ export async function recordVoiceConsent(
     await fs.rename(tmp, sidecarPath);
 
     const toolName = args.agree ? "voice.consentGranted" : "voice.consentWithdrawn";
-    appendAuditEntry({
+    const audited = appendAuditEntry({
       runId: `voice-${Date.now()}`,
       employeeId,
       employeeName: sidecar.name ?? employeeId,
@@ -276,6 +278,7 @@ export async function recordVoiceConsent(
       approvalChannel: "ui",
       ...(args.actor?.userId ? { requesterId: args.actor.userId } : {}),
     });
+    if (!audited) console.error(`[voice-consent] audit entry not written for ${toolName} (${employeeId})`);
     return { ok: true as const, voiceConsent };
   });
 }

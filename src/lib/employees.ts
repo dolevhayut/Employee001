@@ -215,6 +215,9 @@ export const ELEVENLABS_VOICE_STORAGE_KEY = "twin.ttsVoices";
  *  custom voice from the ElevenLabs library) may be a real person's voice. */
 export const isStockVoice = (voiceId: string) => ELEVENLABS_VOICES.some((v) => v.id === voiceId);
 
+/** Employee ids come from requests; keep them to a safe directory name. */
+export const EMPLOYEE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
 /** Consent to use one person's voice for their twin. Bound to the voice id it
  *  was given for; withdrawing it deletes the record (and with it the voice id). */
 export type VoiceConsent = {
