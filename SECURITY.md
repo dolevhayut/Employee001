@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---|---|
-| The latest minor release (currently 0.7.x) | ✅ |
-| The minor release before it (currently 0.6.x) | ✅ Security fixes only |
+| The latest minor release | ✅ |
+| The minor release before it | ✅ Security fixes only |
 | Older releases | ❌ |
 
 We support the latest minor release and the one before it as weekly releases continue.
@@ -170,7 +170,7 @@ You host Employee001, so it runs inside your environment and within your complia
 
 Download the release tarball, then verify its build provenance with the GitHub CLI:
 
-`gh attestation verify employee001-0.7.0.tgz -R dolevhayut/Employee001`
+`gh attestation verify employee001-<version>.tgz -R dolevhayut/Employee001`
 
 ## Reporting a Vulnerability
 

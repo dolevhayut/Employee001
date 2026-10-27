@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { AI_AUDIO_HEADERS } from "@/lib/ai-disclosure";
 import { elevenLabsBase, voiceEnabled } from "@/lib/data-residency";
 import { fetchSpeech } from "@/lib/tts-model";
 
@@ -54,5 +55,5 @@ export async function POST(request: NextRequest) {
   const audioBuffer = await res.arrayBuffer();
   const audioBase64 = Buffer.from(audioBuffer).toString("base64");
 
-  return Response.json({ audioContent: audioBase64, mimeType: "audio/mpeg" });
+  return Response.json({ audioContent: audioBase64, mimeType: "audio/mpeg" }, { headers: AI_AUDIO_HEADERS });
 }

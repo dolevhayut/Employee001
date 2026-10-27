@@ -6,13 +6,15 @@
 
 **Employee001 builds an AI twin of each employee from their own work: what they know, how they decide, and the tools they choose to connect.** Ask the twin of the person who knows, ask the whole company for one cited answer, or convene the right twins in a Team Meeting. External actions wait for a person's approval. Open source, self-hosted.
 
+**Consent first: no twin is trained, given a person's tools or allowed to act for them until that person has recorded their consent.**
+
 **Every install is also your organization's own MCP server**, so your team can ask the twins from the agents they already use: Claude Code, Codex, Cursor, Claude Desktop.
 
 ```bash
 npx employee001     # first run: a short setup, then it opens http://localhost:3000
 ```
 
-Signed in to Claude Code? Your Claude subscription runs the twins, no API key needed, and it covers one person.
+Signed in to Claude Code? Your Claude subscription runs the twins, no API key needed. Subscription mode covers one person.
 
 <table>
   <tr>
@@ -307,18 +309,19 @@ You host Employee001, so it runs inside your environment and your compliance sco
 
 ## How it compares
 
-Last reviewed **2026-10-21**, from each project's public pages. Both are good open-source projects that overlap with Employee001; the difference is where an agent comes from.
+Last reviewed **2026-10-27**, from each project's public pages. These are good open-source projects that overlap with Employee001; the difference is where an agent comes from, and whether the person it represents has consented. Where a cell says a page "doesn't describe" something, that is only what the page says, not a claim about the software.
 
-| | [Paperclip](https://github.com/paperclipai/paperclip) | [Cabinet](https://github.com/cabinetai/cabinet) | **Employee001** |
-|---|---|---|---|
-| Focus | Managing a company of AI agents: org chart, goals, tickets, budgets, board governance | An AI workspace: git-versioned Markdown knowledge base plus an AI team | Making what your real people know askable |
-| What an agent represents | An AI employee with a title, role, instructions and budget; people can sit in the same org chart | An agent persona from about 20 templates (CEO, CTO, Marketer, SDR...) | **One named employee, built from their own account of their work and the tools they connect** |
-| Runtime | Bring your own (Claude Code, Codex, Cursor, Gemini CLI, HTTP/shell...) | Several runtimes (Claude Code, Codex, OpenAI, Gemini, local models...) | Claude via the Claude Agent SDK: your subscription, an API key, Bedrock, Vertex, Foundry or a local model |
-| Several agents at once | Delegation along the org chart, ticket threads | Channels where agents and people chat; @mention an agent | Team Meeting ending in a decision with owners; Ask the company |
-| External actions | Board approvals, per-tool Allowed / Ask first / Off, review stages; v2026.1001.0 notes say execution harnesses default to full auto unless a restrictive mode is set | Dispatched work waits in a human approval queue | Writes and web fetches wait for approval by default; hash-chained audit log |
-| Shared ground | MIT, self-hosted, routines, MCP + Composio, audit trail, cloud waitlist | MIT, local, files on disk, MCP, scheduled jobs, cloud waitlist | MIT, self-hosted, routines, MCP + Composio, cloud waitlist |
+| | [Paperclip](https://github.com/paperclipai/paperclip) | [Cabinet](https://github.com/cabinetai/cabinet) | [Distilly](https://github.com/titanwings/distilly) | [GBrain](https://github.com/garrytan/gbrain) | [openbot](https://github.com/meetopenbot/openbot) | **Employee001** |
+|---|---|---|---|---|---|---|
+| Focus | Managing a company of AI agents: org chart, goals, tickets, budgets, board governance | An AI workspace: git-versioned Markdown knowledge base plus an AI team | A "person-modeling layer for agents": source-grounded Person Profiles packaged as an Agent Skill | An agent memory system: a store of facts and pages agents read and write | A local-first harness for running AI agents | Making what your real people know askable |
+| What an agent represents | An AI employee with a title, role, instructions and budget; people can sit in the same org chart | An agent persona from about 20 templates (CEO, CTO, Marketer, SDR...) | A profile of a colleague, relationship or public figure, built from messages, documents and interviews you supply | No persona; a shared memory (a "brain") for the agents you already use | Configurable assistants defined in `AGENT.md` files (name, plugins, instructions) | **One named employee, built from their own account of their work and the tools they connect** |
+| Consent of the person modeled | Not reviewed | Not reviewed | The README doesn't describe a consent step for the person profiled | Consent prompts for installs and data sharing; none described for the people in the brain | The README doesn't describe one | **A twin without recorded consent can't be trained, gets none of their tools and can't act for them** |
+| Runtime | Bring your own (Claude Code, Codex, Cursor, Gemini CLI, HTTP/shell...) | Several runtimes (Claude Code, Codex, OpenAI, Gemini, local models...) | Agent hosts that load Skills (Claude Code, Codex, OpenCode, OpenClaw...) | CLI or MCP into Claude Code, Codex, Cursor and others; PGLite or Postgres | Its own local server, "Melony-powered" | Claude via the Claude Agent SDK: your subscription, an API key, Bedrock, Vertex, Foundry or a local model |
+| Several agents at once | Delegation along the org chart, ticket threads | Channels where agents and people chat; @mention an agent | Not its focus | Durable facts shared across agents | Multiple configurable agents | Team Meeting ending in a decision with owners; Ask the company |
+| External actions | Board approvals, per-tool Allowed / Ask first / Off, review stages; v2026.1001.0 notes say execution harnesses default to full auto unless a restrictive mode is set | Dispatched work waits in a human approval queue | The README doesn't describe an approval step for agent actions; you review a generated profile before use | Owner-approved OAuth, scope-gated access, and "Ask before anything destructive" in its bootstrap prompt | The README doesn't describe approvals, permissions or an audit log | Writes and web fetches wait for approval by default; hash-chained audit log |
+| Shared ground | MIT, self-hosted, routines, MCP + Composio, audit trail, cloud waitlist | MIT, local, files on disk, MCP, scheduled jobs, cloud waitlist | MIT, local profile storage | MIT, self-hosted, MCP, optional hosted service | MIT, local-first | MIT, self-hosted, routines, MCP + Composio, cloud waitlist |
 
-Sources: [paperclipai/paperclip](https://github.com/paperclipai/paperclip), [docs.paperclip.ing](https://docs.paperclip.ing), [Paperclip v2026.1001.0](https://github.com/paperclipai/paperclip/releases/tag/v2026.1001.0), [cabinetai/cabinet](https://github.com/cabinetai/cabinet), [runcabinet.com](https://runcabinet.com), [docs.runcabinet.com](https://docs.runcabinet.com/cabinet/agents/). Spotted something out of date? [Open an issue](https://github.com/dolevhayut/Employee001/issues) and we'll fix the table.
+Sources: [paperclipai/paperclip](https://github.com/paperclipai/paperclip), [docs.paperclip.ing](https://docs.paperclip.ing), [Paperclip v2026.1001.0](https://github.com/paperclipai/paperclip/releases/tag/v2026.1001.0), [cabinetai/cabinet](https://github.com/cabinetai/cabinet), [runcabinet.com](https://runcabinet.com), [docs.runcabinet.com](https://docs.runcabinet.com/cabinet/agents/), [titanwings/distilly](https://github.com/titanwings/distilly), [garrytan/gbrain](https://github.com/garrytan/gbrain), [meetopenbot/openbot](https://github.com/meetopenbot/openbot) (several unrelated projects share the name openbot; this is the local-first agent harness). Spotted something out of date? [Open an issue](https://github.com/dolevhayut/Employee001/issues) and we'll fix the table.
 
 ## Cloud and roadmap
 

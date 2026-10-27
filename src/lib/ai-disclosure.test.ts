@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { discloseOutbound, isOutboundMessageTool, withAiDisclosure, withOutboundDisclosure } from "./ai-disclosure";
+import { describe, expect, it, vi } from "vitest";
+import { AI_AUDIO_HEADERS, AI_HEADER, AI_HEADER_VALUE, AI_VOICE_LABEL, discloseOutbound, isOutboundMessageTool, withAiDisclosure, withOutboundDisclosure } from "./ai-disclosure";
 
 describe("AI disclosure on outbound messages", () => {
   it("prefixes text once", () => {
@@ -50,6 +50,36 @@ describe("AI disclosure on outbound messages", () => {
     const gate = withOutboundDisclosure(async () => ({ behavior: "allow", updatedInput: { channel: "C1", text: "edited, no label" } }), "Noa");
     const result = await gate("mcp__composio__SLACK_SEND_MESSAGE", { channel: "C1", text: "x" }, { signal: new AbortController().signal, toolUseID: "t" } as never);
     expect(result?.behavior === "allow" && result.updatedInput?.text).toBe("🤖 AI twin of Noa: edited, no label");
+  });
+
+  it("adds X-AI-Generated when the email tool takes headers, keeping the text line", () => {
+    const obj = discloseOutbound("GMAIL_SEND_EMAIL", { to: "a@b.co", body: "Hi", headers: { "X-Other": "1" } }, "Noa");
+    expect(obj.headers).toEqual({ "X-Other": "1", [AI_HEADER]: AI_HEADER_VALUE });
+    expect(obj.body).toBe("🤖 AI twin of Noa: Hi");
+    const list = discloseOutbound("OUTLOOK_SEND_EMAIL", { body: "Hi", internet_message_headers: [] }, "Noa");
+    expect(list.internet_message_headers).toEqual([{ name: AI_HEADER, value: AI_HEADER_VALUE }]);
+    const twice = discloseOutbound("OUTLOOK_SEND_EMAIL", list, "Noa");
+    expect(twice.internet_message_headers).toEqual([{ name: AI_HEADER, value: AI_HEADER_VALUE }]);
+  });
+
+  it("logs the gap and keeps the text line when the email tool has no header field", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const out = discloseOutbound("MAIL_SEND_EMAIL_NOHDR", { body: "Hi" }, "Noa");
+    expect(out.body).toBe("🤖 AI twin of Noa: Hi");
+    expect(Object.keys(out)).toEqual(["body"]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain(AI_HEADER);
+    warn.mockRestore();
+  });
+
+  it("never adds the header to chat sends", () => {
+    expect(discloseOutbound("SLACK_SEND_MESSAGE", { text: "hi" }, "Noa")).not.toHaveProperty("headers");
+  });
+
+  it("labels synthetic audio", () => {
+    expect(AI_VOICE_LABEL).toBe("AI voice");
+    expect(AI_AUDIO_HEADERS[AI_HEADER]).toBe("true");
+    expect(AI_AUDIO_HEADERS["X-AI-Voice"]).toBe("synthetic");
   });
 
   it("leaves denials and other tools alone", async () => {

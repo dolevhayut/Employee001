@@ -10,6 +10,7 @@ type Proposal = {
   file: string;
   markdown: string;
   reason: string;
+  source?: { kind: "council" | "answer" };
 };
 
 /**
@@ -110,6 +111,11 @@ export function KnowledgeProposalsPanel({
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--fs-sm)", color: "var(--text)" }}>
                   knowledge/<bdi>{p.file}</bdi>
                 </span>
+                {p.source?.kind === "answer" && (
+                  <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
+                    · {t("profile.proposals.fromAnswer")}
+                  </span>
+                )}
                 {p.reason && (
                   <span dir="auto" style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
                     · {p.reason}
