@@ -222,6 +222,7 @@ describe("proxy: personal MCP sign-in bearers", () => {
   });
 
   it("stops honouring a local-owner session once accounts exist", async () => {
+    process.env.EMPLOYEE001_MCP_PERSONAL_SIGNIN = "1";
     const { proxy, store } = await load();
     const bearer = await mint("local-owner");
     expect(proxy(mcp("http://127.0.0.1:3000/api/mcp", bearer)).headers.get("x-middleware-next")).toBe("1");
