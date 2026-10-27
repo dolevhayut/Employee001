@@ -20,7 +20,11 @@ interface DeviceRecord {
   approvedAt?: number;
   /** Set once the session bearer was handed to the polling client. */
   sessionId?: string;
+  lastPolledAt?: number;
 }
+
+/** Wrong user-code guesses tolerated per code lifetime before approvals are refused. */
+const MAX_FAILED_APPROVALS = 10;
 
 interface SessionRecord {
   personId: string;
@@ -32,6 +36,7 @@ interface SessionRecord {
 interface StoreShape {
   devices: Record<string, DeviceRecord>; // key: hash(deviceCode)
   sessions: Record<string, SessionRecord>; // key: hash(bearer)
+  failedApprovals?: number[]; // timestamps of unknown-code approval attempts
 }
 
 export interface McpSession {
@@ -49,11 +54,11 @@ export interface IssuedDeviceCode {
 
 export type ApproveResult =
   | { ok: true; approvedAt: number }
-  | { ok: false; reason: "unknown" | "expired" | "already_approved" };
+  | { ok: false; reason: "unknown" | "expired" | "already_approved" | "rate_limited" };
 
 export type ExchangeResult =
   | { status: "approved"; bearer: string; expiresAt: number }
-  | { status: "pending" | "expired" | "invalid" | "consumed" };
+  | { status: "pending" | "expired" | "invalid" | "consumed" | "slow_down" };
 
 type Clock = () => number;
 let clock: Clock = Date.now;
@@ -73,9 +78,7 @@ export function normalizeUserCode(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-// Single-process assumption: every operation is a synchronous read-modify-write,
-// so requests within one Next server never interleave. Running several server
-// processes on one data dir would need a lock.
+// Every mutation is a read-modify-write under a cross-process lock (withLock).
 function load(): StoreShape {
   let text: string;
   try {
@@ -91,7 +94,11 @@ function load(): StoreShape {
   if (!isMap(raw) || !isMap(raw.devices ?? {}) || !isMap(raw.sessions ?? {})) {
     throw new Error("mcp-device-auth store is malformed");
   }
-  return { devices: raw.devices ?? {}, sessions: raw.sessions ?? {} };
+  return {
+    devices: raw.devices ?? {},
+    sessions: raw.sessions ?? {},
+    failedApprovals: Array.isArray(raw.failedApprovals) ? raw.failedApprovals : [],
+  };
 }
 
 function save(store: StoreShape): void {
@@ -123,7 +130,57 @@ function prune(store: StoreShape, now: number): void {
   }
 }
 
+const LOCK_STALE_MS = 10_000;
+const LOCK_WAIT_MS = 3_000;
+
+/** Cross-process mutex: mkdir is atomic. Serialises every read-modify-write. */
+function withLock<T>(fn: () => T): T {
+  const lock = `${file()}.lock`;
+  fs.mkdirSync(path.dirname(lock), { recursive: true });
+  const started = Date.now();
+  for (;;) {
+    try {
+      fs.mkdirSync(lock);
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      try {
+        if (Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS) fs.rmdirSync(lock);
+      } catch {
+        /* released or reclaimed by someone else */
+      }
+      if (Date.now() - started > LOCK_WAIT_MS) throw new Error("mcp-device-auth store is busy");
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    try {
+      fs.rmdirSync(lock);
+    } catch {
+      /* already reclaimed as stale */
+    }
+  }
+}
+
 export function issueDeviceCode(): IssuedDeviceCode {
+  return withLock(issueUnlocked);
+}
+export function approveUserCode(userCode: string, personId: string): ApproveResult {
+  return withLock(() => approveUnlocked(userCode, personId));
+}
+export function exchangeDeviceCode(deviceCode: string): ExchangeResult {
+  return withLock(() => exchangeUnlocked(deviceCode));
+}
+export function revokePersonSessions(personId: string): number {
+  return withLock(() => revokePersonUnlocked(personId));
+}
+export function revokeBearer(bearer: string): boolean {
+  return withLock(() => revokeBearerUnlocked(bearer));
+}
+
+function issueUnlocked(): IssuedDeviceCode {
   const now = clock();
   const store = load();
   prune(store, now);
@@ -143,13 +200,19 @@ export function issueDeviceCode(): IssuedDeviceCode {
 }
 
 /** Record that a signed-in person approved the user code. Caller authenticates `personId`. */
-export function approveUserCode(userCode: string, personId: string): ApproveResult {
+function approveUnlocked(userCode: string, personId: string): ApproveResult {
   const now = clock();
   if (!personId) return { ok: false, reason: "unknown" };
   const store = load();
+  const recent = (store.failedApprovals ?? []).filter((t) => t > now - DEVICE_CODE_TTL_MS);
+  if (recent.length >= MAX_FAILED_APPROVALS) return { ok: false, reason: "rate_limited" };
   const hash = sha(normalizeUserCode(userCode));
   const entry = Object.values(store.devices).find((d) => d.userCodeHash === hash);
-  if (!entry) return { ok: false, reason: "unknown" };
+  if (!entry) {
+    store.failedApprovals = [...recent, now];
+    save(store);
+    return { ok: false, reason: "unknown" };
+  }
   if (entry.expiresAt <= now) return { ok: false, reason: "expired" };
   if (entry.approvedBy) return { ok: false, reason: "already_approved" };
   entry.approvedBy = personId;
@@ -162,15 +225,27 @@ export function approveUserCode(userCode: string, personId: string): ApproveResu
  * Polling step: trade an approved device code for a session bearer, once.
  * The device code itself never works as a bearer.
  */
-export function exchangeDeviceCode(deviceCode: string): ExchangeResult {
+function exchangeUnlocked(deviceCode: string): ExchangeResult {
   const now = clock();
   const store = load();
   const key = sha(deviceCode);
   const entry = store.devices[key];
   if (!entry) return { status: "invalid" };
   if (entry.expiresAt <= now) return { status: "expired" };
-  if (!entry.approvedBy) return { status: "pending" };
-  if (entry.sessionId) return { status: "consumed" };
+  if (entry.lastPolledAt !== undefined && now - entry.lastPolledAt < POLL_INTERVAL_SECONDS * 1000) {
+    entry.lastPolledAt = now;
+    save(store);
+    return { status: "slow_down" };
+  }
+  entry.lastPolledAt = now;
+  if (!entry.approvedBy) {
+    save(store);
+    return { status: "pending" };
+  }
+  if (entry.sessionId) {
+    save(store);
+    return { status: "consumed" };
+  }
   const bearer = randomBytes(32).toString("base64url");
   const bearerHash = sha(bearer);
   const expiresAt = now + SESSION_TTL_MS;
@@ -194,7 +269,7 @@ export function resolveBearer(bearer: string): McpSession | null {
 }
 
 /** Revoke every MCP session (and unredeemed approval) held by a person. Returns sessions revoked. */
-export function revokePersonSessions(personId: string): number {
+function revokePersonUnlocked(personId: string): number {
   const now = clock();
   const store = load();
   let revoked = 0;
@@ -212,7 +287,7 @@ export function revokePersonSessions(personId: string): number {
 }
 
 /** Revoke the single session behind a bearer (sign out). */
-export function revokeBearer(bearer: string): boolean {
+function revokeBearerUnlocked(bearer: string): boolean {
   const store = load();
   const session = store.sessions[sha(bearer)];
   if (!session || session.revokedAt) return false;
