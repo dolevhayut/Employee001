@@ -237,7 +237,8 @@ export function MeetingHistoryDrawer({
   function jumpToTurn(turn: number) {
     const el = asideRef.current?.querySelector<HTMLElement>(`[data-turn="${turn}"]`);
     if (!el) return;
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
     el.focus({ preventScroll: true });
     setFlashTurn(turn);
     window.setTimeout(() => setFlashTurn((cur) => (cur === turn ? null : cur)), 1800);
@@ -425,7 +426,7 @@ export function MeetingHistoryDrawer({
                     {stances.length > 0 && (
                       <div style={{ padding: "10px 14px 4px" }}>
                         <div style={sectionLabel}>{t("meeting.stances")}</div>
-                        <ul style={{ listStyle: "none", margin: "6px 0 0", padding: 0, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <ul aria-label={t("meeting.stances")} style={{ listStyle: "none", margin: "6px 0 0", padding: 0, display: "flex", flexWrap: "wrap", gap: 6 }}>
                           {stances.map((s) => {
                             const accepted = s.stance === "accept";
                             const color = accepted ? "var(--success)" : "var(--danger)";
@@ -455,7 +456,7 @@ export function MeetingHistoryDrawer({
                                     {accepted ? <Icons.Check size={11} /> : <span aria-hidden>✕</span>}
                                   </span>
                                   <b><bdi>{name}</bdi></b>
-                                  <span style={{ color: "var(--text-muted)" }}>{label} · #{s.turn + 1}</span>
+                                  <span style={{ color: "var(--text-muted)" }}>{label} · <bdi>#{s.turn + 1}</bdi></span>
                                 </button>
                               </li>
                             );
