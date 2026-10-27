@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEVICE_CODE_TTL_MS,
   DeviceCodeLimitError,
@@ -17,6 +17,9 @@ import {
   revokePersonSessions,
   setDeviceAuthClock,
 } from "./store";
+
+// Everyone signing in below is a member of the app.
+vi.mock("@/lib/auth/store", () => ({ getUser: (id: string) => ({ id, role: "member" }) }));
 
 let home: string;
 let now: number;
@@ -204,6 +207,40 @@ describe("lock", () => {
     expect(fs.readFileSync(lockPath(), "utf8")).toBe("someone-else");
     fs.rmSync(lockPath());
     await expect(pending).resolves.toBeTruthy();
+  });
+
+  it("keeps every write when many callers race to reclaim the same stale lock", async () => {
+    await issueDeviceCode();
+    fs.writeFileSync(lockPath(), "dead-owner");
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(lockPath(), old, old);
+    const issued = await Promise.all(Array.from({ length: 10 }, () => issueDeviceCode()));
+    const stored = JSON.parse(fs.readFileSync(path.join(home, "data", "mcp-device-auth.json"), "utf8"));
+    expect(Object.keys(stored.devices)).toHaveLength(11); // the first call plus all ten racers
+    expect(new Set(issued.map((i) => i.deviceCode)).size).toBe(10);
+    expect(fs.existsSync(lockPath())).toBe(false);
+    expect(fs.existsSync(`${lockPath()}.guard`)).toBe(false);
+  });
+
+  it("leaves a fresh lock alone and waits for it, with no guard left behind", async () => {
+    await issueDeviceCode();
+    fs.writeFileSync(lockPath(), "live-owner"); // fresh mtime, no pid prefix
+    const pending = issueDeviceCode();
+    await new Promise((r) => setTimeout(r, 80));
+    expect(fs.readFileSync(lockPath(), "utf8")).toBe("live-owner");
+    expect(fs.existsSync(`${lockPath()}.guard`)).toBe(false);
+    fs.rmSync(lockPath());
+    await pending;
+  });
+
+  it("ages out a guard left by a crashed process", async () => {
+    await issueDeviceCode();
+    const guard = `${lockPath()}.guard`;
+    fs.writeFileSync(guard, "dead-guard");
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(guard, old, old);
+    await expect(issueDeviceCode()).resolves.toBeTruthy();
+    expect(fs.existsSync(guard)).toBe(false);
   });
 
   it("reclaims a fresh lock whose owner process is dead", async () => {

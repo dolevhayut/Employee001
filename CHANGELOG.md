@@ -18,6 +18,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - New `employee001 login` command: it prints a page address and a code, you
   approve the code in the app as yourself at `/device`, and the command saves
   a personal session that `employee001 mcp` uses when no shared token is set.
+- The sign-in routes answer 404 while personal sign-in is off, so no code can
+  be minted early. Deleting, disabling, demoting or resetting the password of a
+  person now ends their MCP sessions too.
 
 ### The security policy no longer names out-of-date versions
 - SECURITY.md now says "the latest minor release" and "the one before it"

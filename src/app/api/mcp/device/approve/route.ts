@@ -2,7 +2,7 @@ import { appendAuditEntry } from "@/lib/audit-log";
 import { readJson } from "@/lib/auth/http";
 import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 import { approveUserCode } from "@/lib/mcp-server/device-auth";
-import { fail, json } from "../respond";
+import { fail, json, signInOff } from "../respond";
 
 export const runtime = "nodejs";
 
@@ -10,6 +10,8 @@ export const runtime = "nodejs";
  *  the verified session, never from the body) becomes the owner of the MCP
  *  session the polling client receives. */
 export async function POST(request: Request) {
+  const off = signInOff();
+  if (off) return off;
   const me = sessionUserFromHeaders(request.headers);
   if (!me) return fail(401, "unauthorized", "Sign in to Employee001 to approve a device.");
   const body = await readJson<{ user_code?: unknown }>(request);
