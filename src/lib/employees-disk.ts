@@ -166,7 +166,7 @@ export async function profileFileAges(employeeId: string, nowMs: number = Date.n
  * "Still true": record that the owner re-confirmed a profile file. The file's
  * content and modified time are left alone; the confirmation lives in the
  * sidecar and is appended to the audit log. Returns the new age, or null for
- * an unknown employee or file.
+ * an unknown employee or file; throws when the record can't be saved.
  */
 export async function confirmProfileFile(
   employeeId: string,
@@ -183,32 +183,29 @@ export async function confirmProfileFile(
   } catch {
     return null;
   }
-  let name = employeeId;
   const at = new Date(nowMs).toISOString();
-  try {
-    await withSidecarLock(employeeId, async () => {
-      const sidecar: DiskSidecar = JSON.parse(await fs.readFile(sidecarPath, "utf8"));
-      name = sidecar.name || employeeId;
-      const tmp = `${sidecarPath}.${randomUUID()}.tmp`;
-      await fs.writeFile(
-        tmp,
-        JSON.stringify({ ...sidecar, profileConfirmedAt: { ...sidecar.profileConfirmedAt, [file]: at } }, null, 2),
-        "utf8",
-      );
-      await fs.rename(tmp, sidecarPath);
+  // Throws if the sidecar can't be read or written, or the audit entry can't
+  // be appended: a confirmation is only made once it is on the record.
+  await withSidecarLock(employeeId, async () => {
+    const sidecar: DiskSidecar = JSON.parse(await fs.readFile(sidecarPath, "utf8"));
+    const audited = appendAuditEntry({
+      runId: `profile-confirm-${nowMs}-${randomUUID().slice(0, 8)}`,
+      employeeId,
+      employeeName: sidecar.name || employeeId,
+      toolName: "confirmProfileFile",
+      bareName: "confirmProfileFile",
+      input: { file },
+      verdict: "executed",
+      ...(actor?.id ? { approvedBy: actor.id, approvalChannel: "ui" as const } : {}),
     });
-  } catch {
-    return null;
-  }
-  appendAuditEntry({
-    runId: `profile-confirm-${nowMs}`,
-    employeeId,
-    employeeName: name,
-    toolName: "confirmProfileFile",
-    bareName: "confirmProfileFile",
-    input: { file },
-    verdict: "executed",
-    ...(actor?.id ? { approvedBy: actor.id, approvalChannel: "ui" as const } : {}),
+    if (!audited) throw new Error("could not write the audit log");
+    const tmp = `${sidecarPath}.${randomUUID()}.tmp`;
+    await fs.writeFile(
+      tmp,
+      JSON.stringify({ ...sidecar, profileConfirmedAt: { ...sidecar.profileConfirmedAt, [file]: at } }, null, 2),
+      "utf8",
+    );
+    await fs.rename(tmp, sidecarPath);
   });
   return { file, days: 0, basis: "confirmed", at };
 }

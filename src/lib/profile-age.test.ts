@@ -80,6 +80,14 @@ describe("profile file ages on disk", () => {
     expect(await profileFileAges("dana")).toMatchObject([{ days: 1, basis: "written" }]);
   });
 
+  it("fails loudly, and records nothing, when the sidecar is unreadable", async () => {
+    twin("dana", { "DECISIONS.md": 5 });
+    fs.writeFileSync(path.join(dir("dana"), "employee.json"), "{not json");
+    const { confirmProfileFile } = await import("./employees-disk");
+    await expect(confirmProfileFile("dana", "DECISIONS.md")).rejects.toThrow();
+    expect(fs.existsSync(path.join(home, "data", "audit.jsonl"))).toBe(false);
+  });
+
   it("refuses unknown files, unknown twins and path tricks", async () => {
     twin("dana", { "DECISIONS.md": 5 });
     const { confirmProfileFile, profileFileAges } = await import("./employees-disk");
