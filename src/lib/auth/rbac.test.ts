@@ -88,6 +88,14 @@ describe("authorizeApi", () => {
     expect(authorizeApi("/api/auth/login", "POST", null)).toMatchObject({ allow: true, access: { kind: "public" } });
     expect(authorizeApi("/api/mcp", "POST", null)).toMatchObject({ allow: true, access: { kind: "bearer" } });
   });
+
+  it("keeps the Claude Code import to the owner: it reads the server user's own folder", () => {
+    const route = "/api/employees/noa/import-claude-code";
+    expect(authorizeApi(route, "POST", owner).allow).toBe(true);
+    for (const caller of [admin, approver, member, employee]) {
+      expect(authorizeApi(route, "POST", caller).allow, caller.role).toBe(false);
+    }
+  });
 });
 
 describe("authorizePage", () => {

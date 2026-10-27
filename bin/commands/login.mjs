@@ -49,6 +49,16 @@ export function appBase(value) {
   return value.replace(/\/+$/, "").replace(/\/api\/mcp$/, "");
 }
 
+/** True for an http:// address that is not this machine. */
+export function isCleartextRemote(base) {
+  try {
+    const { protocol, hostname } = new URL(base);
+    return protocol === "http:" && !["localhost", "127.0.0.1", "[::1]", "::1"].includes(hostname) && !hostname.endsWith(".localhost");
+  } catch {
+    return false;
+  }
+}
+
 async function postJson(fetchFn, url, body) {
   const res = await fetchFn(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
   const data = await res.json().catch(() => ({}));
@@ -69,6 +79,9 @@ export async function runLogin({
   now = () => Date.now(),
   write = (s) => process.stdout.write(s),
 }) {
+  if (isCleartextRemote(base)) {
+    write(`\nWarning: ${base} is plain http on another machine. The session token will cross the network unencrypted; prefer https.\n`);
+  }
   let started;
   try {
     started = await postJson(fetchFn, `${base}/api/mcp/device/start`, {});

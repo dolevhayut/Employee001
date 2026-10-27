@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { appBase, readStoredSession, runLogin } from "../../bin/commands/login.mjs";
+import { appBase, isCleartextRemote, readStoredSession, runLogin } from "../../bin/commands/login.mjs";
 
 let dir: string;
 let env: Record<string, string>;
@@ -94,5 +94,16 @@ describe("employee001 login", () => {
   it("accepts the app address or the MCP endpoint", () => {
     expect(appBase("http://127.0.0.1:3000/api/mcp/")).toBe("http://127.0.0.1:3000");
     expect(appBase("http://127.0.0.1:3000")).toBe("http://127.0.0.1:3000");
+  });
+});
+
+describe("isCleartextRemote", () => {
+  it("flags plain http to another machine, not https or this machine", () => {
+    expect(isCleartextRemote("http://10.0.0.5:3000")).toBe(true);
+    expect(isCleartextRemote("http://mac-mini.local:3000")).toBe(true);
+    expect(isCleartextRemote("https://e001.example.com")).toBe(false);
+    expect(isCleartextRemote("http://127.0.0.1:3000")).toBe(false);
+    expect(isCleartextRemote("http://localhost:3001")).toBe(false);
+    expect(isCleartextRemote("http://[::1]:3000")).toBe(false);
   });
 });

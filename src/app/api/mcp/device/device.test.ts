@@ -2,7 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEVICE_CODE_TTL_MS, POLL_INTERVAL_SECONDS, resolveBearer, setDeviceAuthClock } from "@/lib/mcp-server/device-auth";
+import { DEVICE_CODE_TTL_MS, MAX_OUTSTANDING_CODES, POLL_INTERVAL_SECONDS, resolveBearer, setDeviceAuthClock } from "@/lib/mcp-server/device-auth";
+import { dataDir } from "@/lib/app-home";
 import { POST as start } from "./start/route";
 import { POST as poll } from "./poll/route";
 import { POST as approve } from "./approve/route";
@@ -55,6 +56,18 @@ async function begin() {
 }
 
 describe("POST /api/mcp/device/start", () => {
+  it("answers 429, not 500, once the store holds the most pending codes it allows", async () => {
+    const devices = Object.fromEntries(
+      Array.from({ length: MAX_OUTSTANDING_CODES }, (_, i) => [`d${i}`, { userCodeHash: `u${i}`, expiresAt: now + DEVICE_CODE_TTL_MS }]),
+    );
+    const file = dataDir("mcp-device-auth.json");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ devices, sessions: {} }));
+    const res = await start(post("start"));
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe("rate_limited");
+  });
+
   it("returns a device code, user code, verification URL and interval", async () => {
     const res = await start(post("start"));
     const body = await res.json();

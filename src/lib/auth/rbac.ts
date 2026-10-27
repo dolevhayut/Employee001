@@ -35,6 +35,7 @@ const employee = role("employee");
 const member = role("member");
 const approver = role("approver");
 const admin = role("admin");
+const owner = role("owner");
 
 type Methods = Partial<Record<"GET" | "POST" | "PUT" | "PATCH" | "DELETE", Access>>;
 
@@ -90,7 +91,8 @@ export const API_ROUTES: Record<string, Methods> = {
   "/api/employees/[id]/knowledge/proposals": { GET: member, POST: member },
   "/api/employees/[id]/knowledge/proposals/[pid]": { POST: admin },
   "/api/employees/[id]/skills": { GET: member, PATCH: admin },
-  "/api/employees/[id]/import-claude-code": { POST: admin },
+  // Reads the server user's own ~/.claude: the machine owner only, never another admin.
+  "/api/employees/[id]/import-claude-code": { POST: owner },
   "/api/employees/[id]/task": { POST: member },
   "/api/employees/[id]/versions/builds": { GET: role("member", "id") },
   "/api/employees/[id]/versions/file/[name]": { GET: role("member", "id") },
