@@ -44,7 +44,7 @@ export function ingestEmailMessage(
   // Invisible characters (Unicode tags, bidi overrides, zero-width) can hide
   // instructions a reader never sees. Sender and subject reach the prompt too,
   // outside the untrusted fence, so they are cleaned with the body.
-  const clean = stripHiddenCharsFields(message, ["from", "subject", "body"] as const);
+  const clean = stripHiddenCharsFields(message, ["from", "subject", "date", "body"] as const);
   const mail = clean.value;
   const { item, deduped } = enqueueWorkItem({
     type: "email", assigneeEmployeeId: employeeId,

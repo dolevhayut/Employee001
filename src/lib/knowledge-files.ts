@@ -9,6 +9,7 @@ import {
   sanitizeKnowledgeSegment,
 } from "./knowledge-versions";
 import { stripHiddenChars, type HiddenCharCounts } from "./hidden-chars";
+import { cleanUploadedBytes } from "./hidden-chars-upload";
 import { auditHiddenCharsRemoved } from "./hidden-chars-audit";
 
 function employeesDataDir(): string {
@@ -241,19 +242,6 @@ export function writeUntrustedKnowledgeFile(
 }
 
 /**
- * Remove invisible characters from an uploaded TEXT file's bytes. Only when
- * the bytes are valid UTF-8 (they round-trip exactly); any other encoding is
- * left as it is rather than risk corrupting it.
- */
-function cleanUploadedText(data: Buffer): { data: Buffer; removed?: HiddenCharCounts } {
-  const decoded = data.toString("utf-8");
-  if (!Buffer.from(decoded, "utf-8").equals(data)) return { data };
-  const clean = stripHiddenChars(decoded);
-  if (clean.total === 0) return { data };
-  return { data: Buffer.from(clean.text, "utf-8"), removed: clean.removed };
-}
-
-/**
  * Persist an uploaded file. Validates size, extension (text OR any non-blocked
  * binary), and the executable blocklist. On a name collision, suffixes the
  * basename with -1, -2, … Returns the saved metadata or a structured error.
@@ -295,9 +283,11 @@ export function saveUploadedKnowledgeFile(
       finalName = `${base}-${i}${parsedExt}`;
     }
 
-    // A text upload is read by the twin as-is: clean it first. Binary
-    // uploads are never read directly; PDF/DOCX text is cleaned on extraction.
-    const cleaned = isTextExt(ext) ? cleanUploadedText(data) : { data };
+    // The twin reads any upload that isn't a binary format as text, whatever
+    // its extension or encoding (UTF-8, UTF-16, UTF-32): clean it first.
+    // Binary formats are left byte for byte; PDF/DOCX text is cleaned on
+    // extraction.
+    const cleaned = cleanUploadedBytes(finalName, data);
     fs.writeFileSync(path.join(dir, finalName), cleaned.data);
     const kf = statToKnowledgeFile(dir, finalName);
     if (!kf) return { error: "Could not read back the saved file." };

@@ -19,7 +19,7 @@ import { actionsAllowed } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
 import { dataDir } from "@/lib/app-home";
 import { addPersonProblem } from "@/lib/model-provider";
-import { addHiddenCharCounts, emptyHiddenCharCounts, hiddenCharTotal, stripHiddenChars } from "@/lib/hidden-chars";
+import { addHiddenCharCounts, emptyHiddenCharCounts, hiddenCharTotal, stripHiddenChars, stripHiddenCharsFields, type HiddenCharCounts } from "@/lib/hidden-chars";
 import { auditHiddenCharsRemoved } from "@/lib/hidden-chars-audit";
 
 // The autonomy work plane's executor. Each armed tick leases at most ONE
@@ -190,6 +190,12 @@ async function executeWorkItem(item: WorkItem): Promise<void> {
     // Decide before drafting: an unattended reply is drafted from the public
     // profile only, so it can't carry what a human would have to vet.
     const slackDecision = item.type === "slack" ? decideSlackReply(employee.id, item.payload as SlackPayload) : undefined;
+    // Items queued before intake cleaned hidden characters are cleaned again
+    // in taskFor; record that removal here (counts only).
+    const dispatchRemoved = cleanWorkItemText(item).removed;
+    if (hiddenCharTotal(dispatchRemoved) > 0 && (item.type === "slack" || item.type === "email")) {
+      auditHiddenCharsRemoved({ source: item.type, employeeId: employee.id, removed: dispatchRemoved, ref: { workItemId: item.id, stage: "dispatch" } });
+    }
     await runSingleTwin(employee, taskFor(effectiveItem), onEvent, [], {
       surface: "background",
       runId,
@@ -234,11 +240,39 @@ async function executeWorkItem(item: WorkItem): Promise<void> {
   }
 }
 
-/** Invisible characters out of outside text. Intake already cleans what it
- *  stores; this second pass covers items queued before that existed. */
+/** Invisible characters out of outside text. */
 const visible = (value: string): string => stripHiddenChars(value).text;
 
-/** Tell the twin when intake removed hidden characters: the sender tried to
+/**
+ * Clean a Slack or email item's outside text again. Intake already cleans
+ * what it stores; this second pass covers items queued before that existed.
+ * Returns the cleaned item, with this pass's counts added to its
+ * hiddenCharsRemoved, and what this pass removed.
+ */
+export function cleanWorkItemText(item: WorkItem): { item: WorkItem; removed: HiddenCharCounts } {
+  const removed = emptyHiddenCharCounts();
+  let payload: WorkItem["payload"] = item.payload;
+  if (item.type === "slack") {
+    const p = item.payload as SlackPayload;
+    const top = stripHiddenCharsFields(p, ["text"] as const);
+    addHiddenCharCounts(removed, top.removed);
+    const threadMessages = p.threadMessages?.map((message) => {
+      const clean = stripHiddenCharsFields(message, ["userId", "text"] as const);
+      addHiddenCharCounts(removed, clean.removed);
+      return clean.value;
+    });
+    payload = { ...top.value, ...(threadMessages ? { threadMessages } : {}) };
+  } else if (item.type === "email") {
+    const clean = stripHiddenCharsFields(item.payload as EmailPayload, ["from", "subject", "date", "body"] as const);
+    addHiddenCharCounts(removed, clean.removed);
+    payload = clean.value;
+  }
+  if (hiddenCharTotal(removed) === 0) return { item, removed };
+  const total = addHiddenCharCounts({ ...(item.hiddenCharsRemoved ?? emptyHiddenCharCounts()) }, removed);
+  return { item: { ...item, payload, hiddenCharsRemoved: total }, removed };
+}
+
+/** Tell the twin when hidden characters were removed: the sender tried to
  *  say something a human reader couldn't see, which is itself a red flag. */
 function hiddenCharsNotice(item: WorkItem): string[] {
   if (!item.hiddenCharsRemoved || hiddenCharTotal(item.hiddenCharsRemoved) === 0) return [];
@@ -359,7 +393,9 @@ async function deliverSlackReply(input: { employeeId: string; employeeName: stri
   appendAuditEntry({ ...base, input: { ...auditInput, postedAs: identity, policy: decision.reason }, verdict: "executed", approvedBy: "policy:slack-autoreply", approvalChannel: "policy" });
 }
 
-function taskFor(item: WorkItem): string {
+/** The twin's prompt for a work item. Exported for tests. */
+export function taskFor(queued: WorkItem): string {
+  const { item } = cleanWorkItemText(queued);
   if (item.type === "task") {
     return (item.payload as { task: string }).task;
   }
@@ -373,9 +409,9 @@ function taskFor(item: WorkItem): string {
   return [
     `An email arrived in your connected inbox and was routed to you as a work item.`,
     ``,
-    `From: ${p.from !== undefined ? visible(p.from) : "(unknown sender)"}`,
-    `Subject: ${p.subject !== undefined ? visible(p.subject) : "(no subject)"}`,
-    `Date: ${p.date !== undefined ? visible(p.date) : "(unknown)"}`,
+    `From: ${p.from ?? "(unknown sender)"}`,
+    `Subject: ${p.subject ?? "(no subject)"}`,
+    `Date: ${p.date ?? "(unknown)"}`,
     p.threadId ? `Gmail thread id: ${p.threadId}` : ``,
     `Gmail message id: ${p.messageId}`,
     ``,
