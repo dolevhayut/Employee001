@@ -14,8 +14,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   browser) is recorded. Without it, speech uses the default voice and says why.
 - Withdrawing consent removes the voice id and is written to the audit log.
   Consent recorded by an admin is marked "on behalf".
-- The screens to give or withdraw consent come in a follow-up; until then
-  custom voices use the default voice.
+- Give or withdraw consent under the voice list on the profile. A cloned voice
+  is used only for the person it belongs to (or an admin), and is spoken
+  through the server rather than a live connection.
 
 ---
 

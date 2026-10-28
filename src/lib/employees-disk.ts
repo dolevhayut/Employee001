@@ -6,9 +6,8 @@ import "server-only";
 import fs from "fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import path from "path";
-import { EMPLOYEE_ID, VOICE_CONSENT_TEXT } from "./employees";
+import { EMPLOYEE_ID, VOICE_CONSENT_TEXT, voiceConsentStatus } from "./employees";
 import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin, RetentionConsent, TwinLifecycle, VoiceConsent } from "./employees";
-import { appendAuditEntry } from "./audit-log";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 import { withSidecarLock } from "./sidecar-lock";
 import { dataDir } from "./app-home";
@@ -294,7 +293,8 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
       ...(sidecar.lifecycle && sidecar.lifecycle !== "active" ? { lifecycle: sidecar.lifecycle } : {}),
       ...(sidecar.retiredAt ? { retiredAt: sidecar.retiredAt } : {}),
       ...(sidecar.retention ? { retention: sidecar.retention } : {}),
-      ...(sidecar.voiceConsent ? { voiceConsent: sidecar.voiceConsent } : {}),
+      // Status only: this row goes to every member, so no voice id, IP or user agent.
+      ...(sidecar.voiceConsent ? { voiceConsent: voiceConsentStatus(sidecar.voiceConsent) } : {}),
     });
   }
 

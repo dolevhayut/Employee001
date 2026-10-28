@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { AI_AUDIO_HEADERS } from "@/lib/ai-disclosure";
 import { elevenLabsBase, voiceEnabled } from "@/lib/data-residency";
+import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 import { fetchSpeech } from "@/lib/tts-model";
 import { resolveTtsVoice } from "@/lib/voice-live";
 
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
   const text = stripMarkdown(rawText).slice(0, MAX_CHARS);
   // Same pick as live speech: the twin's voice, the install default, or Sarah.
   // A cloned or custom voice needs the person's recorded consent; otherwise the default.
-  const { voiceId, fallback } = await resolveTtsVoice(body.voiceId, body.employeeId);
+  const { voiceId, fallback } = await resolveTtsVoice(body.voiceId, body.employeeId, process.env, sessionUserFromHeaders(request.headers));
 
   const upstream = await fetchSpeech(`${elevenLabsBase()}/v1/text-to-speech/${voiceId}/stream`, apiKey, text);
 

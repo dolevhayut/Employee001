@@ -232,6 +232,16 @@ export type VoiceConsent = {
   userAgent: string;
 };
 
+/** What the rest of the app may see of a voice consent: that it exists, when,
+ *  and whether an admin gave it. The voice id, IP and user agent stay in the
+ *  sidecar and the audit log. */
+export type VoiceConsentStatus = { grantedAt: string; onBehalf?: boolean };
+
+export const voiceConsentStatus = (c: VoiceConsent): VoiceConsentStatus => ({
+  grantedAt: c.grantedAt,
+  ...(c.onBehalf ? { onBehalf: true } : {}),
+});
+
 /** The wording shown before a voice consent is recorded. Its SHA-256 goes into
  *  the record and the audit log; changing a word changes the digest. */
 export const VOICE_CONSENT_TEXT = [
@@ -275,8 +285,8 @@ export type EmployeeWithTwin = Employee & {
   /** ISO timestamp the twin was retired. */
   retiredAt?: string;
   retention?: RetentionConsent;
-  /** Recorded consent to use a cloned or custom voice for this person. */
-  voiceConsent?: VoiceConsent;
+  /** Recorded consent to use a cloned or custom voice for this person (status only). */
+  voiceConsent?: VoiceConsentStatus;
   /** Per-twin unattended Slack policy. Off unless the CEO explicitly enables it. */
   answerSlackWithoutAsking?: boolean;
   twinStatus: TwinStatus;

@@ -13,6 +13,8 @@
 
 import { elevenLabsBase, euRegion, voiceEnabled } from "@/lib/data-residency";
 import { STT_SAMPLE_RATE, TTS_SAMPLE_RATE } from "@/lib/pcm";
+import { ROLE_RANK } from "@/lib/auth/rbac";
+import type { Role } from "@/lib/auth/request-user";
 import { EMPLOYEE_ID, isStockVoice } from "@/lib/employees";
 import { loadVoiceConsent } from "@/lib/employees-disk";
 
@@ -57,24 +59,51 @@ export function liveVoiceId(requested: unknown, env: Env = process.env): string 
 export const VOICE_CONSENT_REQUIRED_MESSAGE =
   "This voice isn't cleared for use: no recorded consent from the person it belongs to. Using the default voice instead.";
 
+export const VOICE_OWNER_ONLY_MESSAGE =
+  "This voice can be used only by the person it belongs to, or an admin. Using the default voice instead.";
+
+export type VoiceFallback =
+  | { error: "voice_consent_required"; message: string }
+  | { error: "voice_owner_only"; message: string };
+
 export type ResolvedVoice =
-  | { voiceId: string; fallback?: undefined }
-  | { voiceId: string; fallback: { error: "voice_consent_required"; message: string } };
+  | { voiceId: string; fallback?: undefined; cloned?: boolean }
+  | { voiceId: string; fallback: VoiceFallback; cloned?: undefined };
+
+/** Who is asking, as the proxy resolved the session. Null: accounts are off. */
+export type VoiceRequester = { role: Role; employeeId?: string } | null;
 
 /**
  * The voice TTS may use for this request. A stock catalogue voice, or the
  * install's configured default, needs no one's consent. Any other voice id
- * (a clone or custom voice) is used only for the person who recorded consent
- * for exactly that voice id; otherwise the default voice is returned together
- * with the reason, so the caller can tell the user.
+ * (a clone or custom voice) is used only when (1) the person it belongs to
+ * recorded consent for exactly that voice id, and (2) the requester is that
+ * person or an admin (the employeeId comes from the request body, so it
+ * proves nothing by itself). Otherwise the default voice is returned together
+ * with the reason, so the caller can tell the user. `cloned` marks a voice
+ * that passed both checks.
+ *
+ * Not covered: ELEVENLABS_VOICE_ID is the operator's own setting and skips
+ * consent. If it is a clone of a real person, the operator must hold that
+ * person's consent outside this app.
  */
-export async function resolveTtsVoice(requested: unknown, employeeId: unknown, env: Env = process.env): Promise<ResolvedVoice> {
+export async function resolveTtsVoice(
+  requested: unknown,
+  employeeId: unknown,
+  env: Env = process.env,
+  requester: VoiceRequester = null,
+): Promise<ResolvedVoice> {
   const wanted = liveVoiceId(requested, env);
   const fallbackVoice = liveVoiceId(undefined, env);
   if (wanted === fallbackVoice || typeof requested !== "string" || isStockVoice(wanted)) return { voiceId: wanted };
   const consent = typeof employeeId === "string" && EMPLOYEE_ID.test(employeeId) ? await loadVoiceConsent(employeeId) : null;
-  if (consent && consent.voiceId === wanted) return { voiceId: wanted };
-  return { voiceId: fallbackVoice, fallback: { error: "voice_consent_required", message: VOICE_CONSENT_REQUIRED_MESSAGE } };
+  if (!consent || consent.voiceId !== wanted) {
+    return { voiceId: fallbackVoice, fallback: { error: "voice_consent_required", message: VOICE_CONSENT_REQUIRED_MESSAGE } };
+  }
+  if (requester && ROLE_RANK[requester.role] < ROLE_RANK.admin && requester.employeeId !== employeeId) {
+    return { voiceId: fallbackVoice, fallback: { error: "voice_owner_only", message: VOICE_OWNER_ONLY_MESSAGE } };
+  }
+  return { voiceId: wanted, cloned: true };
 }
 
 /** Scribe v2 Realtime, VAD-committed: one committed transcript per pause. */

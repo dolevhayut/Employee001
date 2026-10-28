@@ -14,14 +14,14 @@ const ready = new Map<string, AudioBuffer>();
 const preparing = new Map<string, number>();
 const RETRY_MS = 60_000;
 
-async function synthesize(voiceId: string | undefined, phrase: string): Promise<AudioBuffer | null> {
+async function synthesize(voiceId: string | undefined, phrase: string, employeeId?: string): Promise<AudioBuffer | null> {
   const ctx = playbackContext();
   if (!ctx) return null;
   try {
     const res = await fetch("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: phrase, voiceId }),
+      body: JSON.stringify({ text: phrase, voiceId, employeeId }),
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return null;
@@ -37,7 +37,7 @@ async function synthesize(voiceId: string | undefined, phrase: string): Promise<
 /** Synthesizes the acknowledgments for this voice in the background, one at
  *  a time (no burst against ElevenLabs' concurrency limit next to the live
  *  sockets). A failure is retried no sooner than a minute later. */
-export function prepareAcks(voiceId: string | undefined) {
+export function prepareAcks(voiceId: string | undefined, employeeId?: string) {
   const v = voiceId ?? "";
   const since = preparing.get(v);
   if (since !== undefined && (since === Infinity || Date.now() - since < RETRY_MS)) return;
@@ -47,7 +47,7 @@ export function prepareAcks(voiceId: string | undefined) {
     for (const phrase of ACK_PHRASES) {
       const k = key(voiceId, phrase);
       if (ready.has(k)) continue;
-      const buf = await synthesize(voiceId, phrase);
+      const buf = await synthesize(voiceId, phrase, employeeId);
       if (buf) ready.set(k, buf);
       else failed = true;
     }

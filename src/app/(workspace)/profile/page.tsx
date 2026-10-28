@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { KnowledgeProposalsPanel } from "@/components/ex/knowledge-proposals-panel";
+import { VoiceConsentCard } from "@/components/ex/voice-consent-card";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef, useMemo, useId, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1648,6 +1649,9 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
           </div>
         )}
       </div>
+
+      {/* A cloned or custom voice speaks only with the person's recorded consent */}
+      <VoiceConsentCard employeeId={employee.id} voiceId={voiceId} />
 
       {/* Footer */}
       <div style={{ padding: "12px 18px", display: "flex", alignItems: "center", gap: "var(--sp-12)", borderTop: "1px solid var(--hairline)" }}>

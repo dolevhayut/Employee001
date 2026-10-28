@@ -792,6 +792,8 @@ export default function AskPage() {
   const ackRef = useRef<PlayingAck | null>(null);
   // The turn spoken live while it streamed, so it isn't spoken again at the end.
   const liveTurnRef = useRef<number | null>(null);
+  /** A turn whose voice must be spoken by the server, not the live socket. */
+  const serverOnlyTurnRef = useRef<number | null>(null);
   // Live speech failed to connect once: whole-answer playback for this visit.
   const liveTtsBroken = useRef(false);
   // What the twin is saying (or just said), to tell its echo from the person.
@@ -865,9 +867,10 @@ export default function AskPage() {
 
   /** A live speaker for one turn, or null when live speech isn't available.
    *  `fallback` runs if it can't connect, before anything was said. */
-  const openSpeaker = (turnId: number, voiceId: string | undefined, fallback?: () => void): LiveSpeaker | null => {
+  const openSpeaker = (turnId: number, voiceId: string | undefined, employeeId: string | undefined, fallback?: () => void): LiveSpeaker | null => {
     if (!voiceLive || liveTtsBroken.current) return null;
     const speaker: LiveSpeaker = new LiveSpeaker(voiceId, {
+      notice: (message) => flashHint(message),
       playing: () => {
         if (speakerRef.current === speaker) setAudio({ id: turnId, status: "playing" });
       },
@@ -877,14 +880,16 @@ export default function AskPage() {
         speakerRef.current = null;
         setAudio(null);
       },
-      failed: () => {
-        liveTtsBroken.current = true;
+      failed: (reason) => {
+        // A cloned voice is spoken through the server; live speech is fine for the others.
+        if (reason === "server_only") serverOnlyTurnRef.current = turnId;
+        else liveTtsBroken.current = true;
         if (speakerRef.current !== speaker) return;
         speakerRef.current = null;
         setAudio(null);
         fallback?.();
       },
-    });
+    }, employeeId);
     speakerRef.current = speaker;
     spokenRef.current = { text: "", endedAt: null };
     setAudio({ id: turnId, status: "loading" });
@@ -916,7 +921,8 @@ export default function AskPage() {
     playbackContext(); // inside the click when there is one
     answer = stripCites(answer);
     stopAudio();
-    const speaker = openSpeaker(turnId, voiceId, () => void speakWhole(turnId, answer, voiceId));
+    const employeeId = turns.find((x) => x.id === turnId)?.twinId;
+    const speaker = openSpeaker(turnId, voiceId, employeeId, () => void speakWhole(turnId, answer, voiceId));
     if (speaker) {
       for (const sentence of takeSentences(answer, true).sentences) speaker.say(speakable(sentence));
       speaker.finish();
@@ -934,9 +940,12 @@ export default function AskPage() {
       const res = await fetch("/api/tts/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: answer, voiceId }),
+        body: JSON.stringify({ text: answer, voiceId, employeeId: turns.find((x) => x.id === turnId)?.twinId }),
       });
       if (!res.ok) throw new Error(`tts ${res.status}`);
+      // The twin's voice isn't cleared (no recorded consent): the default voice speaks; say why.
+      const fallbackNote = res.headers.get("X-Voice-Fallback-Message");
+      if (fallbackNote) flashHint(fallbackNote);
       const blob = await res.blob();
       // Stopped (or the mic opened) while the audio was on its way: drop it.
       if (gen !== speakGen.current || (!liveEngineRef.current && voiceStateRef.current !== "idle")) return;
@@ -1119,7 +1128,7 @@ export default function AskPage() {
     ]);
     // Spoken back while it's written: each finished sentence goes to the
     // speaker as soon as the twin streams it.
-    const speaker = voiceReady && (voiceOn || viaVoice) ? openSpeaker(id, twin.ttsVoiceId) : null;
+    const speaker = voiceReady && (voiceOn || viaVoice) ? openSpeaker(id, twin.ttsVoiceId, twin.id) : null;
     liveTurnRef.current = speaker ? id : null;
     // The demo speaks its recorded answer as the text starts, like live voice.
     let demoClip = voiceOn && !signal.aborted ? demoClipFor(twinId, question) : null;
@@ -1308,8 +1317,8 @@ export default function AskPage() {
   // Have the twin's "Let me check." ready before the first spoken question.
   const ackVoice = twin?.ttsVoiceId;
   useEffect(() => {
-    if (voice.engine === "live" && voice.state !== "idle") prepareAcks(ackVoice);
-  }, [voice.engine, voice.state, ackVoice]);
+    if (voice.engine === "live" && voice.state !== "idle") prepareAcks(ackVoice, twin?.id);
+  }, [voice.engine, voice.state, ackVoice, twin?.id]);
   // Live voice listens across questions; it lets go after a quiet spell with
   // nothing said, nothing being answered and nothing playing.
   const live = voice.engine === "live";
@@ -1474,7 +1483,7 @@ export default function AskPage() {
               // A spoken question always gets a spoken answer. Live voice
               // already said it while it streamed.
               if (!last || !voiceReady || !(voiceOn || last.viaVoice)) return;
-              if (liveTurnRef.current === last.id && !liveTtsBroken.current) return;
+              if (liveTurnRef.current === last.id && !liveTtsBroken.current && serverOnlyTurnRef.current !== last.id) return;
               void speak(last.id, answer, last.voiceId);
             }}
             answerAction={(() => {

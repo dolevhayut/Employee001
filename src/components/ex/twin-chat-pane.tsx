@@ -627,13 +627,14 @@ function useTTS() {
     };
   }, []);
 
-  const play = useCallback(async (msgId: string, text: string, voiceId?: string) => {
+  const play = useCallback(async (msgId: string, text: string, voiceId?: string, employeeId?: string) => {
     const sink = openSink(msgId);
     try {
       const res = await fetch("/api/tts/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voiceId }),
+        // employeeId: a cloned voice is only used with that person's recorded consent.
+        body: JSON.stringify({ text, voiceId, employeeId }),
       });
       if (!res.ok || !res.body) throw new Error(`TTS stream failed: ${res.status}`);
 
@@ -1620,7 +1621,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                     <button
                       onClick={() => {
                         if (playingId === m.id) { stop(); }
-                        else { play(m.id, m.text, resolveVoiceId(employeeId ?? "", roster)); }
+                        else { play(m.id, m.text, resolveVoiceId(employeeId ?? "", roster), employeeId); }
                       }}
                       disabled={loadingId === m.id}
                       title={playingId === m.id ? t("chat.stopTitle") : t("chat.listenTitle")}
