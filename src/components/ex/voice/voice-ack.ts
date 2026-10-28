@@ -8,7 +8,9 @@
 import { ACK_PHRASES } from "@/lib/voice-lane";
 import { playbackContext } from "./live-speaker";
 
-const key = (voiceId: string | undefined, phrase: string) => `${voiceId ?? ""}\u0000${phrase}`;
+// Per person as well as per voice: consent is checked per person on the server,
+// so one twin's cloned-voice clips must not be played for another.
+const key = (voiceId: string | undefined, phrase: string, employeeId?: string) => `${employeeId ?? ""}\u0001${voiceId ?? ""}\u0000${phrase}`;
 const ready = new Map<string, AudioBuffer>();
 /** Voices being prepared, or that failed recently (retried after a minute). */
 const preparing = new Map<string, number>();
@@ -38,14 +40,14 @@ async function synthesize(voiceId: string | undefined, phrase: string, employeeI
  *  a time (no burst against ElevenLabs' concurrency limit next to the live
  *  sockets). A failure is retried no sooner than a minute later. */
 export function prepareAcks(voiceId: string | undefined, employeeId?: string) {
-  const v = voiceId ?? "";
+  const v = `${employeeId ?? ""}\u0001${voiceId ?? ""}`;
   const since = preparing.get(v);
   if (since !== undefined && (since === Infinity || Date.now() - since < RETRY_MS)) return;
   preparing.set(v, Infinity);
   void (async () => {
     let failed = false;
     for (const phrase of ACK_PHRASES) {
-      const k = key(voiceId, phrase);
+      const k = key(voiceId, phrase, employeeId);
       if (ready.has(k)) continue;
       const buf = await synthesize(voiceId, phrase, employeeId);
       if (buf) ready.set(k, buf);
@@ -58,8 +60,8 @@ export function prepareAcks(voiceId: string | undefined, employeeId?: string) {
 export type PlayingAck = { stop: () => void; endsAt: number };
 
 /** Plays the phrase now if it's ready; null when it isn't (nothing is said). */
-export function playAck(voiceId: string | undefined, phrase: string, onEnded: () => void): PlayingAck | null {
-  const buf = ready.get(key(voiceId, phrase));
+export function playAck(voiceId: string | undefined, phrase: string, onEnded: () => void, employeeId?: string): PlayingAck | null {
+  const buf = ready.get(key(voiceId, phrase, employeeId));
   const ctx = playbackContext();
   if (!buf || !ctx) return null;
   const src = ctx.createBufferSource();

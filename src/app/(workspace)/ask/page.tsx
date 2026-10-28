@@ -1156,7 +1156,7 @@ export default function AskPage() {
               if (ackRef.current === ack) ackRef.current = null;
               // Its words stay echo for a moment after, even if the answer's voice failed.
               if (spokenRef.current.text === phrase) spokenRef.current = { text: phrase, endedAt: Date.now() };
-            });
+            }, twin.id);
             if (!ack) return;
             ackRef.current = ack;
             speaker.after(ack.endsAt, phrase);
