@@ -11,6 +11,7 @@ import {
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useVoicePolicy } from "@/components/ex/voice/use-voice-policy";
+import { voiceFallbackNote } from "@/components/ex/voice/voice-storage";
 import { Icons } from "@/components/ex/icons";
 import { Markdown } from "@/components/ex/markdown";
 import { ClarificationCard } from "@/components/ex/clarification-card";
@@ -542,6 +543,8 @@ type InlineSink = { appendChunk: (b64: string) => void; finish: () => void; abor
 function useTTS() {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  /** Why the default voice spoke instead of the twin's (no recorded consent). */
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
   const stop = useCallback(() => {
@@ -629,6 +632,7 @@ function useTTS() {
 
   const play = useCallback(async (msgId: string, text: string, voiceId?: string, employeeId?: string) => {
     const sink = openSink(msgId);
+    setVoiceNote(null);
     try {
       const res = await fetch("/api/tts/stream", {
         method: "POST",
@@ -637,6 +641,7 @@ function useTTS() {
         body: JSON.stringify({ text, voiceId, employeeId }),
       });
       if (!res.ok || !res.body) throw new Error(`TTS stream failed: ${res.status}`);
+      setVoiceNote(voiceFallbackNote(res.headers));
 
       const reader = res.body.getReader();
       while (true) {
@@ -658,7 +663,7 @@ function useTTS() {
 
   useEffect(() => () => { stopRef.current(); }, []);
 
-  return { playingId, loadingId, play, stop, stopRef };
+  return { playingId, loadingId, voiceNote, play, stop, stopRef };
 }
 
 // ─── Voice hook ───────────────────────────────────────────────────────────────
@@ -878,7 +883,7 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
   const sessionIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const { playingId, loadingId, play, stop, stopRef } = useTTS();
+  const { playingId, loadingId, voiceNote, play, stop, stopRef } = useTTS();
   const submitRef = useRef<
     (
       question: string,
@@ -1617,6 +1622,9 @@ export function TwinChatPane({ onTrace, onOpenFile, employeeId }: Props) {
                     )}
                     {(playingId === m.id || loadingId === m.id) && (
                       <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>{t("ask.aiVoice")}</span>
+                    )}
+                    {voiceNote && (playingId === m.id || loadingId === m.id) && (
+                      <span role="status" style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>{voiceNote}</span>
                     )}
                     <button
                       onClick={() => {

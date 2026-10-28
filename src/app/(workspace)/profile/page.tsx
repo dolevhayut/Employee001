@@ -1651,7 +1651,7 @@ function VoicePicker({ employee }: { employee: EmployeeWithTwin }) {
       </div>
 
       {/* A cloned or custom voice speaks only with the person's recorded consent */}
-      <VoiceConsentCard employeeId={employee.id} voiceId={voiceId} />
+      <VoiceConsentCard employeeId={employee.id} voiceId={voiceId} onWithdrawn={() => setVoiceId(employee.ttsVoiceId)} />
 
       {/* Footer */}
       <div style={{ padding: "12px 18px", display: "flex", alignItems: "center", gap: "var(--sp-12)", borderTop: "1px solid var(--hairline)" }}>

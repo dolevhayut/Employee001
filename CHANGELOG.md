@@ -18,6 +18,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is used only for the person it belongs to (or an admin), and is spoken
   through the server rather than a live connection. The app cannot check whose
   voice a voice id is, so consent should only be recorded for the person's own voice.
+- Withdrawing consent also forgets the voice picked on this device, and the
+  twin chat shows why the default voice spoke when a voice is not cleared.
 
 ---
 

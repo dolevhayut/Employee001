@@ -19,6 +19,7 @@ import MorphOrb, { type MorphOrbHandle } from "@/components/ex/morph-orb/morph-o
 import { useVoiceInput, type VoiceInputError } from "@/components/ex/voice/use-voice-input";
 import { MicButton } from "@/components/ex/voice/mic-button";
 import { LiveSpeaker, playbackContext } from "@/components/ex/voice/live-speaker";
+import { voiceFallbackNote } from "@/components/ex/voice/voice-storage";
 import { playAck, prepareAcks, type PlayingAck } from "@/components/ex/voice/voice-ack";
 import { playDemoClip, type DemoClip } from "@/components/ex/voice/demo-clip";
 import { normalizeDemoQuestion } from "@/lib/demo-ask-recording";
@@ -944,7 +945,7 @@ export default function AskPage() {
       });
       if (!res.ok) throw new Error(`tts ${res.status}`);
       // The twin's voice isn't cleared (no recorded consent): the default voice speaks; say why.
-      const fallbackNote = res.headers.get("X-Voice-Fallback-Message");
+      const fallbackNote = voiceFallbackNote(res.headers);
       if (fallbackNote) flashHint(fallbackNote);
       const blob = await res.blob();
       // Stopped (or the mic opened) while the audio was on its way: drop it.

@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { isStockVoice } from "@/lib/employees";
+import { clearStoredVoice } from "@/components/ex/voice/voice-storage";
 
 type Status = {
   text: string;
@@ -15,7 +16,7 @@ type Status = {
   covers: boolean;
 };
 
-export function VoiceConsentCard({ employeeId, voiceId }: { employeeId: string; voiceId: string }) {
+export function VoiceConsentCard({ employeeId, voiceId, onWithdrawn }: { employeeId: string; voiceId: string; onWithdrawn?: () => void }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -50,6 +51,11 @@ export function VoiceConsentCard({ employeeId, voiceId }: { employeeId: string; 
         throw new Error(body.error ?? `Request failed (${res.status})`);
       }
       setAgreed(false);
+      if (!agree) {
+        // Withdrawn: forget the locally chosen voice too, so it isn't offered or sent again.
+        clearStoredVoice(employeeId);
+        onWithdrawn?.();
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save. Try again.");
