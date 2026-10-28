@@ -69,7 +69,8 @@ export function VoiceConsentCard({ employeeId, voiceId }: { employeeId: string; 
         <>
           <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600, marginBottom: "var(--sp-4)" }}>Consent needed for this voice</div>
           <div className="subtle" style={{ marginBottom: "var(--sp-8)" }}>
-            Until it is recorded, this twin speaks in the default voice.
+            Until it is recorded, this twin speaks in the default voice. Record it only for a voice that is the
+            person&apos;s own: the app cannot check whose voice a voice id is.
           </div>
           <div
             style={{ whiteSpace: "pre-line", padding: "10px 12px", border: "1px solid var(--hairline)", borderRadius: 6, background: "var(--surface)", color: "var(--text)", marginBottom: "var(--sp-8)" }}
