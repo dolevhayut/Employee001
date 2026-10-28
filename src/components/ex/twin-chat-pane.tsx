@@ -545,6 +545,7 @@ function useTTS() {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   /** Why the default voice spoke instead of the twin's (no recorded consent). */
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const playTokenRef = useRef(0);
   const cleanupRef = useRef<(() => void) | null>(null);
 
   const stop = useCallback(() => {
@@ -632,6 +633,8 @@ function useTTS() {
 
   const play = useCallback(async (msgId: string, text: string, voiceId?: string, employeeId?: string) => {
     const sink = openSink(msgId);
+    // A slow reply for an earlier message must not label this one.
+    const token = ++playTokenRef.current;
     setVoiceNote(null);
     try {
       const res = await fetch("/api/tts/stream", {
@@ -641,7 +644,7 @@ function useTTS() {
         body: JSON.stringify({ text, voiceId, employeeId }),
       });
       if (!res.ok || !res.body) throw new Error(`TTS stream failed: ${res.status}`);
-      setVoiceNote(voiceFallbackNote(res.headers));
+      if (playTokenRef.current === token) setVoiceNote(voiceFallbackNote(res.headers));
 
       const reader = res.body.getReader();
       while (true) {

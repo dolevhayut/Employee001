@@ -51,12 +51,13 @@ export function VoiceConsentCard({ employeeId, voiceId, onWithdrawn }: { employe
         throw new Error(body.error ?? `Request failed (${res.status})`);
       }
       setAgreed(false);
-      if (!agree) {
-        // Withdrawn: forget the locally chosen voice too, so it isn't offered or sent again.
+      if (!agree && !isStockVoice(voiceId)) {
+        // Withdrawn: forget the locally chosen non-stock voice too, so it isn't offered or sent again.
         clearStoredVoice(employeeId);
         onWithdrawn?.();
+      } else {
+        await load();
       }
-      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save. Try again.");
     } finally {
