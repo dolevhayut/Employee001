@@ -75,12 +75,12 @@ export const askEn = {
   "ask.task.failed": "Didn't finish",
   "ask.task.open": "Open in Tasks",
   "ask.resize": "Drag to resize the conversation",
-  "ask.task.words": "{count} words",
+  "ask.task.words": "{count, plural, one {# word} other {# words}}",
   "ask.task.read": "Read",
   "ask.task.close": "Close",
   "ask.conversationEmpty": "Pick a twin and ask a question. Every question and answer stays here, with the steps the twin took, and follow-ups keep the context.",
   "ask.trace.working": "Working",
-  "ask.trace.steps": "{count} steps",
+  "ask.trace.steps": "{count, plural, one {# step} other {# steps}}",
   "ask.trace.profileFiles": "9 profile files",
 } as const;
 
@@ -132,11 +132,11 @@ export const askHe: Partial<Record<keyof typeof askEn, string>> = {
   "ask.task.failed": "לא הושלם",
   "ask.task.open": "פתח במשימות",
   "ask.resize": "גררו כדי לשנות את רוחב השיחה",
-  "ask.task.words": "{count} מילים",
+  "ask.task.words": "{count, plural, one {מילה אחת} other {# מילים}}",
   "ask.task.read": "קריאה",
   "ask.task.close": "סגירה",
   "ask.conversationEmpty": "בחרו תאום ושאלו שאלה. כל שאלה ותשובה נשארות כאן, יחד עם הצעדים שהתאום עשה, ושאלות המשך שומרות על ההקשר.",
   "ask.trace.working": "עובד",
-  "ask.trace.steps": "{count} צעדים",
+  "ask.trace.steps": "{count, plural, one {צעד אחד} other {# צעדים}}",
   "ask.trace.profileFiles": "9 קבצי פרופיל",
 };

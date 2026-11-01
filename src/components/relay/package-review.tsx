@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/components/ex/i18n-context";
 
 // The handover package, as the departing employee and an admin review it:
 // every captured item with its quote from the interview, an unconfirmed flag
@@ -69,6 +70,7 @@ export function PackageReview({
   editable: boolean;
   onEdit: (edit: { op: "remove" | "update"; field: Field; itemId: string; title?: string; body?: string }) => Promise<void>;
 }) {
+  const { t } = useT();
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState({ title: "", body: "" });
   const total = itemCount(pkg);
@@ -77,7 +79,7 @@ export function PackageReview({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-12)" }}>
       <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
-        {total} items{unconfirmed ? `, ${unconfirmed} not confirmed word for word in the interview` : ""}.{" "}
+        {t("handover.items", { count: total })}{unconfirmed ? `, ${unconfirmed} not confirmed word for word in the interview` : ""}.{" "}
         {pkg.review ? `Approved ${pkg.review.approvedAt.slice(0, 10)}.` : "Not approved yet."}
       </div>
       {total === 0 && <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>Nothing was captured. Answer a few more questions and build the notes again.</div>}

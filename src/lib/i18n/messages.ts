@@ -93,6 +93,9 @@ const coreEn = {
   "shell.cmd.twinHintOnboarding": "Start onboarding",
   "shell.cmd.profileHint": "View profile, consent, lineage",
   "handover.live": "Live interview",
+  "handover.answers": "{count, plural, one {# answer} other {# answers}}",
+  "handover.answersSaved": "{count, plural, one {# answer saved} other {# answers saved}}",
+  "handover.items": "{count, plural, one {# item} other {# items}}",
   "load.tryAgain": "Try again",
   "load.refreshMiss": "Couldn't refresh",
   "load.approvals": "Couldn't load approvals.",
@@ -913,10 +916,67 @@ export const messages: { en: Record<MessageKey, string>; he: Partial<Record<Mess
 
 export type MessageVars = Record<string, string | number>;
 
-/** Resolve one catalog string. `useT()` binds the locale so UI code calls `t(key)`. */
+const pluralRules: Partial<Record<Locale, Intl.PluralRules>> = {};
+
+function pluralCategory(locale: Locale, n: number): Intl.LDMLPluralRule {
+  pluralRules[locale] ??= new Intl.PluralRules(locale);
+  return pluralRules[locale].select(n);
+}
+
+/** Index just past the `}` that closes the `{` at `open`, or -1 when unbalanced. */
+function closingBrace(text: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === "{") depth++;
+    else if (text[i] === "}" && --depth === 0) return i + 1;
+  }
+  return -1;
+}
+
+/**
+ * Expand ICU-style plural blocks: `{count, plural, one {# step} other {# steps}}`.
+ * The branch is picked with `Intl.PluralRules` for the locale (Hebrew also has
+ * `two`, English only `one`/`other`); a category with no branch uses `other`,
+ * and `=N` branches match an exact number. `#` is the number itself.
+ */
+function expandPlurals(text: string, locale: Locale, vars: MessageVars): string {
+  const head = /\{(\w+),\s*plural,/g;
+  let out = "";
+  let from = 0;
+  for (let m = head.exec(text); m; m = head.exec(text)) {
+    const end = closingBrace(text, m.index);
+    if (end < 0) break;
+    const raw = vars[m[1]];
+    const n = typeof raw === "number" ? raw : Number(raw);
+    if (raw === undefined || Number.isNaN(n)) continue;
+    const branches = new Map<string, string>();
+    const body = text.slice(m.index + m[0].length, end - 1);
+    const sel = /\s*(=\d+|zero|one|two|few|many|other)\s*\{/g;
+    for (let b = sel.exec(body); b; b = sel.exec(body)) {
+      const open = b.index + b[0].length - 1;
+      const close = closingBrace(body, open);
+      if (close < 0) break;
+      branches.set(b[1], body.slice(open + 1, close - 1));
+      sel.lastIndex = close;
+    }
+    const branch = branches.get(`=${n}`) ?? branches.get(pluralCategory(locale, n)) ?? branches.get("other") ?? "";
+    out += text.slice(from, m.index) + branch.replace(/#/g, String(n));
+    from = end;
+    head.lastIndex = end;
+  }
+  return out + text.slice(from);
+}
+
+/**
+ * Resolve one catalog string. `useT()` binds the locale so UI code calls `t(key)`.
+ * `{name}` is replaced by `vars.name`. A count that changes the wording uses
+ * a plural block, so "1 step" and "2 steps" come from one key:
+ * `"{count, plural, one {# step} other {# steps}}"`.
+ */
 export function t(locale: Locale, key: MessageKey, vars?: MessageVars): string {
-  const text: string = messages[locale][key] ?? messages.en[key];
+  let text: string = messages[locale][key] ?? messages.en[key];
   if (!vars) return text;
+  if (text.includes(", plural,")) text = expandPlurals(text, locale, vars);
   return text.replace(/\{(\w+)\}/g, (match, name: string) => {
     const value = vars[name];
     return value === undefined ? match : String(value);

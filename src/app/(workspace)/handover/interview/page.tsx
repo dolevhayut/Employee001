@@ -241,7 +241,7 @@ function InterviewInner() {
               )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: "var(--sp-12)" }}>
-              <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)", flex: 1 }}>{answers} answers saved</span>
+              <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-subtle)", flex: 1 }}>{t("handover.answersSaved", { count: answers })}</span>
               <button style={{ ...secondary, opacity: answers < 1 || busy ? 0.5 : 1 }} disabled={answers < 1 || busy !== null} onClick={build}>
                 {busy === "build" ? "Building the notes…" : state.package ? "Rebuild the handover notes" : "Finish and build the handover notes"}
               </button>

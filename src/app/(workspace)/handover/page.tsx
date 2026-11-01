@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
+import { useT } from "@/components/ex/i18n-context";
 import { PackageReview, itemCount, type HandoverState } from "@/components/relay/package-review";
 
 type Twin = { id: string; name: string; role: string; initials: string; avatarColor: string; twinStatus: string; lifecycle: "active" | "handover" | "retired"; retiredAt: string | null };
@@ -43,6 +44,7 @@ async function send(url: string, method: string, body?: unknown): Promise<string
 }
 
 function HandoverCard({ twin, onChanged, setError }: { twin: Twin; onChanged: () => void; setError: (e: string | null) => void }) {
+  const { t } = useT();
   const [state, setState] = useState<HandoverState | null>(null);
   const [showNotes, setShowNotes] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -85,8 +87,8 @@ function HandoverCard({ twin, onChanged, setError }: { twin: Twin; onChanged: ()
         </div>
       </div>
       <ul style={{ margin: "var(--sp-12) 0", paddingInlineStart: 18, fontSize: "var(--fs-ui)", color: "var(--text-muted)", lineHeight: 1.7 }}>
-        <li>Interview: {answers ? `${answers} answers` : "not started"}</li>
-        <li>Notes: {pkg ? `${itemCount(pkg)} items, ${pkg.review ? "approved" : "waiting for your approval"}` : "not built yet"}</li>
+        <li>Interview: {answers ? t("handover.answers", { count: answers }) : "not started"}</li>
+        <li>Notes: {pkg ? `${t("handover.items", { count: itemCount(pkg) })}, ${pkg.review ? "approved" : "waiting for your approval"}` : "not built yet"}</li>
         <li>{twin.name.split(" ")[0]} {consent}</li>
       </ul>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
