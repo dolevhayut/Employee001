@@ -7,11 +7,20 @@ import {
 } from "@/lib/mcp-server/audit";
 import { matchesSharedToken, personalSignInEnabled, resolveBearer } from "@/lib/mcp-server/device-auth";
 import { checkLocalRequest } from "@/lib/mcp-server/guard";
+import { clientKey, takeSlot } from "@/app/api/mcp/device/respond";
 import { buildPublicMcpServer, isLoopbackBind } from "@/lib/mcp-server/server";
 
 export const dynamic = "force-dynamic";
 
 const MAX_BODY_BYTES = 1_000_000;
+// Refused requests are audited, but only this many a minute per caller and in
+// total, so an unauthenticated caller cannot flood the hash-chained log or hold
+// the event loop on its synchronous writes. The 401 itself is always sent.
+const REFUSED_AUDIT_PER_CLIENT = 6;
+const REFUSED_AUDIT_TOTAL = 60;
+/** Refusals past the caps since the last refusal that was written: the next
+ *  written row carries the count, so a flood still shows in the log. */
+let refusedNotLogged = 0;
 
 function rpcError(code: number, message: string, status = 403): Response {
   return new Response(
@@ -66,10 +75,19 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (!identity) {
-    auditMcpRequest(UNAUTHENTICATED_IDENTITY, ["(refused)"], {
-      verdict: "hard_blocked",
-      reason: bearer ? "invalid, expired or revoked token" : "missing token",
-    });
+    if (
+      takeSlot(`mcp-refused:${clientKey(request)}`, REFUSED_AUDIT_PER_CLIENT) &&
+      takeSlot("mcp-refused:all", REFUSED_AUDIT_TOTAL)
+    ) {
+      const skipped = refusedNotLogged ? ` (${refusedNotLogged} earlier refusals over the rate cap, not logged)` : "";
+      refusedNotLogged = 0;
+      auditMcpRequest(UNAUTHENTICATED_IDENTITY, ["(refused)"], {
+        verdict: "hard_blocked",
+        reason: `${bearer ? "invalid, expired or revoked token" : "missing token"}${skipped}`,
+      });
+    } else {
+      refusedNotLogged++;
+    }
     return rpcError(-32004, "missing or invalid token", 401);
   }
 

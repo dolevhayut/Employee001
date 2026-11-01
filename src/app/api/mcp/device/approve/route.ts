@@ -2,7 +2,7 @@ import { appendAuditEntry } from "@/lib/audit-log";
 import { readJson } from "@/lib/auth/http";
 import { sessionUserFromHeaders } from "@/lib/auth/request-user";
 import { approveUserCode } from "@/lib/mcp-server/device-auth";
-import { fail, json, signInOff } from "../respond";
+import { fail, json, sameOriginJsonOnly, signInOff } from "../respond";
 
 export const runtime = "nodejs";
 
@@ -12,6 +12,8 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const off = signInOff();
   if (off) return off;
+  const blocked = sameOriginJsonOnly(request);
+  if (blocked) return blocked;
   const me = sessionUserFromHeaders(request.headers);
   if (!me) return fail(401, "unauthorized", "Sign in to Employee001 to approve a device.");
   const body = await readJson<{ user_code?: unknown }>(request);

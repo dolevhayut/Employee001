@@ -244,6 +244,18 @@ describe("POST /api/mcp/device/approve", () => {
     expect(resolveBearer(body.access_token)?.personId).toBe("ada");
   });
 
+  // A foreign Origin is refused by the proxy (crossSiteBlock) before this route runs.
+  it("refuses a request the browser marks cross-site and a non-JSON body, and approves nothing", async () => {
+    const { user_code } = await begin();
+    const withHeaders = (extra: Record<string, string>) =>
+      post("approve", { user_code }, { ...as("ada", "member"), host: "localhost:3000", ...extra });
+    expect((await approve(withHeaders({ "sec-fetch-site": "cross-site" }))).status).toBe(403);
+    expect((await approve(withHeaders({ "content-type": "text/plain" }))).status).toBe(415);
+    expect((await approve(withHeaders({ "content-type": "application/x-www-form-urlencoded" }))).status).toBe(415);
+    // Still pending: the same code approves from the app's own page.
+    expect((await approve(withHeaders({ origin: "http://localhost:3000", "sec-fetch-site": "same-origin" }))).status).toBe(200);
+  });
+
   it("rejects unknown, expired and already-approved codes", async () => {
     const a = await begin();
     expect((await approve(post("approve", { user_code: "ZZZZ-ZZZZ" }, as("ada", "member")))).status).toBe(404);

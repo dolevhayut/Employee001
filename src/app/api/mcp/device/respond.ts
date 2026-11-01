@@ -53,3 +53,19 @@ export function signInOff(): NextResponse | null {
   if (personalSignInEnabled()) return null;
   return fail(404, "not_found", "Personal MCP sign-in is not enabled.");
 }
+
+/** For routes that change state from a browser session: the body must be JSON (a
+ *  cross-site HTML form can't send it) and the browser must not mark it cross-site.
+ *  Comparing Origin with Host is the proxy's job (crossSiteBlock): it runs first and
+ *  knows the loopback aliases and the extra allowed hosts behind a reverse proxy,
+ *  which a second, stricter check here would refuse. Null when the request is fine. */
+export function sameOriginJsonOnly(request: Request): NextResponse | null {
+  const type = request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
+  if (type !== "application/json") {
+    return fail(415, "unsupported_media_type", "Send the request as application/json.");
+  }
+  if (request.headers.get("sec-fetch-site") === "cross-site") {
+    return fail(403, "forbidden", "Cross-site requests are not allowed.");
+  }
+  return null;
+}

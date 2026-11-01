@@ -21,6 +21,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Withdrawing consent also forgets the voice picked on this device, and the
   twin chat shows why the default voice spoke when a voice is not cleared.
 
+### Personal MCP sign-in hardening
+- Approving a device now needs a JSON request that the browser doesn't mark cross-site (the app's cross-site check still applies), and refused `/api/mcp` requests write at most a few audit rows a minute, so a flood of bad tokens can't fill the audit log. The next row written says how many refusals were dropped.
+
 ---
 
 ## [0.12.0] — 2026-10-28

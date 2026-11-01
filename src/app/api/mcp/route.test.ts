@@ -21,6 +21,7 @@ import {
   issueDeviceCode,
   revokePersonSessions,
 } from "@/lib/mcp-server/device-auth";
+import { resetSlots } from "./device/respond";
 import { POST } from "./route";
 
 const ENV_KEYS = [
@@ -37,6 +38,7 @@ let home: string;
 beforeEach(() => {
   rows.length = 0;
   appendOk = true;
+  resetSlots();
   for (const key of ENV_KEYS) saved[key] = process.env[key];
   home = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-route-"));
   process.env.EMPLOYEE001_HOME = home;
@@ -62,12 +64,13 @@ async function signIn(personId: string): Promise<string> {
   return exchanged.bearer;
 }
 
-function call(bearer: string | null, body: unknown = { jsonrpc: "2.0", id: 1, method: "tools/list" }) {
+function call(bearer: string | null, body: unknown = { jsonrpc: "2.0", id: 1, method: "tools/list" }, from?: string) {
   return POST(
     new Request("http://localhost:3000/api/mcp", {
       method: "POST",
       headers: {
         host: "localhost:3000",
+        ...(from ? { "x-forwarded-for": from } : {}),
         "content-type": "application/json",
         accept: "application/json, text/event-stream",
         ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
@@ -203,6 +206,20 @@ describe("POST /api/mcp per-person identity and audit", () => {
     expect((await call("shared-secret-token")).status).toBe(200);
     expect((await call("nope")).status).toBe(401);
     expect((await call(null)).status).toBe(401);
+  });
+
+  it("caps the audit rows written for refused requests but still answers each with 401", async () => {
+    resetSlots();
+    for (let i = 0; i < 20; i++) expect((await call(`bad-${i}`)).status).toBe(401);
+    const refused = rows.filter((r) => r.verdict === "hard_blocked");
+    expect(refused.length).toBe(6);
+    // The next refusal that is written says how many were dropped before it.
+    expect((await call("bad-other", undefined, "203.0.113.9")).status).toBe(401);
+    expect(JSON.stringify(rows.at(-1))).toContain("14 earlier refusals over the rate cap, not logged");
+    // A person with a valid session is still audited.
+    const ana = await signIn("person_ana");
+    expect((await call(ana)).status).toBe(200);
+    expect(rows.at(-1)).toMatchObject({ requesterId: "person_ana", verdict: "executed" });
   });
 
   it("leaves a loopback request without a token working when personal sign-in is off", async () => {
