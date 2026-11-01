@@ -33,6 +33,7 @@ import { buildBaseOptions, buildTwinHooks, TWIN_MODEL_PRIMARY } from "@/lib/sdk-
 import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
 import { ensureTwinSandbox } from "@/lib/twin-sandbox";
+import { knowledgeSourceForRead, stampProfileFrontmatter } from "@/lib/twin-builder-frontmatter";
 
 // Re-export the client-safe types/constants so existing imports keep working.
 import { TWIN_FILE_NAMES, type TwinFileName, type TwinBuilderEvent } from "./twin-builder-types";
@@ -183,6 +184,12 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
   };
   const expectedDir = real(employeeDir);
 
+  // Uploaded documents (knowledge/) the builder has read, in order: a Read's
+  // tool_use names the file, its successful tool_result confirms the read.
+  // A profile file written afterwards lists these as its sources.
+  const knowledgeRead = new Set<string>();
+  const pendingKnowledgeReads = new Map<string, string>();
+
   // Tool gate: sandbox Write to {employeeDir}/{KNOWN_NAME}.md, allow read-only
   // Composio/org tools, deny any external write the agent attempts.
   const canUseTool: CanUseTool = async (
@@ -217,8 +224,15 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
         typeof typedInput.content === "string" ? (typedInput.content as string) : "",
         filename,
       );
-      const body = filtered.text;
       if (filtered.removed.length) auditProfilingFilter(employee, buildId, filename, filtered.removed);
+      // The frontmatter states when and from what the file was built; the
+      // build's clock and the reads seen so far decide that, not the model.
+      const body = stampProfileFrontmatter(filtered.text, {
+        employeeId: employee.id,
+        filename,
+        generatedAt: buildStartedAt.toISOString(),
+        knowledgeSources: [...knowledgeRead],
+      });
 
       // Snapshot whatever's at root for this filename BEFORE the SDK
       // overwrites it, so the previous version is recoverable. Best-effort.
@@ -438,6 +452,13 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
       if (message.type === "assistant") {
         for (const block of message.message.content) {
           if (block.type === "tool_use") {
+            if (block.name === "Read") {
+              const source = knowledgeSourceForRead(
+                (block.input as { file_path?: unknown } | null)?.file_path,
+                employeeDir,
+              );
+              if (source) pendingKnowledgeReads.set(block.id, source);
+            }
             // Skip Write — already surfaced via `file_writing` from the gate.
             if (block.name === "Write") continue;
             onEvent({
@@ -469,6 +490,12 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
               "type" in block &&
               block.type === "tool_result"
             ) {
+              const result = block as { tool_use_id?: string; is_error?: boolean };
+              const readSource = result.tool_use_id ? pendingKnowledgeReads.get(result.tool_use_id) : undefined;
+              if (readSource) {
+                pendingKnowledgeReads.delete(result.tool_use_id as string);
+                if (!result.is_error) knowledgeRead.add(readSource);
+              }
               // After every tool result, re-scan disk for files that
               // changed since the last scan (catches rewrites too).
               for (const name of TWIN_FILE_NAMES) {
