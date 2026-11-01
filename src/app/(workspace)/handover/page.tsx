@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { useT } from "@/components/ex/i18n-context";
+import { useRefreshRoster } from "@/components/ex/roster-context";
 import { PackageReview, itemCount, type HandoverState } from "@/components/relay/package-review";
 
 type Twin = { id: string; name: string; role: string; initials: string; avatarColor: string; twinStatus: string; lifecycle: "active" | "handover" | "retired"; retiredAt: string | null };
@@ -166,7 +167,13 @@ export default function RelayPage() {
   const [error, setError] = useState<string | null>(null);
   const [pick, setPick] = useState("");
 
-  const load = useCallback(async () => setTwins(await fetchTwins()), []);
+  // Starting, cancelling, retiring or deleting changes the twin everywhere
+  // (Ask, Tasks, pickers), so the shared roster is refetched with this list.
+  const refreshRoster = useRefreshRoster();
+  const load = useCallback(async () => {
+    refreshRoster();
+    setTwins(await fetchTwins());
+  }, [refreshRoster]);
   useEffect(() => {
     let alive = true;
     fetchTwins().then((t) => {

@@ -14,7 +14,8 @@ export async function fetchRoster(
   fetchImpl: typeof fetch = fetch,
 ): Promise<EmployeeWithTwin[] | null> {
   try {
-    const res = await fetchImpl("/api/employees");
+    // no-store: a refresh after a retire must not get the cached copy back.
+    const res = await fetchImpl("/api/employees", { cache: "no-store" });
     const data: unknown = await res.json();
     return Array.isArray(data) ? (data as EmployeeWithTwin[]) : null;
   } catch {
