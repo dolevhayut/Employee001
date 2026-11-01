@@ -574,7 +574,9 @@ function ProfilePageContent() {
   const [files, setFiles] = useState<FileNode[]>([]);
   const [activeToolkits, setActiveToolkits] = useState<string[]>([]);
   const [relayState, setRelayState] = useState<{ employeeId: string; state: RelayProfileState | null } | null>(null);
-  const currentRelayState = relayState?.employeeId === employeeId ? relayState.state : null;
+  // Both sides are undefined on the first render (no state, employee not
+  // loaded yet), so check the state itself before comparing ids.
+  const currentRelayState = relayState && relayState.employeeId === employeeId ? relayState.state : null;
 
   // Reset to overview when switching employee. Done during render (the React
   // "storing information from previous renders" pattern) rather than in an
