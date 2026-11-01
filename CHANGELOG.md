@@ -16,6 +16,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   in, never of a meeting marked "Don't remember", and not when it answers
   people outside the workspace.
 
+### Fixed
+- The profile page crashed on load ("This page couldn't load") in 0.11.0 to
+  0.13.0: before the employee list arrived, a check on the twin's handover
+  state read from an empty value. It loads again.
+- Counts read "1 step", "1 answer saved" and "1 item" (in English and
+  Hebrew) instead of "1 steps".
+- After retiring a twin, Ask and other pages show the change without a reload.
+- A retired twin's profile says "Retired", not "Twin is live".
+- In a handover, a Systems item's access and owner can be edited.
+- /brain and the sidebar no longer flash "No trained twin yet" and
+  "Autonomy off" while loading.
+- A built profile records the real build time and the documents the builder
+  actually read.
+- A twin's name and role can be edited on its profile (admins; not for a
+  retired twin), and Build my twin says where to change them.
+
 ### Removed
 - The old `/flow` chat page. Twin chat has lived in Ask for a while; `/flow`
   now redirects to `/ask`, so old links still work.
