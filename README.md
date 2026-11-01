@@ -16,6 +16,10 @@ npx employee001     # first run: a short setup, then it opens http://localhost:3
 
 Signed in to Claude Code? Your Claude subscription runs the twins, no API key needed. Subscription mode covers one person.
 
+<img src="docs/screenshots/hero-60s.gif" width="100%" alt="From npx employee001 to a twin's first cited answer: setup, Build my twin, then Ask (sped up, under a minute)" />
+
+<sub>From `npx employee001` to a twin's first cited answer, sped up. The company and people are made up.</sub>
+
 <table>
   <tr>
     <td width="33%" valign="top"><b>1. Run it</b><br /><code>npx employee001</code><br /><sub>A short setup, then it opens http://localhost:3000.</sub></td>
