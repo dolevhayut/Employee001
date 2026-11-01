@@ -8,7 +8,7 @@ describe("fetchRoster", () => {
   it("returns the roster array from /api/employees", async () => {
     const fetchImpl = okJson([{ id: "e1", twinStatus: "ready" }]);
     await expect(fetchRoster(fetchImpl)).resolves.toEqual([{ id: "e1", twinStatus: "ready" }]);
-    expect(fetchImpl).toHaveBeenCalledWith("/api/employees");
+    expect(fetchImpl).toHaveBeenCalledWith("/api/employees", { cache: "no-store" });
   });
 
   it("returns null (not a rejection) when the body is not an array", async () => {
