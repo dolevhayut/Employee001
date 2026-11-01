@@ -1000,7 +1000,8 @@ export async function runSingleTwin(
       // files + the shared org-brain. Read-only, no auth, no approval
       // gate (the twin can already Read these files directly; the MCP
       // tool is just a more efficient retrieval surface).
-      org_brain: buildOrgBrainMcpServer(),
+      // search_meetings only where the twin answers inside the workspace.
+      org_brain: buildOrgBrainMcpServer({ meetingsFor: options.readOnly || options.answerOnly ? undefined : employee.id }),
       // Connection requests write a local Inbox item for the admin. They do
       // not contact or configure the requested external service.
       connection_requests: buildConnectionRequestMcpServer(employee),

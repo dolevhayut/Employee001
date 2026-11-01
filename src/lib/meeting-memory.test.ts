@@ -212,3 +212,41 @@ describe("maybeDigestMeeting", () => {
     expect(saved).toHaveLength(3);
   });
 });
+
+describe("searchMeetings", () => {
+  const record = (decision: string, over: Partial<Meeting> = {}) =>
+    meeting({ digest: { decision, points: [], actions: [{ employeeId: "itai", action: "Write the token doc" }], open: [], generatedAt: 1, throughTurn: 1 }, ...over });
+
+  it("searches only meetings the twin was in, and never forgotten ones", async () => {
+    const { searchMeetings } = await import("./meeting-memory");
+    const mine = record("Keep the shared MCP token as a fallback", { participantIds: ["noa", "itai"] });
+    const spokeIn = record("MCP token docs go in SECURITY.md", {
+      participantIds: ["dana"],
+      transcript: [{ kind: "ceo", text: "q", ts: 1 }, { kind: "twin", employeeId: "noa", employeeName: "Noa", text: "a", ts: 2 }],
+    });
+    const notMine = record("MCP token is removed entirely", { participantIds: ["dana"] });
+    const forgotten = record("MCP token secret plan", { participantIds: ["noa"], forget: true });
+    const hits = await searchMeetings({ employeeId: "noa", query: "MCP token", meetings: [mine, spokeIn, notMine, forgotten], people });
+    expect(hits.map((h) => h.id).sort()).toEqual([mine.id, spokeIn.id].sort());
+    expect(hits[0].text).toContain("- Actions: Itai: Write the token doc");
+  });
+
+  it("ranks by matched terms, then by recency, and returns nothing without a match", async () => {
+    const { searchMeetings } = await import("./meeting-memory");
+    const older = record("pricing for Q3", { updatedAt: 1_000 });
+    const newer = record("pricing", { updatedAt: 9_000 });
+    const both = record("pricing Q3 launch", { updatedAt: 500 });
+    const hits = await searchMeetings({ employeeId: "noa", query: "pricing Q3", meetings: [older, newer, both], people });
+    // Two terms match "older" and "both"; the more recent of them comes first. "newer" matches one term.
+    expect(hits.map((h) => h.id)).toEqual([older.id, both.id, newer.id]);
+    expect(await searchMeetings({ employeeId: "noa", query: "the and", meetings: [older], people })).toEqual([]);
+    expect(await searchMeetings({ employeeId: "noa", query: "unrelated", meetings: [older], people })).toEqual([]);
+  });
+
+  it("strips hidden characters from what it returns", async () => {
+    const { searchMeetings } = await import("./meeting-memory");
+    const m = record("deploy ‮plan\u{E0041}");
+    const [hit] = await searchMeetings({ employeeId: "noa", query: "deploy", meetings: [m], people });
+    expect(hit.text).not.toMatch(/[‮\u{E0000}-\u{E007F}]/u);
+  });
+});

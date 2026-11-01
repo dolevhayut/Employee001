@@ -48,7 +48,7 @@ const STOPWORDS = new Set([
 /** Cheap tokeniser — lowercase, strip non-alphanumeric, drop stopwords and
  *  one-char tokens. Good enough for English; for non-English files the
  *  full token survives intact (Hebrew etc. pass through). */
-function tokenise(text: string): string[] {
+export function tokenise(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[`*_~\[\]()<>{}#|!?,.;:"]/g, " ")

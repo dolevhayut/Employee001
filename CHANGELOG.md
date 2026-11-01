@@ -8,6 +8,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Twins can look up older meetings
+- A twin can search the records of past Team Meetings it was in (what was
+  decided, key points, open questions, who took what on) with a new
+  `search_meetings` tool, beyond the three meetings in the "Since the last
+  meeting" brief. It sees records, never transcripts, only of meetings it sat
+  in, never of a meeting marked "Don't remember", and not when it answers
+  people outside the workspace.
+
 ---
 
 ## [0.13.0] — 2026-11-01
