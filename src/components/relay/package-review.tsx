@@ -61,6 +61,24 @@ const btn: React.CSSProperties = {
   cursor: "pointer",
 };
 
+const input: React.CSSProperties = {
+  fontSize: "var(--fs-ui)",
+  padding: 6,
+  borderRadius: 6,
+  border: "1px solid var(--hairline)",
+  background: "var(--surface-soft)",
+  color: "var(--text)",
+};
+
+function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
+      {label}
+      {children}
+    </label>
+  );
+}
+
 export function PackageReview({
   pkg,
   editable,
@@ -68,11 +86,11 @@ export function PackageReview({
 }: {
   pkg: HandoverPackage;
   editable: boolean;
-  onEdit: (edit: { op: "remove" | "update"; field: Field; itemId: string; title?: string; body?: string }) => Promise<void>;
+  onEdit: (edit: { op: "remove" | "update"; field: Field; itemId: string; title?: string; body?: string; accessVia?: string; ownedBy?: string }) => Promise<void>;
 }) {
   const { t } = useT();
   const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ title: "", body: "" });
+  const [draft, setDraft] = useState({ title: "", body: "", accessVia: "", ownedBy: "" });
   const total = itemCount(pkg);
   const unconfirmed = FIELDS.reduce((n, [f]) => n + (pkg[f] as Array<{ verified?: boolean }>).filter((i) => i.verified === false).length, 0);
 
@@ -100,10 +118,38 @@ export function PackageReview({
                   <div key={it.id} style={{ borderInlineStart: "2px solid var(--hairline)", paddingInlineStart: "var(--sp-12)" }}>
                     {isEditing ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} style={{ fontSize: "var(--fs-ui)", padding: 6, borderRadius: 6, border: "1px solid var(--hairline)", background: "var(--surface-soft)", color: "var(--text)" }} />
-                        <textarea value={draft.body} rows={3} onChange={(e) => setDraft({ ...draft, body: e.target.value })} style={{ fontSize: "var(--fs-ui)", padding: 6, borderRadius: 6, border: "1px solid var(--hairline)", background: "var(--surface-soft)", color: "var(--text)", fontFamily: "inherit", resize: "vertical" }} />
+                        {"system" in it ? (
+                          <>
+                            <Labelled label={t("handover.review.system")}>
+                              <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} style={input} />
+                            </Labelled>
+                            <Labelled label={t("handover.review.location")}>
+                              <input value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} style={input} />
+                            </Labelled>
+                            <Labelled label={t("handover.review.access")}>
+                              <input value={draft.accessVia} placeholder={t("handover.review.accessHint")} onChange={(e) => setDraft({ ...draft, accessVia: e.target.value })} style={input} />
+                            </Labelled>
+                            <Labelled label={t("handover.review.owner")}>
+                              <input value={draft.ownedBy} placeholder={t("handover.review.ownerHint")} onChange={(e) => setDraft({ ...draft, ownedBy: e.target.value })} style={input} />
+                            </Labelled>
+                          </>
+                        ) : (
+                          <>
+                            <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} style={input} />
+                            <textarea value={draft.body} rows={3} onChange={(e) => setDraft({ ...draft, body: e.target.value })} style={{ ...input, fontFamily: "inherit", resize: "vertical" }} />
+                          </>
+                        )}
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={btn} onClick={async () => { await onEdit({ op: "update", field, itemId: it.id, title: draft.title, body: draft.body }); setEditing(null); }}>Save</button>
+                          <button
+                            style={btn}
+                            onClick={async () => {
+                              const systemFields = "system" in it ? { accessVia: draft.accessVia, ownedBy: draft.ownedBy } : {};
+                              await onEdit({ op: "update", field, itemId: it.id, title: draft.title, body: draft.body, ...systemFields });
+                              setEditing(null);
+                            }}
+                          >
+                            Save
+                          </button>
                           <button style={btn} onClick={() => setEditing(null)}>Cancel</button>
                         </div>
                       </div>
@@ -113,7 +159,7 @@ export function PackageReview({
                           <div style={{ fontSize: "var(--fs-ui)", fontWeight: 600, flex: 1 }}>{title}</div>
                           {editable && (
                             <>
-                              <button style={btn} onClick={() => { setEditing(it.id); setDraft({ title, body: "system" in it ? it.location : it.body }); }}>Edit</button>
+                              <button style={btn} onClick={() => { setEditing(it.id); setDraft("system" in it ? { title, body: it.location, accessVia: it.accessVia, ownedBy: it.ownedBy ?? "" } : { title, body: it.body, accessVia: "", ownedBy: "" }); }}>Edit</button>
                               <button style={btn} onClick={() => onEdit({ op: "remove", field, itemId: it.id })}>Remove</button>
                             </>
                           )}

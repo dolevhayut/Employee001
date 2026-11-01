@@ -54,7 +54,8 @@ const isField = (v: unknown): v is PackageField => PACKAGE_FIELDS.includes(v as 
 
 /**
  * Review the package. Body: `{ op: "remove", field, itemId }`,
- * `{ op: "update", field, itemId, title?, body? }`, or `{ op: "approve" }`
+ * `{ op: "update", field, itemId, title?, body?, accessVia?, ownedBy? }`
+ * (the last two for Systems items only), or `{ op: "approve" }`
  * (admins only). Edits clear an earlier approval.
  */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ employeeId: string }> }) {
@@ -90,6 +91,8 @@ async function applyEdit(
           itemId: body.itemId,
           ...(typeof body.title === "string" ? { title: body.title } : {}),
           ...(typeof body.body === "string" ? { body: body.body } : {}),
+          ...(typeof body.accessVia === "string" ? { accessVia: body.accessVia } : {}),
+          ...(typeof body.ownedBy === "string" ? { ownedBy: body.ownedBy } : {}),
         };
     next = applyItemEdit(state.package, edit);
     if (!next) return Response.json({ error: "Item not found" }, { status: 404 });

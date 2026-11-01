@@ -91,7 +91,17 @@ export async function deleteHandover(id: string): Promise<void> {
 
 export type ItemEdit =
   | { op: "remove"; field: PackageField; itemId: string }
-  | { op: "update"; field: PackageField; itemId: string; title?: string; body?: string };
+  | {
+      op: "update";
+      field: PackageField;
+      itemId: string;
+      title?: string;
+      body?: string;
+      /** Systems (tooling_map) only: how access is granted, and who owns it. */
+      accessVia?: string;
+      /** Systems only. An empty string clears it. */
+      ownedBy?: string;
+    };
 
 /** Apply one reviewer edit. Any edit clears an earlier approval. */
 export function applyItemEdit(rcp: RoleContextPackage, edit: ItemEdit): RoleContextPackage | null {
@@ -108,7 +118,18 @@ export function applyItemEdit(rcp: RoleContextPackage, edit: ItemEdit): RoleCont
     const title = edit.title !== undefined ? redactPii(edit.title.slice(0, 300)) : undefined;
     const body = edit.body !== undefined ? redactPii(edit.body.slice(0, 4000)) : undefined;
     if ("system" in item) {
-      next[index] = { ...item, ...edited, ...(title !== undefined ? { system: title } : {}), ...(body !== undefined ? { location: body } : {}) };
+      const accessVia = edit.accessVia !== undefined ? redactPii(edit.accessVia.trim().slice(0, 300)) : undefined;
+      const ownedBy = edit.ownedBy !== undefined ? redactPii(edit.ownedBy.trim().slice(0, 300)) : undefined;
+      const tool: ToolingRef = {
+        ...item,
+        ...edited,
+        ...(title !== undefined ? { system: title } : {}),
+        ...(body !== undefined ? { location: body } : {}),
+        ...(accessVia !== undefined ? { accessVia } : {}),
+        ...(ownedBy ? { ownedBy } : {}),
+      };
+      if (ownedBy === "") delete tool.ownedBy;
+      next[index] = tool;
     } else {
       next[index] = { ...item, ...edited, ...(title !== undefined ? { title } : {}), ...(body !== undefined ? { body } : {}) };
     }

@@ -77,6 +77,25 @@ describe("handover package", () => {
     expect(await loadInterview("dana")).toEqual([]);
   });
 
+  it("a Systems edit sets how to get access and the owner", async () => {
+    const { applyItemEdit, packageMarkdown } = await import("./package-store");
+    const edited = applyItemEdit(rcp(), { op: "update", field: "tooling_map", itemId: "t1", accessVia: "  Ask IT in #it-help  ", ownedBy: "Finance ops" })!;
+    expect(edited.tooling_map[0]).toMatchObject({ system: "Billing console", location: "behind VPN", accessVia: "Ask IT in #it-help", ownedBy: "Finance ops", verified: false });
+    expect(packageMarkdown(edited, { name: "Dana" })).toContain("- **Billing console**: behind VPN; access: Ask IT in #it-help; owner: Finance ops");
+
+    // Redacted like any other edit; an empty owner clears it.
+    const redacted = applyItemEdit(edited, { op: "update", field: "tooling_map", itemId: "t1", ownedBy: "dana@corp.com" })!;
+    expect(redacted.tooling_map[0].ownedBy).toBe("[REDACTED-EMAIL]");
+    const cleared = applyItemEdit(edited, { op: "update", field: "tooling_map", itemId: "t1", ownedBy: " " })!;
+    expect(cleared.tooling_map[0]).not.toHaveProperty("ownedBy");
+    expect(cleared.tooling_map[0].accessVia).toBe("Ask IT in #it-help");
+
+    // Only Systems items have these fields.
+    const rule = applyItemEdit(rcp(), { op: "update", field: "decision_rules", itemId: "r1", accessVia: "x", ownedBy: "y" })!;
+    expect(rule.decision_rules[0]).not.toHaveProperty("accessVia");
+    expect(rule.decision_rules[0]).not.toHaveProperty("ownedBy");
+  });
+
   it("an edit is redacted, marked unconfirmed, and changes the approval digest", async () => {
     const { applyItemEdit, packageDigest, approvePackage } = await import("./package-store");
     const before = rcp();
