@@ -82,7 +82,7 @@ boards, plans and logs are in `docs/local/cto/archive/`.
   writes, labelled "Former <role>". The runner enforces it from disk
   (`runSingleTwin`); work paths (intake, routines, shifts, tasks, builder,
   approvals) refuse retired twins.
-- `/flow`, `/cockpit`, `/connections` — twin chat with live memory graph, run
+- `/ask`, `/cockpit`, `/connections` — twin chat with live memory graph, run
   observability, and Composio tool connections.
 
 <!-- BEGIN:nextjs-agent-rules -->

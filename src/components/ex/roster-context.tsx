@@ -2,7 +2,7 @@
 
 // Client-side roster cache. The Shell layout fetches /api/employees once on
 // mount and exposes the result via context so individual components
-// (twin-chat-pane, employee-picker, global-approval-overlay, etc.) don't each
+// (employee-picker, global-approval-overlay, etc.) don't each
 // duplicate the network call. Falls back to the empty in-memory constant
 // from `@/lib/employees` while loading or on fetch failure, matching the
 // disk-roster refactor's "empty on first paint, hydrate from API" pattern.

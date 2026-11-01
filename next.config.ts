@@ -59,6 +59,11 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   // Inlined at build time so the sidebar label always matches the release.
   env: { NEXT_PUBLIC_APP_VERSION: pkg.version },
+  // The old chat page; twin chat lives in Ask now. Kept as a redirect so old
+  // links and bookmarks still land somewhere.
+  async redirects() {
+    return [{ source: "/flow", destination: "/ask", permanent: true }];
+  },
   images: {
     // This is a local-first desktop-style app — no need for server-side image
     // resizing/format conversion. Disabling it lets us drop `sharp` entirely

@@ -16,6 +16,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   in, never of a meeting marked "Don't remember", and not when it answers
   people outside the workspace.
 
+### Removed
+- The old `/flow` chat page. Twin chat has lived in Ask for a while; `/flow`
+  now redirects to `/ask`, so old links still work.
+
 ---
 
 ## [0.13.0] — 2026-11-01

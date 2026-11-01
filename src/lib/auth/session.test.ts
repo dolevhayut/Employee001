@@ -128,7 +128,7 @@ describe("sign-in", () => {
 
   it("only redirects back to same-site paths", async () => {
     const { safeReturnTo } = await import("./login");
-    expect(safeReturnTo("/flow?x=1")).toBe("/flow?x=1");
+    expect(safeReturnTo("/ask?x=1")).toBe("/ask?x=1");
     expect(safeReturnTo("https://evil.com")).toBe("/");
     expect(safeReturnTo("//evil.com")).toBe("/");
     expect(safeReturnTo("/\\evil.com")).toBe("/");

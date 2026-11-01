@@ -109,14 +109,14 @@ describe("authorizeApi", () => {
 
 describe("authorizePage", () => {
   it("sends signed-out users to sign in, except public pages", () => {
-    expect(authorizePage("/flow", null)).toMatchObject({ allow: false, status: 401 });
+    expect(authorizePage("/ask", null)).toMatchObject({ allow: false, status: 401 });
     expect(authorizePage("/login", null).allow).toBe(true);
     expect(authorizePage("/join", null).allow).toBe(true);
   });
 
   it("keeps employees on their own profile and admin pages to admins", () => {
     expect(authorizePage("/profile", employee).allow).toBe(true);
-    expect(authorizePage("/flow", employee).allow).toBe(false);
+    expect(authorizePage("/ask", employee).allow).toBe(false);
     expect(authorizePage("/settings", member).allow).toBe(false);
     expect(authorizePage("/settings", admin).allow).toBe(true);
     expect(authorizePage("/council", member).allow).toBe(true);
