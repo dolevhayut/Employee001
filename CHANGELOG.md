@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.14.0] — 2026-11-02
+
 ### Twins can look up older meetings
 - A twin can search the records of past Team Meetings it was in (what was
   decided, key points, open questions, who took what on) with a new
