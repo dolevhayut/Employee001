@@ -64,6 +64,14 @@ describe("PATCH /api/employees/[id] name and role", () => {
     expect(sidecar().name).toBe("A".repeat(120));
   });
 
+  it("refuses to rename a retired twin", async () => {
+    fs.writeFileSync(sidecarPath(), JSON.stringify({ id: "ava-1a2b3c", name: "Ava Chen", role: "Head of Success", lifecycle: "retired" }));
+    const before = fs.readFileSync(sidecarPath(), "utf8");
+    expect((await patch({ role: "CEO" })).status).toBe(409);
+    expect((await patch({ name: "Someone Else", nameHe: "אווה" })).status).toBe(409);
+    expect(fs.readFileSync(sidecarPath(), "utf8")).toBe(before);
+  });
+
   it("keeps the Hebrew-name update as before", async () => {
     const res = await patch({ nameHe: "אווה" });
     expect(await res.json()).toEqual({ ok: true, nameHe: "אווה" });

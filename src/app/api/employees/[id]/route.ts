@@ -191,6 +191,10 @@ export async function PATCH(
       return NextResponse.json({ error: "invalid_sidecar" }, { status: 500 });
     }
 
+    if ((name !== undefined || role !== undefined) && sidecar.lifecycle === "retired") {
+      // A retired twin is labelled "Former <role>" from the record it left with.
+      return NextResponse.json({ error: "This twin is retired and read-only." }, { status: 409 });
+    }
     if (nameHe !== undefined) {
       if (nameHe === "") delete sidecar.nameHe;
       else sidecar.nameHe = nameHe;
