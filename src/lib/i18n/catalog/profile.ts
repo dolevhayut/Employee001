@@ -27,6 +27,8 @@ export const profileEn = {
   "profile.slack.title": "Slack replies",
   "profile.slack.answerWithoutAsking": "Answer Slack questions without asking",
   "profile.slack.answerHint": "Off by default. Action requests and external shared channels still require approval.",
+  "profile.identity.edit": "Edit name and role", "profile.identity.name": "Name", "profile.identity.role": "Role",
+  "profile.identity.required": "Name and role can't be empty.", "profile.identity.error": "Could not save the name and role.",
 } as const;
 
 export const profileHe: Partial<Record<keyof typeof profileEn, string>> = {

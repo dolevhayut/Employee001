@@ -6,6 +6,7 @@ import { dataDir } from "./app-home";
 import { CURRENT_CONSENT_VERSION, type EmployeeConsent } from "./employees";
 import { recordConsentEvidence } from "./consent-evidence";
 import { saveUploadedKnowledgeFile } from "./knowledge-files";
+import { SELF_NOTES_FILE } from "./self-twin-shared";
 
 // "Build my twin": the person running Employee001 builds their own twin from
 // what they write and upload, with no invite and no connected tools. The
@@ -13,7 +14,7 @@ import { saveUploadedKnowledgeFile } from "./knowledge-files";
 // twin keeps reading it at run time like any uploaded knowledge.
 
 /** Where the "tell your twin about your work" text is kept. */
-export const SELF_NOTES_FILE = "about-my-work.md";
+export { SELF_NOTES_FILE };
 export const SELF_NOTES_MAX_CHARS = 60_000;
 
 export type SelfTwinInput = {

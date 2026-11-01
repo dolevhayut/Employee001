@@ -553,12 +553,13 @@ function ProfilePageContent() {
 
   // Pull static + hired (marketplace) employees and resolve by id
   const [allEmployees, setAllEmployees] = useState<EmployeeWithTwin[]>(EMPLOYEES_WITH_TWIN);
-  useEffect(() => {
+  const loadEmployees = useCallback(() => {
     fetch("/api/employees", { cache: "no-store" })
       .then((r) => r.json())
       .then((data: EmployeeWithTwin[]) => setAllEmployees(data))
       .catch(() => {/* fall back to static */});
   }, []);
+  useEffect(loadEmployees, [loadEmployees]);
 
   // After a fresh install — or when a CEO opens a stale profile URL whose
   // employee was deleted — `allEmployees` is empty. Previously we fell back
@@ -701,7 +702,7 @@ function ProfilePageContent() {
           style={{ marginBottom: "var(--sp-16)", maxWidth: 880 }}
         />
         {/* Hero (always shown) */}
-        <Hero employee={employee} />
+        <Hero employee={employee} onIdentitySaved={loadEmployees} />
         {currentRelayState && (currentRelayState.lifecycle === "handover" || Boolean(currentRelayState.package)) && (
           <HandoverProfileCard employee={employee} open={currentRelayState.lifecycle === "handover"} />
         )}
@@ -1001,7 +1002,130 @@ export default function ProfilePage() {
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
-function Hero({ employee }: { employee: EmployeeWithTwin }) {
+/** Name and role as entered when the twin was created (Build my twin, an
+ *  invite): this is where a typo or a new title gets fixed. */
+function NameRoleEditor({ employee, onSaved }: { employee: EmployeeWithTwin; onSaved: () => void }) {
+  const { t } = useT();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(employee.name);
+  const [role, setRole] = useState(employee.role);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function begin() {
+    setName(employee.name);
+    setRole(employee.role);
+    setError(null);
+    setEditing(true);
+  }
+
+  async function save() {
+    if (!name.trim() || !role.trim()) {
+      setError(t("profile.identity.required"));
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/employees/${encodeURIComponent(employee.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, role }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(data?.error === "name_role_required" ? t("profile.identity.required") : t("profile.identity.error"));
+        return;
+      }
+      setEditing(false);
+      onSaved();
+    } catch {
+      setError(t("profile.identity.error"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputStyle = {
+    minWidth: 160,
+    padding: "4px 8px",
+    fontSize: "var(--fs-ui)",
+    background: "var(--surface)",
+    border: "1px solid var(--hairline)",
+    borderRadius: 4,
+    color: "var(--text)",
+    fontFamily: "inherit",
+  };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void save();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setEditing(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={begin}
+        style={{
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          color: "var(--text-muted)",
+          fontSize: "var(--fs-sm)",
+          fontFamily: "inherit",
+          cursor: "pointer",
+        }}
+      >
+        {t("profile.identity.edit")}
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: "grid", gap: "var(--sp-6)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-8)", flexWrap: "wrap" }}>
+        <input
+          value={name}
+          aria-label={t("profile.identity.name")}
+          placeholder={t("profile.identity.name")}
+          maxLength={120}
+          disabled={saving}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={onKeyDown}
+          style={inputStyle}
+        />
+        <input
+          value={role}
+          aria-label={t("profile.identity.role")}
+          placeholder={t("profile.identity.role")}
+          maxLength={120}
+          disabled={saving}
+          onChange={(e) => setRole(e.target.value)}
+          onKeyDown={onKeyDown}
+          style={inputStyle}
+        />
+        <button type="button" className="btn sm primary" disabled={saving} onClick={() => void save()}>
+          {saving ? t("profile.name.saving") : t("profile.name.save")}
+        </button>
+        <button type="button" className="btn sm ghost" disabled={saving} onClick={() => setEditing(false)}>
+          {t("profile.name.cancel")}
+        </button>
+      </div>
+      {error ? (
+        <div role="alert" style={{ fontSize: "var(--fs-xs)", color: "var(--danger)" }}>
+          {error}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Hero({ employee, onIdentitySaved }: { employee: EmployeeWithTwin; onIdentitySaved: () => void }) {
   const { t } = useT();
   const orgName = useOrgName();
   const [boundId, setBoundId] = useState(employee.id);
@@ -1224,6 +1348,11 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
               </div>
             ) : null}
           </div>}
+          {!retired && (
+            <div style={{ marginTop: "var(--sp-6)" }}>
+              <NameRoleEditor key={employee.id} employee={employee} onSaved={onIdentitySaved} />
+            </div>
+          )}
         </div>
         <div
           className="row"

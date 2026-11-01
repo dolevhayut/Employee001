@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { Icons } from "@/components/ex/icons";
 import { PageHead } from "@/components/ex/page-head";
@@ -9,6 +10,7 @@ import { StarterPacks } from "@/components/ex/starter-packs";
 import { isUnchangedExample, livePack, planStarterPack, type AppliedPack, type StarterPack } from "@/lib/starter-packs";
 import { useT } from "@/components/ex/i18n-context";
 import { KNOWLEDGE_FOLDER_DISCLOSURE } from "@/lib/knowledge-folder-shared";
+import { SELF_NOTES_FILE } from "@/lib/self-twin-shared";
 
 // "Build my twin": the person running Employee001 builds their own twin from
 // what they write and upload. No invite and no connected tools: the builder
@@ -130,7 +132,7 @@ function InterviewPanel({
   if (locked) {
     return (
       <div className="subtle" style={{ fontSize: "var(--fs-sm)" }}>
-        Your twin is created; edit its profile after the build.
+        Your twin is created with the notes from this interview. Change them on its profile, in Files under knowledge/{SELF_NOTES_FILE}.
       </div>
     );
   }
@@ -388,9 +390,12 @@ export default function BuildMyTwinPage() {
         />
 
         <div style={{ maxWidth: 880, display: "grid", gap: "var(--sp-18)" }}>
-          {profileLocked && (
-            <p className="subtle" style={{ margin: 0, fontSize: "var(--fs-sm)" }}>
-              Your twin is created; edit its profile after the build.
+          {createdId && (
+            <p role="status" className="subtle" style={{ margin: 0, fontSize: "var(--fs-sm)" }}>
+              Your twin is created with the name, role and notes below, so they&apos;re locked here and Continue the build uses them as they are.
+              To change them, open{" "}
+              <Link href={`/profile?employee=${encodeURIComponent(createdId)}`} style={{ color: "var(--text)" }}>its profile</Link>:
+              name and role at the top, your notes in Files under knowledge/{SELF_NOTES_FILE}.
             </p>
           )}
           <StarterPacks disabled={profileLocked} onStart={startFromPack} status={packStatus} />

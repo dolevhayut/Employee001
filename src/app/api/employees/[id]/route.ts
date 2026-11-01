@@ -36,6 +36,22 @@ function normalizeNameHe(raw: string): string | null {
   return value;
 }
 
+/** Same cap as a twin created on Build my twin (self-twin.ts). */
+const NAME_ROLE_MAX = 120;
+
+/** Trim, collapse whitespace, strip controls, then cap. Null when empty:
+ *  a twin always has a name and a role. */
+function normalizeNameOrRole(raw: string): string | null {
+  let stripped = "";
+  for (const ch of raw.replace(/\s+/g, " ")) {
+    const code = ch.charCodeAt(0);
+    if (code <= 0x1f || code === 0x7f) continue;
+    stripped += ch;
+  }
+  const value = stripped.trim().slice(0, NAME_ROLE_MAX).trim();
+  return value || null;
+}
+
 function employeeDir(id: string, action: "delete" | "update"): { dir: string } | NextResponse {
   if (!isSafeId(id)) {
     return NextResponse.json(
@@ -131,13 +147,21 @@ export async function PATCH(
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
-  const input = body as { nameHe?: unknown; answerSlackWithoutAsking?: unknown };
+  const input = body as { nameHe?: unknown; answerSlackWithoutAsking?: unknown; name?: unknown; role?: unknown };
   const nameHeRaw = input.nameHe;
   const slackSetting = input.answerSlackWithoutAsking;
   if (nameHeRaw !== undefined && typeof nameHeRaw !== "string") {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
   if (slackSetting !== undefined && typeof slackSetting !== "boolean") return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+  if ((input.name !== undefined && typeof input.name !== "string") || (input.role !== undefined && typeof input.role !== "string")) {
+    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+  }
+  const name = input.name === undefined ? undefined : normalizeNameOrRole(input.name as string);
+  const role = input.role === undefined ? undefined : normalizeNameOrRole(input.role as string);
+  if (name === null || role === null) {
+    return NextResponse.json({ error: "name_role_required" }, { status: 400 });
+  }
 
   const nameHe = nameHeRaw === undefined ? undefined : normalizeNameHe(nameHeRaw);
   if (nameHe === null) {
@@ -172,6 +196,8 @@ export async function PATCH(
       else sidecar.nameHe = nameHe;
     }
     if (slackSetting !== undefined) sidecar.answerSlackWithoutAsking = slackSetting;
+    if (name !== undefined) sidecar.name = name;
+    if (role !== undefined) sidecar.role = role;
 
     const tmp = path.join(dir, `.employee.json.${randomUUID()}.tmp`);
     try {
@@ -188,15 +214,22 @@ export async function PATCH(
   const sidecar = outcome;
 
   const employeeName = typeof sidecar.name === "string" ? sidecar.name : id;
+  const changed = {
+    ...(nameHe !== undefined ? { nameHe } : {}),
+    ...(slackSetting !== undefined ? { answerSlackWithoutAsking: slackSetting } : {}),
+    ...(name !== undefined ? { name } : {}),
+    ...(role !== undefined ? { role } : {}),
+  };
+  const tool = name !== undefined || role !== undefined ? "employee.update_profile" : "employee.update_name_he";
   appendAuditEntry({
     runId: `update-name-he-${Date.now()}`,
     employeeId: id,
     employeeName,
-    toolName: "employee.update_name_he",
-    bareName: "employee.update_name_he",
-    input: { id, ...(nameHe !== undefined ? { nameHe } : {}), ...(slackSetting !== undefined ? { answerSlackWithoutAsking: slackSetting } : {}) },
+    toolName: tool,
+    bareName: tool,
+    input: { id, ...changed },
     verdict: "executed",
   });
 
-  return NextResponse.json({ ok: true, ...(nameHe !== undefined ? { nameHe } : {}), ...(slackSetting !== undefined ? { answerSlackWithoutAsking: slackSetting } : {}) });
+  return NextResponse.json({ ok: true, ...changed });
 }
