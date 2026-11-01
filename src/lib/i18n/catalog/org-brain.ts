@@ -30,6 +30,7 @@ export const orgBrainEn = {
   "org.sources": "{count} sources",
   "org.new": "New question",
   "org.noTwin": "No trained twin yet. Train one from the Twins page first.",
+  "org.loading": "Loading twins…",
   "org.error": "Something went wrong reaching the company. Try again.",
   "org.s1": "Which customers are at risk this quarter, and what are we doing about it?",
   "org.s2": "What are we shipping this month, and what could slip?",

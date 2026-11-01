@@ -13,7 +13,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { Topbar } from "@/components/ex/shell";
 import { useT } from "@/components/ex/i18n-context";
-import { useRoster } from "@/components/ex/roster-context";
+import { useRoster, useRosterLoaded } from "@/components/ex/roster-context";
+import { twinsGate } from "@/components/ex/roster-load";
 import { Icons } from "@/components/ex/icons";
 import { CitedAnswer, type CitedSource } from "@/components/ex/cited-answer";
 import { SourceCard, type SourceCardData, type SourceLookup } from "@/components/ex/source-card";
@@ -62,7 +63,9 @@ export default function AskCompanyPage() {
   const { t } = useT();
   const router = useRouter();
   const roster = useRoster();
+  const rosterLoaded = useRosterLoaded();
   const twins = useMemo(() => roster.filter((e) => e.twinStatus === "ready"), [roster]);
+  const gate = twinsGate(rosterLoaded, twins.length);
   const byId = useMemo(() => new Map(twins.map((e) => [e.id, e])), [twins]);
   const known = useMemo(() => new Set([...twins.map((e) => e.id), "org-brain", "systems"]), [twins]);
 
@@ -197,7 +200,9 @@ export default function AskCompanyPage() {
                   <h1 style={{ margin: 0, fontSize: "var(--fs-h2)", fontWeight: 650, letterSpacing: "-0.02em", color: "var(--text)" }}>{t("org.title")}</h1>
                   <p style={{ margin: "6px 0 0", fontSize: "var(--fs-sm)", color: "var(--text-muted)", lineHeight: 1.5 }}>{t("org.subtitle")}</p>
                 </div>
-                {twins.length === 0 ? (
+                {gate === "loading" ? (
+                  <p style={{ margin: 0, fontSize: "var(--fs-sm)", color: "var(--text-subtle)" }}>{t("org.loading")}</p>
+                ) : gate === "empty" ? (
                   <p style={{ margin: 0, fontSize: "var(--fs-sm)", color: "var(--text-muted)" }}>
                     {t("org.noTwin")}{" "}
                     <Link href="/employees" style={{ color: "var(--accent-deep)", fontWeight: 600 }}>

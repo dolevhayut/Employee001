@@ -12,6 +12,7 @@ import { type EmployeeWithTwin } from "@/lib/employees";
 import { GlobalApprovalOverlay, NotificationBell, usePendingApprovalCount } from "./global-approval-overlay";
 import { ActiveBuildsBanner } from "./active-builds-banner";
 import { RosterProvider, useRoster } from "./roster-context";
+import { autonomyGate } from "./roster-load";
 import { WorkspaceModeProvider, useWorkspaceMode } from "./workspace-mode-context";
 import { useT } from "./i18n-context";
 import { t as translate, type MessageKey } from "@/lib/i18n/messages";
@@ -938,9 +939,14 @@ function TwinSwitcher() {
 function ModeToggle({ collapsed }: { collapsed: boolean }) {
   const { mode, loaded, setMode } = useWorkspaceMode();
   const { t } = useT();
-  const armed = mode === "x";
+  // Until the server value arrives, show neither "armed" nor "off": the
+  // "base" fallback is a safe default for gating, not a known state.
+  const state = autonomyGate(loaded, mode);
+  const armed = state === "armed";
   const flip = () => setMode(armed ? "base" : "x");
-  const title = armed ? t("autonomy.titleArmed") : t("autonomy.titleOff");
+  const title =
+    state === "loading" ? t("autonomy.label") : armed ? t("autonomy.titleArmed") : t("autonomy.titleOff");
+  const dotClass = state === "loading" ? "dot" : armed ? "dot success pulse" : "dot idle";
 
   if (collapsed) {
     return (
@@ -962,7 +968,7 @@ function ModeToggle({ collapsed }: { collapsed: boolean }) {
           width: "100%",
         }}
       >
-        <span className={armed ? "dot success pulse" : "dot idle"} style={{ boxShadow: "none" }} />
+        <span className={dotClass} style={{ boxShadow: "none", opacity: state === "loading" ? 0.4 : 1 }} />
       </button>
     );
   }
@@ -987,13 +993,13 @@ function ModeToggle({ collapsed }: { collapsed: boolean }) {
         textAlign: "start",
       }}
     >
-      <span className={armed ? "dot success pulse" : "dot idle"} style={{ boxShadow: "none", flexShrink: 0 }} />
+      <span className={dotClass} style={{ boxShadow: "none", flexShrink: 0, opacity: state === "loading" ? 0.4 : 1 }} />
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block", fontSize: "var(--fs-sm)", fontWeight: 600, color: "var(--text)", letterSpacing: "-0.005em" }}>
           {t("autonomy.label")}
         </span>
         <span style={{ display: "block", fontSize: "var(--fs-meta)", color: "var(--text-muted)", lineHeight: 1.3 }}>
-          {armed ? t("autonomy.armed") : t("autonomy.off")}
+          {state === "loading" ? "—" : armed ? t("autonomy.armed") : t("autonomy.off")}
         </span>
       </span>
       {/* Switch track */}
@@ -1015,7 +1021,8 @@ function ModeToggle({ collapsed }: { collapsed: boolean }) {
           style={{
             position: "absolute",
             top: 1,
-            insetInlineStart: armed ? 13 : 1,
+            insetInlineStart: state === "loading" ? 7 : armed ? 13 : 1,
+            opacity: state === "loading" ? 0 : 1,
             width: 12,
             height: 12,
             borderRadius: "50%",
