@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.13.0] — 2026-11-01
+
 ### A cloned voice needs the person's recorded consent
 - A cloned or custom voice is only used for a twin if the person it belongs to
   has agreed, and the agreement (who, when, the wording's SHA-256, IP and
