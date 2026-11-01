@@ -1092,16 +1092,22 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="row" style={{ gap: "var(--sp-10)", marginBottom: "var(--sp-6)" }}>
-            {employee.twinStatus === "ready" && (
-              <span className="badge twin">
-                <span className="dot success pulse" /> {t("profile.status.live")}
-              </span>
-            )}
-            {employee.twinStatus === "building" && (
-              <span className="badge warn">{t("profile.status.building")}</span>
-            )}
-            {employee.twinStatus === "pending" && (
-              <span className="badge">{t("profile.status.notStarted")}</span>
+            {retired ? (
+              <span className="badge" title={t("profile.status.retiredTitle")}>{t("profile.status.retired")}</span>
+            ) : (
+              <>
+                {employee.twinStatus === "ready" && (
+                  <span className="badge twin">
+                    <span className="dot success pulse" /> {t("profile.status.live")}
+                  </span>
+                )}
+                {employee.twinStatus === "building" && (
+                  <span className="badge warn">{t("profile.status.building")}</span>
+                )}
+                {employee.twinStatus === "pending" && (
+                  <span className="badge">{t("profile.status.notStarted")}</span>
+                )}
+              </>
             )}
           </div>
           <h1
@@ -1247,7 +1253,7 @@ function Hero({ employee }: { employee: EmployeeWithTwin }) {
             className="btn primary"
             style={{ textDecoration: "none" }}
           >
-            <Icons.Bot size={12} /> {retired ? "Ask" : t("profile.hero.chat")}
+            <Icons.Bot size={12} /> {retired ? t("profile.hero.ask") : t("profile.hero.chat")}
           </Link>
         </div>
       </div>
