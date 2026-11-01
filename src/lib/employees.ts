@@ -211,6 +211,46 @@ export const ELEVENLABS_VOICES: ElevenLabsVoice[] = [
 
 export const ELEVENLABS_VOICE_STORAGE_KEY = "twin.ttsVoices";
 
+/** A stock catalogue voice belongs to no one. Any other voice id (a clone, or a
+ *  custom voice from the ElevenLabs library) may be a real person's voice. */
+export const isStockVoice = (voiceId: string) => ELEVENLABS_VOICES.some((v) => v.id === voiceId);
+
+/** Employee ids come from requests; keep them to a safe directory name. */
+export const EMPLOYEE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+/** Consent to use one person's voice for their twin. Bound to the voice id it
+ *  was given for; withdrawing it deletes the record (and with it the voice id). */
+export type VoiceConsent = {
+  voiceId: string;
+  grantedAt: string;
+  /** sha256 of the consent text shown, so the wording can be proven later. */
+  textDigest: string;
+  locale: "en";
+  /** Recorded by an admin for the person, not by them signed in themself. */
+  onBehalf?: boolean;
+  ip: string;
+  userAgent: string;
+};
+
+/** What the rest of the app may see of a voice consent: that it exists, when,
+ *  and whether an admin gave it. The voice id, IP and user agent stay in the
+ *  sidecar and the audit log. */
+export type VoiceConsentStatus = { grantedAt: string; onBehalf?: boolean };
+
+export const voiceConsentStatus = (c: VoiceConsent): VoiceConsentStatus => ({
+  grantedAt: c.grantedAt,
+  ...(c.onBehalf ? { onBehalf: true } : {}),
+});
+
+/** The wording shown before a voice consent is recorded. Its SHA-256 goes into
+ *  the record and the audit log; changing a word changes the digest. */
+export const VOICE_CONSENT_TEXT = [
+  "Use my voice for my twin.",
+  "I agree that a cloned or custom voice that sounds like me may be used to read my twin's answers aloud on this workspace.",
+  "My voice sample and voice id are processed by ElevenLabs, our text-to-speech provider.",
+  "I can withdraw this at any time; withdrawing removes my voice id from this workspace and my twin goes back to the default voice.",
+].join("\n");
+
 // ─── Employee twin type ───────────────────────────────────────────────────────
 
 /**
@@ -245,6 +285,8 @@ export type EmployeeWithTwin = Employee & {
   /** ISO timestamp the twin was retired. */
   retiredAt?: string;
   retention?: RetentionConsent;
+  /** Recorded consent to use a cloned or custom voice for this person (status only). */
+  voiceConsent?: VoiceConsentStatus;
   /** Per-twin unattended Slack policy. Off unless the CEO explicitly enables it. */
   answerSlackWithoutAsking?: boolean;
   twinStatus: TwinStatus;

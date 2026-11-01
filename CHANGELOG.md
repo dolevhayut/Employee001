@@ -8,6 +8,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### A cloned voice needs the person's recorded consent
+- A cloned or custom voice is only used for a twin if the person it belongs to
+  has agreed, and the agreement (who, when, the wording's SHA-256, IP and
+  browser) is recorded. Without it, speech uses the default voice and says why.
+- Withdrawing consent removes the voice id and is written to the audit log.
+  Consent recorded by an admin is marked "on behalf".
+- Give or withdraw consent under the voice list on the profile. A cloned voice
+  is used only for the person it belongs to (or an admin), and is spoken
+  through the server rather than a live connection. The app cannot check whose
+  voice a voice id is, so consent should only be recorded for the person's own voice.
+
 ---
 
 ## [0.12.0] — 2026-10-28

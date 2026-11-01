@@ -41,7 +41,9 @@ export type LiveSpeakerEvents = {
   /** Everything was said (or stop() was called). */
   ended?: () => void;
   /** Couldn't speak at all (no token, socket refused): nothing was played. */
-  failed?: () => void;
+  failed?: (reason?: "server_only") => void;
+  /** The twin's voice isn't cleared for use, so the default voice is speaking; say why. */
+  notice?: (message: string) => void;
 };
 
 type TtdMessage = { audio?: string; is_final?: boolean; error?: string; message?: string };
@@ -67,9 +69,11 @@ export class LiveSpeaker {
   constructor(
     voiceId: string | undefined,
     private readonly on: LiveSpeakerEvents = {},
+    /** Whose voice it is: a cloned or custom voice is only used with their recorded consent. */
+    employeeId?: string,
   ) {
     this.ctx = playbackContext();
-    void this.open(voiceId);
+    void this.open(voiceId, employeeId);
   }
 
   /** One sentence (already cleaned for speech). */
@@ -127,18 +131,24 @@ export class LiveSpeaker {
     return this.started && !this.stopped;
   }
 
-  private async open(requested?: string) {
+  private async open(requested?: string, employeeId?: string) {
     let url: string;
     try {
       const res = await fetch("/api/tts/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voiceId: requested }),
+        body: JSON.stringify({ voiceId: requested, employeeId }),
       });
+      if (res.status === 409) {
+        // A consented cloned voice: the live token isn't bound to a voice, so
+        // the server speaks it instead (the caller falls back to /api/tts/stream).
+        return this.fail("server_only");
+      }
       if (!res.ok) throw new Error(`tts token ${res.status}`);
-      const body = (await res.json()) as { url: string; voiceId: string };
+      const body = (await res.json()) as { url: string; voiceId: string; voiceFallback?: { message?: string } };
       url = body.url;
       this.voiceId = body.voiceId;
+      if (body.voiceFallback?.message) this.on.notice?.(body.voiceFallback.message);
     } catch {
       return this.fail();
     }
@@ -247,11 +257,11 @@ export class LiveSpeaker {
     clearTimeout(this.deadline);
   }
 
-  private fail() {
+  private fail(reason?: "server_only") {
     if (this.stopped) return;
     this.stopped = true;
     this.clearTimers();
     if (this.ws && this.ws.readyState <= WebSocket.OPEN) this.ws.close(1000);
-    this.on.failed?.();
+    this.on.failed?.(reason);
   }
 }
