@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import path from "path";
 import { getHiredAgentIds, dismissAgent } from "@/lib/hired-agents";
 import { appendAuditEntry } from "@/lib/audit-log";
+import { stripHiddenChars } from "@/lib/hidden-chars";
 import { purgeEmployee, runningWorkFor } from "@/lib/employee-purge";
 import { withSidecarLock } from "@/lib/sidecar-lock";
 import { dataDir } from "@/lib/app-home";
@@ -39,11 +40,12 @@ function normalizeNameHe(raw: string): string | null {
 /** Same cap as a twin created on Build my twin (self-twin.ts). */
 const NAME_ROLE_MAX = 120;
 
-/** Trim, collapse whitespace, strip controls, then cap. Null when empty:
- *  a twin always has a name and a role. */
+/** Trim, collapse whitespace, strip controls and hidden characters (a name
+ *  and role reach every twin's prompt), then cap. Null when empty: a twin
+ *  always has a name and a role. */
 function normalizeNameOrRole(raw: string): string | null {
   let stripped = "";
-  for (const ch of raw.replace(/\s+/g, " ")) {
+  for (const ch of stripHiddenChars(raw).text.replace(/\s+/g, " ")) {
     const code = ch.charCodeAt(0);
     if (code <= 0x1f || code === 0x7f) continue;
     stripped += ch;

@@ -64,6 +64,12 @@ describe("PATCH /api/employees/[id] name and role", () => {
     expect(sidecar().name).toBe("A".repeat(120));
   });
 
+  it("strips hidden characters, which would reach every twin's prompt", async () => {
+    expect((await patch({ name: "Ava\u202E Chen\u{E0041}", role: "Head\u200B of Success" })).status).toBe(200);
+    expect(sidecar().name).toBe("Ava Chen");
+    expect(sidecar().role).toBe("Head of Success");
+  });
+
   it("refuses to rename a retired twin", async () => {
     fs.writeFileSync(sidecarPath(), JSON.stringify({ id: "ava-1a2b3c", name: "Ava Chen", role: "Head of Success", lifecycle: "retired" }));
     const before = fs.readFileSync(sidecarPath(), "utf8");
