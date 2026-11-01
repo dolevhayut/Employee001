@@ -195,3 +195,32 @@ describe("LiveSpeaker", () => {
     expect(ended).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("LiveSpeaker voice consent", () => {
+  it("sends employeeId with the voice and speaks the voice the server returned", async () => {
+    const fetchMock = vi.fn<(url: string, init: { body: string }) => Promise<Response>>(
+      async () =>
+        new Response(JSON.stringify({ url: "wss://x/tts", voiceId: "default", voiceFallback: { error: "voice_consent_required", message: "No recorded consent, so the default voice speaks." } })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const notice = vi.fn();
+    const sp = new LiveSpeaker("cloned", { notice }, "emp1");
+    sp.say("A sentence long enough.");
+    await flush();
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ voiceId: "cloned", employeeId: "emp1" });
+    expect(notice).toHaveBeenCalledWith("No recorded consent, so the default voice speaks.");
+    const ws = FakeSocket.last!;
+    ws.open();
+    expect(ws.sent[0]).toEqual({ voices: ["default"] });
+    expect(ws.sent[1]).toEqual({ inputs: [{ text: "A sentence long enough. ", voice_id: "default" }], flush: true });
+  });
+
+  it("hands a consented cloned voice (409) to the server-side stream", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "voice_server_only" }), { status: 409 })));
+    const failed = vi.fn();
+    new LiveSpeaker("cloned", { failed }, "emp1");
+    await flush();
+    await flush();
+    expect(failed).toHaveBeenCalledWith("server_only");
+  });
+});
