@@ -6,6 +6,11 @@ export async function register(): Promise<void> {
     return;
   }
 
+  // Keys saved in Settings on the data volume (Docker): before anything reads them.
+  const { loadSavedKeys } = await import("@/lib/saved-keys");
+  const loaded = loadSavedKeys();
+  if (loaded.length) console.log(`[employee001] loaded saved keys: ${loaded.join(", ")}`);
+
   const { removeLegacyDebugLog } = await import("@/lib/legacy-cleanup");
   removeLegacyDebugLog();
   const { markTwinsConsentRequired } = await import("@/lib/consent-migration");

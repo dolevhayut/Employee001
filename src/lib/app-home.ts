@@ -17,6 +17,9 @@ export function dataDir(...parts: string[]): string {
   return path.join(appHome(), "data", ...parts);
 }
 
+/** Where keys saved in Settings go: EMPLOYEE001_ENV_FILE when set (the Docker
+ *  image points it at the data volume), else the install's own `.env`. */
 export function envFilePath(): string {
-  return path.join(appHome(), ".env");
+  const configured = process.env.EMPLOYEE001_ENV_FILE;
+  return configured ? path.resolve(configured) : path.join(appHome(), ".env");
 }

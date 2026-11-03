@@ -202,6 +202,45 @@ The Slack connection must expose the connected Slack user and workspace IDs. Emp
 
 ---
 
+### Any Docker host (a VPS on Hostinger, Hetzner, DigitalOcean…)
+
+The same image runs on any server with Docker Compose. One container, one volume for `/app/data`:
+
+```bash
+mkdir -p /srv/employee001 && cd /srv/employee001
+git clone --depth 1 https://github.com/dolevhayut/Employee001 src
+umask 077 && printf 'EMPLOYEE001_TOKEN=%s\nAPP_URL=https://employee001.example.com\n' "$(openssl rand -hex 32)" > .env
+```
+
+`compose.yaml`, private (reach it through `ssh -L 8080:127.0.0.1:8080 <server>`, then `http://localhost:8080`):
+
+```yaml
+services:
+  employee001:
+    build: ./src
+    restart: unless-stopped
+    env_file: .env
+    volumes: [e001-data:/app/data]
+    ports: ["127.0.0.1:8080:8080"]
+volumes:
+  e001-data:
+```
+
+To serve it on a public HTTPS name behind an existing Traefik, drop `ports` and add the
+`traefik` network with `traefik.http.routers.<name>.rule=Host(...)`, `tls.certresolver` and
+`traefik.http.services.<name>.loadbalancer.server.port=8080` labels.
+
+```bash
+docker compose up -d --build
+```
+
+Open `https://<host>/?token=<EMPLOYEE001_TOKEN>` once and create the owner account. The
+admin then enters the Anthropic and Composio keys in **Settings**, with no server access:
+the image keeps them at `/app/data/.env` on the volume, so they survive rebuilds and
+updates. Keys set in the server's `.env` (the `env_file`) take precedence over them.
+
+Update: `cd /srv/employee001/src && git pull && cd .. && docker compose up -d --build`.
+
 ## Data migration — zero loss
 
 Two paths; use the raw copy for a true "lose nothing" migration and `export`/`import` as

@@ -8,6 +8,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Docker keeps the keys you save in Settings
+- In the Docker image, keys an admin saves in Settings (Anthropic, Composio,
+  ElevenLabs) now live on the data volume (`/app/data/.env`) and load at
+  startup, so a rebuild or an image update no longer drops them. Twins can't
+  read that file, and it's written readable by its owner only.
+- `docs/DEPLOY-CLOUD.md` covers any Docker host (a VPS on Hostinger and the
+  like), private or behind Traefik.
+
 ---
 
 ## [0.15.0] — 2026-11-03

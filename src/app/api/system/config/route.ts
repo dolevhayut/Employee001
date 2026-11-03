@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { voiceAllowed, voiceEnabled } from "@/lib/data-residency";
 import { liveVoiceEnabled } from "@/lib/voice-live";
 import fs from "fs";
+import path from "path";
 import { envFilePath } from "@/lib/app-home";
+import { SAVED_KEY_NAMES } from "@/lib/saved-keys";
 import { canRunModel, currentProvider, providerLabel, type ModelProvider } from "@/lib/model-provider";
 import { claudeCliStatus } from "@/lib/claude-code-cli";
 import { KEYCHAIN_PLACEHOLDER, readKeychainSecret, storeKeychainSecret, type SecretName } from "@/lib/keychain";
@@ -40,11 +42,7 @@ export type SystemConfigStatus = {
   ready: boolean;
 };
 
-const ALLOWED_KEYS = new Set([
-  "ANTHROPIC_API_KEY",
-  "COMPOSIO_API_KEY",
-  "ELEVENLABS_API_KEY",
-]);
+const ALLOWED_KEYS = new Set<string>(SAVED_KEY_NAMES);
 
 export async function GET() {
   const anthropic = Boolean(process.env.ANTHROPIC_API_KEY);
@@ -128,7 +126,8 @@ export async function PATCH(req: NextRequest) {
     ? existing.replace(keyRegex, line)
     : existing + (existing.endsWith("\n") || existing === "" ? "" : "\n") + line + "\n";
 
-  fs.writeFileSync(envPath, updated, "utf8");
+  fs.mkdirSync(path.dirname(envPath), { recursive: true });
+  fs.writeFileSync(envPath, updated, { encoding: "utf8", mode: 0o600 });
 
   // Also update in-memory so the running server benefits immediately
   // (only affects process.env reads — SDK clients re-read at next request)
