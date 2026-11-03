@@ -4,7 +4,7 @@
 // Pure (no fs), so the rules can be tested byte for byte.
 
 import path from "path";
-import { stripHiddenChars, type HiddenCharCounts } from "./hidden-chars";
+import { addHiddenCharCounts, stripHiddenChars, type HiddenCharCounts } from "./hidden-chars";
 
 /** Extensions read as text whatever their bytes look like (a NUL byte in a
  *  .txt must not switch cleaning off). */
@@ -202,5 +202,16 @@ export function cleanUploadedBytes(
   const body = encode(clean.text, encoding);
   // encodeUtf32 writes its own BOM.
   const head = encoding.startsWith("utf-32") ? Buffer.alloc(0) : bom;
-  return { data: Buffer.concat([head, body, tail]), encoding, removed: clean.removed };
+  const out = Buffer.concat([head, body, tail]);
+  // UTF-16 without a BOM is still read as UTF-8 by Claude Code. Removing
+  // code units can join UTF-8 bytes they kept apart into a hidden character,
+  // so that reading is cleaned too (lossy, but only a file built for this
+  // has anything to remove there).
+  if (encoding.startsWith("utf-16") && bom.length === 0) {
+    const asUtf8 = stripHiddenChars(out.toString("utf-8"));
+    if (asUtf8.total > 0) {
+      return { data: Buffer.from(asUtf8.text, "utf-8"), encoding, removed: addHiddenCharCounts(clean.removed, asUtf8.removed) };
+    }
+  }
+  return { data: out, encoding, removed: clean.removed };
 }
