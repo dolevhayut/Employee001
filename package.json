@@ -60,7 +60,7 @@
     "@anthropic-ai/sandbox-runtime": "0.0.79",
     "@anthropic-ai/sdk": "0.93.0",
     "@clack/prompts": "^0.9.1",
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "semver": "^7.8.0",
     "tar": "^7.5.22"
   },
