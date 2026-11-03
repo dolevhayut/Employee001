@@ -3043,7 +3043,7 @@ function CouncilPageInner() {
                               >
                                 <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "4px 0 10px", fontSize: "var(--fs-xs)", fontWeight: 600, color: "var(--accent-deep)" }}>
                                   <Icons.MessageSquare size={11} />
-                                  {t(replies.length === 1 ? "meeting.replyOne" : "meeting.replies", { count: replies.length })}
+                                  {t("meeting.replies", { count: replies.length })}
                                 </div>
                                 {replies.map((r, j) => renderOne(r.resp, r.originalIdx, j, true))}
                               </motion.div>

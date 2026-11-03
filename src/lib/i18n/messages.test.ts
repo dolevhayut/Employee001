@@ -79,6 +79,30 @@ describe("plural strings", () => {
     expect(t("en", "nav.pendingBadge", { label: "Tasks", count: 1 })).toBe("Tasks (1 pending)");
   });
 
+  it("pluralizes the Ask and meeting counts", () => {
+    expect(t("en", "meeting.replies", { count: 1 })).toBe("1 reply");
+    expect(t("en", "meeting.replies", { count: 2 })).toBe("2 replies");
+    expect(t("en", "meeting.messages", { count: 1 })).toBe("1 message");
+    expect(t("en", "meeting.messages", { count: 7 })).toBe("7 messages");
+    expect(t("en", "meeting.out.ticketCount", { count: 1 })).toBe("1 ticket");
+    expect(t("en", "meeting.out.ticketCount", { count: 3 })).toBe("3 tickets");
+    expect(t("en", "org.sources", { count: 1 })).toBe("1 source");
+    expect(t("en", "org.sources", { count: 4 })).toBe("4 sources");
+    expect(t("en", "org.source.tools", { count: 1 })).toBe("1 lookup");
+    expect(t("en", "org.source.tools", { count: 2 })).toBe("2 lookups");
+    expect(t("en", "org.source.earlier", { count: 1 })).toBe("1 earlier lookup");
+    expect(t("en", "org.source.earlier", { count: 5 })).toBe("5 earlier lookups");
+
+    expect(t("he", "meeting.replies", { count: 1 })).toBe("תגובה אחת");
+    expect(t("he", "meeting.replies", { count: 2 })).toBe("2 תגובות");
+    expect(t("he", "org.sources", { count: 1 })).toBe("מקור אחד");
+    expect(t("he", "org.sources", { count: 3 })).toBe("3 מקורות");
+    expect(t("he", "meeting.out.ticketCount", { count: 1 })).toBe("טיקט אחד");
+    // No Hebrew string yet: the English fallback still picks the right form.
+    expect(t("he", "meeting.messages", { count: 1 })).toBe("1 message");
+    expect(t("he", "meeting.messages", { count: 2 })).toBe("2 messages");
+  });
+
   it("gives every plural block an `other` branch", () => {
     for (const locale of ["en", "he"] as const) {
       for (const [key, value] of Object.entries(messages[locale])) {
