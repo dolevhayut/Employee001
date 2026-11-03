@@ -23,8 +23,12 @@ export function chromePath(env = process.env) {
   return null;
 }
 
-/** Problems found on one page: uncaught exceptions, then crash text in the body. */
-export function pageProblems({ exceptions, bodyText }) {
+/** Problems found on one page: it didn't load, uncaught exceptions, then
+ *  crash text in the body. */
+export function pageProblems({ exceptions, bodyText, href }) {
+  // Chrome shows its own error page (chrome-error://) when nothing answers:
+  // no app code runs there, so no exception and no crash text either.
+  if (href && !/^https?:/.test(href)) return [`the page didn't load (${href.split("/")[0]})`];
   const problems = exceptions.map((e) => `uncaught: ${e}`);
   if (CRASH_TEXT.some((re) => re.test(bodyText ?? ""))) problems.push("the page shows an error screen");
   return problems;
@@ -75,8 +79,9 @@ export async function browserSmoke(baseUrl, paths, { chrome = chromePath(), sett
       exceptions = [];
       await send("Page.navigate", { url: baseUrl + path });
       await sleep(settleMs);
-      const res = await send("Runtime.evaluate", { expression: "document.body ? document.body.innerText : ''", returnByValue: true });
-      const problems = pageProblems({ exceptions, bodyText: res.result?.result?.value });
+      const res = await send("Runtime.evaluate", { expression: "JSON.stringify({ href: location.href, text: document.body ? document.body.innerText : '' })", returnByValue: true });
+      const page = JSON.parse(res.result?.result?.value ?? "{}");
+      const problems = pageProblems({ exceptions, bodyText: page.text, href: page.href });
       if (problems.length) failures[path] = problems;
     }
     ws.close();
