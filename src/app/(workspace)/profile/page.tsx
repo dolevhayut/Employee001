@@ -13,6 +13,7 @@ import { Topbar } from "@/components/ex/shell";
 import { Markdown } from "@/components/ex/markdown";
 import { PageHead } from "@/components/ex/page-head";
 import { useT } from "@/components/ex/i18n-context";
+import { useRefreshRoster } from "@/components/ex/roster-context";
 import { TwinEditor } from "@/components/editor/TwinEditor";
 import {
   EMPLOYEES_WITH_TWIN,
@@ -242,6 +243,7 @@ function SectionGroup({
 function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
   const { t, locale } = useT();
   const router = useRouter();
+  const refreshRoster = useRefreshRoster();
   const consent = employee.consent;
   const firstName = employee.name.split(" ")[0];
   const [revoking, setRevoking] = useState(false);
@@ -262,6 +264,8 @@ function ConsentCard({ employee }: { employee: EmployeeWithTwin }) {
         const body = (await res.json().catch(() => ({}))) as { message?: string };
         throw new Error(body.message ?? `Revoke failed (${res.status})`);
       }
+      // The twin is gone, so the shared roster (sidebar, pickers) refetches.
+      refreshRoster();
       router.push("/employees");
     } catch (err) {
       setRevokeError(err instanceof Error ? err.message : t("profile.danger.error"));
@@ -817,6 +821,7 @@ function ProfilePageContent() {
 function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
   const { t } = useT();
   const router = useRouter();
+  const refreshRoster = useRefreshRoster();
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -835,7 +840,8 @@ function DangerTab({ employee }: { employee: EmployeeWithTwin }) {
         const body = (await res.json().catch(() => ({}))) as { message?: string };
         throw new Error(body.message ?? `Delete failed (${res.status})`);
       }
-      // Twin gone — back to the roster.
+      // Twin gone: refetch the shared roster, then back to the roster page.
+      refreshRoster();
       router.push("/employees");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("profile.danger.error"));
