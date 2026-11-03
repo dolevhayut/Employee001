@@ -3,18 +3,17 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { listUsers } from "./auth/store";
 import { sdkChildEnv } from "./sdk-env";
 
 // The "claude-code" model provider: twins run through the Claude Code the
 // user installed and signed in to themselves, so a Claude subscription works
 // without an API key. Anthropic's terms allow an end user to sign in to the
 // unmodified Claude Code binary with their own subscription; they don't allow
-// an app to offer Claude login, to collect or store Claude credentials, or to
-// route other people's requests through one person's plan. So:
+// an app to offer Claude login or to collect or store Claude credentials. How
+// a workspace uses its plan is the operator's call (this is self-hosted open
+// source, not a service). So:
 //   - we only run the user's own `claude` binary; sign-in happens in it;
-//   - we never read, pass or store a Claude token (the child env drops them);
-//   - it's for one person: with a second active account it stops (seatProblem).
+//   - we never read, pass or store a Claude token (the child env drops them).
 
 type Env = Record<string, string | undefined>;
 
@@ -66,23 +65,6 @@ export function claudeCodeEnvOverrides(source: Env = process.env): Env {
   delete out.CLAUDE_CONFIG_DIR;
   delete out.CLAUDE_AGENT_SDK_CLIENT_APP;
   return out;
-}
-
-/** Whether the server listens beyond this machine (EMPLOYEE001_BIND, or the
- *  HOSTNAME `start` and the Docker image set to an address). */
-export function reachableFromNetwork(env: Env = process.env): boolean {
-  const bind = (env.EMPLOYEE001_BIND ?? env.HOSTNAME ?? "").trim().toLowerCase();
-  if (!bind || ["127.0.0.1", "::1", "localhost"].includes(bind)) return false;
-  return /^[0-9.:a-f]+$/.test(bind) && /[.:]/.test(bind);
-}
-
-/** Why this mode can't serve the workspace: it covers one person on this
- *  machine. Checked on every model run (claudeCodeExecutable). */
-export function seatProblem(env: Env = process.env): string | null {
-  const active = listUsers().filter((u) => !u.disabled).length;
-  if (active > 1) return "A Claude subscription covers one person, and this workspace has more than one account. Use an Anthropic API key or your cloud provider instead (run `npx employee001 setup`).";
-  if (reachableFromNetwork(env)) return "A Claude subscription covers one person on this machine, and this server is reachable from the network. Bind it to 127.0.0.1, or use an Anthropic API key or your cloud provider (run `npx employee001 setup`).";
-  return null;
 }
 
 export type ClaudeCliStatus = {
@@ -177,8 +159,6 @@ export async function claudeCliStatus(opts: { fresh?: boolean } = {}): Promise<C
 
 /** What's wrong with this mode right now, worded for the person fixing it. */
 export function claudeCodeProblem(status: ClaudeCliStatus | undefined, env: Env = process.env): string | null {
-  const seat = seatProblem(env);
-  if (seat) return seat;
   if (!findClaudeCli(env)) {
     return process.platform === "win32"
       ? "Claude Code (claude.exe) isn't installed on this machine. Install it with Anthropic's native installer, run `claude` once and sign in."

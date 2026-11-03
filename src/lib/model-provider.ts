@@ -1,9 +1,9 @@
 import "server-only";
 import { euRegion, modelResidencyProblem } from "./data-residency";
-import { cachedClaudeCliStatus, claudeCodeEnvOverrides, claudeCodeProblem, findClaudeCli, seatProblem } from "./claude-code-cli";
+import { cachedClaudeCliStatus, claudeCodeEnvOverrides, claudeCodeProblem, findClaudeCli } from "./claude-code-cli";
 
-// "claude-code": the user's own signed-in Claude Code (a Claude subscription,
-// one person only). See claude-code-cli.ts.
+// "claude-code": the user's own signed-in Claude Code (a Claude subscription).
+// See claude-code-cli.ts.
 export const MODEL_PROVIDERS = ["anthropic", "claude-code", "bedrock", "vertex", "foundry", "local"] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 type Env = Record<string, string | undefined>;
@@ -79,10 +79,6 @@ export function providerEnvForAgentSdk(env: Env = process.env): Env {
  *  claude-code mode, the SDK's bundled one otherwise. */
 export function claudeCodeExecutable(env: Env = process.env): string | undefined {
   if (currentProvider(env) !== "claude-code") return undefined;
-  // Every model run passes here (providerRuntimeOptions), routines and
-  // shifts included: the one-person rule holds even where no route checked.
-  const seat = seatProblem(env);
-  if (seat) throw new Error(seat);
   const cli = findClaudeCli(env);
   // Never fall back to the bundled runtime here: it would run without the
   // user's sign-in (or with whatever key is around) and bill the wrong way.
@@ -90,14 +86,6 @@ export function claudeCodeExecutable(env: Env = process.env): string | undefined
   return cli;
 }
 
-/** Why another person can't be added (an account or an employee invite):
- *  a Claude subscription runs on one person's plan, and Anthropic doesn't
- *  allow routing other people's requests through it. Null otherwise. */
-export function addPersonProblem(env: Env = process.env): string | null {
-  return currentProvider(env) === "claude-code"
-    ? "This install runs on your own Claude subscription, which covers you alone. To bring in colleagues, switch to an Anthropic API key or your cloud provider first: run `npx employee001 setup`."
-    : null;
-}
 
 const LOCAL_MODEL_PINS = ["OPUS", "SONNET", "HAIKU"] as const;
 

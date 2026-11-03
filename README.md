@@ -14,7 +14,7 @@
 npx employee001     # first run: a short setup, then it opens http://localhost:3000
 ```
 
-Signed in to Claude Code? Your Claude subscription runs the twins, no API key needed. Subscription mode covers one person.
+Signed in to Claude Code? Your Claude subscription runs the twins, no API key needed.
 
 <img src="docs/screenshots/hero-60s.gif" width="100%" alt="From npx employee001 to a twin's first cited answer: setup, Build my twin, then Ask (sped up, under a minute)" />
 
@@ -28,7 +28,7 @@ Signed in to Claude Code? Your Claude subscription runs the twins, no API key ne
   </tr>
 </table>
 
-Claude subscription covers one person. For a team, use an Anthropic API key, a cloud provider or a local model.
+Running a team on a Claude subscription is up to you and your plan's terms. An Anthropic API key, a cloud provider or a local model also work.
 
 [![npm version](https://img.shields.io/npm/v/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
 [![npm downloads](https://img.shields.io/npm/dm/employee001?style=flat-square&color=2ea44f)](https://www.npmjs.com/package/employee001)
@@ -56,7 +56,7 @@ Claude subscription covers one person. For a team, use an Anthropic API key, a c
 
 ## Get started in five minutes
 
-1. **Run it.** `npx employee001`. Setup finds your signed-in Claude Code and offers your Claude subscription, with no API key; it covers one person. Otherwise it asks for an Anthropic API key, your cloud provider (Bedrock, Vertex AI, Foundry) or a local model.
+1. **Run it.** `npx employee001`. Setup finds your signed-in Claude Code and offers your Claude subscription, with no API key. Otherwise it asks for an Anthropic API key, your cloud provider (Bedrock, Vertex AI, Foundry) or a local model.
 2. **Build your own twin.** Open **Build my twin**, first on the Launchpad. Write about your work or answer a short interview, add documents if you like, and agree. The builder writes the nine profile files while you watch.
 3. **Ask it.** Open **Ask**, pick your twin, and ask it what people usually ask you.
 
@@ -83,7 +83,7 @@ A twin can be built two ways. Both end in the same nine Markdown files: `CONTEXT
 
 **1. Build my twin (you).** The person running Employee001 briefs their own twin at `/build-my-twin`. Write a few paragraphs about your work (what you own, how you decide, what people ask you, a few messages you wrote), or choose **Interview me** and answer about eight questions, one at a time. Add documents if you like (PDF, Word, Markdown, text, CSV, JSON). The builder writes the profile files from that material and says where it falls short instead of making things up. No invite, no Composio, no OAuth.
 
-**2. Invite a colleague (them).** An admin creates a private invite link and picks a lookback window of 30 to 360 days. The colleague reviews a consent screen, answers a few role questions and connects their own tools (Slack, Gmail, Linear, GitHub, Calendar, Drive and more) through [Composio](https://composio.dev). A builder agent reads that history through a read-only gate (120 turns, $5 budget) and writes their profile files. Invites need an API key or a cloud provider, plus a Composio key; Claude subscription mode is for one person.
+**2. Invite a colleague (them).** An admin creates a private invite link and picks a lookback window of 30 to 360 days. The colleague reviews a consent screen, answers a few role questions and connects their own tools (Slack, Gmail, Linear, GitHub, Calendar, Drive and more) through [Composio](https://composio.dev). A builder agent reads that history through a read-only gate (120 turns, $5 budget) and writes their profile files. Invites need a working model (subscription, API key, cloud or local) plus a Composio key.
 
 **Then, for every twin:**
 - **Ask** one twin, **Ask the company** for one answer with every claim cited, or open a **Team Meeting** with the twins whose area it is.
@@ -141,7 +141,7 @@ Everything below is in the current npm release ([0.10.0](CHANGELOG.md)).
 - **Routines and autonomous shifts** (`/routines`, `/cockpit`) with per-run archives and a daily per-twin budget. They run only when Autonomy is on (off by default).
 
 **Platform**
-- **Model providers**: your Claude subscription through a signed-in Claude Code (one person, no API key), an Anthropic API key, Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible model.
+- **Model providers**: your Claude subscription through a signed-in Claude Code (no API key), an Anthropic API key, Amazon Bedrock, Google Vertex AI, Azure AI Foundry, or a local Anthropic-compatible model.
 - **Your org's own MCP server**: anyone on the team can ask the twins from Claude Code, Codex, Cursor and other MCP clients ([below](#your-twins-inside-every-agent-mcp)).
 - **Custom MCP servers** with Bearer auth or OAuth, from Settings.
 - **Accounts and roles**: owner, admin, approver, member, employee. TOTP two-factor and OpenID Connect single sign-on.

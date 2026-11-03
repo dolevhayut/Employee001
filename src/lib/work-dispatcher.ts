@@ -18,7 +18,6 @@ import { withAiDisclosure } from "@/lib/ai-disclosure";
 import { actionsAllowed } from "@/lib/consent-policy";
 import { loadConsentStatus } from "@/lib/consent-status";
 import { dataDir } from "@/lib/app-home";
-import { addPersonProblem } from "@/lib/model-provider";
 import { addHiddenCharCounts, emptyHiddenCharCounts, hiddenCharTotal, stripHiddenChars, stripHiddenCharsFields, type HiddenCharCounts } from "@/lib/hidden-chars";
 import { auditHiddenCharsRemoved } from "@/lib/hidden-chars-audit";
 
@@ -104,13 +103,6 @@ async function executeWorkItem(item: WorkItem): Promise<void> {
   // Queued before the person left: a former employee's twin takes no work.
   if (employee.lifecycle === "retired") {
     skipWorkItem(item.id, "Assignee has left the company (retired twin)");
-    return;
-  }
-
-  // Slack and email come from other people. On a Claude subscription (one
-  // person) their messages don't run a twin.
-  if ((item.type === "slack" || item.type === "email") && addPersonProblem()) {
-    skipWorkItem(item.id, "Messages from other people don't run on your Claude subscription, which covers you alone. Switch to an API key or your cloud to answer them.");
     return;
   }
 

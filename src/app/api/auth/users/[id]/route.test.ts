@@ -6,7 +6,6 @@ const users = new Map<string, { id: string; role: string; disabled?: boolean }>(
 
 vi.mock("@/lib/mcp-server/device-auth", () => ({ revokePersonSessions: (id: string) => revokePersonSessions(id) }));
 vi.mock("@/lib/audit-log", () => ({ appendAuditEntry: vi.fn() }));
-vi.mock("@/lib/model-provider", () => ({ addPersonProblem: () => null }));
 vi.mock("@/lib/auth/password", () => ({ hashPassword: (p: string) => p, passwordProblem: () => null }));
 vi.mock("@/lib/auth/store", () => ({
   accountsEnabled: () => true,

@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const users = vi.hoisted(() => ({ list: [] as { id: string; disabled?: boolean }[] }));
 vi.mock("./auth/store", () => ({ listUsers: () => users.list }));
 
-import { claudeCodeProblem, compareVersions, findClaudeCli, parseAuthStatus, reachableFromNetwork, seatProblem } from "./claude-code-cli";
-import { addPersonProblem, canRunModel, claudeCodeExecutable, modelErrorMessage, modelForProvider, providerEnvForAgentSdk, providerLabel } from "./model-provider";
+import { claudeCodeProblem, compareVersions, findClaudeCli, parseAuthStatus } from "./claude-code-cli";
+import { canRunModel, claudeCodeExecutable, modelErrorMessage, modelForProvider, providerEnvForAgentSdk, providerLabel } from "./model-provider";
 import { buildBaseOptions } from "./sdk-defaults";
 import { isSdkChildEnvVar, sdkChildEnv } from "./sdk-env";
 
@@ -124,35 +124,12 @@ describe("claude-code provider", () => {
     expect(canRunModel()).toMatchObject({ ok: false, reason: expect.stringMatching(/isn't installed/) });
   });
 
-  it("covers this machine only: a server reachable from the network stops it", () => {
-    expect(reachableFromNetwork({ EMPLOYEE001_BIND: "127.0.0.1" })).toBe(false);
-    expect(reachableFromNetwork({ HOSTNAME: "Dolevs-MacBook.local" })).toBe(false);
-    expect(reachableFromNetwork({})).toBe(false);
-    expect(reachableFromNetwork({ EMPLOYEE001_BIND: "0.0.0.0" })).toBe(true);
-    expect(reachableFromNetwork({ HOSTNAME: "192.168.1.20" })).toBe(true);
-    expect(reachableFromNetwork({ HOSTNAME: "::" })).toBe(true);
-    expect(seatProblem({ EMPLOYEE001_BIND: "0.0.0.0" })).toMatch(/reachable from the network/);
-  });
-
-  it("enforces the one-person rule on every model run, not only in routes", () => {
+  it("runs for a workspace with several accounts", () => {
     process.env.EMPLOYEE001_MODEL_PROVIDER = "claude-code";
     process.env.PATH = dir;
     users.list = [{ id: "owner" }, { id: "colleague" }];
-    expect(() => claudeCodeExecutable()).toThrow(/covers one person/);
-    expect(() => buildBaseOptions({ surface: "routine", runId: "r", employeeId: "e" })).toThrow(/covers one person/);
-  });
-
-  it("covers one person: a second active account stops it, and adding people is refused", () => {
-    process.env.EMPLOYEE001_MODEL_PROVIDER = "claude-code";
-    process.env.PATH = dir;
-    expect(addPersonProblem()).toMatch(/covers you alone/);
-    users.list = [{ id: "owner" }, { id: "old", disabled: true }];
-    expect(seatProblem()).toBeNull();
-    users.list = [{ id: "owner" }, { id: "colleague" }];
-    expect(canRunModel()).toMatchObject({ ok: false, reason: expect.stringMatching(/covers one person/) });
-
-    process.env.EMPLOYEE001_MODEL_PROVIDER = "anthropic";
-    expect(addPersonProblem()).toBeNull();
+    expect(canRunModel()).toEqual({ ok: true });
+    expect(claudeCodeExecutable()).toBe(cli);
   });
 
   it("uses first-party model ids and points sign-in errors at claude", () => {

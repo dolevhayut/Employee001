@@ -5,7 +5,6 @@ import { ROLES, sessionUserFromHeaders, type Role } from "@/lib/auth/request-use
 import { hashPassword, passwordProblem } from "@/lib/auth/password";
 import { readJson } from "@/lib/auth/http";
 import { revokePersonSessions } from "@/lib/mcp-server/device-auth";
-import { addPersonProblem } from "@/lib/model-provider";
 
 export const runtime = "nodejs";
 
@@ -28,10 +27,6 @@ export async function PATCH(request: Request, { params }: Params) {
   const touchesOwner = target.role === "owner" || body.role === "owner";
   if (touchesOwner && me.role !== "owner") return NextResponse.json({ error: "Only an owner can change an owner." }, { status: 403 });
   if (body.role && !ROLES.includes(body.role)) return NextResponse.json({ error: "Unknown role." }, { status: 400 });
-  if (body.disabled === false && target.disabled) {
-    const seat = addPersonProblem();
-    if (seat) return NextResponse.json({ error: seat }, { status: 409 });
-  }
   if (target.role === "owner" && (body.disabled || (body.role && body.role !== "owner")) && otherActiveOwners(id) === 0) {
     return NextResponse.json({ error: "Keep at least one active owner." }, { status: 400 });
   }

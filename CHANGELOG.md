@@ -8,6 +8,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Invites work on a Claude subscription
+- Subscription mode no longer limits the workspace to one person: you can
+  invite people, add accounts and answer Slack and email on your Claude
+  subscription. How you use your plan is up to you and its terms.
+- The invite form shows why an invite couldn't be created instead of a button
+  that does nothing.
+
 ---
 
 ## [0.14.0] — 2026-11-02

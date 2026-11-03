@@ -941,9 +941,8 @@ function InvitePanel({
         }),
       });
       if (!res.ok) {
-        // The server explains every refusal (subscription mode is one person
-        // only, a missing key, a bad lookback); show it instead of a button
-        // that silently does nothing.
+        // The server explains every refusal (a missing key, a bad lookback);
+        // show it instead of a button that silently does nothing.
         const data = (await res.json().catch(() => ({}))) as { message?: unknown };
         setCreateError(typeof data.message === "string" && data.message ? data.message : t("twins.invite.createFailed"));
         return;
