@@ -8,6 +8,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixes
+- Hidden characters are now also stripped from what twins get back from
+  WebFetch, WebSearch, Read, Grep and Glob (web pages, file text, file
+  names), and from UTF-16 uploads that have no byte-order mark.
+- The profile's "Trained on" card shows what a twin was built from (sources,
+  amounts, lookback, when); a build now records it.
+- The profiling filter keeps a profile file's frontmatter keys (such as
+  `sources:`) and redacts the sensitive value instead of dropping the line.
+- Deleting a twin or revoking consent on its profile updates the twin list
+  without a reload.
+- Counts read right in the singular ("1 reply", "1 source") in Ask, Team
+  Meeting and Org Brain.
+- Reading the audit log's last row takes linear time; a very long row made it
+  slow enough to time out.
+
 ### Privacy
 - The Composio SDK no longer sends its usage and error telemetry (function
   calls, and error messages with their stack trace) to telemetry.composio.dev,
