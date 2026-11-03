@@ -58,14 +58,95 @@ export type FilterResult = { text: string; removed: Array<{ category: ProfilingC
 /** Profile files whose job is to name sensitive topics to stay away from. */
 const EXEMPT_FILES = new Set(["BOUNDARIES.md"]);
 
+/** A YAML frontmatter block at the very top of a profile file. */
+const FRONTMATTER_RE = /^(﻿?---[ \t]*\r?\n)([\s\S]*?)(\r?\n---[ \t]*(?:\r?\n|$))/;
+/** Quoted so YAML reads it as a string, not as a one-item list. */
+const REDACTED_VALUE = '"[redacted]"';
+
+/** Items of an inline YAML list body, split on commas outside quotes. */
+function splitInlineList(body: string): string[] {
+  const items: string[] = [];
+  let current = "";
+  let quote = "";
+  for (const ch of body) {
+    if (quote) {
+      if (ch === quote) quote = "";
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === ",") {
+      items.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) items.push(current.trim());
+  return items;
+}
+
+/**
+ * Frontmatter lines are structure, not prose: dropping `sources:` because a
+ * filename in it looks sensitive leaves the file without the key its readers
+ * expect. Keys stay; only the flagged value, list item or loose line goes.
+ */
+function filterFrontmatterLines(inner: string, removed: FilterResult["removed"]): string {
+  const out: string[] = [];
+  for (const line of inner.split("\n")) {
+    const category = profilingCategoryOf(line);
+    if (!category) {
+      out.push(line);
+      continue;
+    }
+    const cr = line.endsWith("\r") ? "\r" : "";
+    const bare = cr ? line.slice(0, -1) : line;
+    const item = bare.match(/^(\s*-\s+)(.*)$/);
+    if (item) {
+      // Block-list item (e.g. under `sources:`): keep the slot, hide the value.
+      removed.push({ category, line: item[2].trim() });
+      out.push(`${item[1]}${REDACTED_VALUE}${cr}`);
+      continue;
+    }
+    const kv = bare.match(/^(\s*[A-Za-z0-9_][\w.-]*\s*:)(\s*)(.*)$/);
+    if (!kv || profilingCategoryOf(kv[1])) {
+      // Not a key, or a key that itself profiles the person: no structure to keep.
+      removed.push({ category, line: bare.trim() });
+      continue;
+    }
+    const [, key, space, value] = kv;
+    const list = value.trim().match(/^\[(.*)\]$/);
+    if (list) {
+      const items = splitInlineList(list[1]).map((it) => {
+        const c = profilingCategoryOf(it);
+        if (!c) return it;
+        removed.push({ category: c, line: it });
+        return REDACTED_VALUE;
+      });
+      out.push(`${key}${space || " "}[${items.join(", ")}]${cr}`);
+      continue;
+    }
+    removed.push({ category, line: bare.trim() });
+    out.push(`${key} ${REDACTED_VALUE}${cr}`);
+  }
+  return out.join("\n");
+}
+
 /**
  * Drop every line (or, inside a paragraph, every sentence) that profiles the
- * person. Headings stay so the file keeps its shape.
+ * person. Headings stay so the file keeps its shape. For a named profile file,
+ * a leading YAML frontmatter block keeps its keys: sensitive values in it are
+ * redacted in place instead of the line being dropped.
  */
 export function filterProfilingContent(markdown: string, filename?: string): FilterResult {
   if (filename && EXEMPT_FILES.has(filename)) return { text: markdown, removed: [] };
   const removed: FilterResult["removed"] = [];
-  const lines = markdown.split("\n").flatMap((line) => {
+  let head = "";
+  let body = markdown;
+  const fm = filename ? markdown.match(FRONTMATTER_RE) : null;
+  if (fm) {
+    head = fm[1] + filterFrontmatterLines(fm[2], removed) + fm[3];
+    body = markdown.slice(fm[0].length);
+  }
+  const lines = body.split("\n").flatMap((line) => {
     if (/^\s*#/.test(line)) return [line];
     const category = profilingCategoryOf(line);
     if (!category) return [line];
@@ -81,7 +162,7 @@ export function filterProfilingContent(markdown: string, filename?: string): Fil
     });
     return kept.length ? [kept.join(" ")] : [];
   });
-  return { text: lines.join("\n"), removed };
+  return { text: head + lines.join("\n"), removed };
 }
 
 // ─── Personal-data redaction ────────────────────────────────────────────────

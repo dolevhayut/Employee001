@@ -101,3 +101,58 @@ describe("redaction keeps ordinary numbers", () => {
     expect(out).toBe("ID [national_id]. Meeting at 10:30, budget 2026 is 40000.");
   });
 });
+
+describe("profiling filter keeps profile frontmatter intact", () => {
+  const md = [
+    "---",
+    "employee: noa-1a2b3c",
+    "file: DECISIONS.md",
+    "generatedAt: 2026-11-03T09:15:00.000Z",
+    "sources: [gmail.fetch_emails, knowledge/therapy-notes.md, \"knowledge/pip-install.md\", slack]",
+    "confidenceNote: \"medium, sent mail only\"",
+    "---",
+    "# Decisions",
+    "- Chose Postgres over Mongo for audit needs",
+    "- Underperforming lately, possibly job hunting",
+  ].join("\n");
+
+  it("keeps the sources key when a filename in it looks sensitive", () => {
+    const { text, removed } = filterProfilingContent(md, "DECISIONS.md");
+    expect(text).toContain('sources: [gmail.fetch_emails, "[redacted]", "[redacted]", slack]');
+    expect(text).not.toMatch(/therapy|pip-install/);
+    expect(text.startsWith("---\nemployee: noa-1a2b3c\nfile: DECISIONS.md\ngeneratedAt: 2026-11-03T09:15:00.000Z\n")).toBe(true);
+    expect(text).toContain('confidenceNote: "medium, sent mail only"\n---\n# Decisions');
+    // The body is still filtered as before.
+    expect(text).toContain("Chose Postgres");
+    expect(text).not.toContain("Underperforming");
+    expect(removed.map((r) => r.category).sort()).toEqual(["performance_judgment", "performance_judgment", "special_category"]);
+  });
+
+  it("redacts block-list items and scalar values without dropping their keys", () => {
+    const block = [
+      "---",
+      "file: TONE.md",
+      "sources:",
+      "  - gmail.fetch_emails",
+      "  - knowledge/sick-leave-cover.md",
+      "confidenceNote: low, she was on medical leave for most of the window",
+      "---",
+      "body",
+    ].join("\r\n");
+    const { text, removed } = filterProfilingContent(block, "TONE.md");
+    expect(text).toBe(
+      ["---", "file: TONE.md", "sources:", "  - gmail.fetch_emails", '  - "[redacted]"', 'confidenceNote: "[redacted]"', "---", "body"].join("\r\n"),
+    );
+    expect(removed).toHaveLength(2);
+  });
+
+  it("drops a frontmatter key that itself profiles the person", () => {
+    const { text } = filterProfilingContent("---\nfile: CONTEXT.md\ndiagnosis: anxiety\n---\nbody", "CONTEXT.md");
+    expect(text).toBe("---\nfile: CONTEXT.md\n---\nbody");
+  });
+
+  it("treats a leading --- block as prose when no profile file is named (memory text)", () => {
+    const { text } = filterProfilingContent("---\nShe was diagnosed with anxiety.\n---\nok");
+    expect(text).toBe("---\n---\nok");
+  });
+});

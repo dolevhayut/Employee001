@@ -34,6 +34,15 @@ import { registerRun, updateRun, unregisterRun } from "@/lib/active-runs";
 import { appendRunLog, logPathFor } from "@/lib/run-logs";
 import { ensureTwinSandbox } from "@/lib/twin-sandbox";
 import { knowledgeSourceForRead, stampProfileFrontmatter } from "@/lib/twin-builder-frontmatter";
+import {
+  KNOWLEDGE_LINEAGE_SOURCE,
+  buildTwinLineage,
+  lineageSourceForTool,
+  recordLineageRead,
+  type LineageSourceKey,
+  type LineageTally,
+} from "@/lib/twin-builder-lineage";
+import { saveTwinLineage } from "@/lib/employees-disk";
 
 // Re-export the client-safe types/constants so existing imports keep working.
 import { TWIN_FILE_NAMES, type TwinFileName, type TwinBuilderEvent } from "./twin-builder-types";
@@ -189,6 +198,11 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
   // A profile file written afterwards lists these as its sources.
   const knowledgeRead = new Set<string>();
   const pendingKnowledgeReads = new Map<string, string>();
+  // Every successful read from a connected system or knowledge/, per source:
+  // becomes the twin's lineage (the profile's "Trained on" card) at the end.
+  const lineageTally: LineageTally = new Map();
+  const pendingLineageReads = new Map<string, LineageSourceKey>();
+  const orgMcpNames = Object.keys(orgMcpServers);
 
   // Tool gate: sandbox Write to {employeeDir}/{KNOWN_NAME}.md, allow read-only
   // Composio/org tools, deny any external write the agent attempts.
@@ -220,19 +234,21 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
       // Profiling bans are enforced here, not only in the prompt: lines with
       // special-category data, performance/loyalty judgments or work-hour
       // patterns never reach the profile file.
-      const filtered = filterProfilingContent(
-        typeof typedInput.content === "string" ? (typedInput.content as string) : "",
-        filename,
-      );
-      if (filtered.removed.length) auditProfilingFilter(employee, buildId, filename, filtered.removed);
       // The frontmatter states when and from what the file was built; the
       // build's clock and the reads seen so far decide that, not the model.
-      const body = stampProfileFrontmatter(filtered.text, {
-        employeeId: employee.id,
-        filename,
-        generatedAt: buildStartedAt.toISOString(),
-        knowledgeSources: [...knowledgeRead],
-      });
+      // Stamped first, so the filter also sees the documents it lists.
+      const stamped = stampProfileFrontmatter(
+        typeof typedInput.content === "string" ? (typedInput.content as string) : "",
+        {
+          employeeId: employee.id,
+          filename,
+          generatedAt: buildStartedAt.toISOString(),
+          knowledgeSources: [...knowledgeRead],
+        },
+      );
+      const filtered = filterProfilingContent(stamped, filename);
+      if (filtered.removed.length) auditProfilingFilter(employee, buildId, filename, filtered.removed);
+      const body = filtered.text;
 
       // Snapshot whatever's at root for this filename BEFORE the SDK
       // overwrites it, so the previous version is recoverable. Best-effort.
@@ -457,8 +473,13 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
                 (block.input as { file_path?: unknown } | null)?.file_path,
                 employeeDir,
               );
-              if (source) pendingKnowledgeReads.set(block.id, source);
+              if (source) {
+                pendingKnowledgeReads.set(block.id, source);
+                pendingLineageReads.set(block.id, KNOWLEDGE_LINEAGE_SOURCE);
+              }
             }
+            const lineageSource = lineageSourceForTool(block.name, activeToolkits, orgMcpNames);
+            if (lineageSource) pendingLineageReads.set(block.id, lineageSource);
             // Skip Write — already surfaced via `file_writing` from the gate.
             if (block.name === "Write") continue;
             onEvent({
@@ -490,11 +511,16 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
               "type" in block &&
               block.type === "tool_result"
             ) {
-              const result = block as { tool_use_id?: string; is_error?: boolean };
+              const result = block as { tool_use_id?: string; is_error?: boolean; content?: unknown };
               const readSource = result.tool_use_id ? pendingKnowledgeReads.get(result.tool_use_id) : undefined;
               if (readSource) {
                 pendingKnowledgeReads.delete(result.tool_use_id as string);
                 if (!result.is_error) knowledgeRead.add(readSource);
+              }
+              const lineageSource = result.tool_use_id ? pendingLineageReads.get(result.tool_use_id) : undefined;
+              if (lineageSource) {
+                pendingLineageReads.delete(result.tool_use_id as string);
+                if (!result.is_error) recordLineageRead(lineageTally, lineageSource, result.content);
               }
               // After every tool result, re-scan disk for files that
               // changed since the last scan (catches rewrites too).
@@ -593,6 +619,18 @@ export async function runTwinBuilder(args: RunTwinBuilderArgs): Promise<void> {
   // Backstop: scrub every profile file once more after the run (covers files
   // written before this build, e.g. by the onboarding form).
   scrubProfileFiles(employee, employeeDir, buildId);
+
+  // Lineage: what this build read, for the profile's "Trained on" card. Only
+  // a build that produced files replaces the previous build's lineage.
+  if (filesWrittenThisRun.size > 0) {
+    const lineage = buildTwinLineage({
+      tally: lineageTally,
+      lookbackDays,
+      startedAt: buildStartedAt,
+      finishedAt: new Date(),
+    });
+    if (lineage) await saveTwinLineage(employee.id, lineage);
+  }
 
   // Record the build manifest if anything was actually produced. Even if zero
   // new files were written this run (e.g. agent gave up), we still record

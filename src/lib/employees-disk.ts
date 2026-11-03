@@ -7,13 +7,14 @@ import fs from "fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import path from "path";
 import { EMPLOYEE_ID, VOICE_CONSENT_TEXT, voiceConsentStatus } from "./employees";
-import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin, RetentionConsent, TwinLifecycle, VoiceConsent } from "./employees";
+import type { ClaudeModel, EmployeeConsent, EmployeeWithTwin, RetentionConsent, TwinLifecycle, TwinLineage, VoiceConsent } from "./employees";
 import { TWIN_MODEL_OPUS, TWIN_MODEL_PRIMARY } from "./sdk-defaults";
 import { withSidecarLock } from "./sidecar-lock";
 import { dataDir } from "./app-home";
 import { pendingInviteTokens } from "./invites";
 import { appendAuditEntry } from "./audit-log";
 import { daysBetween, type ProfileFileAge } from "./profile-age";
+import { parseTwinLineage } from "./twin-builder-lineage";
 
 const AVATAR_PALETTE = [
   "#A8B4C4", "#C4A8B8", "#B8C4A8", "#A8C4B8", "#C4B8A8",
@@ -79,6 +80,8 @@ type DiskSidecar = {
   via?: { invite?: string };
   /** When the owner last clicked "Still true" on each profile file (ISO). */
   profileConfirmedAt?: Record<string, string>;
+  /** What the last finished twin build read (twin-builder-lineage.ts). */
+  lineage?: TwinLineage;
 };
 
 /** Returns the ISO week string for a given date, e.g. "2026-W20". */
@@ -125,6 +128,29 @@ export async function bumpActivityOnDisk(employeeId: string): Promise<void> {
 
 function validEmployeeId(id: string): boolean {
   return /^[a-z0-9][a-z0-9_-]*$/i.test(id);
+}
+
+/**
+ * Store what a finished build read, replacing the previous build's lineage.
+ * Best-effort like the activity counter: a failed write never fails a build.
+ * Retired twins are read-only and keep what they have.
+ */
+export async function saveTwinLineage(employeeId: string, lineage: TwinLineage): Promise<boolean> {
+  if (!validEmployeeId(employeeId)) return false;
+  const sidecarPath = dataDir("employees", employeeId, "employee.json");
+  try {
+    return await withSidecarLock(employeeId, async () => {
+      const sidecar: DiskSidecar = JSON.parse(await fs.readFile(sidecarPath, "utf8"));
+      if (sidecar.lifecycle === "retired") return false;
+      // Temp file + rename: lifecycle checks read this file without the lock.
+      const tmp = `${sidecarPath}.${randomUUID()}.tmp`;
+      await fs.writeFile(tmp, JSON.stringify({ ...sidecar, lineage }, null, 2), "utf8");
+      await fs.rename(tmp, sidecarPath);
+      return true;
+    });
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -266,6 +292,7 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
       }
     }
 
+    const lineage = parseTwinLineage(sidecar.lineage);
     results.push({
       id: sidecar.id || id,
       name: sidecar.name,
@@ -295,6 +322,7 @@ export async function loadEmployeesFromDisk(): Promise<EmployeeWithTwin[]> {
       ...(sidecar.retention ? { retention: sidecar.retention } : {}),
       // Status only: this row goes to every member, so no voice id, IP or user agent.
       ...(sidecar.voiceConsent ? { voiceConsent: voiceConsentStatus(sidecar.voiceConsent) } : {}),
+      ...(lineage ? { lineage } : {}),
     });
   }
 
