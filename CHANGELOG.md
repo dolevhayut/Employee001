@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.15.1] — 2026-11-03
+
 ### Docker keeps the keys you save in Settings
 - In the Docker image, keys an admin saves in Settings (Anthropic, Composio,
   ElevenLabs) now live on the data volume (`/app/data/.env`) and load at
