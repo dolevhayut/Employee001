@@ -27,7 +27,8 @@ import { HIDDEN_CHAR_CLASS } from "./hidden-chars";
 import { cleanWorkItemText, taskFor } from "./work-dispatcher";
 import { leaseNextWorkItem, type WorkItem } from "./work-items";
 import { ingestEmailMessage } from "./email-intake";
-import { buildCleanMcpOutputHook, withHiddenCharCleaning } from "./hidden-chars-tools";
+import type { HookCallback } from "@anthropic-ai/claude-agent-sdk";
+import { buildCleanBuiltinToolOutputHook, buildCleanMcpOutputHook, withHiddenCharCleaning } from "./hidden-chars-tools";
 import { importOrgSkillMarkdown, readOrgSkill } from "./org-skills";
 import { readOrgBrainNode, writeOrgBrainNode } from "./org-brain";
 import { listKnowledgeVersions, restoreKnowledgeVersion, snapshotKnowledgeText } from "./knowledge-versions";
@@ -166,6 +167,78 @@ describe("tool results", () => {
     expect(await post("mcp__supabase__query", [{ type: "text", text: "rows: 3" }])).toEqual({});
     expect(await post("Read", { file: { content: `x${SMUGGLED}` } })).toEqual({});
     expect(auditRows()).toHaveLength(1);
+  });
+});
+
+describe("built-in tool output (WebFetch, WebSearch, Read, Grep)", () => {
+  const signal = new AbortController().signal;
+  const post = (hook: HookCallback, tool_name: string, tool_input: unknown, tool_response: unknown) =>
+    hook({ hook_event_name: "PostToolUse", tool_name, tool_input, tool_response, tool_use_id: "t1", session_id: "s", transcript_path: "", cwd: "" } as never, "t1", { signal });
+  const rewrite = (value: unknown) => ({ hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: value } });
+
+  it("cleans a fetched page in place, every other field untouched", async () => {
+    const hook = buildCleanBuiltinToolOutputHook("ava");
+    const fetched = { bytes: 812, code: 200, codeText: "OK", result: `Pricing starts at $10.\u200B${SMUGGLED}\u202E`, durationMs: 41, url: "https://vendor.test/pricing" };
+    expect(await post(hook, "WebFetch", { url: "https://vendor.test/pricing", prompt: "price?" }, fetched)).toEqual(rewrite({ ...fetched, result: "Pricing starts at $10." }));
+    expect(auditRows()).toHaveLength(1);
+    expect(auditRows()[0].input).toMatchObject({ source: "web-tool", tool: "WebFetch", url: "https://vendor.test/pricing", removed: { tag: [...SMUGGLED].length, bidi: 1, zeroWidth: 1 } });
+    expect(JSON.stringify(auditRows()[0])).not.toMatch(ANY_HIDDEN);
+  });
+
+  it("cleans search results, both commentary strings and hit titles", async () => {
+    const hook = buildCleanBuiltinToolOutputHook("ava");
+    const search = {
+      query: "acme pricing",
+      results: [
+        `Acme lists three plans.${SMUGGLED}`,
+        { tool_use_id: "srv1", content: [{ title: `Acme \u2066plans\u2069${SMUGGLED}`, url: "https://acme.test/plans" }] },
+      ],
+      durationSeconds: 1.2,
+    };
+    expect(await post(hook, "WebSearch", { query: "acme pricing" }, search)).toEqual(rewrite({
+      query: "acme pricing",
+      results: ["Acme lists three plans.", { tool_use_id: "srv1", content: [{ title: "Acme plans", url: "https://acme.test/plans" }] }],
+      durationSeconds: 1.2,
+    }));
+    expect(auditRows()[0].input).toMatchObject({ source: "web-tool", tool: "WebSearch", query: "acme pricing" });
+  });
+
+  it("cleans a file read (a configured folder's file) and keeps Hebrew direction marks", async () => {
+    const hook = buildCleanBuiltinToolOutputHook("ava");
+    const read = (content: string) => ({
+      type: "text",
+      file: { filePath: "/Users/ava/projects/site/README.md", content, numLines: 2, startLine: 1, totalLines: 2 },
+    });
+    const dirty = read(`# \u200Fשלום \u200Fעולם\nShip on Friday.${SMUGGLED}\u200B`);
+    expect(await post(hook, "Read", { file_path: "/Users/ava/projects/site/README.md" }, dirty)).toEqual(rewrite(read("# \u200Fשלום \u200Fעולם\nShip on Friday.")));
+    expect(auditRows()[0].input).toMatchObject({ source: "file-tool", tool: "Read", file: "/Users/ava/projects/site/README.md" });
+
+    // Clean text (Hebrew marks included) is never rewritten.
+    expect(await post(hook, "Read", { file_path: "/Users/ava/projects/site/README.md" }, read("# \u200Fשלום \u200Fעולם\n"))).toEqual({});
+    expect(auditRows()).toHaveLength(1);
+  });
+
+  it("cleans Grep content lines", async () => {
+    const hook = buildCleanBuiltinToolOutputHook("ava");
+    const grep = { mode: "content", numFiles: 1, filenames: ["notes.md"], content: `notes.md:3:deploy on Friday${SMUGGLED}`, numLines: 1 };
+    expect(await post(hook, "Grep", { pattern: "deploy", path: "/Users/ava/projects/site" }, grep)).toEqual(rewrite({ ...grep, content: "notes.md:3:deploy on Friday" }));
+    expect(auditRows()[0].input).toMatchObject({ source: "file-tool", tool: "Grep", path: "/Users/ava/projects/site" });
+  });
+
+  it("leaves MCP tools to the MCP hook and other tools alone", async () => {
+    const hook = buildCleanBuiltinToolOutputHook("ava");
+    expect(await post(hook, "mcp__supabase__query", {}, [{ type: "text", text: `rows${SMUGGLED}` }])).toEqual({});
+    expect(await post(hook, "Write", {}, { content: `x${SMUGGLED}` })).toEqual({});
+    expect(auditRows()).toHaveLength(0);
+  });
+
+  it("is wired into every twin run: exactly one PostToolUse hook rewrites a dirty WebFetch", async () => {
+    const { buildTwinHooks } = await import("./sdk-defaults");
+    const hooks = buildTwinHooks({ runId: "r", employeeId: "ava", employeeName: "Ava", surface: "chat" }).PostToolUse!.flatMap((m) => m.hooks);
+    const fetched = { bytes: 10, code: 200, codeText: "OK", result: `hi${SMUGGLED}`, durationMs: 1, url: "https://x.test" };
+    const results = await Promise.all(hooks.map((hook) => post(hook, "WebFetch", { url: "https://x.test" }, fetched)));
+    const rewrites = results.filter((r) => (r as { hookSpecificOutput?: { updatedToolOutput?: unknown } }).hookSpecificOutput?.updatedToolOutput !== undefined);
+    expect(rewrites).toEqual([rewrite({ ...fetched, result: "hi" })]);
   });
 });
 

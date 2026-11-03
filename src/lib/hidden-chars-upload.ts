@@ -56,6 +56,57 @@ const BINARY_FORMATS: Array<{ exts: string[]; matches: (data: Buffer) => boolean
 
 export type UploadTextEncoding = "utf-8" | "utf-16le" | "utf-16be" | "utf-32le" | "utf-32be";
 
+/** Has a control character no text file has (NUL and the other C0 controls
+ *  apart from tab, newlines, form feed and escape; DEL)? */
+function hasBinaryControl(text: string): boolean {
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code <= 0x08 || (code >= 0x0e && code <= 0x1f && code !== 0x1b) || code === 0x7f) return true;
+  }
+  return false;
+}
+
+/**
+ * UTF-16 without a byte-order mark. Spaces, newlines, digits and ASCII
+ * punctuation put a zero in the high byte of their code unit (odd offsets
+ * for little-endian, even for big-endian), so zeros pile up on one side.
+ * Even mostly-Hebrew or Arabic text has them between words. The bytes must
+ * also decode as valid UTF-16 with no NUL or binary control characters, so
+ * a binary file with many zero bytes is not taken for text.
+ *
+ * Claude Code's Read decodes a file without a BOM as UTF-8, so that reading
+ * must stay covered: when the bytes read as UTF-8 carry hidden characters,
+ * they are cleaned as UTF-8, as before (a few NUL bytes in a UTF-8 file must
+ * not switch its cleaning to another encoding).
+ */
+function bomlessUtf16(data: Buffer): "utf-16le" | "utf-16be" | null {
+  if (data.length < 4 || data.length % 2 !== 0) return null;
+  let even = 0;
+  let odd = 0;
+  for (let i = 0; i < data.length; i += 2) {
+    if (data[i] === 0) even += 1;
+    if (data[i + 1] === 0) odd += 1;
+  }
+  const encoding = odd >= even ? "utf-16le" : "utf-16be";
+  const highByte = encoding === "utf-16le" ? 1 : 0;
+  const high = Math.max(odd, even);
+  const low = Math.min(odd, even);
+  // Surrogate pairs (tag characters, emoji) never hold a zero byte, so they
+  // don't count against the ratio: padding with tags can't hide a file.
+  let units = 0;
+  for (let i = highByte; i < data.length; i += 2) if (data[i] < 0xd8 || data[i] > 0xdf) units += 1;
+  // At least one code unit in 20 has a zero high byte, and the other side
+  // (U+xx00 characters only) has almost none.
+  if (high === 0 || high * 20 < units || low * 8 > high) return null;
+  try {
+    const text = new TextDecoder(encoding, { fatal: true, ignoreBOM: true }).decode(data);
+    if (hasBinaryControl(text)) return null;
+  } catch {
+    return null;
+  }
+  return stripHiddenChars(data.toString("utf-8")).total === 0 ? encoding : null;
+}
+
 /** How an upload will be read: as text in some encoding, or as binary. */
 export function detectUploadEncoding(name: string, data: Buffer): UploadTextEncoding | "binary" {
   const ext = path.extname(name).toLowerCase();
@@ -66,6 +117,10 @@ export function detectUploadEncoding(name: string, data: Buffer): UploadTextEnco
   if (startsWith(data, 0x00, 0x00, 0xfe, 0xff)) return "utf-32be";
   if (startsWith(data, 0xff, 0xfe)) return "utf-16le";
   if (startsWith(data, 0xfe, 0xff)) return "utf-16be";
+  // Before the extension check: a .txt saved as UTF-16 without a BOM would
+  // otherwise be read as UTF-8, where its hidden characters don't show up.
+  const utf16 = bomlessUtf16(data);
+  if (utf16) return utf16;
   if (TEXT_EXTS.has(ext)) return "utf-8";
   // Unknown (or mislabelled) file: text unless it has a NUL byte, which no
   // UTF-8 text has and almost every binary format does.
@@ -101,9 +156,11 @@ function decode(data: Buffer, encoding: UploadTextEncoding): { text: string; bom
     case "utf-16le":
     case "utf-16be": {
       const usable = data.length - (data.length % 2);
-      // TextDecoder drops the BOM and decodes lone surrogates lossily.
-      const text = new TextDecoder(encoding).decode(data.subarray(2, usable));
-      return { text, bom: data.subarray(0, 2), tail: data.subarray(usable) };
+      // With or without a BOM: a BOM-less file is written back without one.
+      const bomLength = startsWith(data, ...(encoding === "utf-16le" ? [0xff, 0xfe] : [0xfe, 0xff])) ? 2 : 0;
+      // Decodes lone surrogates lossily.
+      const text = new TextDecoder(encoding, { ignoreBOM: true }).decode(data.subarray(bomLength, usable));
+      return { text, bom: data.subarray(0, bomLength), tail: data.subarray(usable) };
     }
     default: {
       const bom = startsWith(data, 0xef, 0xbb, 0xbf) ? data.subarray(0, 3) : none;

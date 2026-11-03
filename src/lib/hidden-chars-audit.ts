@@ -16,6 +16,8 @@ export type HiddenCharSource =
   | "focus-preload"
   | "composio-tool"
   | "mcp-tool"
+  | "web-tool"
+  | "file-tool"
   | "knowledge-restore"
   | "org-skill-write"
   | "org-brain-write";
