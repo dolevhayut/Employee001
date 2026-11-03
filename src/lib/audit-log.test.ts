@@ -157,9 +157,14 @@ describe("audit redaction", () => {
 });
 
 describe("audit tail reader", () => {
+  // One module and temp dir per test (afterEach removes only the last one).
+  let reader: Awaited<ReturnType<typeof auditModule>>["__auditTest"] | undefined;
+  afterEach(() => { reader = undefined; });
+  let n = 0;
   async function lastLineOf(content: string | Buffer) {
-    const { __auditTest } = await auditModule();
-    const file = path.join(process.cwd(), "tail.jsonl");
+    reader ??= (await auditModule()).__auditTest;
+    const __auditTest = reader;
+    const file = path.join(process.cwd(), `tail-${n++}.jsonl`);
     fs.writeFileSync(file, content);
     return __auditTest.readLastLine(file);
   }
