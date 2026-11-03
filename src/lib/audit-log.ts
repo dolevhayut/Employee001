@@ -185,27 +185,41 @@ function hashRow(prevHash: string, row: Omit<AuditEntry, "hash">): string {
   return sha256(`${prevHash}\n${canonicalJson(hashedPayload(row))}`);
 }
 
-/** Read only the final line, even when the active log is large. */
+const NEWLINE = 0x0a;
+
+/** Read only the final line, even when the active log is large.
+ *  Works on raw bytes and decodes once: rebuilding and rescanning a growing
+ *  string for every chunk made one multi-megabyte row take seconds, and
+ *  decoding chunk by chunk could split a multibyte character. */
 function readLastLine(filePath: string): string | undefined {
   const stat = fs.statSync(filePath);
   if (stat.size === 0) return undefined;
 
   const fd = fs.openSync(filePath, "r");
   try {
+    const chunks: Buffer[] = []; // newest first
     let end = stat.size;
-    let suffix = "";
+    let skippingTrailingNewlines = true;
     while (end > 0) {
       const length = Math.min(8192, end);
       end -= length;
-      const buffer = Buffer.alloc(length);
-      fs.readSync(fd, buffer, 0, length, end);
-      suffix = buffer.toString("utf8") + suffix;
-      const withoutTrailingNewlines = suffix.replace(/\n+$/, "");
-      const priorLineBreak = withoutTrailingNewlines.lastIndexOf("\n");
-      if (priorLineBreak >= 0) return withoutTrailingNewlines.slice(priorLineBreak + 1);
-      if (end === 0) return withoutTrailingNewlines || undefined;
+      let chunk = Buffer.alloc(length);
+      fs.readSync(fd, chunk, 0, length, end);
+      if (skippingTrailingNewlines) {
+        let stop = chunk.length;
+        while (stop > 0 && chunk[stop - 1] === NEWLINE) stop--;
+        if (stop === 0) continue;
+        chunk = chunk.subarray(0, stop);
+        skippingTrailingNewlines = false;
+      }
+      const priorLineBreak = chunk.lastIndexOf(NEWLINE);
+      if (priorLineBreak >= 0) {
+        chunks.push(chunk.subarray(priorLineBreak + 1));
+        break;
+      }
+      chunks.push(chunk);
     }
-    return undefined;
+    return Buffer.concat(chunks.reverse()).toString("utf8") || undefined;
   } finally {
     fs.closeSync(fd);
   }
@@ -601,5 +615,6 @@ export function readAuditLog(filter: AuditFilter = {}): AuditReadResult {
   }
 }
 
-/** Exposed for tests that build rows the way older versions wrote them. */
-export const __auditTest = { hashRow };
+/** Exposed for tests that build rows the way older versions wrote them, and
+ *  for the tail reader's edge cases. */
+export const __auditTest = { hashRow, readLastLine };

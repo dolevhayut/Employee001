@@ -155,3 +155,39 @@ describe("audit redaction", () => {
     expect(verifyAuditChain()).toMatchObject({ ok: false, reason: "redacted row without a purge record" });
   });
 });
+
+describe("audit tail reader", () => {
+  async function lastLineOf(content: string | Buffer) {
+    const { __auditTest } = await auditModule();
+    const file = path.join(process.cwd(), "tail.jsonl");
+    fs.writeFileSync(file, content);
+    return __auditTest.readLastLine(file);
+  }
+
+  it("returns the final line of a normal file, ignoring trailing newlines", async () => {
+    expect(await lastLineOf("one\ntwo\nthree\n")).toBe("three");
+    expect(await lastLineOf("one\ntwo\n\n\n")).toBe("two");
+    expect(await lastLineOf("only")).toBe("only");
+  });
+
+  it("returns nothing for an empty file or one made of newlines", async () => {
+    expect(await lastLineOf("")).toBeUndefined();
+    expect(await lastLineOf("\n".repeat(20_000))).toBeUndefined();
+  });
+
+  it("reads a final line many chunks long, behind trailing newlines that span a chunk", async () => {
+    const long = "a".repeat(100_000);
+    expect(await lastLineOf(`first\n${long}${"\n".repeat(9000)}`)).toBe(long);
+    expect(await lastLineOf(long)).toBe(long);
+  });
+
+  it("keeps a multibyte character that straddles a chunk boundary whole", async () => {
+    // The reader takes 8192-byte chunks from the end. "é" is two bytes; put
+    // them either side of that boundary.
+    const line = `start é${"x".repeat(8190)}`;
+    const content = Buffer.from(`head\n${line}\n`, "utf8");
+    const boundary = content.length - 8192;
+    expect(content.subarray(boundary - 1, boundary + 1).toString("utf8")).toBe("é");
+    expect(await lastLineOf(content)).toBe(line);
+  });
+});
