@@ -56,5 +56,7 @@ found": the stream and data checks ran, the tool-result check did not.
 | 2026-11-01 (5f86498, `--require-model`) | `--sandbox` | Passed: WebFetch failed as required, Write and 5/5 folder reads `hard_blocked`, folder Grep filtered, no leak, audit chain intact (39 rows) |
 | 2026-11-02 (fe08869, `--require-model`) | sandbox off | Passed: Write and 5/5 folder reads `hard_blocked`, folder Grep filtered, no leak, audit chain intact (26 rows). WebFetch recorded as failed/unclear (allowed by design without the sandbox) |
 | 2026-11-02 (fe08869, `--require-model`) | `--sandbox` | Passed: WebFetch failed as required, Write and 5/5 folder reads `hard_blocked`, folder Grep filtered, no leak, audit chain intact (41 rows) |
+| 2026-11-03 (284e6d3, `--require-model`) | sandbox off | Passed: browser smoke 9 pages clean, Write and 5/5 folder reads `hard_blocked`, folder Grep filtered, no leak, audit chain intact (26 rows). WebFetch recorded as failed/unclear (allowed by design without the sandbox) |
+| 2026-11-03 (284e6d3, `--require-model`) | `--sandbox` | Passed: browser smoke 9 pages clean, WebFetch failed as required, Write and 5/5 folder reads `hard_blocked`, folder Grep filtered, no leak, audit chain intact (47 rows) |
 
 Add a line here after each release run.
