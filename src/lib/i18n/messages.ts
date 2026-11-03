@@ -386,6 +386,7 @@ const coreEn = {
   "twins.invite.needKeys": "Configure your model provider and COMPOSIO_API_KEY first",
   "twins.invite.creating": "Creating…",
   "twins.invite.create": "Create invite link",
+  "twins.invite.createFailed": "Couldn't create the invite. Check the server log and try again.",
   "twins.invite.pending": "Pending invites",
   "twins.invite.clearExpired": "Clear expired",
   "twins.invite.clearUnused": "Clear unused",

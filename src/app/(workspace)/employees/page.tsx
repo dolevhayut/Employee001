@@ -899,6 +899,7 @@ function InvitePanel({
   const [role, setRole] = useState("");
   const [lookbackDays, setLookbackDays] = useState(90);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   // Block invite creation until both API keys are present. Fetched once
   // on mount; the user has to restart the server after editing .env, so
@@ -928,6 +929,7 @@ function InvitePanel({
 
   async function createInvite() {
     setCreating(true);
+    setCreateError(null);
     try {
       const res = await fetch("/api/invites", {
         method: "POST",
@@ -938,15 +940,20 @@ function InvitePanel({
           lookbackDays,
         }),
       });
-      if (!res.ok) throw new Error("create_failed");
+      if (!res.ok) {
+        // The server explains every refusal (subscription mode is one person
+        // only, a missing key, a bad lookback); show it instead of a button
+        // that silently does nothing.
+        const data = (await res.json().catch(() => ({}))) as { message?: unknown };
+        setCreateError(typeof data.message === "string" && data.message ? data.message : t("twins.invite.createFailed"));
+        return;
+      }
       setName("");
       setRole("");
       setLookbackDays(90);
       onInvitesChanged();
     } catch {
-      // No-op: a follow-up call to onInvitesChanged() refreshes from the
-      // server. Surfacing a toast here would need a toast system this page
-      // doesn't have today.
+      setCreateError(t("twins.invite.createFailed"));
     } finally {
       setCreating(false);
     }
@@ -1394,6 +1401,22 @@ function InvitePanel({
             </>
           )}
         </button>
+        {createError && (
+          <div
+            role="alert"
+            style={{
+              marginTop: "var(--sp-12)",
+              padding: "var(--sp-12) var(--sp-14)",
+              border: "1px solid color-mix(in oklch, var(--danger) 40%, transparent)",
+              borderRadius: "var(--radius)",
+              fontSize: "var(--fs-sm)",
+              color: "var(--text)",
+              background: "color-mix(in oklch, var(--danger) 10%, transparent)",
+            }}
+          >
+            {createError}
+          </div>
+        )}
       </div>
 
       {/* ── Pending invites ───────────────────────────────────── */}
