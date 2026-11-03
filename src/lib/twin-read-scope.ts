@@ -49,6 +49,7 @@ export const TWIN_DENIED_DATA_PATHS: readonly string[] = [
   "telegram-approval-secret",
   ".audit-pseudonym-key",
   ".env",
+  ".claude/",
 ];
 
 /** Is this data-relative path one of TWIN_DENIED_DATA_PATHS or inside one? */

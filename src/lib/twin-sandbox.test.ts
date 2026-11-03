@@ -45,11 +45,22 @@ describe("twin sandbox policy", () => {
       "/workspace/employee001/data/settings.json",
       "/workspace/employee001/data/*-secret*",
       "/workspace/employee001/data/scratch/**",
+      "/workspace/employee001/data/.env*",
     ]));
     expect(policy.filesystem.denyWrite).toEqual(expect.arrayContaining([
       "/Users/ceo/.claude/settings.json",
       "/Users/ceo/.claude/hooks",
       "/Users/ceo/.claude.json",
+    ]));
+  });
+
+  it("follows CLAUDE_CONFIG_DIR when the image moves Claude Code onto the data volume", () => {
+    const policy = buildTwinSandboxPolicy({ ...env, CLAUDE_CONFIG_DIR: "/workspace/employee001/data/.claude" }, [], "chat:maya");
+    expect(policy.filesystem.allowWrite).toContain("/workspace/employee001/data/.claude");
+    expect(policy.filesystem.allowWrite).not.toContain("/Users/ceo/.claude");
+    expect(policy.filesystem.denyWrite).toEqual(expect.arrayContaining([
+      "/workspace/employee001/data/.claude/settings.json",
+      "/workspace/employee001/data/.claude/hooks",
     ]));
   });
 

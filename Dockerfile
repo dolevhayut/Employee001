@@ -37,13 +37,15 @@ COPY --from=deps /app/node_modules/@anthropic-ai/ ./node_modules/@anthropic-ai/
 # server.js reads HOSTNAME/PORT; the app's proxy.ts middleware reads EMPLOYEE001_BIND
 # to enforce the token gate on a non-loopback bind. EMPLOYEE001_TOKEN comes from
 # `fly secrets` at runtime — never bake it into the image.
-# Keys an admin saves in Settings go to the data volume, so a rebuild or an
-# image update keeps them (src/lib/saved-keys.ts loads them at startup).
+# State that has to outlive an image update lives on the data volume: keys an
+# admin saves in Settings (src/lib/saved-keys.ts loads them at startup) and
+# Claude Code's sessions, which twin chats resume.
 ENV NODE_ENV=production \
     PORT=8080 \
     HOSTNAME=0.0.0.0 \
     EMPLOYEE001_BIND=0.0.0.0 \
-    EMPLOYEE001_ENV_FILE=/app/data/.env
+    EMPLOYEE001_ENV_FILE=/app/data/.env \
+    CLAUDE_CONFIG_DIR=/app/data/.claude
 
 EXPOSE 8080
 VOLUME ["/app/data"]

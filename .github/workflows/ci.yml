@@ -37,3 +37,19 @@ jobs:
           test -f .next/standalone/server.js
           test -d .next/standalone/.next/static
           test -d .next/standalone/public
+
+  docker:
+    name: Docker smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Build the image, run it on a volume, save a key in Settings, replace
+      # the container, and check the key, the owner and the session survive.
+      - name: Docker smoke
+        run: node scripts/docker-smoke.mjs

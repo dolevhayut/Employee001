@@ -43,6 +43,9 @@ export function buildTwinSandboxPolicy(env: Env = process.env, customMcp: Pick<C
   if (!employeeId) throw new Error(`Invalid twin sandbox scope: ${scope}`);
   const home = env.HOME || process.env.HOME || ".";
   const appHome = path.resolve(env.EMPLOYEE001_HOME || process.cwd());
+  // Claude Code keeps its sessions and settings here (the Docker image moves
+  // it onto the data volume so chats can be resumed after an update).
+  const claudeDir = env.CLAUDE_CONFIG_DIR ? path.resolve(env.CLAUDE_CONFIG_DIR) : path.join(home, ".claude");
   const allowedDomains = new Set<string>(["backend.composio.dev", "*.composio.dev"]);
   const provider = currentProvider(env);
   if (provider === "anthropic" || provider === "claude-code") ["api.anthropic.com", "*.anthropic.com", "claude.ai", "*.claude.ai", "claude.com", "*.claude.com"].forEach((host) => allowedDomains.add(host));
@@ -65,7 +68,7 @@ export function buildTwinSandboxPolicy(env: Env = process.env, customMcp: Pick<C
     filesystem: {
       allowRead: [path.join(appHome, "data", "scratch", employeeId)],
       denyRead: [
-        path.join(home, ".ssh"), path.join(appHome, ".env*"), path.join(appHome, "data", "auth", "**"), path.join(appHome, "data", "invites.json"),
+        path.join(home, ".ssh"), path.join(appHome, ".env*"), path.join(appHome, "data", ".env*"), path.join(appHome, "data", "auth", "**"), path.join(appHome, "data", "invites.json"),
         path.join(appHome, "data", "org", "custom-mcp.json"), path.join(appHome, "data", "telegram-approval-secret"), path.join(appHome, "data", "relay", "**"),
         path.join(appHome, "data", "handovers", "**"), path.join(appHome, "data", "audit*.jsonl"), path.join(appHome, "data", "settings.json"),
         path.join(appHome, "data", "*-secret*"), path.join(appHome, "data", "employees", "*", ".composio.json"), path.join(appHome, "data", "employees", "*", "chat-history.jsonl"),
@@ -73,12 +76,12 @@ export function buildTwinSandboxPolicy(env: Env = process.env, customMcp: Pick<C
       ],
       allowWrite: [
         path.join(appHome, "data", "scratch", employeeId), ...(scope.startsWith("builder:") ? [path.join(appHome, "data", "employees", employeeId)] : []),
-        path.join(home, ".claude"), path.join(home, ".claude.json"), path.join(home, ".claude.json.lock"), env.TMPDIR || process.env.TMPDIR || "/tmp", "/tmp",
+        claudeDir, path.join(home, ".claude.json"), path.join(home, ".claude.json.lock"), env.TMPDIR || process.env.TMPDIR || "/tmp", "/tmp",
       ],
       denyWrite: [
-        path.join(home, ".claude", "settings.json"), path.join(home, ".claude", "settings.local.json"), path.join(home, ".claude", "CLAUDE.md"),
-        path.join(home, ".claude", "skills"), path.join(home, ".claude", "plugins"), path.join(home, ".claude", "hooks"), path.join(home, ".claude", "agents"),
-        path.join(home, ".claude", "commands"), path.join(home, ".claude", "output-styles"), path.join(home, ".claude.json"),
+        path.join(claudeDir, "settings.json"), path.join(claudeDir, "settings.local.json"), path.join(claudeDir, "CLAUDE.md"),
+        path.join(claudeDir, "skills"), path.join(claudeDir, "plugins"), path.join(claudeDir, "hooks"), path.join(claudeDir, "agents"),
+        path.join(claudeDir, "commands"), path.join(claudeDir, "output-styles"), path.join(home, ".claude.json"),
       ],
     },
   };

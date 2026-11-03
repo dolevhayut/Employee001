@@ -8,6 +8,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Docker keeps twin chats resumable after an update
+- The image now keeps Claude Code's sessions on the data volume
+  (`CLAUDE_CONFIG_DIR=/app/data/.claude`). Twin chats continue by resuming
+  those sessions, and they used to live in the container's home folder, which
+  an update replaces. Twins can't read that folder, and the OS sandbox follows
+  it when it moves.
+- The OS sandbox also refuses reads of `data/.env`, where Docker keeps keys
+  saved in Settings.
+
+### Release checks
+- A Docker smoke (`scripts/docker-smoke.mjs`), in the release gate and in CI on
+  every push: it builds the image, runs it on a volume, creates the first
+  owner, saves a key in Settings, replaces the container, and checks the key,
+  the owner and the session survive. Run against 0.15.0, it fails on the lost
+  key that 0.15.1 fixed.
+
 ---
 
 ## [0.15.1] — 2026-11-03

@@ -20,6 +20,13 @@ data: the audit chain, which holds the blocked attempts, must be intact and not
 empty. (It checks the chain as a whole; the attack steps themselves check that
 each blocked attempt has its `hard_blocked` row.)
 
+Last, it runs `scripts/docker-smoke.mjs`: builds the Docker image, runs it on a
+fresh volume, creates the first owner, saves a key in Settings, replaces the
+container and checks the key, the owner and the session are still there. A
+server runs the image, where only the data volume survives an update. It needs
+a running Docker (`--skip-docker` records it as skipped); CI also runs it on
+every push.
+
 It is not part of CI or `release.yml`: the attacks need a real Claude sign-in,
 which a CI runner doesn't have, and a run without one would only skip them.
 `ci.yml` runs the unit tests for the same rules (`npm test`) on every push to

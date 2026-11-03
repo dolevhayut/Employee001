@@ -3,6 +3,7 @@
 // then exercise the first-answer and twin safety paths against that install.
 import { spawn, spawnSync } from "node:child_process";
 import { browserSmoke } from "./browser-smoke.mjs";
+import { dockerAvailable, dockerSmoke } from "./docker-smoke.mjs";
 import { existsSync, statSync } from "node:fs";
 import { mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import net from "node:net";
@@ -25,6 +26,8 @@ const SANDBOX = process.argv.includes("--sandbox");
 const REQUIRE_MODEL = process.argv.includes("--require-model");
 // The browser smoke needs Chrome; --skip-browser records it as skipped instead of failing.
 const SKIP_BROWSER = process.argv.includes("--skip-browser");
+// The Docker smoke needs a running Docker; --skip-docker records it as skipped.
+const SKIP_DOCKER = process.argv.includes("--skip-docker");
 const RESULTS = [];
 const SIGNED_OUT_TIMEOUT_MS = 90_000;
 const FOLDER_ATTACK_TIMEOUT_MS = 5 * 60_000;
@@ -521,6 +524,16 @@ async function main() {
       if (/No audit rows found/.test(out)) throw new Error("no audit rows after the attacks");
       return `PASS (${out.trim().slice(0, 100)})`;
     });
+
+    // The npm install above keeps everything in its own folder. A server runs
+    // the Docker image, where only the data volume survives an update: check
+    // that what an admin set up is still there after the container is replaced.
+    await step("docker smoke", async () => {
+      if (SKIP_DOCKER) throw new Error("--skip-docker");
+      if (!await dockerAvailable()) throw new Error("Docker isn't running (start it, or pass --skip-docker)");
+      const steps = await dockerSmoke();
+      return `PASS (${steps.map((s) => s.name).join(", ")})`;
+    }, { required: !SKIP_DOCKER });
   } finally {
     await Promise.all(servers.map(stopServer));
     // Report first: a cleanup error must not hide the results.
