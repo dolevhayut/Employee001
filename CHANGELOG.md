@@ -15,6 +15,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The invite form shows why an invite couldn't be created instead of a button
   that does nothing.
 
+### Release checks
+- The release gate now loads the main pages in headless Chrome and fails on a
+  client-side crash, the kind that broke /profile in 0.11.0 to 0.13.0.
+
 ---
 
 ## [0.14.0] — 2026-11-02
