@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const composio = new Composio({ apiKey });
+    const composio = new Composio({ apiKey, allowTracking: false, disableVersionCheck: true });
     await composio.toolkits.get({ limit: 1 });
     return NextResponse.json({ ok: true, message: "Composio API key is valid" });
   } catch (err) {

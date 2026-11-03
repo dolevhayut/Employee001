@@ -8,6 +8,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Privacy
+- The Composio SDK no longer sends its usage and error telemetry (function
+  calls, and error messages with their stack trace) to telemetry.composio.dev,
+  and no longer checks npm for a newer version. It was on by default.
+
 ### Docker keeps twin chats resumable after an update
 - The image now keeps Claude Code's sessions on the data volume
   (`CLAUDE_CONFIG_DIR=/app/data/.claude`). Twin chats continue by resuming

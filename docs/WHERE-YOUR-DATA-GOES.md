@@ -23,6 +23,7 @@
 ## 3. Sent to tools you connect
 
 - Composio receives OAuth tokens and every tool call's inputs and outputs when `COMPOSIO_API_KEY` is set and a tool is connected. Source: `SECURITY.md:26`.
+- The Composio SDK's own usage and error telemetry (to telemetry.composio.dev) and its npm version check are turned off. Source: `src/lib/composio-client.ts`, `src/app/api/system/composio-check/route.ts`.
 - A custom MCP server receives its tool calls, including read query content, once enabled in Settings. Source: `SECURITY.md:32`.
 - OpenAI receives memory-card text for embeddings only when `OPENAI_API_KEY` is set, `TWIN_MEMORY_ENABLED` is not `false` and `EMBEDDINGS_BASE_URL` is not set; off in EU mode. Source: `SECURITY.md:27`.
 - ElevenLabs receives the twin's answer text and microphone audio when `ELEVENLABS_API_KEY` is set and voice is used. Source: `SECURITY.md:28`.

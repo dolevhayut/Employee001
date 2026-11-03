@@ -122,6 +122,10 @@ export function getComposio(): Composio<ClaudeAgentSDKProvider> {
   _composio = new Composio({
     apiKey: process.env.COMPOSIO_API_KEY,
     provider: new ClaudeAgentSDKProvider(),
+    // The SDK otherwise reports every call, and errors with their message and
+    // stack, to telemetry.composio.dev, and checks npm for a newer version.
+    allowTracking: false,
+    disableVersionCheck: true,
   });
   return _composio;
 }
