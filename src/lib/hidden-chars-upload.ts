@@ -79,8 +79,12 @@ function hasBinaryControl(text: string): boolean {
  * they are cleaned as UTF-8, as before (a few NUL bytes in a UTF-8 file must
  * not switch its cleaning to another encoding).
  */
-function bomlessUtf16(data: Buffer): "utf-16le" | "utf-16be" | null {
-  if (data.length < 4 || data.length % 2 !== 0) return null;
+function bomlessUtf16(whole: Buffer): "utf-16le" | "utf-16be" | null {
+  // An odd trailing byte doesn't make it something else: decode() keeps it
+  // as a tail, so judge the even-length body (one appended byte must not
+  // switch the detection off).
+  const data = whole.length % 2 ? whole.subarray(0, whole.length - 1) : whole;
+  if (data.length < 4) return null;
   let even = 0;
   let odd = 0;
   for (let i = 0; i < data.length; i += 2) {
@@ -104,7 +108,7 @@ function bomlessUtf16(data: Buffer): "utf-16le" | "utf-16be" | null {
   } catch {
     return null;
   }
-  return stripHiddenChars(data.toString("utf-8")).total === 0 ? encoding : null;
+  return stripHiddenChars(whole.toString("utf-8")).total === 0 ? encoding : null;
 }
 
 /** How an upload will be read: as text in some encoding, or as binary. */

@@ -225,6 +225,13 @@ describe("built-in tool output (WebFetch, WebSearch, Read, Grep)", () => {
     expect(auditRows()[0].input).toMatchObject({ source: "file-tool", tool: "Grep", path: "/Users/ava/projects/site" });
   });
 
+  it("cleans Glob file names", async () => {
+    const hook = buildCleanBuiltinToolOutputHook("ava");
+    const glob = { filenames: [`/Users/ava/projects/site/notes${SMUGGLED}.md`, "/Users/ava/projects/site/plan.md"], durationMs: 3, numFiles: 2, truncated: false };
+    expect(await post(hook, "Glob", { pattern: "**/*.md" }, glob)).toEqual(rewrite({ ...glob, filenames: ["/Users/ava/projects/site/notes.md", "/Users/ava/projects/site/plan.md"] }));
+    expect(auditRows()[0].input).toMatchObject({ source: "file-tool", tool: "Glob", pattern: "**/*.md" });
+  });
+
   it("leaves MCP tools to the MCP hook and other tools alone", async () => {
     const hook = buildCleanBuiltinToolOutputHook("ava");
     expect(await post(hook, "mcp__supabase__query", {}, [{ type: "text", text: `rows${SMUGGLED}` }])).toEqual({});

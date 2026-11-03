@@ -188,6 +188,16 @@ describe("knowledge files", () => {
     expect(auditInputs()[0].input).toMatchObject({ source: "knowledge-upload", file: "nobom-le.txt", removed: { tag: [...SMUGGLED].length } });
   });
 
+  it("still detects BOM-less UTF-16 with one byte appended", () => {
+    const odd = Buffer.concat([Buffer.from(`notes for Q3\n${SMUGGLED}end`, "utf16le"), Buffer.from([0x0a])]);
+    for (const name of ["odd.txt", "odd.dat"]) {
+      expect(detectUploadEncoding(name, odd)).toBe("utf-16le");
+      const { bytes } = upload(name, odd);
+      expect(ANY_HIDDEN.test(new TextDecoder("utf-16le").decode(bytes.subarray(0, bytes.length - (bytes.length % 2))))).toBe(false);
+      expect(ANY_HIDDEN.test(bytes.toString("utf-8"))).toBe(false);
+    }
+  });
+
   it("stores a clean BOM-less UTF-16 file byte for byte, and doesn't take binary with zero bytes for UTF-16", () => {
     const clean = Buffer.from("Clean notes\nשלום \u200Fעולם\n", "utf16le");
     expect(detectUploadEncoding("clean.txt", clean)).toBe("utf-16le");

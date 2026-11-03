@@ -8,8 +8,8 @@
 //   - Org custom MCP servers are remote: the SDK talks to them directly. A
 //     PostToolUse hook rewrites their output instead (the SDK's
 //     updatedMCPToolOutput), only when something was actually removed.
-//   - Claude Code's own WebFetch, WebSearch, Read and Grep return web pages
-//     and file text (a configured knowledge folder holds the user's own
+//   - Claude Code's own WebFetch, WebSearch, Read, Grep and Glob return web
+//     pages, file text and file names (a configured knowledge folder holds the user's own
 //     files, never cleaned on the way in). A second PostToolUse hook rewrites
 //     their output with updatedToolOutput, the SDK field that works for
 //     built-in tools. The runtime checks a rewrite against the tool's output
@@ -86,6 +86,8 @@ const CLEANED_BUILTIN_TOOLS = new Map<string, { source: HiddenCharSource; refKey
   ["WebSearch", { source: "web-tool", refKey: "query", inputKey: "query" }],
   ["Read", { source: "file-tool", refKey: "file", inputKey: "file_path" }],
   ["Grep", { source: "file-tool", refKey: "path", inputKey: "path" }],
+  // File names are outside text too: a name can carry hidden characters.
+  ["Glob", { source: "file-tool", refKey: "pattern", inputKey: "pattern" }],
 ]);
 
 /**
