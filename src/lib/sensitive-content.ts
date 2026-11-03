@@ -121,7 +121,15 @@ function filterFrontmatterLines(inner: string, removed: FilterResult["removed"])
         removed.push({ category: c, line: it });
         return REDACTED_VALUE;
       });
-      out.push(`${key}${space || " "}[${items.join(", ")}]${cr}`);
+      const kept = `${key}${space || " "}[${items.join(", ")}]`;
+      // Some patterns only match the line as a whole (a verb and a time in
+      // different items): then no item is to blame, so the whole list goes.
+      if (profilingCategoryOf(kept)) {
+        removed.push({ category, line: bare.trim() });
+        out.push(`${key} [${REDACTED_VALUE}]${cr}`);
+      } else {
+        out.push(`${kept}${cr}`);
+      }
       continue;
     }
     removed.push({ category, line: bare.trim() });

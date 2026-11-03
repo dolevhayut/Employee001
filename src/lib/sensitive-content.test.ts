@@ -146,6 +146,16 @@ describe("profiling filter keeps profile frontmatter intact", () => {
     expect(removed).toHaveLength(2);
   });
 
+  it("redacts the whole inline list when only the line as a whole profiles the person", () => {
+    // Neither item matches alone; the key plus the time together do.
+    for (const line of ["active: [after 11pm]", "notes: [replies, after 11pm]"]) {
+      const { text, removed } = filterProfilingContent(`---\nfile: TONE.md\n${line}\n---\nbody`, "TONE.md");
+      expect(text).not.toContain("11pm");
+      expect(text).toContain(`${line.split(":")[0]}: ["[redacted]"]`);
+      expect(removed).toHaveLength(1);
+    }
+  });
+
   it("drops a frontmatter key that itself profiles the person", () => {
     const { text } = filterProfilingContent("---\nfile: CONTEXT.md\ndiagnosis: anxiety\n---\nbody", "CONTEXT.md");
     expect(text).toBe("---\nfile: CONTEXT.md\n---\nbody");

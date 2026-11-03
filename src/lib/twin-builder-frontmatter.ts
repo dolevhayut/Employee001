@@ -62,6 +62,9 @@ function formatList(items: string[]): string {
 function mergeSources(claimed: string[], knowledgeSources: string[]): string[] {
   const out: string[] = [];
   for (const s of [...claimed.filter((c) => !c.startsWith(KNOWLEDGE_PREFIX)), ...knowledgeSources]) {
+    // "[redacted]" is what the profiling filter left of a sensitive name; it
+    // isn't a source, so a later rewrite doesn't carry it forward.
+    if (s === "[redacted]") continue;
     if (!out.includes(s)) out.push(s);
   }
   return out;

@@ -33,6 +33,12 @@ describe("stampProfileFrontmatter", () => {
     expect(out).toContain('confidenceNote: "high — sent mail"');
   });
 
+  it("doesn't carry a redacted source forward", () => {
+    const out = stampProfileFrontmatter('---\nsources: [gmail, "[redacted]"]\n---\nbody', stamp);
+    expect(out).toContain("sources: [gmail, knowledge/about-my-work.md, knowledge/playbook.pdf]");
+    expect(out).not.toContain("redacted");
+  });
+
   it("drops a knowledge/ source the builder never read", () => {
     const out = stampProfileFrontmatter(
       "---\ngeneratedAt: x\nsources: [`knowledge/invented.md`, knowledge/playbook.pdf, github]\n---\nbody",
