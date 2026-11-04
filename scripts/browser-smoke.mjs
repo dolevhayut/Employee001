@@ -25,7 +25,7 @@ export function chromePath(env = process.env) {
 
 /** Problems found on one page: it didn't load, uncaught exceptions, then
  *  crash text in the body. */
-export function pageProblems({ exceptions, bodyText, href }) {
+export function pageProblems({ exceptions, bodyText, href = "" }) {
   // Chrome shows its own error page (chrome-error://) when nothing answers:
   // no app code runs there, so no exception and no crash text either.
   if (href && !/^https?:/.test(href)) return [`the page didn't load (${href.split("/")[0]})`];
