@@ -14,7 +14,7 @@ import { packageMarkdown } from "./relay/package-store";
 import { reviewedHandoverMarkdown } from "./relay/retired-twin";
 import type { CapturedItem, RoleContextPackage, ToolingRef } from "./relay/rcp.types";
 
-const fixtureRoot = path.resolve(process.cwd(), "bin", "demo");
+const fixtureRoot = path.resolve(import.meta.dirname, "..", "..", "bin", "demo");
 const baseFiles = [
   "EXPERTISE.md", "DECISIONS.md", "CONTEXT.md", "PEOPLE.md", "PROJECTS.md",
   "PREFERENCES.md", "TONE.md", "BOUNDARIES.md", "EMPLOYMENT.md",

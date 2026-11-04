@@ -18,7 +18,7 @@ import { POST as chat } from "@/app/api/twin/chat/route";
 import { GET as demoStatus } from "@/app/api/demo/route";
 import { GET as demoAudio } from "@/app/api/demo/audio/[id]/route";
 
-const demoDir = path.resolve(process.cwd(), "bin", "demo");
+const demoDir = path.resolve(import.meta.dirname, "..", "..", "bin", "demo");
 const askPath = path.join(demoDir, "ask.json");
 const recording = parseAskRecording(JSON.parse(fs.readFileSync(askPath, "utf8")));
 const ENV_KEYS = ["EMPLOYEE001_DEMO", "EMPLOYEE001_DEMO_LIVE", "EMPLOYEE001_DEMO_ASK", "EMPLOYEE001_DEMO_RECORDING", "EMPLOYEE001_HOME", "ANTHROPIC_API_KEY"] as const;

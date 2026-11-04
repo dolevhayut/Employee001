@@ -96,7 +96,7 @@ describe("verification_uri", () => {
   });
 
   it("points at a page that exists", () => {
-    expect(fs.existsSync(path.join(process.cwd(), "src/app/device/page.tsx"))).toBe(true);
+    expect(fs.existsSync(path.join(import.meta.dirname, "..", "..", "..", "device", "page.tsx"))).toBe(true);
   });
 });
 
